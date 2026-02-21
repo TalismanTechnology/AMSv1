@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  serverExternalPackages: ["officeparser", "pdfjs-dist", "libreoffice-convert", "resend"],
 };
 
 export default nextConfig;
