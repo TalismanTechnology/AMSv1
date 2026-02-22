@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { RefreshCw, Loader2, Server, Database, HardDrive, AlertCircle } from "lucide-react";
+import { RefreshCw, Server, Database, HardDrive, AlertCircle } from "lucide-react";
+import { LogoSpinner } from "@/components/logo-spinner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getDebugInfo } from "@/actions/dev-panel";
@@ -55,7 +56,7 @@ export function DebugTab({ schoolId }: DebugTabProps) {
   if (loading && !data) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        <LogoSpinner size={20} />
       </div>
     );
   }

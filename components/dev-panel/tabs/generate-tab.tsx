@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { Loader2, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
+import { LogoSpinner } from "@/components/logo-spinner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -277,7 +278,7 @@ export function GenerateTab({ schoolId }: GenerateTabProps) {
       >
         {generating ? (
           <>
-            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            <LogoSpinner className="mr-2" />
             {currentStep === "documents"
               ? "Generating documents with AI..."
               : `Generating ${currentStep ? STEP_LABELS[currentStep] : ""}...`}

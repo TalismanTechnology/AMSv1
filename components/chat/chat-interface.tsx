@@ -4,6 +4,7 @@ import { useRef, useEffect, useState, useMemo } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { Send } from "lucide-react";
+import { LogoSpinner } from "@/components/logo-spinner";
 import { motion } from "framer-motion";
 import { messageEntrance } from "@/lib/motion";
 import { Button } from "@/components/ui/button";
@@ -333,7 +334,13 @@ export function ChatInterface({
                   );
                 })
               )}
-              {isLoading && (!messages[messages.length - 1] || messages[messages.length - 1].role === "user" || !getMessageText(messages[messages.length - 1])) && (
+              {creatingSession && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <LogoSpinner size={20} />
+                  Starting chat session...
+                </div>
+              )}
+              {isLoading && !creatingSession && (!messages[messages.length - 1] || messages[messages.length - 1].role === "user" || !getMessageText(messages[messages.length - 1])) && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <TypingIndicator />
                   Searching documents...

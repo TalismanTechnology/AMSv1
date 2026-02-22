@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import {
-  Loader2,
   RefreshCcw,
   Download,
   Shield,
@@ -10,6 +9,7 @@ import {
   UserCog,
   Eye,
 } from "lucide-react";
+import { LogoSpinner } from "@/components/logo-spinner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -69,7 +69,7 @@ function ReprocessSection({ schoolId }: { schoolId: string }) {
         <AlertDialogTrigger asChild>
           <Button variant="outline" size="sm" disabled={loading} className="w-full">
             {loading ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin mr-2" />
+              <LogoSpinner size={14} className="mr-2" />
             ) : (
               <RefreshCcw className="h-3.5 w-3.5 mr-2" />
             )}
@@ -157,7 +157,7 @@ function UserManagementSection({ schoolId }: { schoolId: string }) {
 
       {loading && users.length === 0 ? (
         <div className="flex justify-center py-4">
-          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          <LogoSpinner />
         </div>
       ) : users.length === 0 ? (
         <p className="text-xs text-muted-foreground">No users found.</p>
@@ -191,7 +191,7 @@ function UserManagementSection({ schoolId }: { schoolId: string }) {
                     title={u.approved ? "Revoke approval" : "Approve"}
                   >
                     {isLoading ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
+                      <LogoSpinner size={12} />
                     ) : u.approved ? (
                       <ShieldCheck className="h-3 w-3 text-green-500" />
                     ) : (
@@ -267,7 +267,7 @@ function TableViewerSection({ schoolId }: { schoolId: string }) {
 
       {loading && (
         <div className="flex justify-center py-4">
-          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          <LogoSpinner />
         </div>
       )}
 
@@ -316,7 +316,7 @@ function ExportSection({ schoolId }: { schoolId: string }) {
       </p>
       <Button variant="outline" size="sm" onClick={handleExport} disabled={loading} className="w-full">
         {loading ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin mr-2" />
+          <LogoSpinner size={14} className="mr-2" />
         ) : (
           <Download className="h-3.5 w-3.5 mr-2" />
         )}

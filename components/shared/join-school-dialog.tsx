@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, CheckCircle2, Clock } from "lucide-react";
+import { CheckCircle2, Clock } from "lucide-react";
+import { LogoSpinner } from "@/components/logo-spinner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -141,7 +142,7 @@ export function JoinSchoolDialog({ open, onOpenChange }: JoinSchoolDialogProps) 
                 Cancel
               </Button>
               <Button type="submit" disabled={loading || !code.trim()}>
-                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {loading && <LogoSpinner className="mr-2" />}
                 Join School
               </Button>
             </div>

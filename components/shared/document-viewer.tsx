@@ -7,10 +7,10 @@ import {
   FileSpreadsheet,
   Image as ImageIcon,
   Download,
-  Loader2,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
+import { LogoSpinner } from "@/components/logo-spinner";
 import {
   Dialog,
   DialogContent,
@@ -189,7 +189,7 @@ export function DocumentViewer({
         <div className="flex-1 min-h-0 relative">
           {loading ? (
             <div className="flex items-center justify-center h-full">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <LogoSpinner size={32} />
             </div>
           ) : showAsPdf ? (
             <iframe

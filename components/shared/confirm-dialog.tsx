@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { LogoSpinner } from "@/components/logo-spinner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -58,7 +58,7 @@ export function ConfirmDialog({
                 "bg-destructive text-destructive-foreground hover:bg-destructive/90"
             )}
           >
-            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {loading && <LogoSpinner className="mr-2" />}
             {confirmLabel}
           </AlertDialogAction>
         </AlertDialogFooter>

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Plus, X, Copy, Check } from "lucide-react";
+import { Plus, X, Copy, Check } from "lucide-react";
+import { LogoSpinner } from "@/components/logo-spinner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -109,7 +110,7 @@ export function SettingsClient({ settings, schoolId, schoolSlug, joinCode: initi
           </p>
         </div>
         <Button onClick={handleSave} disabled={saving}>
-          {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          {saving && <LogoSpinner className="mr-2" />}
           Save all settings
         </Button>
       </div>

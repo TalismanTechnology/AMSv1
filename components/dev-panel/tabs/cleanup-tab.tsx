@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, Trash2, AlertTriangle } from "lucide-react";
+import { Trash2, AlertTriangle } from "lucide-react";
+import { LogoSpinner } from "@/components/logo-spinner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -106,7 +107,7 @@ export function CleanupTab({ schoolId }: CleanupTabProps) {
               className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
             >
               {isClearing ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
+                <LogoSpinner size={12} />
               ) : (
                 "Clear"
               )}
@@ -184,7 +185,7 @@ export function CleanupTab({ schoolId }: CleanupTabProps) {
               className="w-full"
             >
               {clearing === "all" ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin mr-2" />
+                <LogoSpinner size={14} className="mr-2" />
               ) : (
                 <Trash2 className="h-3.5 w-3.5 mr-2" />
               )}
@@ -219,7 +220,7 @@ export function CleanupTab({ schoolId }: CleanupTabProps) {
               className="w-full text-destructive border-destructive/30 hover:bg-destructive/10"
             >
               {clearing === "chunks" ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin mr-2" />
+                <LogoSpinner size={14} className="mr-2" />
               ) : null}
               Purge Document Chunks Only
             </Button>

@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import { LogoSpinner } from "@/components/logo-spinner";
 import { Logo } from "@/components/logo";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -194,7 +195,7 @@ export function RegisterForm({ schoolSlug, schoolId, schoolName, requireJoinCode
                 />
               </div>
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {loading && <LogoSpinner className="mr-2" />}
                 Create account
               </Button>
             </form>

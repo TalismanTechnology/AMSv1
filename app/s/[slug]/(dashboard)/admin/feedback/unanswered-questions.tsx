@@ -15,11 +15,11 @@ import {
   Trash2,
   MessageSquarePlus,
   Send,
-  Loader2,
   Search,
   Flame,
   TrendingUp,
 } from "lucide-react";
+import { LogoSpinner } from "@/components/logo-spinner";
 import { formatDistanceToNow } from "date-fns";
 import {
   dismissUnansweredQuestion,
@@ -270,7 +270,7 @@ export function UnansweredQuestionsSection({
                           disabled={isPending || !answerText.trim()}
                         >
                           {isPending ? (
-                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            <LogoSpinner size={12} className="mr-1" />
                           ) : (
                             <Send className="h-3 w-3 mr-1" />
                           )}

@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useSourcePanel } from "./source-panel-context";
-import { X, FileText, Loader2, Download, Eye } from "lucide-react";
+import { X, FileText, Download, Eye } from "lucide-react";
+import { LogoSpinner } from "@/components/logo-spinner";
 import { getDocumentSignedUrl } from "@/lib/storage-url";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -86,7 +87,7 @@ function PanelContent() {
       <ScrollArea className="flex-1 px-4 py-4">
         {isLoadingContent ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <LogoSpinner size={24} />
           </div>
         ) : (
           <div className="whitespace-pre-wrap text-sm text-foreground/90 leading-relaxed">

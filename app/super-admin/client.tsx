@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Loader2, Plus, ExternalLink, Pencil, Trash2 } from "lucide-react";
+import { Plus, ExternalLink, Pencil, Trash2 } from "lucide-react";
+import { LogoSpinner } from "@/components/logo-spinner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -158,7 +159,7 @@ export function SuperAdminClient({
                 </div>
               </div>
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {loading && <LogoSpinner className="mr-2" />}
                 Create School
               </Button>
             </form>
@@ -235,7 +236,7 @@ export function SuperAdminClient({
                           onClick={() => handleUpdateSchool(school.id)}
                         >
                           {loading && (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            <LogoSpinner className="mr-2" />
                           )}
                           Save
                         </Button>
@@ -287,7 +288,7 @@ export function SuperAdminClient({
                           disabled={loading}
                         >
                           {loading && (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            <LogoSpinner className="mr-2" />
                           )}
                           Assign Admin
                         </Button>

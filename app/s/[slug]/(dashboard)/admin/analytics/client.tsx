@@ -27,8 +27,8 @@ import {
   FileText,
   MessageCircle,
   Download,
-  Loader2,
 } from "lucide-react";
+import { LogoSpinner } from "@/components/logo-spinner";
 import { AnimatedNumber } from "@/components/motion";
 import { MagicBentoGrid, MagicBentoCard } from "@/components/magic-bento";
 import { cn } from "@/lib/utils";
@@ -125,7 +125,7 @@ export function AnalyticsClient({ data: initialData, schoolId, schoolSlug }: Ana
             disabled={exporting}
           >
             {exporting ? (
-              <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+              <LogoSpinner size={14} className="mr-1" />
             ) : (
               <Download className="mr-1 h-3.5 w-3.5" />
             )}
@@ -136,7 +136,7 @@ export function AnalyticsClient({ data: initialData, schoolId, schoolSlug }: Ana
 
       {isPending && (
         <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" />
+          <LogoSpinner />
           Loading...
         </div>
       )}

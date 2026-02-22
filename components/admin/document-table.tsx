@@ -7,10 +7,10 @@ import {
   Trash2,
   Pencil,
   MoreHorizontal,
-  Loader2,
   CheckCircle,
   Eye,
 } from "lucide-react";
+import { LogoSpinner } from "@/components/logo-spinner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -131,7 +131,7 @@ export function DocumentTable({ documents, onEdit, onView, schoolId }: DocumentT
       case "processing":
         return (
           <Badge variant="secondary" className="gap-1">
-            <Loader2 className="h-3 w-3 animate-spin" />
+            <LogoSpinner size={12} />
             Processing
           </Badge>
         );

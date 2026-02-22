@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronRight, Loader2, Check, FileText, CalendarDays, Megaphone, Tag } from "lucide-react";
+import { ChevronDown, ChevronRight, Check, FileText, CalendarDays, Megaphone, Tag } from "lucide-react";
+import { LogoSpinner } from "@/components/logo-spinner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -96,7 +97,7 @@ function QuickDocument({ schoolId }: { schoolId: string }) {
         <Input id="doc-tags" name="tags" placeholder="policies, handbook" className="h-8 text-sm mt-1" />
       </div>
       <Button type="submit" size="sm" disabled={loading} className="w-full">
-        {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : success ? <Check className="h-3.5 w-3.5" /> : "Add Document"}
+        {loading ? <LogoSpinner size={14} /> : success ? <Check className="h-3.5 w-3.5" /> : "Add Document"}
       </Button>
     </form>
   );
@@ -151,7 +152,7 @@ function QuickEvent({ schoolId }: { schoolId: string }) {
         <Input id="evt-location" name="location" placeholder="Main Auditorium" className="h-8 text-sm mt-1" />
       </div>
       <Button type="submit" size="sm" disabled={loading} className="w-full">
-        {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : success ? <Check className="h-3.5 w-3.5" /> : "Add Event"}
+        {loading ? <LogoSpinner size={14} /> : success ? <Check className="h-3.5 w-3.5" /> : "Add Event"}
       </Button>
     </form>
   );
@@ -200,7 +201,7 @@ function QuickAnnouncement({ schoolId }: { schoolId: string }) {
         </Select>
       </div>
       <Button type="submit" size="sm" disabled={loading} className="w-full">
-        {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : success ? <Check className="h-3.5 w-3.5" /> : "Add Announcement"}
+        {loading ? <LogoSpinner size={14} /> : success ? <Check className="h-3.5 w-3.5" /> : "Add Announcement"}
       </Button>
     </form>
   );
@@ -236,7 +237,7 @@ function QuickCategory({ schoolId }: { schoolId: string }) {
         <Input id="cat-color" name="color" type="color" defaultValue="#6366f1" className="h-8 w-full mt-1" />
       </div>
       <Button type="submit" size="sm" disabled={loading} className="w-full">
-        {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : success ? <Check className="h-3.5 w-3.5" /> : "Add Category"}
+        {loading ? <LogoSpinner size={14} /> : success ? <Check className="h-3.5 w-3.5" /> : "Add Category"}
       </Button>
     </form>
   );

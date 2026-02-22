@@ -6,11 +6,11 @@ import { useDropzone } from "react-dropzone";
 import {
   Upload,
   X,
-  Loader2,
   FileText,
   CheckCircle2,
   AlertCircle,
 } from "lucide-react";
+import { LogoSpinner } from "@/components/logo-spinner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -305,7 +305,7 @@ export function DocumentUpload({
                       )}
                       {item.status === "processing" && (
                         <Badge variant="secondary" className="gap-1 text-xs">
-                          <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                          <LogoSpinner size={10} />
                           Processing
                         </Badge>
                       )}

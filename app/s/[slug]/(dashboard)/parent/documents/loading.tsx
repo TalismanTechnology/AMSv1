@@ -1,5 +1,5 @@
 import { LogoLoading } from "@/components/logo-loading";
 
-export default function ChatLoading() {
+export default function DocumentsLoading() {
   return <LogoLoading />;
 }
