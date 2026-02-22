@@ -327,23 +327,15 @@ export async function answerUnansweredCluster(
   );
 
   // 4. Trigger document processing (chunk + embed)
-  const baseUrl =
-    process.env.NEXT_PUBLIC_APP_URL ||
-    (process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : "http://localhost:3000");
-  const secret = process.env.PROCESS_DOCUMENT_SECRET;
-
-  fetch(`${baseUrl}/api/process-document`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(secret ? { "x-process-secret": secret } : {}),
-    },
-    body: JSON.stringify({ documentId: doc.id }),
-  }).catch((err) => {
-    console.error("[answerUnanswered] Failed to trigger processing:", err);
-  });
+  // Call processDocument directly instead of fire-and-forget fetch.
+  // On Vercel, un-awaited fetches get dropped when the serverless function exits.
+  try {
+    const { processDocument } = await import("@/lib/documents/processor");
+    await processDocument(doc.id);
+  } catch (err) {
+    console.error("[answerUnanswered] Processing failed:", err);
+    // Document status is already set to "error" by processDocument's catch block
+  }
 
   // 5. Get cluster IDs and dismiss questions + clusters
   const { data: clusterInfo } = await supabase

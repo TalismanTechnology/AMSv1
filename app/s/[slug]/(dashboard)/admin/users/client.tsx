@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   Users,
   ArrowUp,
@@ -84,6 +85,7 @@ interface UsersClientProps {
 }
 
 export function UsersClient({ users, schoolId, schoolSlug, joinCode, requireJoinCode, requireApproval }: UsersClientProps) {
+  const router = useRouter();
   const [sortKey, setSortKey] = useState<SortKey>("created_at");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [gradeFilter, setGradeFilter] = useState<string>("all");
@@ -135,12 +137,14 @@ export function UsersClient({ users, schoolId, schoolSlug, joinCode, requireJoin
     if (result.error) toast.error(result.error);
     else toast.success(`Approved ${result.count} user${result.count !== 1 ? "s" : ""}`);
     setApprovingAll(false);
+    router.refresh();
   }
 
   async function handleApprove(userId: string) {
     const result = await approveUser(userId, schoolId);
     if (result.error) toast.error(result.error);
     else toast.success("User approved");
+    router.refresh();
   }
 
   async function handleDelete() {
@@ -151,6 +155,7 @@ export function UsersClient({ users, schoolId, schoolSlug, joinCode, requireJoin
     else toast.success("User deleted");
     setDeleting(false);
     setDeleteId(null);
+    router.refresh();
   }
 
   async function handleRoleChange() {
@@ -162,6 +167,7 @@ export function UsersClient({ users, schoolId, schoolSlug, joinCode, requireJoin
     else toast.success(`Role changed to ${newRole}`);
     setChangingRole(false);
     setRoleChangeUser(null);
+    router.refresh();
   }
 
   const filteredAndSorted = useMemo(() => {

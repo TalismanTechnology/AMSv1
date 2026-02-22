@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { logAudit } from "@/lib/audit";
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
@@ -58,9 +59,6 @@ export async function generateBulkDocuments(
 ) {
   const user = await requireAdmin(schoolId);
   const admin = createAdminClient();
-
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL
-    || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
 
   let inserted = 0;
 
@@ -121,12 +119,16 @@ Do not include any preamble or explanation — just the document content.`,
         continue;
       }
 
-      // Trigger processing (chunking + embedding) — fire and forget
-      fetch(`${baseUrl}/api/process-document`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ documentId: doc.id, schoolId }),
-      }).catch(() => {});
+      // Trigger processing (chunking + embedding) after response
+      const docId = doc.id;
+      after(async () => {
+        try {
+          const { processDocument } = await import("@/lib/documents/processor");
+          await processDocument(docId);
+        } catch (err) {
+          console.error(`[dev] Processing failed for ${docId}:`, err);
+        }
+      });
 
       inserted++;
     } catch (err) {
@@ -503,17 +505,18 @@ export async function forceReprocessDocuments(schoolId: string) {
     .update({ status: "processing" })
     .in("id", docs.map((d) => d.id));
 
-  // Fire off reprocessing
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL
-    || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
-
-  for (const doc of docs) {
-    fetch(`${baseUrl}/api/process-document`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ documentId: doc.id, schoolId }),
-    }).catch(() => {});
-  }
+  // Process documents after response is sent
+  const docIds = docs.map((d) => d.id);
+  after(async () => {
+    const { processDocument } = await import("@/lib/documents/processor");
+    for (const docId of docIds) {
+      try {
+        await processDocument(docId);
+      } catch (err) {
+        console.error(`[dev] Reprocess failed for ${docId}:`, err);
+      }
+    }
+  });
 
   logAudit(user.id, "dev_reprocess_all", "document", undefined, { count: docs.length }, schoolId);
   revalidatePath("/", "layout");

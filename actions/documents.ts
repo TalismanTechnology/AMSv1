@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { logAudit } from "@/lib/audit";
 import type { PreviewResult, ContentSearchResult } from "@/lib/types";
 
@@ -19,22 +20,15 @@ const TYPE_MAP: Record<string, string> = {
 };
 
 function triggerProcessing(documentId: string) {
-  const baseUrl =
-    process.env.NEXT_PUBLIC_APP_URL ||
-    (process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : "http://localhost:3000");
-  const secret = process.env.PROCESS_DOCUMENT_SECRET;
-
-  fetch(`${baseUrl}/api/process-document`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(secret ? { "x-process-secret": secret } : {}),
-    },
-    body: JSON.stringify({ documentId }),
-  }).catch((err) => {
-    console.error("[upload] Failed to trigger processing:", err);
+  // Use after() so processing runs after the response is sent.
+  // On Vercel, fire-and-forget fetches get dropped when the function exits.
+  after(async () => {
+    try {
+      const { processDocument } = await import("@/lib/documents/processor");
+      await processDocument(documentId);
+    } catch (err) {
+      console.error("[upload] Processing failed:", err);
+    }
   });
 }
 

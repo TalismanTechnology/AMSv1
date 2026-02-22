@@ -163,7 +163,7 @@ export function RegisterForm({ schoolSlug, schoolId, schoolName, requireJoinCode
                 </div>
               )}
               <div className="space-y-2">
-                <Label htmlFor="full_name">Full name</Label>
+                <Label htmlFor="full_name">Parent&apos;s name</Label>
                 <Input
                   id="full_name"
                   name="full_name"
