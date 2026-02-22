@@ -7,7 +7,6 @@ import {
   BODY_PATH,
   LOGO_VIEWBOX,
   LOGO_ASPECT_RATIO,
-  NEON_BLUE_HEX,
 } from "@/lib/logo-paths";
 import { cn } from "@/lib/utils";
 
@@ -68,7 +67,7 @@ export function LogoLoading({ size = 80, fullScreen }: LogoLoadingProps) {
         fullScreen ? "min-h-screen" : "min-h-[200px]"
       )}
     >
-      <div className="flex flex-col items-center gap-3">
+      <div className="flex flex-col items-center gap-3 text-foreground">
         <svg
           width={width}
           height={height}
@@ -80,12 +79,12 @@ export function LogoLoading({ size = 80, fullScreen }: LogoLoadingProps) {
           <motion.path
             d={HEAD_PATH.d}
             transform={`translate(${HEAD_PATH.translateX}, ${HEAD_PATH.translateY})`}
+            fill="currentColor"
             style={{ transformOrigin: "742px 385px" }}
             animate={{
               opacity: [0.3, 1, 1, 0.3],
               scale: [0.85, 1, 1, 0.85],
               y: [-15, 0, 0, -15],
-              fill: [NEON_BLUE_HEX, "#9ca3af", "#9ca3af", NEON_BLUE_HEX],
             }}
             transition={{
               duration: CYCLE_DURATION,
@@ -98,12 +97,12 @@ export function LogoLoading({ size = 80, fullScreen }: LogoLoadingProps) {
           <motion.path
             d={BODY_PATH.d}
             transform={`translate(${BODY_PATH.translateX}, ${BODY_PATH.translateY})`}
+            fill="currentColor"
             style={{ transformOrigin: "750px 500px" }}
             animate={{
               opacity: [0.3, 1, 1, 0.3],
               scale: [0.85, 1, 1, 0.85],
               y: [15, 0, 0, 15],
-              fill: [NEON_BLUE_HEX, "#9ca3af", "#9ca3af", NEON_BLUE_HEX],
             }}
             transition={{
               duration: CYCLE_DURATION,

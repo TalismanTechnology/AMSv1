@@ -7,7 +7,6 @@ import {
   BODY_PATH,
   LOGO_VIEWBOX,
   LOGO_ASPECT_RATIO,
-  NEON_BLUE_HEX,
 } from "@/lib/logo-paths";
 import { cn } from "@/lib/utils";
 
@@ -40,12 +39,12 @@ export function LogoSpinner({ size = 16, className }: LogoSpinnerProps) {
       >
         <path
           d={HEAD_PATH.d}
-          fill={NEON_BLUE_HEX}
+          fill="currentColor"
           transform={`translate(${HEAD_PATH.translateX}, ${HEAD_PATH.translateY})`}
         />
         <path
           d={BODY_PATH.d}
-          fill={NEON_BLUE_HEX}
+          fill="currentColor"
           transform={`translate(${BODY_PATH.translateX}, ${BODY_PATH.translateY})`}
         />
       </svg>
@@ -65,12 +64,12 @@ export function LogoSpinner({ size = 16, className }: LogoSpinnerProps) {
     >
       <path
         d={HEAD_PATH.d}
-        fill={NEON_BLUE_HEX}
+        fill="currentColor"
         transform={`translate(${HEAD_PATH.translateX}, ${HEAD_PATH.translateY})`}
       />
       <path
         d={BODY_PATH.d}
-        fill={NEON_BLUE_HEX}
+        fill="currentColor"
         transform={`translate(${BODY_PATH.translateX}, ${BODY_PATH.translateY})`}
       />
     </motion.svg>

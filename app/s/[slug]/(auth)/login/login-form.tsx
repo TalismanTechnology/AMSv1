@@ -5,7 +5,8 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { LogoSpinner } from "@/components/logo-spinner";
 import { Logo } from "@/components/logo";
-import { motion } from "framer-motion";
+import { LogoLoading } from "@/components/logo-loading";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,8 +40,22 @@ export function LoginForm({ schoolSlug, schoolId, schoolName }: LoginFormProps) 
     }
   }
 
+  const showTransition = loading && !error;
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <AnimatePresence>
+        {showTransition && (
+          <motion.div
+            key="auth-loading"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-background"
+          >
+            <LogoLoading size={100} />
+          </motion.div>
+        )}
+      </AnimatePresence>
       <GradientMesh />
       <Link
         href="/"
