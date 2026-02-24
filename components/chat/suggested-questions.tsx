@@ -26,11 +26,11 @@ export function SuggestedQuestions({
   const displayQuestions = questions?.length ? questions : SUGGESTED_QUESTIONS;
 
   return (
-    <div className="flex flex-col items-center justify-center py-12">
-      <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-        <MessageSquare className="h-8 w-8 neon-icon-blue" />
+    <div className="flex flex-col items-center justify-center py-6 sm:py-12">
+      <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 sm:h-16 sm:w-16">
+        <MessageSquare className="h-6 w-6 neon-icon-blue sm:h-8 sm:w-8" />
       </div>
-      <h2 className="text-xl font-semibold text-foreground metallic-heading">
+      <h2 className="text-lg font-semibold text-foreground metallic-heading sm:text-xl">
         Ask about your school
       </h2>
       <p className="mt-2 text-sm text-muted-foreground">
