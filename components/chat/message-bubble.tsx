@@ -75,7 +75,7 @@ export function MessageBubble({
         className={`max-w-[80%] space-y-2 ${isUser ? "text-right" : "text-left"}`}
       >
         <div
-          className={`inline-block rounded-2xl px-3 py-2 text-sm sm:px-4 sm:py-2.5 ${
+          className={`inline-block rounded-2xl px-4 py-2.5 text-sm ${
             isUser
               ? "bg-primary text-primary-foreground shadow-[inset_0_1px_0_oklch(1_0_0/15%)]"
               : "bg-card text-foreground border border-border metallic-card"

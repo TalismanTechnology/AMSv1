@@ -18,7 +18,7 @@ export function NewChatFab({ visible, onClick }: NewChatFabProps) {
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.8, y: 20 }}
           transition={{ duration: 0.2 }}
-          className="fixed bottom-28 right-4 z-50 sm:right-6"
+          className="fixed bottom-24 right-6 z-50"
         >
           <Button
             onClick={onClick}

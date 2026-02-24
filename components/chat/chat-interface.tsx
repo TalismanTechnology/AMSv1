@@ -290,7 +290,7 @@ export function ChatInterface({
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto px-4 flex flex-col" ref={scrollRef}>
-            <div className="mx-auto max-w-3xl w-full space-y-6 py-6 pb-24 md:pb-32">
+            <div className="mx-auto max-w-3xl w-full space-y-6 py-6 pb-32">
               {messages.length === 0 ? (
                 <SuggestedQuestions
                   onSelect={handleSuggestedQuestion}
@@ -355,7 +355,7 @@ export function ChatInterface({
           </div>
 
           {/* Floating Input */}
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-3 pb-3 pt-10 bg-gradient-to-t from-background via-background/80 to-transparent sm:bottom-6 sm:px-4 sm:pb-4">
+          <div className="pointer-events-none absolute inset-x-0 bottom-6 z-10 px-4 pb-4 pt-10 bg-gradient-to-t from-background via-background/80 to-transparent">
             <form
               onSubmit={handleSubmit}
               className="pointer-events-auto mx-auto flex max-w-3xl items-end gap-2"

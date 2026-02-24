@@ -35,7 +35,6 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { useMediaQuery } from "@/hooks/use-media-query";
 import type { SchoolEvent, EventType } from "@/lib/types";
 
 // ─── Color maps ───────────────────────────────────────────
@@ -70,8 +69,7 @@ const TYPE_BLOCK_COLORS: Record<EventType, string> = {
   other: "bg-muted-foreground/15 border-l-muted-foreground",
 };
 
-const WEEKDAYS_SHORT = ["S", "M", "T", "W", "T", "F", "S"];
-const WEEKDAYS_LONG = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const HOUR_START = 7;
 const HOUR_END = 21;
 const HOUR_HEIGHT = 60; // px per hour
@@ -216,7 +214,6 @@ function MonthView({
   onCreateEventOnDate,
   onEditEvent,
   onDeleteEvent,
-  isMobile,
 }: {
   currentMonth: Date;
   selectedDate: Date;
@@ -225,7 +222,6 @@ function MonthView({
   onCreateEventOnDate?: (date: string) => void;
   onEditEvent?: (event: SchoolEvent) => void;
   onDeleteEvent?: (event: SchoolEvent) => void;
-  isMobile: boolean;
 }) {
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(currentMonth);
@@ -240,10 +236,10 @@ function MonthView({
     <div className="rounded-lg border bg-card metallic-card overflow-hidden">
       {/* Weekday headers */}
       <div className="grid grid-cols-7 border-b bg-muted/30">
-        {(isMobile ? WEEKDAYS_SHORT : WEEKDAYS_LONG).map((day, i) => (
+        {WEEKDAYS.map((day) => (
           <div
-            key={i}
-            className="py-2 text-center text-[10px] font-medium text-muted-foreground sm:py-2.5 sm:text-xs"
+            key={day}
+            className="py-2.5 text-center text-xs font-medium text-muted-foreground"
           >
             {day}
           </div>
@@ -258,9 +254,8 @@ function MonthView({
           const inMonth = isSameMonth(day, currentMonth);
           const isSelected = isSameDay(day, selectedDate);
           const today = isToday(day);
-          const mobilePillLimit = isMobile ? 2 : MAX_PILLS;
-          const visible = dayEvents.slice(0, mobilePillLimit);
-          const overflow = dayEvents.length - mobilePillLimit;
+          const visible = dayEvents.slice(0, MAX_PILLS);
+          const overflow = dayEvents.length - MAX_PILLS;
 
           return (
             <div
@@ -268,7 +263,7 @@ function MonthView({
               onClick={() => onSelectDate(day)}
               onDoubleClick={() => onCreateEventOnDate?.(dateStr)}
               className={cn(
-                "relative flex flex-col border-t min-h-[4.5rem] p-1 cursor-pointer transition-colors hover:bg-accent/30 sm:min-h-[7.5rem] sm:p-1.5",
+                "relative flex flex-col border-t min-h-[7.5rem] p-1.5 cursor-pointer transition-colors hover:bg-accent/30",
                 !inMonth && "bg-muted/10 text-muted-foreground/30",
                 isSelected && "bg-primary/5 ring-1 ring-inset ring-primary/30",
                 today && !isSelected && "bg-accent/20"
@@ -276,7 +271,7 @@ function MonthView({
             >
               <span
                 className={cn(
-                  "flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-medium mb-0.5 self-end sm:h-6 sm:w-6 sm:text-xs sm:mb-1",
+                  "flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium mb-1 self-end",
                   isSelected && "bg-primary text-primary-foreground",
                   today && !isSelected && "bg-primary/20 text-primary font-bold"
                 )}
@@ -295,12 +290,12 @@ function MonthView({
                     <button
                       onClick={(e) => e.stopPropagation()}
                       className={cn(
-                        "w-full truncate rounded px-1 py-px text-left text-[9px] font-medium leading-tight border-l-2 transition-opacity hover:opacity-80 sm:px-1.5 sm:py-0.5 sm:text-[11px]",
+                        "w-full truncate rounded px-1.5 py-0.5 text-left text-[11px] font-medium leading-tight border-l-2 transition-opacity hover:opacity-80",
                         TYPE_PILL_COLORS[event.event_type as EventType] ||
                           TYPE_PILL_COLORS.general
                       )}
                     >
-                      {!isMobile && event.start_time && (
+                      {event.start_time && (
                         <span className="opacity-60 mr-0.5">
                           {formatTimeShort(event.start_time)}
                         </span>
@@ -315,7 +310,7 @@ function MonthView({
                       e.stopPropagation();
                       onSelectDate(day);
                     }}
-                    className="w-full text-left text-[9px] font-medium text-primary hover:underline px-1 sm:text-[10px] sm:px-1.5"
+                    className="w-full text-left text-[10px] font-medium text-primary hover:underline px-1.5"
                   >
                     +{overflow} more
                   </button>
@@ -535,8 +530,7 @@ export function CalendarView({
   onEditEvent,
   onDeleteEvent,
 }: CalendarViewProps) {
-  const isMobile = useMediaQuery("(max-width: 640px)");
-  const [view, setView] = useState<ViewMode>(isMobile ? "day" : "month");
+  const [view, setView] = useState<ViewMode>("month");
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
@@ -603,41 +597,22 @@ export function CalendarView({
     <div className="space-y-5 pt-2">
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center justify-between sm:justify-start gap-3 pl-1">
-          <h2 className="text-lg font-bold text-foreground sm:text-2xl">
+        <div className="flex items-center gap-3 pl-1">
+          <h2 className="text-2xl font-bold text-foreground">
             {getHeaderLabel()}
           </h2>
-          <div className="flex gap-0.5 sm:hidden">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={navigatePrev}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={navigateNext}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {onCreateEvent && (
             <Button size="sm" onClick={onCreateEvent}>
               <Plus className="mr-1 h-4 w-4" />
-              <span className="hidden sm:inline">Create event</span>
-              <span className="sm:hidden">New</span>
+              Create event
             </Button>
           )}
 
-          {/* View toggle — hide week on mobile since it's unusable */}
+          {/* View toggle */}
           <div className="flex rounded-lg border bg-muted/30 p-0.5">
-            {(isMobile ? (["month", "day"] as const) : (["month", "week", "day"] as const)).map((v) => (
+            {(["month", "week", "day"] as const).map((v) => (
               <button
                 key={v}
                 onClick={() => setView(v)}
@@ -656,7 +631,7 @@ export function CalendarView({
           <Button variant="ghost" size="sm" onClick={goToToday}>
             Today
           </Button>
-          <div className="hidden gap-0.5 sm:flex">
+          <div className="flex gap-0.5">
             <Button
               variant="ghost"
               size="icon"
@@ -737,7 +712,6 @@ export function CalendarView({
           }
           onEditEvent={onEditEvent}
           onDeleteEvent={onDeleteEvent}
-          isMobile={isMobile}
         />
       )}
 

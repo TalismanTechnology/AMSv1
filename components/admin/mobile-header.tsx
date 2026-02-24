@@ -19,8 +19,8 @@ export function MobileHeader() {
 
   return (
     <div className="flex items-center justify-between border-b bg-card metallic-surface neon-divider px-4 py-3 md:hidden">
-      <div className="flex items-center gap-2 min-w-0">
-        <Logo size={24} className="shrink-0 text-primary" />
+      <div className="flex items-center gap-2">
+        <Logo size={24} className="text-primary" />
         <span className="font-bold metallic-text truncate">{school.name}</span>
       </div>
       <div className="flex items-center gap-1">
@@ -30,7 +30,7 @@ export function MobileHeader() {
         </Button>
       </div>
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent side="left" className="w-[85vw] max-w-72 p-0">
+        <SheetContent side="left" className="w-64 p-0">
           <SheetTitle className="sr-only">Navigation</SheetTitle>
           <div className="flex h-full flex-col">
             <AdminSidebarContent onNavigate={() => setOpen(false)} />

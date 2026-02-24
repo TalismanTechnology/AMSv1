@@ -94,7 +94,7 @@ export default async function AdminDashboard({
         questionsTotal={questionsTotal || 0}
       />
 
-      <MagicBentoGrid className="mt-8 grid gap-6 md:grid-cols-2">
+      <MagicBentoGrid className="mt-8 grid gap-6 lg:grid-cols-2">
         {/* Recent Documents */}
         <MagicBentoCard enableBorderGlow enableParticles={false} className="rounded-xl">
           <Card className="metallic-card">

@@ -144,13 +144,13 @@ export function ChatHistorySidebar(props: ChatHistorySidebarProps) {
       <Button
         variant="ghost"
         size="icon"
-        className="absolute left-3 top-3 z-20 md:hidden"
+        className="absolute left-2 top-2 z-10 md:hidden"
         onClick={() => setMobileOpen(true)}
       >
         <History className="h-5 w-5" />
       </Button>
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-        <SheetContent side="left" className="flex w-[85vw] max-w-72 flex-col p-0">
+        <SheetContent side="left" className="flex w-72 flex-col p-0">
           <SidebarContent
             {...props}
             onNewChat={() => {

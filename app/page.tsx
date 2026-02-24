@@ -93,22 +93,20 @@ export default function LandingPage() {
 
       {/* Header */}
       <header className="fixed top-0 z-50 w-full">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-2">
-            <Logo size={28} className="text-primary drop-shadow-[0_0_8px_var(--glow-primary)] drop-shadow-[0_0_14px_oklch(1_0_0/40%)] sm:hidden" />
-            <Logo size={32} className="text-primary drop-shadow-[0_0_8px_var(--glow-primary)] drop-shadow-[0_0_14px_oklch(1_0_0/40%)] hidden sm:block" />
-            <span className="text-lg font-semibold metallic-text sm:text-xl">
+            <Logo size={32} className="text-primary drop-shadow-[0_0_8px_var(--glow-primary)] drop-shadow-[0_0_14px_oklch(1_0_0/40%)]" />
+            <span className="text-xl font-semibold metallic-text">
               AskMySchool
             </span>
           </div>
-          <div className="flex items-center gap-2 sm:gap-3">
-            <Button variant="ghost" size="sm" asChild className="sm:size-default">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" asChild>
               <Link href="/login">Log in</Link>
             </Button>
             <Button
-              size="sm"
               asChild
-              className="sm:size-default shadow-[0_0_20px_var(--glow-primary),0_0_8px_oklch(1_0_0/30%)]"
+              className="shadow-[0_0_20px_var(--glow-primary),0_0_8px_oklch(1_0_0/30%)]"
             >
               <Link href="/register">Sign up</Link>
             </Button>
@@ -117,39 +115,38 @@ export default function LandingPage() {
       </header>
 
       {/* Hero */}
-      <main className="light-source mx-auto max-w-6xl px-4 pt-24 pb-16 text-center sm:px-6 sm:pt-32 sm:pb-24">
-        <div id="hero-logo" className="mb-6 flex justify-center sm:mb-8">
-          <Logo size={80} className="text-primary brightness-200 drop-shadow-[0_0_30px_#fff] sm:hidden" />
-          <Logo size={140} className="text-primary brightness-200 drop-shadow-[0_0_30px_#fff] hidden sm:block" />
+      <main className="light-source mx-auto max-w-6xl px-6 pt-32 pb-24 text-center">
+        <div id="hero-logo" className="mb-8 flex justify-center">
+          <Logo size={140} className="text-primary brightness-200 drop-shadow-[0_0_30px_#fff]" />
         </div>
-        <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-5xl md:text-6xl neon-text">
+        <h1 className="text-5xl font-semibold tracking-tight text-foreground sm:text-6xl neon-text">
           Get instant answers from{" "}
           <span className="metallic-text-animated">school documents</span>
         </h1>
-        <p className="mx-auto mt-4 max-w-2xl text-base text-muted-foreground sm:mt-6 sm:text-lg">
+        <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
           Parents can ask questions in plain English and get AI-powered answers
           sourced directly from your school&apos;s official documents —
           handbooks, policies, calendars, and more.
         </p>
         <RevealOnScroll delay={0.2}>
-          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:mt-10 sm:flex-row sm:gap-4">
+          <div className="mt-10 flex items-center justify-center gap-4">
             <Button
               size="lg"
               asChild
-              className="w-full sm:w-auto shadow-[0_0_20px_var(--glow-primary),0_0_8px_oklch(1_0_0/30%)]"
+              className="shadow-[0_0_20px_var(--glow-primary),0_0_8px_oklch(1_0_0/30%)]"
             >
               <Link href="/register">Get started</Link>
             </Button>
-            <Button size="lg" variant="outline" asChild className="w-full sm:w-auto">
+            <Button size="lg" variant="outline" asChild>
               <Link href="/login">I already have an account</Link>
             </Button>
           </div>
         </RevealOnScroll>
 
         {/* Features */}
-        <StaggerChildren className="mt-16 grid gap-6 sm:mt-24 sm:gap-8 sm:grid-cols-2 lg:grid-cols-3">
+        <StaggerChildren className="mt-24 grid gap-8 sm:grid-cols-3">
           <motion.div variants={fadeInUp}>
-            <div className="metallic-card rounded-xl p-5 text-left backdrop-blur-sm sm:p-8">
+            <div className="metallic-card rounded-xl p-8 text-left backdrop-blur-sm">
               <MessageSquare className="h-10 w-10 neon-icon-blue" />
               <h3 className="mt-4 text-lg font-medium text-foreground">
                 Ask anything
@@ -161,7 +158,7 @@ export default function LandingPage() {
             </div>
           </motion.div>
           <motion.div variants={fadeInUp}>
-            <div className="metallic-card rounded-xl p-5 text-left backdrop-blur-sm sm:p-8">
+            <div className="metallic-card rounded-xl p-8 text-left backdrop-blur-sm">
               <FileText className="h-10 w-10 neon-icon-amber" />
               <h3 className="mt-4 text-lg font-medium text-foreground">
                 Source citations
@@ -173,7 +170,7 @@ export default function LandingPage() {
             </div>
           </motion.div>
           <motion.div variants={fadeInUp}>
-            <div className="metallic-card rounded-xl p-5 text-left backdrop-blur-sm sm:p-8">
+            <div className="metallic-card rounded-xl p-8 text-left backdrop-blur-sm">
               <Shield className="h-10 w-10 neon-icon-green" />
               <h3 className="mt-4 text-lg font-medium text-foreground">
                 Admin controlled
@@ -188,7 +185,7 @@ export default function LandingPage() {
       </main>
 
       {/* How It Works */}
-      <section className="mx-auto max-w-5xl px-4 py-16 sm:px-6 sm:py-24">
+      <section className="mx-auto max-w-5xl px-6 py-24">
         <RevealOnScroll>
           <h2 className="text-center text-3xl font-semibold metallic-heading neon-text-soft sm:text-4xl">
             How it works
@@ -226,9 +223,9 @@ export default function LandingPage() {
       </section>
 
       {/* Stats */}
-      <section className="border-y border-border/50 py-12 neon-divider sm:py-20">
-        <div className="mx-auto max-w-5xl px-4 sm:px-6">
-          <StaggerChildren className="grid grid-cols-2 gap-6 sm:gap-8 lg:grid-cols-4">
+      <section className="border-y border-border/50 py-20 neon-divider">
+        <div className="mx-auto max-w-5xl px-6">
+          <StaggerChildren className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
             {[
               { label: "Documents Processed", value: 500 },
               { label: "Questions Answered", value: 10000 },
@@ -239,7 +236,7 @@ export default function LandingPage() {
                 <div className="text-center">
                   <AnimatedNumber
                     value={stat.value}
-                    className="text-2xl font-bold metallic-text-animated neon-text sm:text-4xl"
+                    className="text-4xl font-bold metallic-text-animated neon-text"
                   />
                   <p className="mt-2 text-sm text-muted-foreground">
                     {stat.label}
@@ -252,16 +249,16 @@ export default function LandingPage() {
       </section>
 
       {/* Testimonials */}
-      <section className="mx-auto max-w-5xl px-4 py-16 sm:px-6 sm:py-24">
+      <section className="mx-auto max-w-5xl px-6 py-24">
         <RevealOnScroll>
           <h2 className="text-center text-3xl font-semibold metallic-heading neon-text-soft sm:text-4xl">
             What parents are saying
           </h2>
         </RevealOnScroll>
-        <StaggerChildren className="mt-10 grid gap-6 sm:mt-16 sm:gap-8 sm:grid-cols-2 lg:grid-cols-3">
+        <StaggerChildren className="mt-16 grid gap-8 sm:grid-cols-3">
           {testimonials.map((t, i) => (
             <motion.div key={i} variants={metallicCardEntrance}>
-              <div className="metallic-card rounded-xl p-5 sm:p-8">
+              <div className="metallic-card rounded-xl p-8">
                 <p className="text-sm leading-relaxed text-muted-foreground italic">
                   &ldquo;{t.quote}&rdquo;
                 </p>
@@ -285,9 +282,9 @@ export default function LandingPage() {
       </section>
 
       {/* CTA */}
-      <section className="mx-auto max-w-4xl px-4 py-16 text-center sm:px-6 sm:py-24">
+      <section className="mx-auto max-w-4xl px-6 py-24 text-center">
         <RevealOnScroll>
-          <div className="metallic-card rounded-2xl p-6 sm:p-12">
+          <div className="metallic-card rounded-2xl p-12">
             <div className="relative z-10">
               <h2 className="text-3xl font-semibold metallic-heading neon-text-soft sm:text-4xl">
                 Ready to get started?
@@ -313,7 +310,7 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="border-t border-border/50 py-8 neon-divider">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 sm:px-6 sm:flex-row">
+        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-6 sm:flex-row">
           <div className="flex items-center gap-2">
             <Logo size={20} className="text-primary drop-shadow-[0_0_6px_oklch(1_0_0/40%)]" />
             <span className="text-sm metallic-text">AskMySchool</span>

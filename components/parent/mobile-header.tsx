@@ -18,15 +18,15 @@ export function ParentMobileHeader() {
 
   return (
     <div className="flex items-center justify-between border-b bg-card metallic-surface neon-divider px-4 py-3 md:hidden">
-      <div className="flex items-center gap-2 min-w-0">
-        <Logo size={24} className="shrink-0 text-primary drop-shadow-[0_0_8px_var(--glow-primary)] drop-shadow-[0_0_12px_oklch(1_0_0/40%)]" />
+      <div className="flex items-center gap-2">
+        <Logo size={24} className="text-primary drop-shadow-[0_0_8px_var(--glow-primary)] drop-shadow-[0_0_12px_oklch(1_0_0/40%)]" />
         <span className="font-bold metallic-text truncate">{school.name}</span>
       </div>
       <Button variant="ghost" size="icon" onClick={() => setOpen(true)}>
         <Menu className="h-5 w-5" />
       </Button>
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent side="left" className="w-[85vw] max-w-72 p-0">
+        <SheetContent side="left" className="w-64 p-0">
           <SheetTitle className="sr-only">Navigation</SheetTitle>
           <div className="flex h-full flex-col">
             <ParentSidebarContent onNavigate={() => setOpen(false)} />
