@@ -3,7 +3,6 @@ import Link from "next/link";
 import { getSchoolBySlug, getUserSchools } from "@/lib/school-context";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
-import { GradientMesh } from "@/components/ui/gradient-mesh";
 import { Clock, ArrowLeft } from "lucide-react";
 import { logout } from "@/actions/auth";
 
@@ -35,8 +34,7 @@ export default async function PendingApprovalPage({
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
-      <GradientMesh />
+    <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4">
       <div className="relative z-10 text-center space-y-8 max-w-md">
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-500/10 border border-amber-500/20">
           <Clock className="h-8 w-8 text-amber-500" />

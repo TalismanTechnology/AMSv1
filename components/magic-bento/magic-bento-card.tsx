@@ -14,7 +14,6 @@ export interface MagicBentoCardProps {
   className?: string;
   style?: CSSProperties;
   enableParticles?: boolean;
-  enableBorderGlow?: boolean;
   enableTilt?: boolean;
   enableMagnetism?: boolean;
   enableClickRipple?: boolean;
@@ -45,7 +44,6 @@ export function MagicBentoCard({
   className,
   style,
   enableParticles = true,
-  enableBorderGlow = true,
   enableTilt = false,
   enableMagnetism = false,
   enableClickRipple = true,
@@ -289,13 +287,9 @@ export function MagicBentoCard({
       data-slot="magic-bento-card"
       className={cn(
         "relative overflow-hidden",
-        enableBorderGlow && "magic-bento-card--border-glow",
         className
       )}
-      style={{
-        ...style,
-        "--glow-color": glowColor,
-      } as CSSProperties}
+      style={style}
     >
       {children}
     </div>

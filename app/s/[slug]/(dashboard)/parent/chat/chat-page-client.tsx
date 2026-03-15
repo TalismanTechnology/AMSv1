@@ -98,7 +98,7 @@ export function ChatPageClient({
 
   return (
     <div className="relative flex h-full overflow-hidden">
-      <MagicBentoCard enableBorderGlow enableParticles={false} className="h-full">
+      <MagicBentoCard enableParticles={false} className="h-full">
         <ChatHistorySidebar
           sessions={sessions}
           activeSessionId={activeSessionId}
@@ -107,7 +107,7 @@ export function ChatPageClient({
           schoolId={schoolId}
         />
       </MagicBentoCard>
-      <MagicBentoCard enableBorderGlow enableParticles={false} className="flex-1 min-w-0 h-full">
+      <MagicBentoCard enableParticles={false} className="flex-1 min-w-0 h-full">
         <ChatInterface
           key={chatKey}
           sessionId={activeSessionId || undefined}

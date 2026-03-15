@@ -150,7 +150,7 @@ export function UsersClient({ users, schoolId, schoolSlug, joinCode, requireJoin
   async function handleDelete() {
     if (!deleteId) return;
     setDeleting(true);
-    const result = await deleteUser(deleteId);
+    const result = await deleteUser(deleteId, schoolId);
     if (result.error) toast.error(result.error);
     else toast.success("User deleted");
     setDeleting(false);
@@ -232,7 +232,7 @@ export function UsersClient({ users, schoolId, schoolSlug, joinCode, requireJoin
           <h2 className="text-lg font-semibold text-foreground">Parent Onboarding</h2>
 
           {/* Registration Link */}
-          <MagicBentoCard enableBorderGlow enableParticles={false} className="rounded-lg">
+          <MagicBentoCard enableParticles={false} className="rounded-lg">
           <div className="rounded-lg border bg-card p-4">
             <div className="flex items-start gap-3">
               <Link className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
@@ -264,7 +264,7 @@ export function UsersClient({ users, schoolId, schoolSlug, joinCode, requireJoin
           </MagicBentoCard>
 
           {/* Join Code */}
-          <MagicBentoCard enableBorderGlow enableParticles={false} className="rounded-lg">
+          <MagicBentoCard enableParticles={false} className="rounded-lg">
           <div className="rounded-lg border bg-card p-4">
             <div className="flex items-start gap-3">
               <KeyRound className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
@@ -310,7 +310,7 @@ export function UsersClient({ users, schoolId, schoolSlug, joinCode, requireJoin
           </MagicBentoCard>
 
           {/* Approval Setting */}
-          <MagicBentoCard enableBorderGlow enableParticles={false} className="rounded-lg">
+          <MagicBentoCard enableParticles={false} className="rounded-lg">
           <div className="rounded-lg border bg-card p-4">
             <div className="flex items-start gap-3">
               <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
@@ -421,7 +421,7 @@ export function UsersClient({ users, schoolId, schoolSlug, joinCode, requireJoin
         </div>
       </div>
 
-      <MagicBentoCard enableBorderGlow enableParticles={false} className="rounded-lg">
+      <MagicBentoCard enableParticles={false} className="rounded-lg">
       <div className="rounded-lg border bg-card">
         <Table>
           <TableHeader>

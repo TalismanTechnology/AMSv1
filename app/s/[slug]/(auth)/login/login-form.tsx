@@ -17,7 +17,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { GradientMesh } from "@/components/ui/gradient-mesh";
 import { login } from "@/actions/auth";
 
 interface LoginFormProps {
@@ -43,7 +42,7 @@ export function LoginForm({ schoolSlug, schoolId, schoolName }: LoginFormProps) 
   const showTransition = loading && !error;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <div className="relative z-10 flex min-h-screen items-center justify-center px-4">
       <AnimatePresence>
         {showTransition && (
           <motion.div
@@ -56,7 +55,6 @@ export function LoginForm({ schoolSlug, schoolId, schoolName }: LoginFormProps) 
           </motion.div>
         )}
       </AnimatePresence>
-      <GradientMesh />
       <Link
         href="/"
         className="group absolute left-6 top-6 flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-primary"

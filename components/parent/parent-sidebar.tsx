@@ -44,11 +44,13 @@ function getNavItems(slug: string) {
 
 interface SidebarContentProps {
   onNavigate?: () => void;
+  forceExpanded?: boolean;
 }
 
-export function ParentSidebarContent({ onNavigate }: SidebarContentProps) {
+export function ParentSidebarContent({ onNavigate, forceExpanded }: SidebarContentProps) {
   const pathname = usePathname();
-  const { collapsed, userName } = useParentSidebar();
+  const { collapsed: contextCollapsed, userName } = useParentSidebar();
+  const collapsed = forceExpanded ? false : contextCollapsed;
   const { school, slug, memberships } = useSchool();
   const navItems = getNavItems(slug);
   const [joinDialogOpen, setJoinDialogOpen] = useState(false);

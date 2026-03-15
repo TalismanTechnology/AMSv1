@@ -29,7 +29,7 @@ export function ParentMobileHeader() {
         <SheetContent side="left" className="w-64 p-0">
           <SheetTitle className="sr-only">Navigation</SheetTitle>
           <div className="flex h-full flex-col">
-            <ParentSidebarContent onNavigate={() => setOpen(false)} />
+            <ParentSidebarContent onNavigate={() => setOpen(false)} forceExpanded />
           </div>
         </SheetContent>
       </Sheet>

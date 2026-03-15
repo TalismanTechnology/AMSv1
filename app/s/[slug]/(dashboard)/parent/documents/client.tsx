@@ -314,7 +314,7 @@ export function ParentDocumentsClient({
                       return (
                         <MagicBentoCard
                           key={doc.id}
-                          enableBorderGlow
+                         
                           enableParticles={false}
                           className="rounded-xl"
                         >

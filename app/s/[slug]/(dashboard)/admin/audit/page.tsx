@@ -33,7 +33,7 @@ export default async function AuditLogPage({
     <div className="p-4 md:p-6 space-y-6">
       <h1 className="text-2xl font-bold metallic-heading">Audit Log</h1>
 
-      <MagicBentoCard enableBorderGlow enableParticles={false} className="rounded-lg">
+      <MagicBentoCard enableParticles={false} className="rounded-lg">
         <div className="rounded-lg border bg-card">
           <Table>
             <TableHeader>

@@ -27,6 +27,7 @@ import {
   formatChildrenContext,
   getTodayString,
 } from "@/lib/ai/context";
+import { rewriteQueryWithContext } from "@/lib/ai/rewrite-query";
 
 export async function POST(request: NextRequest) {
   try {
@@ -41,6 +42,25 @@ export async function POST(request: NextRequest) {
 
     const { messages, sessionId, schoolId } = await request.json();
     debugLog(`REQUEST: sessionId=${sessionId}, schoolId=${schoolId}, messageCount=${messages?.length}`);
+
+    // Verify user is a member of this school
+    if (schoolId) {
+      const { data: membership } = await supabase
+        .from("school_memberships")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("school_id", schoolId)
+        .eq("approved", true)
+        .single();
+
+      if (!membership) {
+        return new Response(JSON.stringify({ error: "Access denied" }), {
+          status: 403,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+    }
+
     const lastMessage = messages[messages.length - 1];
 
     // AI SDK v6 sends UIMessages with `parts` array, not a `content` string
@@ -50,10 +70,16 @@ export async function POST(request: NextRequest) {
         .map((p: { text: string }) => p.text)
         .join("") || "";
 
+    // Rewrite follow-up questions into standalone queries for better RAG search
+    const searchQuery = await rewriteQueryWithContext(messages, lastMessageText);
+    if (searchQuery !== lastMessageText) {
+      debugLog(`Query rewritten: "${lastMessageText.slice(0, 60)}" → "${searchQuery.slice(0, 60)}"`);
+    }
+
     // Search for relevant document chunks (non-fatal — continue without sources on failure)
     let relevantChunks: RelevantChunk[] = [];
     try {
-      relevantChunks = await searchDocuments(lastMessageText, 8, 0.5, schoolId);
+      relevantChunks = await searchDocuments(searchQuery, 8, 0.5, schoolId);
     } catch (error) {
       console.error("RAG search failed (continuing without sources):", error);
     }

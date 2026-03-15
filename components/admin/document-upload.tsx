@@ -48,6 +48,7 @@ const ACCEPTED_TYPES = {
     ".pptx",
   ],
   "text/plain": [".txt"],
+  "image/png": [".png"],
 };
 
 const TYPE_MAP: Record<string, string> = {
@@ -59,6 +60,7 @@ const TYPE_MAP: Record<string, string> = {
   pptx: "pptx",
   ppt: "pptx",
   txt: "txt",
+  png: "image",
 };
 
 type FileStatus = "idle" | "uploading" | "processing" | "ready" | "error";
@@ -271,7 +273,7 @@ export function DocumentUpload({
                 : "Drag & drop files, or click to browse"}
             </p>
             <p className="mt-1 text-xs text-muted-foreground/70">
-              PDF, Word, Excel, PowerPoint, Text (max 10 files, 50MB each)
+              PDF, Word, Excel, PowerPoint, Text, PNG (max 10 files, 50MB each)
             </p>
           </div>
 

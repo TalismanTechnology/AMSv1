@@ -142,7 +142,7 @@ export function ProfileClient({
     <MagicBentoGrid className="mx-auto max-w-2xl space-y-6 p-4 md:p-8">
       <h1 className="text-2xl font-bold text-foreground">Profile</h1>
 
-      <MagicBentoCard enableBorderGlow className="rounded-xl">
+      <MagicBentoCard className="rounded-xl">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -190,7 +190,7 @@ export function ProfileClient({
       </Card>
       </MagicBentoCard>
 
-      <MagicBentoCard enableBorderGlow className="rounded-xl">
+      <MagicBentoCard className="rounded-xl">
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">

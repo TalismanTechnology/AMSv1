@@ -102,7 +102,7 @@ export function DashboardClient({
       {/* Quick Actions */}
       <MagicBentoGrid className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {quickActions.map((action) => (
-          <MagicBentoCard key={action.href} enableBorderGlow enableClickRipple className="rounded-xl">
+          <MagicBentoCard key={action.href} enableClickRipple className="rounded-xl">
             <Link href={action.href}>
               <Card className="metallic-card cursor-pointer h-full">
                 <CardContent className="p-4 flex flex-col items-center text-center gap-2">
@@ -119,7 +119,7 @@ export function DashboardClient({
       </MagicBentoGrid>
 
       {/* Join Another School */}
-      <MagicBentoCard enableBorderGlow enableClickRipple className="rounded-xl">
+      <MagicBentoCard enableClickRipple className="rounded-xl">
         <Card
           className="metallic-card cursor-pointer"
           onClick={() => setJoinDialogOpen(true)}
@@ -142,7 +142,7 @@ export function DashboardClient({
 
       <MagicBentoGrid className="grid md:grid-cols-2 gap-6">
         {/* Recent Announcements */}
-        <MagicBentoCard enableBorderGlow enableParticles={false} className="rounded-xl">
+        <MagicBentoCard enableParticles={false} className="rounded-xl">
           <Card className="metallic-card">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
@@ -189,7 +189,7 @@ export function DashboardClient({
         </MagicBentoCard>
 
         {/* Upcoming Calendar */}
-        <MagicBentoCard enableBorderGlow enableParticles={false} className="rounded-xl">
+        <MagicBentoCard enableParticles={false} className="rounded-xl">
           <Card className="metallic-card">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">

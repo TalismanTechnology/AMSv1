@@ -143,7 +143,7 @@ export function AnalyticsClient({ data: initialData, schoolId, schoolSlug }: Ana
 
       {/* Summary cards */}
       <MagicBentoGrid className="mb-8 grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-        <MagicBentoCard enableBorderGlow enableParticles className="rounded-xl">
+        <MagicBentoCard enableParticles className="rounded-xl">
           <Card className="metallic-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -159,7 +159,7 @@ export function AnalyticsClient({ data: initialData, schoolId, schoolSlug }: Ana
           </Card>
         </MagicBentoCard>
 
-        <MagicBentoCard enableBorderGlow enableParticles className="rounded-xl">
+        <MagicBentoCard enableParticles className="rounded-xl">
           <Card className="metallic-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -175,7 +175,7 @@ export function AnalyticsClient({ data: initialData, schoolId, schoolSlug }: Ana
           </Card>
         </MagicBentoCard>
 
-        <MagicBentoCard enableBorderGlow enableParticles className="rounded-xl">
+        <MagicBentoCard enableParticles className="rounded-xl">
           <Card className="metallic-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -191,7 +191,7 @@ export function AnalyticsClient({ data: initialData, schoolId, schoolSlug }: Ana
           </Card>
         </MagicBentoCard>
 
-        <MagicBentoCard enableBorderGlow enableParticles className="rounded-xl">
+        <MagicBentoCard enableParticles className="rounded-xl">
           <Card className="metallic-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -207,7 +207,7 @@ export function AnalyticsClient({ data: initialData, schoolId, schoolSlug }: Ana
           </Card>
         </MagicBentoCard>
 
-        <MagicBentoCard enableBorderGlow enableParticles className="rounded-xl">
+        <MagicBentoCard enableParticles className="rounded-xl">
           <Card className="metallic-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -227,7 +227,7 @@ export function AnalyticsClient({ data: initialData, schoolId, schoolSlug }: Ana
       {/* Charts grid */}
       <MagicBentoGrid className="grid gap-6 lg:grid-cols-2">
         {/* Area Chart: Questions Trend */}
-        <MagicBentoCard enableBorderGlow enableParticles={false} className="rounded-xl">
+        <MagicBentoCard enableParticles={false} className="rounded-xl">
           <Card className="metallic-card">
             <CardHeader>
               <CardTitle className="text-base">Questions Trend</CardTitle>
@@ -294,7 +294,7 @@ export function AnalyticsClient({ data: initialData, schoolId, schoolSlug }: Ana
         </MagicBentoCard>
 
         {/* Pie Chart: Document Types */}
-        <MagicBentoCard enableBorderGlow enableParticles={false} className="rounded-xl">
+        <MagicBentoCard enableParticles={false} className="rounded-xl">
           <Card className="metallic-card">
             <CardHeader>
               <CardTitle className="text-base">Document Types</CardTitle>
@@ -335,7 +335,7 @@ export function AnalyticsClient({ data: initialData, schoolId, schoolSlug }: Ana
         </MagicBentoCard>
 
         {/* Bar Chart: Questions by Hour */}
-        <MagicBentoCard enableBorderGlow enableParticles={false} className="rounded-xl">
+        <MagicBentoCard enableParticles={false} className="rounded-xl">
           <Card className="metallic-card">
             <CardHeader>
               <CardTitle className="text-base">Questions by Hour</CardTitle>
@@ -379,7 +379,7 @@ export function AnalyticsClient({ data: initialData, schoolId, schoolSlug }: Ana
         </MagicBentoCard>
 
         {/* Line Chart: User Growth */}
-        <MagicBentoCard enableBorderGlow enableParticles={false} className="rounded-xl">
+        <MagicBentoCard enableParticles={false} className="rounded-xl">
           <Card className="metallic-card">
             <CardHeader>
               <CardTitle className="text-base">User Growth</CardTitle>
@@ -438,7 +438,7 @@ export function AnalyticsClient({ data: initialData, schoolId, schoolSlug }: Ana
 
       {/* Top Questions - full width */}
       <div className="mt-6">
-        <MagicBentoCard enableBorderGlow enableParticles={false} className="rounded-xl">
+        <MagicBentoCard enableParticles={false} className="rounded-xl">
           <Card className="metallic-card">
             <CardHeader>
               <CardTitle className="text-base">Most Asked Questions</CardTitle>

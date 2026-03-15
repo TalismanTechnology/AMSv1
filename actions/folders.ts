@@ -11,6 +11,8 @@ export async function createFolder(
   }
 ) {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
 
   const { error } = await supabase.from("folders").insert({
     name: data.name,
@@ -30,6 +32,8 @@ export async function createFolder(
 
 export async function renameFolder(folderId: string, schoolId: string, name: string) {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
 
   const { error } = await supabase
     .from("folders")
@@ -45,6 +49,8 @@ export async function renameFolder(folderId: string, schoolId: string, name: str
 
 export async function deleteFolder(folderId: string, schoolId: string) {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
 
   const { error } = await supabase
     .from("folders")
@@ -64,6 +70,8 @@ export async function moveDocumentToFolder(
   schoolId: string
 ) {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
 
   const { error } = await supabase
     .from("documents")

@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import { getSchoolBySlug } from "@/lib/school-context";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
-import { GradientMesh } from "@/components/ui/gradient-mesh";
 
 export default async function SchoolLandingPage({
   params,
@@ -18,8 +17,7 @@ export default async function SchoolLandingPage({
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
-      <GradientMesh />
+    <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4">
       <div className="relative z-10 text-center space-y-8">
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full metallic-surface border border-glass-border neon-border">
           <Logo

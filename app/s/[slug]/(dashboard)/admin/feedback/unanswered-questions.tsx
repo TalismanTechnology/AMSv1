@@ -155,7 +155,7 @@ export function UnansweredQuestionsSection({
         )}
       </div>
       {filteredGroups.length === 0 ? (
-        <MagicBentoCard enableBorderGlow enableParticles={false} className="rounded-lg">
+        <MagicBentoCard enableParticles={false} className="rounded-lg">
           <div className="rounded-lg border bg-card p-8 text-center text-muted-foreground">
             {searchQuery ? "No questions match your search" : "No unanswered questions"}
           </div>
@@ -165,7 +165,7 @@ export function UnansweredQuestionsSection({
         {filteredGroups.map((group, index) => (
           <MagicBentoCard
             key={index}
-            enableBorderGlow
+           
             enableParticles={false}
             className="rounded-lg"
           >

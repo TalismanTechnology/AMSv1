@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 
 export async function createCategory(schoolId: string, formData: FormData) {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
 
   const name = formData.get("name") as string;
   const description = formData.get("description") as string;
@@ -34,6 +36,8 @@ export async function updateCategory(
   data: { name?: string; description?: string; color?: string }
 ) {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
 
   const { error } = await supabase
     .from("categories")
@@ -49,6 +53,8 @@ export async function updateCategory(
 
 export async function deleteCategory(categoryId: string, schoolId: string) {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
 
   const { error } = await supabase
     .from("categories")

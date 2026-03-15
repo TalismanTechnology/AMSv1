@@ -14,6 +14,7 @@ import {
   Settings,
   ScrollText,
   MessageSquare,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,7 @@ function getNavItems(slug: string) {
     { href: `/s/${slug}/admin/users`, label: "Users", icon: Users },
     { href: `/s/${slug}/admin/analytics`, label: "Analytics", icon: BarChart3 },
     { href: `/s/${slug}/admin/feedback`, label: "Feedback", icon: MessageSquare },
+    { href: `/s/${slug}/admin/document-audit`, label: "Doc Audit", icon: ShieldCheck },
     { href: `/s/${slug}/admin/audit`, label: "Audit Log", icon: ScrollText },
     { href: `/s/${slug}/admin/settings`, label: "Settings", icon: Settings },
   ];
@@ -48,11 +50,13 @@ function getNavItems(slug: string) {
 
 interface SidebarContentProps {
   onNavigate?: () => void;
+  forceExpanded?: boolean;
 }
 
-export function AdminSidebarContent({ onNavigate }: SidebarContentProps) {
+export function AdminSidebarContent({ onNavigate, forceExpanded }: SidebarContentProps) {
   const pathname = usePathname();
-  const { collapsed } = useSidebar();
+  const { collapsed: contextCollapsed } = useSidebar();
+  const collapsed = forceExpanded ? false : contextCollapsed;
   const { school, slug, memberships } = useSchool();
   const navItems = getNavItems(slug);
   const adminBase = `/s/${slug}/admin`;

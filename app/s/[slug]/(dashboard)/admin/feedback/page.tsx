@@ -50,7 +50,7 @@ export default async function FeedbackPage({
       <h1 className="text-2xl font-bold metallic-heading">Feedback & Review</h1>
 
       <MagicBentoGrid className="grid grid-cols-1 gap-4 sm:grid-cols-4">
-        <MagicBentoCard enableBorderGlow enableParticles className="rounded-xl">
+        <MagicBentoCard enableParticles className="rounded-xl">
           <Card className="metallic-card">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm text-muted-foreground">
@@ -62,7 +62,7 @@ export default async function FeedbackPage({
             </CardContent>
           </Card>
         </MagicBentoCard>
-        <MagicBentoCard enableBorderGlow enableParticles className="rounded-xl">
+        <MagicBentoCard enableParticles className="rounded-xl">
           <Card className="metallic-card">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm text-muted-foreground">
@@ -84,7 +84,7 @@ export default async function FeedbackPage({
             </CardContent>
           </Card>
         </MagicBentoCard>
-        <MagicBentoCard enableBorderGlow enableParticles className="rounded-xl">
+        <MagicBentoCard enableParticles className="rounded-xl">
           <Card className="metallic-card">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm text-muted-foreground">
@@ -96,7 +96,7 @@ export default async function FeedbackPage({
             </CardContent>
           </Card>
         </MagicBentoCard>
-        <MagicBentoCard enableBorderGlow enableParticles className="rounded-xl">
+        <MagicBentoCard enableParticles className="rounded-xl">
           <Card className="metallic-card">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm text-muted-foreground">
@@ -120,7 +120,7 @@ export default async function FeedbackPage({
         <p className="text-sm text-muted-foreground">
           Messages where users indicated the response was not helpful.
         </p>
-        <MagicBentoCard enableBorderGlow enableParticles={false} className="rounded-lg">
+        <MagicBentoCard enableParticles={false} className="rounded-lg">
           <div className="rounded-lg border bg-card">
             <Table>
               <TableHeader>

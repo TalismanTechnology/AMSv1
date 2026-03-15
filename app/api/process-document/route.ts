@@ -8,11 +8,12 @@ export const maxDuration = 300;
 const PROCESS_SECRET = process.env.PROCESS_DOCUMENT_SECRET;
 
 export async function POST(request: NextRequest) {
-  if (PROCESS_SECRET) {
-    const authHeader = request.headers.get("x-process-secret");
-    if (authHeader !== PROCESS_SECRET) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  if (!PROCESS_SECRET) {
+    return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
+  }
+  const authHeader = request.headers.get("x-process-secret");
+  if (authHeader !== PROCESS_SECRET) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {

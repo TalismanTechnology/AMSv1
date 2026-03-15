@@ -115,7 +115,7 @@ export function SettingsClient({ settings, schoolId, schoolSlug, joinCode: initi
         </Button>
       </div>
 
-      <MagicBentoCard enableBorderGlow className="rounded-xl">
+      <MagicBentoCard className="rounded-xl">
       <Card>
         <CardHeader>
           <CardTitle>School Information</CardTitle>
@@ -147,7 +147,7 @@ export function SettingsClient({ settings, schoolId, schoolSlug, joinCode: initi
       </Card>
       </MagicBentoCard>
 
-      <MagicBentoCard enableBorderGlow className="rounded-xl">
+      <MagicBentoCard className="rounded-xl">
       <Card>
         <CardHeader>
           <CardTitle>Registration &amp; Access</CardTitle>
@@ -218,7 +218,7 @@ export function SettingsClient({ settings, schoolId, schoolSlug, joinCode: initi
       </Card>
       </MagicBentoCard>
 
-      <MagicBentoCard enableBorderGlow className="rounded-xl">
+      <MagicBentoCard className="rounded-xl">
       <Card>
         <CardHeader>
           <CardTitle>AI Configuration</CardTitle>
@@ -265,7 +265,7 @@ export function SettingsClient({ settings, schoolId, schoolSlug, joinCode: initi
       </Card>
       </MagicBentoCard>
 
-      <MagicBentoCard enableBorderGlow className="rounded-xl">
+      <MagicBentoCard className="rounded-xl">
       <Card>
         <CardHeader>
           <CardTitle>Chat Settings</CardTitle>
@@ -329,7 +329,7 @@ export function SettingsClient({ settings, schoolId, schoolSlug, joinCode: initi
       </Card>
       </MagicBentoCard>
 
-      <MagicBentoCard enableBorderGlow className="rounded-xl">
+      <MagicBentoCard className="rounded-xl">
       <Card>
         <CardHeader>
           <CardTitle>Appearance</CardTitle>

@@ -100,7 +100,7 @@ export function AnnouncementsClient({
           </p>
         </div>
       ) : (
-        <MagicBentoCard enableBorderGlow enableParticles={false} className="rounded-lg">
+        <MagicBentoCard enableParticles={false} className="rounded-lg">
         <div className="rounded-lg border bg-card">
           <Table>
             <TableHeader>

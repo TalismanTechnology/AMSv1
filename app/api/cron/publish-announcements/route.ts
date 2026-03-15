@@ -8,8 +8,11 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const key = searchParams.get("key");
 
-  // Simple shared-secret auth (set CRON_SECRET in env)
-  if (process.env.CRON_SECRET && key !== process.env.CRON_SECRET) {
+  // Shared-secret auth — CRON_SECRET must be set
+  if (!process.env.CRON_SECRET) {
+    return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
+  }
+  if (key !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

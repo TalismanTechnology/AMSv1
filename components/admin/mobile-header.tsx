@@ -33,7 +33,7 @@ export function MobileHeader() {
         <SheetContent side="left" className="w-64 p-0">
           <SheetTitle className="sr-only">Navigation</SheetTitle>
           <div className="flex h-full flex-col">
-            <AdminSidebarContent onNavigate={() => setOpen(false)} />
+            <AdminSidebarContent onNavigate={() => setOpen(false)} forceExpanded />
           </div>
         </SheetContent>
       </Sheet>

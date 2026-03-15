@@ -24,7 +24,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { GradientMesh } from "@/components/ui/gradient-mesh";
 import { register } from "@/actions/auth";
 
 interface RegisterFormProps {
@@ -55,7 +54,7 @@ export function RegisterForm({ schoolSlug, schoolId, schoolName, requireJoinCode
   const showTransition = loading && !error;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <div className="relative z-10 flex min-h-screen items-center justify-center px-4">
       <AnimatePresence>
         {showTransition && (
           <motion.div
@@ -68,7 +67,6 @@ export function RegisterForm({ schoolSlug, schoolId, schoolName, requireJoinCode
           </motion.div>
         )}
       </AnimatePresence>
-      <GradientMesh />
       <Link
         href="/"
         className="group absolute left-6 top-6 flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-primary"

@@ -96,8 +96,8 @@ export default async function AdminDashboard({
 
       <MagicBentoGrid className="mt-8 grid gap-6 lg:grid-cols-2">
         {/* Recent Documents */}
-        <MagicBentoCard enableBorderGlow enableParticles={false} className="rounded-xl">
-          <Card className="metallic-card">
+        <MagicBentoCard enableParticles={false} className="rounded-xl h-full">
+          <Card className="metallic-card h-full">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-base">Recent Documents</CardTitle>
               <Button variant="ghost" size="sm" asChild>
@@ -149,8 +149,8 @@ export default async function AdminDashboard({
         </MagicBentoCard>
 
         {/* Pending Approvals */}
-        <MagicBentoCard enableBorderGlow enableParticles={false} className="rounded-xl">
-          <Card className="metallic-card">
+        <MagicBentoCard enableParticles={false} className="rounded-xl h-full">
+          <Card className="metallic-card h-full">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-base">Pending Approvals</CardTitle>
               <Button variant="ghost" size="sm" asChild>

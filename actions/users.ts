@@ -71,11 +71,27 @@ export async function changeUserRole(userId: string, role: "admin" | "parent", s
   return { success: true };
 }
 
-export async function deleteUser(userId: string) {
+export async function deleteUser(userId: string, schoolId: string) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  if (!user) return { error: "Not authenticated" };
+
+  // Only allow self-deletion or admin deleting a member of their school
+  if (user.id !== userId) {
+    const { data: callerMembership } = await supabase
+      .from("school_memberships")
+      .select("role")
+      .eq("user_id", user.id)
+      .eq("school_id", schoolId)
+      .single();
+
+    if (callerMembership?.role !== "admin") {
+      return { error: "Unauthorized" };
+    }
+  }
 
   const { error } = await supabase
     .from("profiles")

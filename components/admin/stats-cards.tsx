@@ -63,7 +63,7 @@ export function StatsCards({
   return (
     <MagicBentoGrid className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {stats.map((stat) => (
-        <MagicBentoCard key={stat.title} enableBorderGlow enableParticles className="rounded-xl">
+        <MagicBentoCard key={stat.title} enableParticles className="rounded-xl">
           <Card className="metallic-card border-border/50">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-xs font-medium uppercase tracking-widest text-muted-foreground">

@@ -355,7 +355,7 @@ export const Waves = forwardRef<WavesHandle, WavesProps>(function Waves({
   return (
     <div
       ref={containerRef}
-      className={`pointer-events-none fixed inset-0 z-40 overflow-hidden ${className}`}
+      className={`pointer-events-none fixed inset-0 z-40 overflow-hidden ${className ?? ""}`}
       style={{ backgroundColor, opacity: 0.3 }}
       aria-hidden="true"
     >

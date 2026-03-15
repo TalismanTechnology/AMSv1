@@ -251,7 +251,7 @@ export function DocumentsClient({
 
       <div className="flex gap-4">
         <div className="hidden md:block">
-          <MagicBentoCard enableBorderGlow enableParticles={false} className="rounded-lg">
+          <MagicBentoCard enableParticles={false} className="rounded-lg">
             <FolderTree
               folders={folders}
               selectedFolderId={selectedFolderId}
@@ -260,7 +260,7 @@ export function DocumentsClient({
             />
           </MagicBentoCard>
         </div>
-        <MagicBentoCard enableBorderGlow enableParticles={false} className="flex-1 min-w-0 rounded-lg">
+        <MagicBentoCard enableParticles={false} className="flex-1 min-w-0 rounded-lg">
           <DocumentTable
             documents={filteredDocs}
             onEdit={setEditingDoc}

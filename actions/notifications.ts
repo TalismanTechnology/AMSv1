@@ -42,11 +42,14 @@ export async function getUnreadCount(schoolId: string) {
 
 export async function markNotificationRead(id: string, schoolId: string) {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
 
   const { error } = await supabase
     .from("notifications")
     .update({ read: true })
     .eq("id", id)
+    .eq("user_id", user.id)
     .eq("school_id", schoolId);
 
   if (error) return { error: error.message };

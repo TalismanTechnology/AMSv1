@@ -6,7 +6,7 @@ import { after } from "next/server";
 import { logAudit } from "@/lib/audit";
 import type { PreviewResult, ContentSearchResult } from "@/lib/types";
 
-const BLOCKED_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg"];
+const BLOCKED_EXTENSIONS = ["jpg", "jpeg", "gif", "webp", "bmp", "svg"];
 
 const TYPE_MAP: Record<string, string> = {
   pdf: "pdf",
@@ -17,6 +17,7 @@ const TYPE_MAP: Record<string, string> = {
   pptx: "pptx",
   ppt: "pptx",
   txt: "txt",
+  png: "image",
 };
 
 function triggerProcessing(documentId: string) {
@@ -58,7 +59,7 @@ export async function uploadDocument(formData: FormData) {
   if (BLOCKED_EXTENSIONS.includes(ext)) {
     return {
       error:
-        "Image files are not supported. Please upload PDF, Word, Excel, PowerPoint, or TXT files.",
+        "This image format is not supported. Please upload PDF, Word, Excel, PowerPoint, TXT, or PNG files.",
     };
   }
 
@@ -330,12 +331,16 @@ export async function searchDocumentsByName(
 
   if (!user) return { error: "Not authenticated", documents: [] };
 
+  // Sanitize query for use in PostgREST filter strings — escape special chars
+  const sanitized = query.replace(/[%_\\,.()"']/g, "");
+  if (!sanitized.trim()) return { documents: [] };
+
   const { data: docs, error } = await supabase
     .from("documents")
     .select("id, title, file_type, file_url, description")
     .eq("school_id", schoolId)
     .eq("status", "ready")
-    .or(`title.ilike.%${query}%,description.ilike.%${query}%`)
+    .or(`title.ilike.%${sanitized}%,description.ilike.%${sanitized}%`)
     .order("updated_at", { ascending: false })
     .limit(5);
 

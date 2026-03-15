@@ -51,7 +51,7 @@ export function ParentAnnouncementsClient({
     <MagicBentoGrid className="mx-auto max-w-2xl space-y-4 p-4 md:p-8">
       <h1 className="text-2xl font-bold text-foreground">Announcements</h1>
       {announcements.map((a) => (
-        <MagicBentoCard key={a.id} enableBorderGlow className="rounded-xl">
+        <MagicBentoCard key={a.id} className="rounded-xl">
         <Card
           className={
             a.priority === "urgent"

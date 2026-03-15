@@ -23,7 +23,7 @@ export default async function SuperAdminLayout({
   if (profile?.role !== "super_admin") redirect("/");
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="relative z-10 min-h-screen bg-background/60 backdrop-blur-sm">
       <header className="border-b px-6 py-4">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold">Super Admin</h1>
