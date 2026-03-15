@@ -282,7 +282,6 @@ export default function LandingPage() {
               <video
                 ref={videoRef}
                 src="/videos/animation.mp4"
-                muted
                 playsInline
                 preload="auto"
                 className="h-full w-full object-cover"
