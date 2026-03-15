@@ -22,7 +22,7 @@ export async function extractText(
             {
               type: "image",
               image: base64,
-              mimeType: "image/png",
+              mediaType: "image/png",
             },
             {
               type: "text",
