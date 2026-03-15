@@ -98,10 +98,10 @@ export default function LandingPage() {
   const isInView = useInView(videoContainerRef, { margin: "-200px 0px -100px 0px" });
 
   const [currentSub, setCurrentSub] = useState("");
-  const [isMuted, setIsMuted] = useState(true);
+  const [isMuted, setIsMuted] = useState(false);
   const [videoEnded, setVideoEnded] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const isMutedRef = useRef(true);
+  const isMutedRef = useRef(false);
   const segmentIndexRef = useRef(-1);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isPlayingRef = useRef(false);
