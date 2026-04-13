@@ -111,7 +111,7 @@ export function DocumentUpload({
         status: "idle" as FileStatus,
         progress: 0,
       }));
-      setItems((prev) => [...prev, ...newItems].slice(0, 10));
+      setItems((prev) => [...prev, ...newItems]);
     },
     []
   );
@@ -119,7 +119,7 @@ export function DocumentUpload({
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: ACCEPTED_TYPES,
-    maxFiles: 10,
+    maxFiles: undefined,
     maxSize: 50 * 1024 * 1024,
   });
 
@@ -174,7 +174,8 @@ export function DocumentUpload({
     const ext = item.file.name.split(".").pop()?.toLowerCase() || "";
     const fileType = TYPE_MAP[ext] || "txt";
     const timestamp = Date.now();
-    const storageKey = `${schoolId}/${timestamp}-${item.file.name}`;
+    const safeName = item.file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const storageKey = `${schoolId}/${timestamp}-${safeName}`;
 
     // Upload to Supabase Storage directly from browser
     const { error: uploadError } = await supabase.storage
@@ -273,7 +274,7 @@ export function DocumentUpload({
                 : "Drag & drop files, or click to browse"}
             </p>
             <p className="mt-1 text-xs text-muted-foreground/70">
-              PDF, Word, Excel, PowerPoint, Text, PNG (max 10 files, 50MB each)
+              PDF, Word, Excel, PowerPoint, Text, PNG (50MB each)
             </p>
           </div>
 

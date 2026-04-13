@@ -137,9 +137,28 @@ export async function updateSession(request: NextRequest) {
       return supabaseResponse;
     }
 
-    // Pending page — allow if user has an unapproved membership
+    // Pending page — redirect away if already approved
     if (isSchoolPendingRoute) {
       if (!user) return redirectTo(request, `/s/${slug}/login`);
+
+      const [{ data: profile }, { data: membership }] = await Promise.all([
+        supabase.from("profiles").select("role").eq("id", user.id).single(),
+        supabase
+          .from("school_memberships")
+          .select("role, approved")
+          .eq("user_id", user.id)
+          .eq("school_id", school.id)
+          .single(),
+      ]);
+
+      if (profile?.role === "super_admin" || (membership && membership.approved)) {
+        const dest =
+          profile?.role === "super_admin" || membership?.role === "admin"
+            ? `/s/${slug}/admin`
+            : `/s/${slug}/parent`;
+        return redirectTo(request, dest);
+      }
+
       return supabaseResponse;
     }
 
