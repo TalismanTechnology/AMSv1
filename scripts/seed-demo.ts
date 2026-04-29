@@ -753,7 +753,7 @@ async function processOneDocument(
   const { text: content } = await withRetry(
     () =>
       generateText({
-        model: google("gemini-2.0-flash"),
+        model: google("gemini-2.5-flash"),
         prompt: `Generate a realistic school document for Westfield Academy, a K-12 school.
 
 Title: ${docDef.title}

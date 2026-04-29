@@ -317,7 +317,7 @@ export async function POST(request: NextRequest) {
 
     // Stream the response, save assistant message on finish
     const result = streamText({
-      model: google("gemini-2.0-flash"),
+      model: google("gemini-2.5-flash"),
       system: systemPrompt,
       messages: modelMessages,
       temperature: aiTemperature,

@@ -13,7 +13,7 @@ export async function generateSummary(
       : text;
 
   const { text: summary } = await generateText({
-    model: google("gemini-2.0-flash"),
+    model: google("gemini-2.5-flash"),
     prompt: `You are summarizing a school document for parents.
 
 Document title: "${documentTitle}"

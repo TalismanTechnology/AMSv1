@@ -14,7 +14,7 @@ export async function extractText(
   if (fileType === "image") {
     const base64 = buffer.toString("base64");
     const { text } = await generateText({
-      model: google("gemini-2.0-flash"),
+      model: google("gemini-2.5-flash"),
       messages: [
         {
           role: "user",

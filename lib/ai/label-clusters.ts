@@ -27,7 +27,7 @@ export async function labelClusters(
     .join("\n\n");
 
   const { text } = await generateText({
-    model: google("gemini-2.0-flash"),
+    model: google("gemini-2.5-flash"),
     prompt: `You are labeling groups of similar questions that parents asked a school chatbot. For each cluster below, provide a short topic label (3-8 words) that describes what parents are asking about.
 
 ${clusterDescriptions}

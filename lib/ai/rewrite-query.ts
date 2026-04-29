@@ -46,7 +46,7 @@ export async function rewriteQueryWithContext(
 
   try {
     const { text } = await generateText({
-      model: google("gemini-2.0-flash"),
+      model: google("gemini-2.5-flash"),
       prompt: `Given this conversation, rewrite the follow-up question as a standalone search query. Return ONLY the rewritten query, nothing else.
 
 Conversation:

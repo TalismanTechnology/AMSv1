@@ -66,7 +66,7 @@ export async function generateBulkDocuments(
     try {
       // Generate realistic content with AI
       const { text: content } = await generateText({
-        model: google("gemini-2.0-flash"),
+        model: google("gemini-2.5-flash"),
         prompt: `Generate a realistic school document with the following details:
 Title: ${row.title}
 Description: ${row.description}
