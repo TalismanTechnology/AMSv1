@@ -64,9 +64,9 @@ export function ParentSidebarContent({ onNavigate, forceExpanded }: SidebarConte
         )}
       </div>
 
-      {!collapsed && memberships.length > 1 && (
-        <div className="border-b px-3 py-2">
-          <SchoolSwitcher />
+      {memberships.length > 1 && (
+        <div className={cn("border-b py-2", collapsed ? "px-2" : "px-3")}>
+          <SchoolSwitcher collapsed={collapsed} />
         </div>
       )}
 

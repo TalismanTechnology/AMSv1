@@ -68,9 +68,9 @@ export function AdminSidebarContent({ onNavigate, forceExpanded }: SidebarConten
         {!collapsed && <span className="text-lg font-bold metallic-text truncate">{school.name}</span>}
       </div>
 
-      {!collapsed && memberships.length > 1 && (
-        <div className="border-b px-3 py-2">
-          <SchoolSwitcher />
+      {memberships.length > 1 && (
+        <div className={cn("border-b py-2", collapsed ? "px-2" : "px-3")}>
+          <SchoolSwitcher collapsed={collapsed} />
         </div>
       )}
 
