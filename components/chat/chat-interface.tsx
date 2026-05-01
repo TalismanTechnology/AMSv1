@@ -16,7 +16,6 @@ import { SourcePanel } from "./source-panel";
 import { SourcePanelProvider } from "./source-panel-context";
 import { TypingIndicator } from "@/components/ui/typing-indicator";
 import { ChatExport } from "./chat-export";
-import { NewChatFab } from "./new-chat-fab";
 import { createChatSession } from "@/actions/chat";
 import { searchDocumentsByName } from "@/actions/documents";
 import { parseFollowUps } from "@/lib/chat-utils";
@@ -383,11 +382,6 @@ export function ChatInterface({
 
         {/* Artifact panel */}
         <SourcePanel />
-
-        {/* Floating new chat button */}
-        {onNewChat && (
-          <NewChatFab visible={messages.length > 2} onClick={onNewChat} />
-        )}
       </div>
     </SourcePanelProvider>
   );

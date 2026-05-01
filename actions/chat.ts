@@ -108,3 +108,22 @@ export async function deleteChatSession(sessionId: string, schoolId: string) {
   revalidatePath("/", "layout");
   return { success: true };
 }
+
+export async function deleteAllChatSessions(schoolId: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { error: "Not authenticated" };
+
+  const { error } = await supabase
+    .from("chat_sessions")
+    .delete()
+    .eq("user_id", user.id)
+    .eq("school_id", schoolId);
+
+  if (error) return { error: error.message };
+  revalidatePath("/", "layout");
+  return { success: true };
+}

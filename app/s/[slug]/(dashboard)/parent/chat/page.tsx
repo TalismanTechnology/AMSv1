@@ -18,7 +18,8 @@ export default async function ChatPage({
     .select("*")
     .eq("user_id", user.id)
     .eq("school_id", school.id)
-    .order("updated_at", { ascending: false });
+    .order("updated_at", { ascending: false })
+    .limit(1);
 
   // Load suggested questions from settings (fallback to empty)
   const { data: settings } = await supabase

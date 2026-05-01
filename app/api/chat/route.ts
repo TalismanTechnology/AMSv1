@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
     // Search for relevant document chunks (non-fatal — continue without sources on failure)
     let relevantChunks: RelevantChunk[] = [];
     try {
-      relevantChunks = await searchDocuments(searchQuery, 8, 0.5, schoolId);
+      relevantChunks = await searchDocuments(searchQuery, 15, 0.5, schoolId);
     } catch (error) {
       console.error("RAG search failed (continuing without sources):", error);
     }
