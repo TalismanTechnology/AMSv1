@@ -47,7 +47,7 @@ export async function processDocument(documentId: string) {
 
     // 2b. Convert to PDF for viewer (non-fatal)
     let pdfPath: string | null = null;
-    if (doc.file_type !== "pdf" && doc.file_type !== "txt" && doc.file_type !== "image") {
+    if (doc.file_type !== "pdf" && doc.file_type !== "txt" && !doc.file_type.startsWith("image")) {
       try {
         logMem("Starting PDF conversion");
         const pdfBuffer = await convertToPdf(buffer, doc.file_type);

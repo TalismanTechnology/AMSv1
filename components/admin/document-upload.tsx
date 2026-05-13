@@ -49,6 +49,8 @@ const ACCEPTED_TYPES = {
   ],
   "text/plain": [".txt"],
   "image/png": [".png"],
+  "image/jpeg": [".jpg", ".jpeg"],
+  "image/webp": [".webp"],
 };
 
 const TYPE_MAP: Record<string, string> = {
@@ -60,7 +62,10 @@ const TYPE_MAP: Record<string, string> = {
   pptx: "pptx",
   ppt: "pptx",
   txt: "txt",
-  png: "image",
+  png: "image_png",
+  jpg: "image_jpeg",
+  jpeg: "image_jpeg",
+  webp: "image_webp",
 };
 
 type FileStatus = "idle" | "uploading" | "processing" | "ready" | "error";

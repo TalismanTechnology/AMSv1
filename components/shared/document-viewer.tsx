@@ -94,7 +94,7 @@ export function DocumentViewer({
       // Load text content as fallback when no inline/PDF view is available
       const canViewInline =
         doc.file_type === "pdf" ||
-        doc.file_type === "image" ||
+        doc.file_type.startsWith("image") ||
         hasPdfResult ||
         DOCX_TYPES.has(doc.file_type);
       if (!canViewInline) {
@@ -154,7 +154,7 @@ export function DocumentViewer({
     (document.file_type === "pdf" || hasPdf) && viewUrl;
   const showAsDocx =
     DOCX_TYPES.has(document.file_type) && !hasPdf && docxBlob;
-  const showAsImage = document.file_type === "image" && viewUrl;
+  const showAsImage = document.file_type.startsWith("image") && viewUrl;
 
   async function handleDownload() {
     if (!document) return;
@@ -234,7 +234,7 @@ export function DocumentViewer({
         {/* Footer */}
         <div className="flex items-center justify-between border-t px-6 py-3">
           <div className="flex items-center gap-2">
-            {document.file_type === "image" && viewUrl && (
+            {document.file_type.startsWith("image") && viewUrl && (
               <>
                 <Button
                   variant="outline"
