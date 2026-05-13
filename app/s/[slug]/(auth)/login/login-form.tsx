@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { LogoSpinner } from "@/components/logo-spinner";
 import { Logo } from "@/components/logo";
@@ -18,6 +19,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { login } from "@/actions/auth";
+import { GoogleSignInButton } from "@/components/google-sign-in-button";
 
 interface LoginFormProps {
   schoolSlug: string;
@@ -26,7 +28,8 @@ interface LoginFormProps {
 }
 
 export function LoginForm({ schoolSlug, schoolId, schoolName }: LoginFormProps) {
-  const [error, setError] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const [error, setError] = useState<string | null>(searchParams.get("error"));
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(formData: FormData) {
@@ -78,14 +81,23 @@ export function LoginForm({ schoolSlug, schoolId, schoolName }: LoginFormProps) 
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {error && (
+              <div className="mb-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+                {error}
+              </div>
+            )}
+            <GoogleSignInButton schoolSlug={schoolSlug} />
+            <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-glass-border" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-card px-2 text-muted-foreground">or</span>
+              </div>
+            </div>
             <form action={handleSubmit} className="space-y-4">
               <input type="hidden" name="school_slug" value={schoolSlug} />
               <input type="hidden" name="school_id" value={schoolId} />
-              {error && (
-                <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
-                  {error}
-                </div>
-              )}
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input

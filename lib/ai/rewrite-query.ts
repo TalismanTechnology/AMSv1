@@ -24,8 +24,11 @@ export async function rewriteQueryWithContext(
     return lastMessageText;
   }
 
-  // If the message is already long/specific enough, skip rewriting
-  if (lastMessageText.split(" ").length > 12) {
+  // If the message is already long/specific enough, skip rewriting.
+  // 25 words catches long-but-vague follow-ups ("ok so about that thing
+  // you mentioned with the bus schedule on Wednesdays, what time again?")
+  // while still skipping rewrite for truly standalone long queries.
+  if (lastMessageText.split(" ").length > 25) {
     return lastMessageText;
   }
 

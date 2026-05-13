@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
       childrenResult.status === "fulfilled" ? childrenResult.value : [];
 
     let customPrompt = "";
-    let aiTemperature = 0.7;
+    let aiTemperature = 0.3;
     if (settings?.custom_system_prompt) {
       customPrompt = "\n\n" + settings.custom_system_prompt;
     }
@@ -163,10 +163,10 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Only show sources that are genuinely relevant (similarity >= 0.65),
+      // Only show sources that are genuinely relevant (similarity >= 0.55),
       // sort by similarity descending, cap at 3
       const uniqueChunks = [...bestByDoc.values()]
-        .filter((c) => c.similarity >= 0.65)
+        .filter((c) => c.similarity >= 0.55)
         .sort((a, b) => b.similarity - a.similarity)
         .slice(0, 3);
 
@@ -246,7 +246,7 @@ export async function POST(request: NextRequest) {
         .then(({ error }) => { if (error) console.error("Failed to save analytics event:", error); });
 
       // Record unanswered question if no quality sources were found
-      // (sources is empty when no chunks pass the 0.65 similarity threshold)
+      // (sources is empty when no chunks pass the 0.55 similarity threshold)
       debugLog(`Unanswered check: sources=${sources.length}, sessionId=${sessionId}, schoolId=${schoolId}`);
       if (sources.length === 0) {
         debugLog(`Recording unanswered question: "${lastMessageText.slice(0, 80)}"`);
