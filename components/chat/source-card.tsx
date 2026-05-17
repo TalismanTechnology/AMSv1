@@ -19,6 +19,11 @@ export function SourceCard({ source, index }: { source: ChatSource; index?: numb
           <FileText className="h-4 w-4 shrink-0 text-primary" />
           <span className="truncate font-medium text-foreground">
             {index != null ? `[${index}] ` : ""}{source.title}
+            {source.location?.label && (
+              <span className="ml-1.5 text-xs font-normal text-muted-foreground/80">
+                · {source.location.label}
+              </span>
+            )}
           </span>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">

@@ -58,7 +58,7 @@ export function ParentSidebarContent({ onNavigate, forceExpanded }: SidebarConte
   return (
     <>
       <div className="flex items-center gap-2 border-b px-4 py-4  overflow-hidden">
-        <Logo size={collapsed ? 16 : 28} className="shrink-0 text-primary drop-shadow-[0_0_8px_var(--glow-primary)] drop-shadow-[0_0_12px_oklch(1_0_0/40%)]" />
+        <Logo size={collapsed ? 16 : 28} className="shrink-0 text-primary" />
         {!collapsed && (
           <span className="text-lg font-bold metallic-text truncate">{school.name}</span>
         )}

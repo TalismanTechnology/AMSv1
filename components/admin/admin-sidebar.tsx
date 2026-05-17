@@ -92,7 +92,7 @@ export function AdminSidebarContent({ onNavigate, forceExpanded }: SidebarConten
                 collapsed && "justify-center px-2"
               )}
             >
-              <item.icon className={cn("h-5 w-5 shrink-0", isActive && "drop-shadow-[0_0_6px_oklch(1_0_0/50%)]")} />
+              <item.icon className="h-5 w-5 shrink-0" />
               {!collapsed && item.label}
             </Link>
           );

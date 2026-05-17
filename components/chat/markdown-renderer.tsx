@@ -1,5 +1,6 @@
 "use client";
 
+import { Children, Fragment, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ChatSource } from "@/lib/types";
@@ -10,26 +11,106 @@ interface MarkdownRendererProps {
   onSourceClick?: (source: ChatSource) => void;
 }
 
-export function MarkdownRenderer({ content }: MarkdownRendererProps) {
-  // Strip any leftover [Source N] references the model may still produce
-  const processedContent = content.replace(/\[Source\s+\d+\]/gi, "");
+const CITATION_RE = /\[(\d+)\]/g;
+
+function CitationBadge({
+  n,
+  onClick,
+  title,
+}: {
+  n: number;
+  onClick?: () => void;
+  title?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-label={title ? `Source ${n}: ${title}` : `Source ${n}`}
+      className="mx-0.5 inline-flex h-[1.1em] min-w-[1.1em] items-center justify-center rounded border border-glass-border metallic-surface px-[0.25em] align-[0.15em] text-[0.7em] font-medium neon-icon-blue leading-none transition-colors hover:bg-primary/15 hover:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
+    >
+      {n}
+    </button>
+  );
+}
+
+// Walk a ReactMarkdown children tree, replacing [N] occurrences inside text
+// nodes with clickable CitationBadge buttons. Non-text children pass through.
+function renderWithCitations(
+  children: ReactNode,
+  sources: ChatSource[] | undefined,
+  onSourceClick: ((source: ChatSource) => void) | undefined
+): ReactNode {
+  if (!sources || sources.length === 0) return children;
+
+  return Children.map(children, (child, idx) => {
+    if (typeof child !== "string") return child;
+
+    const parts: ReactNode[] = [];
+    let cursor = 0;
+    CITATION_RE.lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = CITATION_RE.exec(child)) !== null) {
+      const n = parseInt(match[1], 10);
+      const source = sources.find((s) => s.source_number === n);
+      if (!source) continue; // leave bogus [N] in place (will be added below)
+
+      if (match.index > cursor) {
+        parts.push(child.slice(cursor, match.index));
+      }
+      const tooltip = source.location?.label
+        ? `${source.title} — ${source.location.label}`
+        : source.title;
+      parts.push(
+        <CitationBadge
+          key={`cite-${idx}-${match.index}-${n}`}
+          n={n}
+          title={tooltip}
+          onClick={onSourceClick ? () => onSourceClick(source) : undefined}
+        />
+      );
+      cursor = match.index + match[0].length;
+    }
+
+    if (cursor === 0) return child;
+    if (cursor < child.length) parts.push(child.slice(cursor));
+    return <Fragment key={`cf-${idx}`}>{parts}</Fragment>;
+  });
+}
+
+export function MarkdownRenderer({
+  content,
+  sources,
+  onSourceClick,
+}: MarkdownRendererProps) {
+  // Also strip the older `[Source N]` form in case any cached responses include it
+  const processedContent = content.replace(/\[Source\s+(\d+)\]/gi, "[$1]");
+  const withCites = (children: ReactNode) =>
+    renderWithCitations(children, sources, onSourceClick);
 
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
       components={{
-        p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-        strong: ({ children }) => (
-          <strong className="font-semibold">{children}</strong>
+        p: ({ children }) => (
+          <p className="mb-2 last:mb-0">{withCites(children)}</p>
         ),
-        em: ({ children }) => <em className="italic">{children}</em>,
+        strong: ({ children }) => (
+          <strong className="font-semibold">{withCites(children)}</strong>
+        ),
+        em: ({ children }) => (
+          <em className="italic">{withCites(children)}</em>
+        ),
         ul: ({ children }) => (
           <ul className="list-disc pl-4 mb-2 space-y-1">{children}</ul>
         ),
         ol: ({ children }) => (
           <ol className="list-decimal pl-4 mb-2 space-y-1">{children}</ol>
         ),
-        li: ({ children }) => <li className="text-sm">{children}</li>,
+        li: ({ children }) => (
+          <li className="text-sm">{withCites(children)}</li>
+        ),
         a: ({ href, children }) => (
           <a
             href={href}
@@ -63,7 +144,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
         ),
         blockquote: ({ children }) => (
           <blockquote className="border-l-2 border-primary/30 pl-3 italic text-muted-foreground mb-2">
-            {children}
+            {withCites(children)}
           </blockquote>
         ),
         table: ({ children }) => (
@@ -79,7 +160,9 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
           </th>
         ),
         td: ({ children }) => (
-          <td className="border border-border px-2 py-1">{children}</td>
+          <td className="border border-border px-2 py-1">
+            {withCites(children)}
+          </td>
         ),
       }}
     >

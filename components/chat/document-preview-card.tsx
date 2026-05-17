@@ -116,6 +116,11 @@ function DocumentSourceCard({
           <span className="min-w-0 flex-1 truncate font-medium text-foreground">
             {index != null ? `[${index}] ` : ""}
             {source.title}
+            {source.location?.label && (
+              <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                · {source.location.label}
+              </span>
+            )}
           </span>
           {source.file_type && (
             <Badge variant="secondary" className="shrink-0 text-[10px] uppercase">

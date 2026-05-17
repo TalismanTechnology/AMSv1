@@ -25,7 +25,7 @@ export default async function SchoolDashboardLayout({
       memberships={memberships}
       disableAnimations={settings.disable_animations}
     >
-      {children}
+      <div className="neo contents">{children}</div>
     </SchoolProvider>
   );
 }

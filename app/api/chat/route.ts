@@ -13,8 +13,10 @@ import { google } from "@ai-sdk/google";
 import {
   searchDocuments,
   buildSystemPrompt,
+  formatChunkLocation,
   type RelevantChunk,
 } from "@/lib/ai/rag";
+import type { ChatSourceLocation } from "@/lib/types";
 import { generateEmbedding } from "@/lib/ai/embeddings";
 import { assignToCluster } from "@/lib/ai/cluster-assignment";
 import { sendClusterAlert } from "@/lib/alerts/cluster-alerts";
@@ -129,18 +131,36 @@ export async function POST(request: NextRequest) {
     // Log context availability for debugging
     console.log(`[Chat] Context for school ${schoolId}: ${relevantChunks.length} doc chunks, ${events.length} events, ${announcements.length} announcements`);
 
+    // Deduplicate chunks by document (keep highest-similarity chunk per doc),
+    // filter to relevant, and cap. The same ordered set is fed to the LLM as
+    // [Source 1..N] AND returned to the client as sources[N-1], so inline
+    // [N] citations the model emits always map to a real source card.
+    const citableChunks: RelevantChunk[] = (() => {
+      if (relevantChunks.length === 0) return [];
+      const bestByDoc = new Map<string, RelevantChunk>();
+      for (const chunk of relevantChunks) {
+        const existing = bestByDoc.get(chunk.document_id);
+        if (!existing || chunk.similarity > existing.similarity) {
+          bestByDoc.set(chunk.document_id, chunk);
+        }
+      }
+      return [...bestByDoc.values()]
+        .filter((c) => c.similarity >= 0.55)
+        .sort((a, b) => b.similarity - a.similarity)
+        .slice(0, 5);
+    })();
+
     // Build system prompt with documents, events, announcements, and children context
     const systemPrompt =
-      buildSystemPrompt(relevantChunks, {
+      buildSystemPrompt(citableChunks, {
         eventsContext: formatEventsContext(events),
         announcementsContext: formatAnnouncementsContext(announcements),
         childrenContext: formatChildrenContext(children),
         todayString: getTodayString(),
       }) + customPrompt;
 
-    // Prepare sources for the response — only show document sources that
-    // were actually found via RAG. Deduplicate by document (keep highest
-    // similarity chunk per document) and cap at 3.
+    // Prepare sources for the response — same set + same numbering as the
+    // labels in the system prompt above.
     const sources: {
       document_id: string;
       title: string;
@@ -151,46 +171,34 @@ export async function POST(request: NextRequest) {
       chunk_index: number;
       source_number: number;
       source_type: "document";
-    }[] = [];
-
-    if (relevantChunks.length > 0) {
-      // Deduplicate: keep the highest-similarity chunk per document
-      const bestByDoc = new Map<string, (typeof relevantChunks)[number]>();
-      for (const chunk of relevantChunks) {
-        const existing = bestByDoc.get(chunk.document_id);
-        if (!existing || chunk.similarity > existing.similarity) {
-          bestByDoc.set(chunk.document_id, chunk);
-        }
+      location: ChatSourceLocation | null;
+    }[] = citableChunks.map((chunk, i) => {
+      // Build a short preview for the source card. We deliberately do NOT
+      // append an ellipsis here — the panel highlights `chunk_content` inside
+      // the full document text, and any trailing character that isn't in the
+      // source breaks the match (see locateChunk in source-panel.tsx).
+      let excerpt = chunk.content;
+      if (excerpt.length > 200) {
+        const truncated = excerpt.slice(0, 200);
+        const lastPeriod = truncated.lastIndexOf(". ");
+        excerpt =
+          lastPeriod > 80
+            ? truncated.slice(0, lastPeriod + 1)
+            : truncated.replace(/\s+\S*$/, "");
       }
-
-      // Only show sources that are genuinely relevant (similarity >= 0.55),
-      // sort by similarity descending, cap at 3
-      const uniqueChunks = [...bestByDoc.values()]
-        .filter((c) => c.similarity >= 0.55)
-        .sort((a, b) => b.similarity - a.similarity)
-        .slice(0, 3);
-
-      for (let i = 0; i < uniqueChunks.length; i++) {
-        const chunk = uniqueChunks[i];
-        let excerpt = chunk.content;
-        if (excerpt.length > 200) {
-          const truncated = excerpt.slice(0, 200);
-          const lastPeriod = truncated.lastIndexOf(". ");
-          excerpt = lastPeriod > 80 ? truncated.slice(0, lastPeriod + 1) : truncated.replace(/\s+\S*$/, "") + "…";
-        }
-        sources.push({
-          document_id: chunk.document_id,
-          title: chunk.document_title || "Unknown",
-          chunk_content: excerpt,
-          similarity: chunk.similarity,
-          file_url: chunk.document_file_url,
-          file_type: chunk.document_file_type,
-          chunk_index: chunk.chunk_index,
-          source_number: i + 1,
-          source_type: "document" as const,
-        });
-      }
-    }
+      return {
+        document_id: chunk.document_id,
+        title: chunk.document_title || "Unknown",
+        chunk_content: excerpt,
+        similarity: chunk.similarity,
+        file_url: chunk.document_file_url,
+        file_type: chunk.document_file_type,
+        chunk_index: chunk.chunk_index,
+        source_number: i + 1,
+        source_type: "document" as const,
+        location: formatChunkLocation(chunk.metadata),
+      };
+    });
 
     // Save user message in the background (fire and forget)
     if (sessionId) {

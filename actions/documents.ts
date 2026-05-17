@@ -6,9 +6,7 @@ import { after } from "next/server";
 import { logAudit } from "@/lib/audit";
 import type { PreviewResult, ContentSearchResult } from "@/lib/types";
 
-// GIF/BMP/SVG still blocked: GIF animation frames and SVG vector content
-// confuse the vision model; BMP is rarely uploaded and large.
-const BLOCKED_EXTENSIONS = ["gif", "bmp", "svg"];
+const BLOCKED_EXTENSIONS = ["png", "jpg", "jpeg", "webp", "gif", "bmp", "svg"];
 
 const TYPE_MAP: Record<string, string> = {
   pdf: "pdf",
@@ -19,10 +17,6 @@ const TYPE_MAP: Record<string, string> = {
   pptx: "pptx",
   ppt: "pptx",
   txt: "txt",
-  png: "image_png",
-  jpg: "image_jpeg",
-  jpeg: "image_jpeg",
-  webp: "image_webp",
 };
 
 function triggerProcessing(documentId: string) {
@@ -64,7 +58,7 @@ export async function uploadDocument(formData: FormData) {
   if (BLOCKED_EXTENSIONS.includes(ext)) {
     return {
       error:
-        "This image format is not supported. Please upload PDF, Word, Excel, PowerPoint, TXT, PNG, JPG, or WEBP files.",
+        "Image files are not supported. Please upload PDF, Word, Excel, PowerPoint, or TXT files.",
     };
   }
 

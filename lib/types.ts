@@ -126,6 +126,22 @@ export interface ChatSource {
   chunk_index?: number;
   source_number?: number;
   source_type?: ChatSourceType;
+  // Per-chunk location within the source document. Populated when the parser
+  // can extract structure: page number for PDFs, sheet name for XLSX, slide
+  // number for PPTX, section heading for DOCX. Null when the file type doesn't
+  // have a meaningful intra-document location.
+  location?: ChatSourceLocation | null;
+}
+
+export interface ChatSourceLocation {
+  // Short human-readable label for display, e.g. "p. 14" or "Sheet: Q3" or
+  // "Slide 5" or "§3 Cafeteria Policy". Always non-empty when location is set.
+  label: string;
+  // Raw fields the label was derived from; useful for sorting/highlighting.
+  page?: number;
+  sheet?: string;
+  slide?: number;
+  section?: string;
 }
 
 export interface ContentSearchResult {

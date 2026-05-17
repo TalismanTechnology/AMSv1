@@ -1,30 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import {
-  MessageSquare,
-  FileText,
-  Shield,
-  Upload,
-  Sparkles,
-  CheckCircle,
-  ChevronDown,
-} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   RevealOnScroll,
   RevealOnScrollDirectional,
   StaggerChildren,
-  AnimatedNumber,
   ScrollProgressBar,
   ScrollHeader,
   BlurReveal,
   SlotMachineHero,
+  Parallax,
   motion,
-  fadeInUp,
   metallicCardEntrance,
 } from "@/components/motion";
 import { Logo } from "@/components/logo";
+import { HowItWorksDemo } from "@/components/landing/how-it-works-demo";
+import {
+  IngestionMockup,
+  EmbeddingsMockup,
+  RetrievalMockup,
+  AnswerMockup,
+} from "@/components/landing/mockups";
 
 const testimonials = [
   {
@@ -50,29 +47,110 @@ const testimonials = [
   },
 ];
 
-const howItWorks = [
-  {
-    icon: Upload,
-    title: "Admin uploads documents",
-    description:
-      "School administrators upload handbooks, policies, calendars, and other official documents to the platform.",
-    neon: "neon-icon-blue",
-  },
-  {
-    icon: Sparkles,
-    title: "AI processes & indexes",
-    description:
-      "Our AI reads, understands, and indexes every document so it can instantly find relevant answers to any question.",
-    neon: "neon-icon-amber",
-  },
-  {
-    icon: CheckCircle,
-    title: "Parents ask, AI answers",
-    description:
-      "Parents type questions in plain English and get accurate answers with citations to the exact source documents.",
-    neon: "neon-icon-green",
-  },
-];
+function Step({
+  number,
+  title,
+  description,
+  highlights,
+  mockup,
+  mockupSide,
+}: {
+  number: string;
+  title: string;
+  description: string;
+  highlights: string[];
+  mockup: React.ReactNode;
+  mockupSide: "left" | "right";
+}) {
+  const textFirst = mockupSide === "right";
+  const textDirection = textFirst ? "left" : "right";
+  const mockupDirection = textFirst ? "right" : "left";
+  return (
+    <section className="relative mx-auto max-w-6xl px-6 py-20 sm:py-28">
+      <div className="grid items-center gap-12 md:grid-cols-2 md:gap-16">
+        {/* Copy column */}
+        <RevealOnScrollDirectional
+          direction={textDirection}
+          className={textFirst ? "md:order-1" : "md:order-2"}
+        >
+          <div className="relative">
+            <motion.span
+              aria-hidden
+              initial={{ opacity: 0, x: textFirst ? -120 : 120, scale: 0.7 }}
+              whileInView={{ opacity: 0.08, x: 0, scale: 1 }}
+              viewport={{ once: true, amount: 0.3 }}
+              transition={{ duration: 0.8, ease: [0, 0, 0.2, 1] }}
+              className="pointer-events-none absolute -top-10 -left-2 select-none text-[7rem] font-bold leading-none tracking-tighter metallic-heading sm:-top-14 sm:text-[10rem]"
+            >
+              {number}
+            </motion.span>
+            <div className="relative">
+              <div className="inline-flex items-center gap-3">
+                <span className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                  Step {number}
+                </span>
+                <span className="h-px w-10 bg-glass-border" />
+              </div>
+              <h3 className="mt-4 text-3xl font-semibold metallic-heading neon-text-soft sm:text-4xl lg:text-5xl">
+                {title}
+              </h3>
+              <p className="mt-6 max-w-md text-base leading-relaxed text-muted-foreground">
+                {description}
+              </p>
+              <motion.ul
+                className="mt-6 space-y-2"
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true, amount: 0.3 }}
+                variants={{
+                  hidden: {},
+                  visible: { transition: { staggerChildren: 0.12, delayChildren: 0.25 } },
+                }}
+              >
+                {highlights.map((h) => (
+                  <motion.li
+                    key={h}
+                    variants={{
+                      hidden: { opacity: 0, x: -16 },
+                      visible: {
+                        opacity: 1,
+                        x: 0,
+                        transition: { duration: 0.4, ease: [0, 0, 0.2, 1] },
+                      },
+                    }}
+                    className="flex items-start gap-2.5 text-sm text-foreground/85"
+                  >
+                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary shadow-[0_0_8px_var(--glow-primary)]" />
+                    <span>{h}</span>
+                  </motion.li>
+                ))}
+              </motion.ul>
+            </div>
+          </div>
+        </RevealOnScrollDirectional>
+
+        {/* Mockup column */}
+        <RevealOnScrollDirectional
+          direction={mockupDirection}
+          className={textFirst ? "md:order-2" : "md:order-1"}
+        >
+          <motion.div
+            variants={metallicCardEntrance}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.3 }}
+          >
+            <Parallax speed={0.15}>
+              <div className="metallic-card relative rounded-2xl p-6 backdrop-blur-sm sm:p-8">
+                {mockup}
+              </div>
+            </Parallax>
+          </motion.div>
+        </RevealOnScrollDirectional>
+      </div>
+    </section>
+  );
+}
 
 export default function LandingPage() {
   return (
@@ -106,7 +184,7 @@ export default function LandingPage() {
       </ScrollHeader>
 
       {/* Hero */}
-      <section className="relative z-10 flex min-h-svh flex-col items-center justify-center px-6 text-center">
+      <section className="relative z-10 flex min-h-[80svh] flex-col items-center justify-center px-6 text-center">
         <div>
           <SlotMachineHero className="text-6xl font-bold metallic-heading neon-text-soft sm:text-7xl lg:text-9xl">
             {"Your Questions\nAnswered Instantly"}
@@ -128,129 +206,89 @@ export default function LandingPage() {
             </Button>
           </div>
         </div>
-        <div className="absolute bottom-8 flex flex-col items-center gap-1">
-          <span className="text-sm text-muted-foreground">Scroll to explore</span>
-          <ChevronDown className="h-5 w-5 text-muted-foreground animate-bounce" />
-        </div>
       </section>
 
 
       {/* ═══ Traditional Landing Page ═══ */}
       <div className="relative">
 
-        {/* Features */}
-        <section className="mx-auto max-w-6xl px-6 py-24">
+        {/* How It Works — live demo */}
+        <section className="mx-auto max-w-5xl px-6 pt-4 pb-24">
+          <HowItWorksDemo />
+        </section>
+
+        {/* Under the hood — intro */}
+        <section className="mx-auto max-w-4xl px-6 pt-24 pb-8 text-center">
           <BlurReveal>
-            <h2 className="text-center text-3xl font-semibold metallic-heading neon-text-soft sm:text-4xl">
-              Why parents love AskMySchool
+            <p className="text-xs font-mono uppercase tracking-[0.2em] text-muted-foreground">
+              Under the hood
+            </p>
+            <h2 className="mt-4 text-3xl font-semibold metallic-heading neon-text-soft sm:text-4xl lg:text-5xl">
+              Retrieval-augmented generation,
+              <br className="hidden sm:block" /> grounded in your documents.
             </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-center text-muted-foreground">
-              Everything you need to stay informed about your child&apos;s school
+            <p className="mx-auto mt-6 max-w-2xl text-muted-foreground">
+              Every answer is built from your school&apos;s own source
+              material — never invented. Here&apos;s how it works, end to end.
             </p>
           </BlurReveal>
-          <StaggerChildren className="mt-16 grid gap-8 sm:grid-cols-3">
-            <motion.div variants={fadeInUp}>
-              <div className="metallic-card rounded-xl p-8 text-left backdrop-blur-sm">
-                <MessageSquare className="h-10 w-10 neon-icon-blue" />
-                <h3 className="mt-4 text-lg font-medium text-foreground">
-                  Ask anything
-                </h3>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Type your question in natural language. Our AI searches through
-                  all school documents to find the answer.
-                </p>
-              </div>
-            </motion.div>
-            <motion.div variants={fadeInUp}>
-              <div className="metallic-card rounded-xl p-8 text-left backdrop-blur-sm">
-                <FileText className="h-10 w-10 neon-icon-amber" />
-                <h3 className="mt-4 text-lg font-medium text-foreground">
-                  Source citations
-                </h3>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Every answer includes references to the exact documents and
-                  sections it came from, so you can verify.
-                </p>
-              </div>
-            </motion.div>
-            <motion.div variants={fadeInUp}>
-              <div className="metallic-card rounded-xl p-8 text-left backdrop-blur-sm">
-                <Shield className="h-10 w-10 neon-icon-green" />
-                <h3 className="mt-4 text-lg font-medium text-foreground">
-                  Admin controlled
-                </h3>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  School admins control which documents are available and approve
-                  parent access. Always accurate, always official.
-                </p>
-              </div>
-            </motion.div>
-          </StaggerChildren>
         </section>
 
-        {/* How It Works */}
-        <section className="mx-auto max-w-5xl px-6 py-24">
-          <BlurReveal>
-            <h2 className="text-center text-3xl font-semibold metallic-heading neon-text-soft sm:text-4xl">
-              How it works
-            </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-center text-muted-foreground">
-              Three simple steps to get answers from your school&apos;s documents
-            </p>
-          </BlurReveal>
+        {/* Step 1 — Ingestion */}
+        <Step
+          number="01"
+          title="Multi-format ingestion"
+          description="PDFs, Word, Excel, and PowerPoint flow through our ingestion pipeline. Scanned PDFs and image-based handouts are routed through our in-house vision model, which extracts text while preserving tables, headings, and structure."
+          highlights={[
+            "PDF · DOCX · XLSX · PPTX · images",
+            "Vision-model OCR for scanned files",
+            "Tables and structure preserved",
+          ]}
+          mockup={<IngestionMockup />}
+          mockupSide="right"
+        />
 
-          <div className="mt-16 space-y-16">
-            {howItWorks.map((step, i) => (
-              <RevealOnScrollDirectional
-                key={step.title}
-                direction={i % 2 === 0 ? "left" : "right"}
-              >
-                <div className="flex flex-col items-center gap-6 text-center">
-                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full metallic-surface border border-glass-border neon-border">
-                    <step.icon className={`h-7 w-7 ${step.neon}`} />
-                  </div>
-                  <div>
-                    <span className="text-sm font-medium text-muted-foreground/60">
-                      Step {i + 1}
-                    </span>
-                    <h3 className="mt-1 text-xl font-medium text-foreground">
-                      {step.title}
-                    </h3>
-                    <p className="mt-2 max-w-lg text-muted-foreground">
-                      {step.description}
-                    </p>
-                  </div>
-                </div>
-              </RevealOnScrollDirectional>
-            ))}
-          </div>
-        </section>
+        {/* Step 2 — Embeddings */}
+        <Step
+          number="02"
+          title="Semantic embeddings"
+          description="Each document is split into overlapping chunks and embedded with our proprietary 768-dimensional embedding model. Vectors are stored in Postgres via pgvector for fast similarity search at query time."
+          highlights={[
+            "768-dimensional embedding model",
+            "Overlapping chunks preserve context",
+            "pgvector for millisecond similarity search",
+          ]}
+          mockup={<EmbeddingsMockup />}
+          mockupSide="left"
+        />
 
-        {/* Stats */}
-        <section className="py-20">
-          <div className="mx-auto max-w-5xl px-6">
-            <StaggerChildren className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-              {[
-                { label: "Documents Processed", value: 500 },
-                { label: "Questions Answered", value: 10000 },
-                { label: "Happy Parents", value: 2500 },
-                { label: "Schools Served", value: 50 },
-              ].map((stat) => (
-                <motion.div key={stat.label} variants={fadeInUp}>
-                  <div className="text-center">
-                    <AnimatedNumber
-                      value={stat.value}
-                      className="text-4xl font-bold metallic-text-animated neon-text"
-                    />
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      {stat.label}
-                    </p>
-                  </div>
-                </motion.div>
-              ))}
-            </StaggerChildren>
-          </div>
-        </section>
+        {/* Step 3 — Retrieval */}
+        <Step
+          number="03"
+          title="Row-level secure retrieval"
+          description="Row-level security guarantees parents only retrieve chunks from documents their school has approved. Each question is embedded on the fly and matched against the corpus by vector similarity."
+          highlights={[
+            "Per-school document scoping",
+            "Drafts and internal memos stay private",
+            "Vector similarity ranks the best matches",
+          ]}
+          mockup={<RetrievalMockup />}
+          mockupSide="right"
+        />
+
+        {/* Step 4 — Answer */}
+        <Step
+          number="04"
+          title="Grounded answers with citations"
+          description="The top-ranked chunks are passed as context to our answer model, which composes a response with inline citations linking back to the exact source document and section — so every claim is verifiable."
+          highlights={[
+            "Inline citations on every claim",
+            "Click through to the exact passage",
+            "If we don't know, we say so",
+          ]}
+          mockup={<AnswerMockup />}
+          mockupSide="left"
+        />
 
         {/* Testimonials */}
         <section className="mx-auto max-w-5xl px-6 py-24">

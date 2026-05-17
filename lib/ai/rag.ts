@@ -6,7 +6,7 @@ export interface RelevantChunk {
   document_id: string;
   content: string;
   chunk_index: number;
-  metadata: Record<string, unknown>;
+  metadata: ChunkMetadata;
   similarity: number;
   document_title?: string;
   document_file_url?: string;
@@ -14,6 +14,45 @@ export interface RelevantChunk {
   document_tags?: string[];
   document_category?: string;
   document_folder?: string;
+}
+
+// Structured metadata stored on each chunk. All fields optional — populated by
+// the parser when the source file type carries that structure. The DB column
+// is JSONB so older chunks without these fields continue to work.
+export interface ChunkMetadata {
+  page?: number;          // PDF page number (1-indexed)
+  page_end?: number;      // when a chunk spans more than one page
+  sheet?: string;         // XLSX sheet name
+  slide?: number;         // PPTX slide number (1-indexed)
+  section?: string;       // DOCX section heading text
+  [key: string]: unknown;
+}
+
+// Build the user-facing location label shown beside the source title,
+// e.g. "p. 14" or "Sheet: Q3 Sales" or "Slide 5" or "§3 Cafeteria".
+// Returns null when there's no structural metadata.
+export function formatChunkLocation(
+  metadata: ChunkMetadata | null | undefined
+): { label: string; page?: number; sheet?: string; slide?: number; section?: string } | null {
+  if (!metadata) return null;
+  const { page, page_end, sheet, slide, section } = metadata;
+  if (typeof page === "number") {
+    const label =
+      typeof page_end === "number" && page_end > page
+        ? `p. ${page}–${page_end}`
+        : `p. ${page}`;
+    return { label, page };
+  }
+  if (typeof slide === "number") {
+    return { label: `Slide ${slide}`, slide };
+  }
+  if (typeof sheet === "string" && sheet.trim()) {
+    return { label: `Sheet: ${sheet.trim()}`, sheet: sheet.trim() };
+  }
+  if (typeof section === "string" && section.trim()) {
+    return { label: `§ ${section.trim()}`, section: section.trim() };
+  }
+  return null;
 }
 
 export async function searchDocuments(
@@ -110,8 +149,18 @@ ${followUpInstruction}`;
   if (chunks.length > 0 || hasEvents || hasAnnouncements) {
     citationRules +=
       "- Answer in your own words. Do NOT quote documents word-for-word. Paraphrase and summarize the information naturally.\n";
+  }
+  if (chunks.length > 0) {
     citationRules +=
-      "- Do NOT use [Source N] citations or any inline citation markers. The sources will be displayed automatically alongside your answer.\n";
+      "- CITATIONS ARE REQUIRED. Every sentence that contains a fact drawn from DOCUMENT CONTEXT MUST end with an inline citation in square brackets that matches the source number above — for example [1] or [1][2]. Do this even when the fact feels obvious. An answer that uses DOCUMENT CONTEXT but contains zero [N] citations is wrong; rewrite it with citations.\n";
+    citationRules +=
+      "- Place each citation immediately after the sentence or clause it supports — never bunch citations at the end of the answer. If a single claim is supported by multiple sources, list them adjacently like [1][2]. Do not invent source numbers and do not cite a number that is not in DOCUMENT CONTEXT.\n";
+    citationRules +=
+      "- Do NOT add citations to follow-up questions, greetings, or clarifying questions back to the parent.\n";
+    citationRules +=
+      "- DO NOT fabricate specifics that aren't in DOCUMENT CONTEXT, EVENTS, or ANNOUNCEMENTS. Never invent contact methods (email addresses, phone numbers, portal names, app names), policies, dates, or procedures. If the context only partially answers the question, share what IS in the context (with citations) and say plainly that the rest isn't covered — then suggest contacting the school office. It is better to give a short, honest answer than a longer answer padded with plausible-sounding but unsourced details.\n";
+    citationRules +=
+      "- Worked example of correct citation behavior:\n  Question: \"When does school start?\"\n  DOCUMENT CONTEXT: [Source 1: \"Daily Schedule\"] First bell rings at 8:25 AM. Classes begin at 8:30 AM.\n  Good answer: \"Classes begin at 8:30 AM, with the first bell at 8:25 AM [1].\"\n  Bad answer (no citation): \"Classes begin at 8:30 AM, with the first bell at 8:25 AM.\"\n  Bad answer (fabrication): \"Classes begin at 8:30 AM [1]. The school day ends at 3:15 PM.\" (the second sentence isn't in DOCUMENT CONTEXT — drop it or say it isn't covered)\n";
   }
 
   // Build context sections — placed BEFORE rules so the model sees data first
@@ -122,6 +171,8 @@ ${followUpInstruction}`;
       `DOCUMENT CONTEXT:\n${chunks
         .map((chunk, i) => {
           const meta: string[] = [];
+          const loc = formatChunkLocation(chunk.metadata);
+          if (loc) meta.push(loc.label);
           if (chunk.document_tags?.length) meta.push(`Tags: ${chunk.document_tags.join(", ")}`);
           if (chunk.document_category) meta.push(`Category: ${chunk.document_category}`);
           if (chunk.document_folder) meta.push(`Folder: ${chunk.document_folder}`);

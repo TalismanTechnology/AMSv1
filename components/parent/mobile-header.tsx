@@ -19,7 +19,7 @@ export function ParentMobileHeader() {
   return (
     <div className="flex items-center justify-between border-b bg-card metallic-surface neon-divider px-4 py-3 md:hidden">
       <div className="flex items-center gap-2">
-        <Logo size={24} className="text-primary drop-shadow-[0_0_8px_var(--glow-primary)] drop-shadow-[0_0_12px_oklch(1_0_0/40%)]" />
+        <Logo size={24} className="text-primary" />
         <span className="font-bold metallic-text truncate">{school.name}</span>
       </div>
       <Button variant="ghost" size="icon" onClick={() => setOpen(true)}>

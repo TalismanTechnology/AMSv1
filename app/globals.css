@@ -296,6 +296,56 @@
   text-shadow: none;
 }
 
+/* ===== MUTED NEO SCOPE (post-login app shell) =====
+   Strips the neon halos so the chat surface reads calm and refined while
+   keeping the dark navy/metallic palette. Applied via the `.neo` class on
+   the dashboard layout — landing keeps its full neon treatment. */
+.neo {
+  --neon-white: none;
+  --neon-white-soft: none;
+  --neon-white-strong: none;
+  --neon-border-glow: none;
+  --glow-primary: transparent;
+  --glow-primary-strong: transparent;
+}
+
+.neo .metallic-card {
+  background: linear-gradient(135deg, oklch(0.19 0.015 265) 0%, oklch(0.20 0.012 260) 100%);
+  border: 1px solid oklch(1 0 0 / 8%);
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 4%),
+    0 1px 2px oklch(0 0 0 / 20%);
+}
+.neo .metallic-card::before { display: none; }
+.neo .metallic-card:hover::before { display: none; }
+
+.neo .metallic-surface {
+  background: linear-gradient(180deg, oklch(0.15 0.015 268) 0%, oklch(0.13 0.012 265) 100%);
+}
+
+.neo .metallic-heading {
+  filter: none;
+}
+
+.neo .neon-border,
+.neo .neon-border-strong,
+.neo .neon-divider {
+  box-shadow: none;
+}
+
+.neo .neon-text,
+.neo .neon-text-soft {
+  text-shadow: none;
+}
+
+.neo .neon-icon-blue,
+.neo .neon-icon-amber,
+.neo .neon-icon-green,
+.neo .neon-icon-purple,
+.neo .neon-icon-red {
+  filter: none;
+}
+
 :root:not(.dark) ::-webkit-scrollbar-track {
   background: oklch(0.96 0.005 265);
 }

@@ -102,15 +102,12 @@ export function MessageBubble({
 function SourcesList({ sources }: { sources: ChatSource[] }) {
   const [isOpen, setIsOpen] = useState(false);
 
-  // Deduplicate by document_id, keeping the highest-similarity chunk
-  const seen = new Map<string, (typeof sources)[number]>();
-  for (const s of sources) {
-    const existing = seen.get(s.document_id);
-    if (!existing || s.similarity > existing.similarity) {
-      seen.set(s.document_id, s);
-    }
-  }
-  const unique = [...seen.values()].slice(0, 3);
+  // Sources arrive pre-numbered from the server (source_number 1..N) and the
+  // numbering already matches the inline [N] citation badges in the answer.
+  // Sort by source_number so the order matches the inline citations.
+  const ordered = [...sources].sort(
+    (a, b) => (a.source_number ?? 0) - (b.source_number ?? 0)
+  );
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -121,11 +118,15 @@ function SourcesList({ sources }: { sources: ChatSource[] }) {
             isOpen && "rotate-180"
           )}
         />
-        Sources ({unique.length})
+        Sources ({ordered.length})
       </CollapsibleTrigger>
       <CollapsibleContent className="space-y-1.5 pt-1.5">
-        {unique.map((source, i) => (
-          <DocumentPreviewCard key={source.document_id} source={source} index={i + 1} />
+        {ordered.map((source) => (
+          <DocumentPreviewCard
+            key={`${source.document_id}-${source.source_number}`}
+            source={source}
+            index={source.source_number}
+          />
         ))}
       </CollapsibleContent>
     </Collapsible>

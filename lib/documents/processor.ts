@@ -1,7 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { extractText } from "./parser";
+import { extractSegments } from "./parser";
 import { convertToPdf } from "./convert-to-pdf";
-import { splitTextIntoChunks } from "@/lib/ai/chunking";
+import { splitSegmentsIntoChunks } from "@/lib/ai/chunking";
 import { generateEmbeddings } from "@/lib/ai/embeddings";
 import { generateSummary } from "@/lib/ai/summary";
 
@@ -69,12 +69,16 @@ export async function processDocument(documentId: string) {
       }
     }
 
-    // 3. Extract text
-    const text = await extractText(buffer, doc.file_type);
+    // 3. Extract text as structured segments (one per page/sheet/slide when
+    //    the file type carries that structure, otherwise one segment total).
+    const segments = await extractSegments(buffer, doc.file_type);
+    const text = segments.map((s) => s.text).join("\n\n");
 
     // Release file buffer — no longer needed
     buffer = null;
-    logMem(`Text extracted (${text.length} chars)`);
+    logMem(
+      `Text extracted (${segments.length} segments, ${text.length} chars)`
+    );
 
     if (!text || text.trim().length === 0) {
       throw new Error("No text could be extracted from the document");
@@ -95,8 +99,9 @@ export async function processDocument(documentId: string) {
     }
     logMem("Txt saved to storage");
 
-    // 5. Chunk text
-    const chunks = splitTextIntoChunks(text);
+    // 5. Chunk within segment boundaries so each chunk carries page/sheet
+    //    metadata from the segment it came from.
+    const chunks = splitSegmentsIntoChunks(segments);
     logMem(`${chunks.length} chunks created`);
 
     // 6. Delete existing chunks (reprocessing support)

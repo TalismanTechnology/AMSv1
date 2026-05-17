@@ -34,7 +34,7 @@ export function DevPanelTrigger({ collapsed }: DevPanelTriggerProps) {
       <div className="relative inline-flex items-center justify-center select-none cursor-pointer" {...handlers}>
         <Logo
           size={logoSize}
-          className="shrink-0 text-primary drop-shadow-[0_0_8px_var(--glow-primary)] drop-shadow-[0_0_12px_oklch(1_0_0/40%)]"
+          className="shrink-0 text-primary"
         />
       </div>
 
