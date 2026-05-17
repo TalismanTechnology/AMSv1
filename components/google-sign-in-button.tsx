@@ -18,6 +18,7 @@ export function GoogleSignInButton({ schoolSlug }: GoogleSignInButtonProps) {
     setError(null);
 
     const supabase = createClient();
+    await supabase.auth.signOut();
     const params = new URLSearchParams();
     if (schoolSlug) params.set("school_slug", schoolSlug);
     const query = params.toString();
