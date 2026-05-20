@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Clock, ArrowLeft } from "lucide-react";
 import { logout } from "@/actions/auth";
+import { PendingPoller } from "./pending-poller";
 
 export default async function PendingApprovalPage({
   params,
@@ -49,6 +50,8 @@ export default async function PendingApprovalPage({
             A school administrator will approve your access.
           </p>
         </div>
+
+        <PendingPoller slug={slug} />
 
         <div className="flex flex-col gap-3 items-center">
           {otherSchools.length > 0 && (

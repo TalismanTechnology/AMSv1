@@ -332,8 +332,8 @@
     inset -1px 0 0 oklch(1 0 0 / 12%),
     0 30px 60px oklch(0 0 0 / 42%),
     0 8px 18px oklch(0 0 0 / 28%);
-  backdrop-filter: blur(160px) saturate(2.4);
-  -webkit-backdrop-filter: blur(160px) saturate(2.4);
+  backdrop-filter: blur(24px) saturate(2.4);
+  -webkit-backdrop-filter: blur(24px) saturate(2.4);
 }
 .neo .metallic-card::before { display: none; }
 .neo .metallic-card:hover::before { display: none; }
@@ -406,8 +406,8 @@
       oklch(0.28 0.003 265 / 85%) 60%,
       oklch(0.30 0.003 265 / 85%) 100%
     );
-  backdrop-filter: blur(160px) saturate(2.4);
-  -webkit-backdrop-filter: blur(160px) saturate(2.4);
+  backdrop-filter: blur(24px) saturate(2.4);
+  -webkit-backdrop-filter: blur(24px) saturate(2.4);
   border: 1px solid oklch(1 0 0 / 22%);
   box-shadow:
     inset 0 1px 0 oklch(1 0 0 / 55%),
@@ -765,8 +765,8 @@ html {
     inset -1px 0 0 oklch(1 0 0 / 12%),
     0 30px 60px oklch(0 0 0 / 42%),
     0 8px 18px oklch(0 0 0 / 28%);
-  backdrop-filter: blur(160px) saturate(2.4);
-  -webkit-backdrop-filter: blur(160px) saturate(2.4);
+  backdrop-filter: blur(24px) saturate(2.4);
+  -webkit-backdrop-filter: blur(24px) saturate(2.4);
   position: relative;
   overflow: hidden;
 }
@@ -1046,8 +1046,8 @@ textarea:focus,
       oklch(0.28 0.003 265 / 85%) 60%,
       oklch(0.30 0.003 265 / 85%) 100%
     );
-  backdrop-filter: blur(160px) saturate(2.4);
-  -webkit-backdrop-filter: blur(160px) saturate(2.4);
+  backdrop-filter: blur(24px) saturate(2.4);
+  -webkit-backdrop-filter: blur(24px) saturate(2.4);
   border: 1px solid oklch(1 0 0 / 22%);
   box-shadow:
     inset 0 1px 0 oklch(1 0 0 / 55%),
@@ -1107,8 +1107,8 @@ textarea:focus,
       oklch(0.30 0.003 265 / 85%) 60%,
       oklch(0.32 0.003 265 / 85%) 100%
     );
-  backdrop-filter: blur(160px) saturate(2.4);
-  -webkit-backdrop-filter: blur(160px) saturate(2.4);
+  backdrop-filter: blur(24px) saturate(2.4);
+  -webkit-backdrop-filter: blur(24px) saturate(2.4);
   border: 1px solid oklch(1 0 0 / 26%);
   box-shadow:
     inset 0 1px 0 oklch(1 0 0 / 60%),
@@ -1164,13 +1164,14 @@ textarea:focus,
     0 0 0 1px oklch(0 0 0 / 4%);
 }
 
-/* Dialogs, sheets — heavier frosted glass for floating layers */
+/* Dialogs, sheets, alert-dialogs — opaque elevated surface.
+   Floating layers that overlap page content MUST be fully opaque so
+   nothing bleeds through. No backdrop-filter: an opaque surface has
+   nothing to blur, and large-radius blurs are a major rendering cost. */
 [data-slot="dialog-content"],
 [data-slot="alert-dialog-content"],
 [data-slot="sheet-content"] {
-  background: oklch(0.42 0.014 250 / 28%) !important;
-  backdrop-filter: blur(96px) saturate(2);
-  -webkit-backdrop-filter: blur(96px) saturate(2);
+  background: var(--popover) !important;
   border-color: oklch(1 0 0 / 32%);
   box-shadow:
     inset 0 1px 0 oklch(1 0 0 / 22%),
@@ -1178,14 +1179,12 @@ textarea:focus,
     0 8px 24px oklch(0 0 0 / 35%);
 }
 
-/* Popovers, dropdowns, selects — frosted glass */
+/* Popovers, dropdowns, selects — opaque elevated surface */
 [data-slot="popover-content"],
 [data-slot="select-content"],
 [data-slot="dropdown-menu-content"],
 [data-slot="dropdown-menu-sub-content"] {
-  background: oklch(0.42 0.014 250 / 28%) !important;
-  backdrop-filter: blur(80px) saturate(2);
-  -webkit-backdrop-filter: blur(80px) saturate(2);
+  background: var(--popover) !important;
   border-color: oklch(1 0 0 / 28%);
   box-shadow:
     inset 0 1px 0 oklch(1 0 0 / 20%),
