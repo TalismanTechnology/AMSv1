@@ -2,6 +2,7 @@
 
 import { MessageSquare } from "lucide-react";
 import { StaggerChildren, motion, fadeInUp } from "@/components/motion";
+import { CursorSpotlight } from "@/components/motion/cursor-spotlight";
 
 const SUGGESTED_QUESTIONS = [
   "What are the school hours?",
@@ -27,25 +28,27 @@ export function SuggestedQuestions({
 
   return (
     <div className="flex flex-col items-center justify-center py-12">
-      <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-        <MessageSquare className="h-8 w-8 neon-icon-blue" />
+      <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-md border border-glass-border bg-muted/40">
+        <MessageSquare className="h-5 w-5 text-muted-foreground" />
       </div>
-      <h2 className="text-xl font-semibold text-foreground metallic-heading">
+      <h2 className="text-xl font-semibold text-foreground">
         Ask about your school
       </h2>
-      <p className="mt-2 text-sm text-muted-foreground">
+      <p className="mt-1.5 text-sm text-muted-foreground">
         {welcomeMessage || "Get instant answers from official school documents"}
       </p>
-      <StaggerChildren className="mt-8 grid max-w-lg gap-2 sm:grid-cols-2">
+      <StaggerChildren className="mt-8 grid max-w-lg auto-rows-fr gap-1.5 sm:grid-cols-2">
         {displayQuestions.map((question) => (
-          <motion.button
-            key={question}
-            variants={fadeInUp}
-            onClick={() => onSelect(question)}
-            className="metallic-card rounded-lg px-4 py-3 text-left text-sm text-foreground transition-colors hover:border-primary/40 hover:bg-primary/5"
-          >
-            {question}
-          </motion.button>
+          <motion.div key={question} variants={fadeInUp} className="h-full">
+            <CursorSpotlight radius={260} intensity={0.12} className="h-full rounded-md">
+              <button
+                onClick={() => onSelect(question)}
+                className="frost-surface glass-noise flex h-full w-full items-center rounded-md px-3.5 py-2.5 text-left text-sm text-foreground hover:border-primary/40"
+              >
+                {question}
+              </button>
+            </CursorSpotlight>
+          </motion.div>
         ))}
       </StaggerChildren>
     </div>

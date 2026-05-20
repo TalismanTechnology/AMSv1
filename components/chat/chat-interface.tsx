@@ -7,6 +7,7 @@ import { Send } from "lucide-react";
 import { LogoSpinner } from "@/components/logo-spinner";
 import { motion } from "framer-motion";
 import { messageEntrance } from "@/lib/motion";
+import { RetrievalLoadingStrip } from "./retrieval-loading-strip";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -14,7 +15,6 @@ import { MessageBubble } from "./message-bubble";
 import { SuggestedQuestions } from "./suggested-questions";
 import { SourcePanel } from "./source-panel";
 import { SourcePanelProvider } from "./source-panel-context";
-import { TypingIndicator } from "@/components/ui/typing-indicator";
 import { ChatExport } from "./chat-export";
 import { createChatSession } from "@/actions/chat";
 import { searchDocumentsByName } from "@/actions/documents";
@@ -327,6 +327,7 @@ export function ChatInterface({
                           message.role === "assistant" &&
                           status === "streaming"
                         }
+                        skipAnimations={hydratedIdsRef.current.has(message.id)}
                         onFollowUpSelect={handleFollowUpSelect}
                       />
                     </motion.div>
@@ -340,10 +341,7 @@ export function ChatInterface({
                 </div>
               )}
               {isLoading && !creatingSession && (!messages[messages.length - 1] || messages[messages.length - 1].role === "user" || !getMessageText(messages[messages.length - 1])) && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <TypingIndicator />
-                  Searching documents...
-                </div>
+                <RetrievalLoadingStrip />
               )}
               {error && (
                 <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
@@ -357,7 +355,7 @@ export function ChatInterface({
           <div className="pointer-events-none absolute inset-x-0 bottom-6 z-10 px-4 pb-4 pt-10 bg-gradient-to-t from-background via-background/80 to-transparent">
             <form
               onSubmit={handleSubmit}
-              className="pointer-events-auto mx-auto flex max-w-3xl items-end gap-2"
+              className="pointer-events-auto mx-auto flex max-w-3xl items-end gap-1.5 rounded-2xl border border-glass-border bg-background/85 p-1.5 pl-2 backdrop-blur-md transition-colors focus-within:border-primary/40"
             >
               <Textarea
                 value={input}
@@ -365,16 +363,16 @@ export function ChatInterface({
                 onKeyDown={onKeyDown}
                 placeholder="Ask a question about your school..."
                 rows={1}
-                className="min-h-[44px] resize-none border-0 bg-muted/80 backdrop-blur-md shadow-lg"
+                className="min-h-[36px] resize-none border-0 bg-transparent shadow-none focus-visible:ring-0 focus-visible:border-transparent px-1 py-1.5"
                 disabled={isLoading}
               />
               <Button
                 type="submit"
                 size="icon"
                 disabled={isLoading || !input.trim()}
-                className="shadow-lg"
+                className="h-9 w-9 shrink-0 rounded-full"
               >
-                <Send className="h-4 w-4" />
+                <Send className="h-3.5 w-3.5" />
               </Button>
             </form>
           </div>

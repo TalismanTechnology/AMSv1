@@ -94,6 +94,7 @@ interface TopographicBackgroundProps {
   /** Intensity preset: "full" (landing), "subtle" (dashboards), "minimal" (content-heavy) */
   intensity?: "full" | "subtle" | "minimal";
   className?: string;
+  style?: React.CSSProperties;
 }
 
 // Intensity presets
@@ -114,6 +115,7 @@ export function TopographicBackground({
   speed,
   intensity = "subtle",
   className = "",
+  style,
 }: TopographicBackgroundProps) {
   const preset = intensityPresets[intensity];
   const resolvedLevels = levels ?? preset.levels;
@@ -320,6 +322,7 @@ export function TopographicBackground({
     <div
       ref={containerRef}
       className={`absolute inset-0 overflow-hidden ${className}`}
+      style={style}
       aria-hidden="true"
     >
       <canvas ref={canvasRef} className="block h-full w-full" />

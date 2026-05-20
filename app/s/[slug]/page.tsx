@@ -17,12 +17,12 @@ export default async function SchoolLandingPage({
   }
 
   return (
-    <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4">
+    <div className="neo relative z-10 flex min-h-screen flex-col items-center justify-center px-4">
       <div className="relative z-10 text-center space-y-8">
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full metallic-surface border border-glass-border neon-border">
           <Logo
             size={32}
-            className="text-primary drop-shadow-[0_0_6px_var(--glow-primary)]"
+            className="text-primary"
           />
         </div>
 

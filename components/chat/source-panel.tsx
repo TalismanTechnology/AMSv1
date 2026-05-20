@@ -14,6 +14,32 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { ease, duration } from "@/lib/motion";
 
+// Expand [start, end) outward to the nearest sentence/paragraph boundaries so
+// the highlight never visibly truncates mid-word or mid-sentence. Chunks are
+// produced by a fixed-size splitter and routinely begin/end inside a word.
+function snapToSentence(full: string, start: number, end: number): [number, number] {
+  const isSentenceEnd = (i: number) =>
+    /[.!?]/.test(full[i]) && (i + 1 >= full.length || /\s/.test(full[i + 1]));
+  const isParagraphBreak = (i: number) =>
+    full[i] === "\n" && (full[i + 1] === "\n" || i + 1 >= full.length);
+
+  let s = start;
+  while (s > 0) {
+    const prev = s - 1;
+    if (isSentenceEnd(prev) || isParagraphBreak(prev)) break;
+    s--;
+  }
+  while (s < full.length && /\s/.test(full[s])) s++;
+
+  let e = end;
+  while (e < full.length) {
+    if (isSentenceEnd(e)) { e++; break; }
+    if (isParagraphBreak(e)) break;
+    e++;
+  }
+  return [s, e];
+}
+
 // Locate `chunk` inside `full` tolerating whitespace differences and trailing
 // ellipsis markers that come from server-side excerpt truncation.
 // Returns [start, end) indices in the original `full` string, or null if not found.
@@ -170,7 +196,7 @@ function PanelContent() {
     }
     const range = locateChunk(fullContent, activeSource.chunk_content);
     if (!range) return { before: body, match: "", after: "" };
-    const [start, end] = range;
+    const [start, end] = snapToSentence(fullContent, range[0], range[1]);
     return {
       before: fullContent.slice(0, start),
       match: fullContent.slice(start, end),
@@ -178,16 +204,34 @@ function PanelContent() {
     };
   }, [fullContent, activeSource]);
 
-  // Auto-scroll to the highlighted chunk once it renders (text fallback only)
+  // Auto-scroll to the highlighted chunk once it renders (text fallback only).
+  // The panel animates open (~300ms width transition); scrollIntoView fired
+  // during that window can resolve against pre-animation layout and land in
+  // the wrong place. We instead set scrollTop directly on the Radix viewport
+  // after the animation has settled.
   useEffect(() => {
     if (canRenderInline) return;
     if (!segments?.match || isLoadingContent) return;
     const el = highlightRef.current;
     if (!el) return;
-    const id = window.requestAnimationFrame(() => {
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
-    });
-    return () => window.cancelAnimationFrame(id);
+
+    const scrollToHighlight = () => {
+      const viewport = el.closest(
+        '[data-slot="scroll-area-viewport"]'
+      ) as HTMLElement | null;
+      if (!viewport) {
+        el.scrollIntoView({ block: "center" });
+        return;
+      }
+      const elTop = el.getBoundingClientRect().top;
+      const vpTop = viewport.getBoundingClientRect().top;
+      const target =
+        viewport.scrollTop + (elTop - vpTop) - viewport.clientHeight / 2 + el.clientHeight / 2;
+      viewport.scrollTo({ top: Math.max(0, target), behavior: "smooth" });
+    };
+
+    const timeout = window.setTimeout(scrollToHighlight, 350);
+    return () => window.clearTimeout(timeout);
   }, [segments, isLoadingContent, canRenderInline]);
 
   if (!activeSource) return null;
@@ -215,7 +259,12 @@ function PanelContent() {
 
   return (
     <>
-      <div className="flex items-center justify-between border-b border-border px-4 py-3">
+      <motion.div
+        initial={{ opacity: 0, y: -6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25, ease: ease.out, delay: 0.05 }}
+        className="flex items-center justify-between border-b border-border px-4 py-3"
+      >
         <div className="flex min-w-0 flex-col gap-0.5">
           <div className="flex items-center gap-2 min-w-0">
             <FileText className="h-5 w-5 shrink-0 text-primary" />
@@ -254,15 +303,25 @@ function PanelContent() {
             <X className="h-4 w-4" />
           </Button>
         </div>
-      </div>
+      </motion.div>
 
-      <div className="border-b border-border px-4 py-2">
+      <motion.div
+        initial={{ opacity: 0, x: -6 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.25, ease: ease.out, delay: 0.15 }}
+        className="border-b border-border px-4 py-2"
+      >
         <Badge variant="secondary" className="text-xs">
           {Math.round(activeSource.similarity * 100)}% match
         </Badge>
-      </div>
+      </motion.div>
 
-      <div className="flex-1 min-h-0 relative">
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, ease: ease.out, delay: 0.22 }}
+        className="flex-1 min-h-0 relative"
+      >
         {loadingDoc ? (
           <div className="flex items-center justify-center h-full">
             <LogoSpinner size={24} />
@@ -313,7 +372,7 @@ function PanelContent() {
             ) : null}
           </ScrollArea>
         )}
-      </div>
+      </motion.div>
 
       <DocumentViewer
         document={viewerDoc}

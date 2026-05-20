@@ -56,14 +56,14 @@ export default async function ParentLayout({
       userName={profile?.full_name || user.email || ""}
     >
       <TooltipProvider>
-        <div className="relative z-10 flex h-screen">
+        <div className="flex h-screen">
           <ParentSidebar />
           <div className="flex flex-1 flex-col overflow-hidden">
             <ParentMobileHeader />
             {visibleBanner.length > 0 && (
               <AnnouncementBanner announcements={visibleBanner} />
             )}
-            <main className="flex-1 overflow-auto basis-0 bg-background/60 backdrop-blur-sm">{children}</main>
+            <main className="dashboard-cards flex-1 overflow-auto basis-0">{children}</main>
           </div>
         </div>
         <OnboardingTour show={!profile?.onboarding_completed} />

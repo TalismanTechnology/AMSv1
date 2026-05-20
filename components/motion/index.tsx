@@ -5,7 +5,6 @@ import {
   useInView,
   useScroll,
   useTransform,
-  useMotionValueEvent,
   animate,
 } from "framer-motion";
 import { useRef, useEffect, useState } from "react";
@@ -222,7 +221,6 @@ export function ScrollProgressBar({ className }: { className?: string }) {
   );
 }
 
-// Header that gains background on scroll
 export function ScrollHeader({
   children,
   className,
@@ -230,28 +228,7 @@ export function ScrollHeader({
   children: React.ReactNode;
   className?: string;
 }) {
-  const [scrolled, setScrolled] = useState(false);
-  const { scrollY } = useScroll();
-
-  useMotionValueEvent(scrollY, "change", (latest) => {
-    setScrolled(latest > 50);
-  });
-
-  return (
-    <motion.header
-      className={className}
-      animate={{
-        backgroundColor: scrolled ? "hsl(var(--background) / 0.8)" : "hsl(var(--background) / 0)",
-        backdropFilter: scrolled ? "blur(12px)" : "blur(0px)",
-        borderBottomColor: scrolled ? "hsl(var(--border) / 0.5)" : "hsl(var(--border) / 0)",
-        borderBottomWidth: scrolled ? 1 : 0,
-      }}
-      transition={{ duration: 0.3 }}
-      style={{ borderBottomStyle: "solid" }}
-    >
-      {children}
-    </motion.header>
-  );
+  return <header className={className}>{children}</header>;
 }
 
 // Fade + blur reveal on scroll

@@ -173,23 +173,10 @@ export async function POST(request: NextRequest) {
       source_type: "document";
       location: ChatSourceLocation | null;
     }[] = citableChunks.map((chunk, i) => {
-      // Build a short preview for the source card. We deliberately do NOT
-      // append an ellipsis here — the panel highlights `chunk_content` inside
-      // the full document text, and any trailing character that isn't in the
-      // source breaks the match (see locateChunk in source-panel.tsx).
-      let excerpt = chunk.content;
-      if (excerpt.length > 200) {
-        const truncated = excerpt.slice(0, 200);
-        const lastPeriod = truncated.lastIndexOf(". ");
-        excerpt =
-          lastPeriod > 80
-            ? truncated.slice(0, lastPeriod + 1)
-            : truncated.replace(/\s+\S*$/, "");
-      }
       return {
         document_id: chunk.document_id,
         title: chunk.document_title || "Unknown",
-        chunk_content: excerpt,
+        chunk_content: chunk.content,
         similarity: chunk.similarity,
         file_url: chunk.document_file_url,
         file_type: chunk.document_file_type,

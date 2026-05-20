@@ -1,6 +1,7 @@
 "use client";
 
-import { Children, Fragment, type ReactNode } from "react";
+import { Children, Fragment, useEffect, useRef, type ReactNode } from "react";
+import { motion } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ChatSource } from "@/lib/types";
@@ -9,29 +10,67 @@ interface MarkdownRendererProps {
   content: string;
   sources?: ChatSource[];
   onSourceClick?: (source: ChatSource) => void;
+  messageId?: string;
+  skipCitationAnimation?: boolean;
 }
 
 const CITATION_RE = /\[(\d+)\]/g;
+
+// Tracks citation pops that have already played this session, so re-mounts
+// (typewriter → static swap, scroll re-renders) don't re-pop.
+const playedCitations = new Set<string>();
+
+const BADGE_CLASS =
+  "mx-0.5 inline-flex h-[1.1em] min-w-[1.1em] items-center justify-center rounded-sm border border-glass-border metallic-surface px-[0.25em] align-[0.15em] text-[0.7em] font-medium neon-icon-blue leading-none transition-colors hover:bg-primary/15 hover:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer";
 
 function CitationBadge({
   n,
   onClick,
   title,
+  animKey,
+  skipAnimation,
 }: {
   n: number;
   onClick?: () => void;
   title?: string;
+  animKey?: string;
+  skipAnimation?: boolean;
 }) {
+  const alreadyPlayed =
+    skipAnimation || !animKey || playedCitations.has(animKey);
+  const playedRef = useRef(alreadyPlayed);
+
+  useEffect(() => {
+    if (animKey) playedCitations.add(animKey);
+  }, [animKey]);
+
+  if (playedRef.current) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        title={title}
+        aria-label={title ? `Source ${n}: ${title}` : `Source ${n}`}
+        className={BADGE_CLASS}
+      >
+        {n}
+      </button>
+    );
+  }
+
   return (
-    <button
+    <motion.button
       type="button"
       onClick={onClick}
       title={title}
       aria-label={title ? `Source ${n}: ${title}` : `Source ${n}`}
-      className="mx-0.5 inline-flex h-[1.1em] min-w-[1.1em] items-center justify-center rounded border border-glass-border metallic-surface px-[0.25em] align-[0.15em] text-[0.7em] font-medium neon-icon-blue leading-none transition-colors hover:bg-primary/15 hover:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
+      className={BADGE_CLASS}
+      initial={{ scale: 0, opacity: 0 }}
+      animate={{ scale: [0, 1.3, 1], opacity: [0, 1, 1] }}
+      transition={{ duration: 0.45, times: [0, 0.55, 1], ease: "easeOut" }}
     >
       {n}
-    </button>
+    </motion.button>
   );
 }
 
@@ -40,7 +79,9 @@ function CitationBadge({
 function renderWithCitations(
   children: ReactNode,
   sources: ChatSource[] | undefined,
-  onSourceClick: ((source: ChatSource) => void) | undefined
+  onSourceClick: ((source: ChatSource) => void) | undefined,
+  messageId: string | undefined,
+  skipAnimation: boolean
 ): ReactNode {
   if (!sources || sources.length === 0) return children;
 
@@ -62,12 +103,17 @@ function renderWithCitations(
       const tooltip = source.location?.label
         ? `${source.title} — ${source.location.label}`
         : source.title;
+      const animKey = messageId
+        ? `${messageId}-${match.index}-${n}`
+        : undefined;
       parts.push(
         <CitationBadge
-          key={`cite-${idx}-${match.index}-${n}`}
+          key={animKey ?? `cite-${idx}-${match.index}-${n}`}
           n={n}
           title={tooltip}
           onClick={onSourceClick ? () => onSourceClick(source) : undefined}
+          animKey={animKey}
+          skipAnimation={skipAnimation}
         />
       );
       cursor = match.index + match[0].length;
@@ -83,11 +129,19 @@ export function MarkdownRenderer({
   content,
   sources,
   onSourceClick,
+  messageId,
+  skipCitationAnimation,
 }: MarkdownRendererProps) {
   // Also strip the older `[Source N]` form in case any cached responses include it
   const processedContent = content.replace(/\[Source\s+(\d+)\]/gi, "[$1]");
   const withCites = (children: ReactNode) =>
-    renderWithCitations(children, sources, onSourceClick);
+    renderWithCitations(
+      children,
+      sources,
+      onSourceClick,
+      messageId,
+      !!skipCitationAnimation
+    );
 
   return (
     <ReactMarkdown

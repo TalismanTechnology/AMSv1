@@ -41,11 +41,26 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
-          <TopographicBackground className="!fixed z-0" intensity="subtle" />
-          <TooltipProvider>
-            {children}
-            <Toaster />
-          </TooltipProvider>
+          <div
+            style={{
+              position: "relative",
+              isolation: "isolate",
+              minHeight: "100vh",
+            }}
+          >
+            <TopographicBackground
+              style={{
+                position: "absolute",
+                inset: 0,
+                zIndex: -1,
+              }}
+              intensity="full"
+            />
+            <TooltipProvider>
+              {children}
+              <Toaster />
+            </TooltipProvider>
+          </div>
         </ThemeProvider>
       </body>
     </html>

@@ -10,12 +10,15 @@ import {
   ScrollHeader,
   BlurReveal,
   SlotMachineHero,
-  Parallax,
   motion,
   metallicCardEntrance,
 } from "@/components/motion";
+import { CursorSpotlight } from "@/components/motion/cursor-spotlight";
+import { MagneticButton } from "@/components/motion/magnetic-button";
 import { Logo } from "@/components/logo";
 import { HowItWorksDemo } from "@/components/landing/how-it-works-demo";
+import { FloatingOrbs } from "@/components/landing/floating-orbs";
+import { AuroraMesh } from "@/components/landing/aurora-mesh";
 import {
   IngestionMockup,
   EmbeddingsMockup,
@@ -66,8 +69,8 @@ function Step({
   const textDirection = textFirst ? "left" : "right";
   const mockupDirection = textFirst ? "right" : "left";
   return (
-    <section className="relative mx-auto max-w-6xl px-6 py-20 sm:py-28">
-      <div className="grid items-center gap-12 md:grid-cols-2 md:gap-16">
+    <section className="relative mx-auto max-w-6xl px-6 py-28 sm:py-40">
+      <div className="grid gap-12 md:grid-cols-2 md:items-start md:gap-16">
         {/* Copy column */}
         <RevealOnScrollDirectional
           direction={textDirection}
@@ -129,24 +132,27 @@ function Step({
           </div>
         </RevealOnScrollDirectional>
 
-        {/* Mockup column */}
-        <RevealOnScrollDirectional
-          direction={mockupDirection}
-          className={textFirst ? "md:order-2" : "md:order-1"}
+        {/* Mockup column — pinned while text scrolls */}
+        <div
+          className={`md:sticky md:top-28 md:self-start ${
+            textFirst ? "md:order-2" : "md:order-1"
+          }`}
         >
-          <motion.div
-            variants={metallicCardEntrance}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, amount: 0.3 }}
-          >
-            <Parallax speed={0.15}>
-              <div className="metallic-card relative rounded-2xl p-6 backdrop-blur-sm sm:p-8">
-                {mockup}
-              </div>
-            </Parallax>
-          </motion.div>
-        </RevealOnScrollDirectional>
+          <RevealOnScrollDirectional direction={mockupDirection}>
+            <motion.div
+              variants={metallicCardEntrance}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, amount: 0.3 }}
+            >
+              <CursorSpotlight radius={420} intensity={0.10} className="rounded-2xl">
+                <div className="metallic-card relative rounded-2xl p-6 backdrop-blur-sm sm:p-8">
+                  {mockup}
+                </div>
+              </CursorSpotlight>
+            </motion.div>
+          </RevealOnScrollDirectional>
+        </div>
       </div>
     </section>
   );
@@ -184,23 +190,29 @@ export default function LandingPage() {
       </ScrollHeader>
 
       {/* Hero */}
-      <section className="relative z-10 flex min-h-[80svh] flex-col items-center justify-center px-6 text-center">
-        <div>
-          <SlotMachineHero className="text-6xl font-bold metallic-heading neon-text-soft sm:text-7xl lg:text-9xl">
-            {"Your Questions\nAnswered Instantly"}
-          </SlotMachineHero>
+      <section className="relative z-10 flex min-h-[80svh] flex-col items-center justify-center overflow-hidden px-6 text-center">
+        <AuroraMesh />
+        <FloatingOrbs />
+        <div className="relative z-10">
+          <div className="shine-sweep inline-block rounded-md">
+            <SlotMachineHero className="text-6xl font-bold metallic-heading neon-text-soft sm:text-7xl lg:text-9xl">
+              {"Your Questions\nAnswered Instantly"}
+            </SlotMachineHero>
+          </div>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground sm:text-xl">
             Parents ask questions in plain English. AI finds the answer from
             your school&apos;s official documents — with citations.
           </p>
           <div className="mt-8 flex items-center justify-center gap-4">
-            <Button
-              size="lg"
-              asChild
-              className="shadow-[0_0_20px_var(--glow-primary),0_0_8px_oklch(1_0_0/30%)]"
-            >
-              <Link href="/register">Get started free</Link>
-            </Button>
+            <MagneticButton strength={0.35} radius={90}>
+              <Button
+                size="lg"
+                asChild
+                className="shadow-[0_0_20px_var(--glow-primary),0_0_8px_oklch(1_0_0/30%)]"
+              >
+                <Link href="/register">Get started free</Link>
+              </Button>
+            </MagneticButton>
             <Button variant="ghost" size="lg" asChild>
               <Link href="/login">Log in</Link>
             </Button>
@@ -300,24 +312,26 @@ export default function LandingPage() {
           <StaggerChildren className="mt-16 grid gap-8 sm:grid-cols-3">
             {testimonials.map((t, i) => (
               <motion.div key={i} variants={metallicCardEntrance}>
-                <div className="metallic-card rounded-xl p-8">
-                  <p className="text-sm leading-relaxed text-muted-foreground italic">
-                    &ldquo;{t.quote}&rdquo;
-                  </p>
-                  <div className="mt-6 flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full metallic-surface border border-glass-border neon-border">
-                      <span className="text-sm font-medium metallic-text">
-                        {t.initials}
-                      </span>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-foreground">
-                        {t.name}
-                      </p>
-                      <p className="text-xs text-muted-foreground">{t.role}</p>
+                <CursorSpotlight radius={280} intensity={0.14} className="rounded-xl">
+                  <div className="metallic-card rounded-xl p-8">
+                    <p className="text-sm leading-relaxed text-muted-foreground italic">
+                      &ldquo;{t.quote}&rdquo;
+                    </p>
+                    <div className="mt-6 flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full metallic-surface border border-glass-border neon-border">
+                        <span className="text-sm font-medium metallic-text">
+                          {t.initials}
+                        </span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">
+                          {t.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{t.role}</p>
+                      </div>
                     </div>
                   </div>
-                </div>
+                </CursorSpotlight>
               </motion.div>
             ))}
           </StaggerChildren>
@@ -326,27 +340,31 @@ export default function LandingPage() {
         {/* Final CTA */}
         <section className="mx-auto max-w-4xl px-6 py-24 text-center">
           <RevealOnScroll>
-            <div className="metallic-card rounded-2xl p-12">
-              <div className="relative z-10">
-                <h2 className="text-3xl font-semibold metallic-heading neon-text-soft sm:text-4xl">
-                  Ready to get started?
-                </h2>
-                <p className="mx-auto mt-4 max-w-xl text-muted-foreground">
-                  Sign up today and start getting instant answers from your
-                  school&apos;s documents. It&apos;s fast, accurate, and always
-                  up to date.
-                </p>
-                <div className="mt-8 flex items-center justify-center gap-4">
-                  <Button
-                    size="lg"
-                    asChild
-                    className="shadow-[0_0_20px_var(--glow-primary),0_0_8px_oklch(1_0_0/30%)]"
-                  >
-                    <Link href="/register">Create your account</Link>
-                  </Button>
+            <CursorSpotlight radius={500} intensity={0.12} className="rounded-2xl">
+              <div className="metallic-card rounded-2xl p-12">
+                <div className="relative z-10">
+                  <h2 className="text-3xl font-semibold metallic-heading neon-text-soft sm:text-4xl">
+                    Ready to get started?
+                  </h2>
+                  <p className="mx-auto mt-4 max-w-xl text-muted-foreground">
+                    Sign up today and start getting instant answers from your
+                    school&apos;s documents. It&apos;s fast, accurate, and always
+                    up to date.
+                  </p>
+                  <div className="mt-8 flex items-center justify-center gap-4">
+                    <MagneticButton strength={0.4} radius={100}>
+                      <Button
+                        size="lg"
+                        asChild
+                        className="shadow-[0_0_20px_var(--glow-primary),0_0_8px_oklch(1_0_0/30%)]"
+                      >
+                        <Link href="/register">Create your account</Link>
+                      </Button>
+                    </MagneticButton>
+                  </div>
                 </div>
               </div>
-            </div>
+            </CursorSpotlight>
           </RevealOnScroll>
         </section>
       </div>

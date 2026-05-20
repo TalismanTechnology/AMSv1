@@ -1,20 +1,15 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { User, Bot, ChevronDown } from "lucide-react";
+import { User, Sparkles } from "lucide-react";
 import { MarkdownRenderer } from "./markdown-renderer";
 import { TypewriterText } from "./typewriter-text";
-import { DocumentPreviewCard } from "./document-preview-card";
 import { FollowUpChips } from "./follow-up-chips";
 import { MessageFeedback } from "./message-feedback";
+import { SourceCard } from "./source-card";
 import { useSourcePanel } from "./source-panel-context";
-import {
-  Collapsible,
-  CollapsibleTrigger,
-  CollapsibleContent,
-} from "@/components/ui/collapsible";
+import { CursorSpotlight } from "@/components/motion/cursor-spotlight";
 import { parseFollowUps } from "@/lib/chat-utils";
-import { cn } from "@/lib/utils";
 import type { ChatSource } from "@/lib/types";
 
 interface MessageBubbleProps {
@@ -25,6 +20,7 @@ interface MessageBubbleProps {
   sources?: ChatSource[];
   isLastAssistant?: boolean;
   isStreaming?: boolean;
+  skipAnimations?: boolean;
   onFollowUpSelect?: (question: string) => void;
 }
 
@@ -36,6 +32,7 @@ export function MessageBubble({
   sources,
   isLastAssistant,
   isStreaming,
+  skipAnimations,
   onFollowUpSelect,
 }: MessageBubbleProps) {
   const isUser = role === "user";
@@ -55,80 +52,83 @@ export function MessageBubble({
 
   const showTypewriter = isStreaming || typewriterActive;
 
-  const { content: displayContent, followUps } =
-    !isUser ? parseFollowUps(content) : { content, followUps: [] };
+  const { content: displayContent, followUps } = !isUser
+    ? parseFollowUps(content)
+    : { content, followUps: [] };
 
-  return (
-    <div className={`flex gap-3 ${isUser ? "flex-row-reverse" : ""}`}>
-      <div
-        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-          isUser ? "bg-primary/15" : "bg-muted"
-        }`}
-      >
-        {isUser ? (
-          <User className="h-4 w-4 text-primary" />
-        ) : (
-          <Bot className="h-4 w-4 text-muted-foreground" />
-        )}
-      </div>
-      <div
-        className={`max-w-[80%] space-y-2 ${isUser ? "text-right" : "text-left"}`}
-      >
-        <div
-          className={`inline-block rounded-2xl px-4 py-2.5 text-sm ${
-            isUser
-              ? "bg-primary text-primary-foreground shadow-[inset_0_1px_0_oklch(1_0_0/15%)]"
-              : "bg-card text-foreground border border-border metallic-card"
-          }`}
-        >
-          {isUser ? (
-            <div className="whitespace-pre-wrap">{content}</div>
-          ) : showTypewriter ? (
-            <TypewriterText content={displayContent} sources={sources} onSourceClick={openSource} onComplete={handleTypewriterComplete} />
-          ) : (
-            <MarkdownRenderer content={displayContent} sources={sources} onSourceClick={openSource} />
-          )}
+  if (isUser) {
+    return (
+      <div className="flex justify-end gap-2.5">
+        <div className="glass-noise max-w-[80%] rounded-2xl rounded-tr-sm border border-primary/25 bg-primary/10 px-3.5 py-2 text-sm text-foreground">
+          <div className="whitespace-pre-wrap">{content}</div>
         </div>
-        {!isUser && messageId && <MessageFeedback messageId={messageId} schoolId={schoolId} />}
-        {sources && sources.length > 0 && <SourcesList sources={sources} />}
-        {isLastAssistant && followUps.length > 0 && onFollowUpSelect && (
-          <FollowUpChips followUps={followUps} onSelect={onFollowUpSelect} />
-        )}
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-glass-border bg-primary/15">
+          <User className="h-3.5 w-3.5 text-primary" />
+        </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
-function SourcesList({ sources }: { sources: ChatSource[] }) {
-  const [isOpen, setIsOpen] = useState(false);
-
-  // Sources arrive pre-numbered from the server (source_number 1..N) and the
-  // numbering already matches the inline [N] citation badges in the answer.
-  // Sort by source_number so the order matches the inline citations.
-  const ordered = [...sources].sort(
-    (a, b) => (a.source_number ?? 0) - (b.source_number ?? 0)
-  );
+  const sortedSources = sources?.length
+    ? [...sources].sort(
+        (a, b) => (a.source_number ?? 0) - (b.source_number ?? 0)
+      )
+    : [];
 
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <CollapsibleTrigger className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
-        <ChevronDown
-          className={cn(
-            "h-3 w-3 transition-transform duration-200",
-            isOpen && "rotate-180"
-          )}
-        />
-        Sources ({ordered.length})
-      </CollapsibleTrigger>
-      <CollapsibleContent className="space-y-1.5 pt-1.5">
-        {ordered.map((source) => (
-          <DocumentPreviewCard
-            key={`${source.document_id}-${source.source_number}`}
-            source={source}
-            index={source.source_number}
-          />
-        ))}
-      </CollapsibleContent>
-    </Collapsible>
+    <div className="flex flex-col gap-2">
+      <CursorSpotlight radius={360} intensity={0.07} className="rounded-lg">
+        <div className="metallic-surface glass-noise relative rounded-lg border border-glass-border p-3.5">
+          <div className="mb-2 flex items-center gap-1.5">
+            <div className="flex h-4 w-4 items-center justify-center rounded-sm border border-glass-border bg-muted/40">
+              <Sparkles className="h-2.5 w-2.5 text-muted-foreground" />
+            </div>
+            <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+              AskMySchool
+            </p>
+          </div>
+          <div className="text-sm leading-relaxed text-foreground">
+            {showTypewriter ? (
+              <TypewriterText
+                content={displayContent}
+                sources={sources}
+                onSourceClick={openSource}
+                onComplete={handleTypewriterComplete}
+                messageId={messageId}
+                skipCitationAnimation={skipAnimations}
+              />
+            ) : (
+              <MarkdownRenderer
+                content={displayContent}
+                sources={sources}
+                onSourceClick={openSource}
+                messageId={messageId}
+                skipCitationAnimation={skipAnimations}
+              />
+            )}
+          </div>
+        </div>
+      </CursorSpotlight>
+
+      {messageId && (
+        <MessageFeedback messageId={messageId} schoolId={schoolId} />
+      )}
+
+      {sortedSources.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          {sortedSources.map((source) => (
+            <SourceCard
+              key={`${source.document_id}-${source.source_number}`}
+              source={source}
+              index={source.source_number}
+            />
+          ))}
+        </div>
+      )}
+
+      {isLastAssistant && followUps.length > 0 && onFollowUpSelect && (
+        <FollowUpChips followUps={followUps} onSelect={onFollowUpSelect} />
+      )}
+    </div>
   );
 }

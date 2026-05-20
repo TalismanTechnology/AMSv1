@@ -70,10 +70,10 @@ export function LoginForm({ schoolSlug, schoolId, schoolName }: LoginFormProps) 
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <Card className="w-full max-w-md metallic-card backdrop-blur-xl">
+        <Card className="neo w-full max-w-md metallic-card backdrop-blur-xl">
           <CardHeader className="text-center">
             <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full metallic-surface border border-glass-border neon-border">
-              <Logo size={24} className="text-primary drop-shadow-[0_0_6px_var(--glow-primary)] drop-shadow-[0_0_10px_oklch(1_0_0/40%)]" />
+              <Logo size={24} className="text-primary" />
             </div>
             <CardTitle className="text-2xl metallic-heading neon-text-soft">Welcome back</CardTitle>
             <CardDescription>

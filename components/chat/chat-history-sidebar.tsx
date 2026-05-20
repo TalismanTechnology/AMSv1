@@ -35,29 +35,37 @@ function SessionRow({
   return (
     <div
       className={cn(
-        "grid grid-cols-[1fr_28px] items-center gap-1 border-b pl-4 pr-2 py-3 transition-colors hover:bg-accent cursor-pointer",
-        isActive && "bg-accent border-l-2 border-l-primary"
+        "group relative grid cursor-pointer grid-cols-[1fr_24px] items-center gap-1 py-2.5 pl-3 pr-2 transition-colors",
+        isActive
+          ? "bg-sidebar-accent text-sidebar-foreground"
+          : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60"
       )}
       onClick={onSelect}
     >
+      {isActive && (
+        <span
+          aria-hidden
+          className="absolute left-0 top-1/2 h-5 w-[2px] -translate-y-1/2 rounded-r-sm bg-primary"
+        />
+      )}
       <div className="overflow-hidden">
-        <p className="truncate text-sm font-medium text-foreground">
+        <p className="truncate text-[13px] font-medium">
           {session.title || "New chat"}
         </p>
-        <p className="mt-0.5 truncate text-xs text-muted-foreground">
+        <p className="mt-0.5 truncate text-[10px] font-mono uppercase tracking-[0.12em] text-sidebar-foreground/40">
           <TimeAgo date={session.updated_at} />
         </p>
       </div>
       <button
         type="button"
-        className="flex h-7 w-7 items-center justify-center rounded-md text-foreground/60 hover:text-destructive hover:bg-destructive/10 transition-colors"
+        className="flex h-6 w-6 items-center justify-center rounded-sm text-sidebar-foreground/40 opacity-0 transition-all hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
         onClick={(e) => {
           e.stopPropagation();
           onDelete();
         }}
         title="Delete chat"
       >
-        <Trash2 className="h-4 w-4" />
+        <Trash2 className="h-3.5 w-3.5" />
       </button>
     </div>
   );
@@ -87,20 +95,34 @@ function SidebarContent({
 
   return (
     <>
-      <div className="flex items-center justify-between border-b px-4 py-3">
-        <h3 className="text-sm font-semibold text-foreground">Chat History</h3>
-        <div className="flex items-center gap-1">
-          <Button size="sm" variant="ghost" onClick={() => setShowSearch(true)} title="Search chats">
-            <Search className="h-4 w-4" />
+      <div className="flex items-center justify-between px-3 py-3">
+        <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-sidebar-foreground/50">
+          Chat History
+        </p>
+        <div className="flex items-center gap-0.5">
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7 text-sidebar-foreground/55 hover:text-sidebar-foreground"
+            onClick={() => setShowSearch(true)}
+            title="Search chats"
+          >
+            <Search className="h-3.5 w-3.5" />
           </Button>
-          <Button size="sm" variant="ghost" onClick={onNewChat} title="New chat">
-            <Plus className="h-4 w-4" />
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7 text-sidebar-foreground/55 hover:text-sidebar-foreground"
+            onClick={onNewChat}
+            title="New chat"
+          >
+            <Plus className="h-3.5 w-3.5" />
           </Button>
         </div>
       </div>
       <ScrollArea className="flex-1">
         {sessions.length === 0 ? (
-          <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+          <div className="px-4 py-10 text-center text-xs text-sidebar-foreground/40">
             No past conversations
           </div>
         ) : (
@@ -133,7 +155,7 @@ export function ChatHistorySidebar(props: ChatHistorySidebarProps) {
 
   if (isDesktop) {
     return (
-      <aside className="flex h-full w-64 shrink-0 flex-col overflow-hidden border-r bg-card metallic-surface neon-border">
+      <aside className="flex h-full w-64 shrink-0 flex-col overflow-hidden bg-sidebar">
         <SidebarContent {...props} />
       </aside>
     );

@@ -26,19 +26,20 @@ import { useSchool } from "@/components/shared/school-context";
 import { SchoolSwitcher } from "@/components/shared/school-switcher";
 import { NotificationBell } from "./notification-bell";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
-import { motion } from "framer-motion";
+import { motion, LayoutGroup } from "framer-motion";
 import { sidebarVariants } from "@/lib/motion";
+import { CursorSpotlight } from "@/components/motion/cursor-spotlight";
 import { Logo } from "@/components/logo";
 import { JoinSchoolDialog } from "@/components/shared/join-school-dialog";
 
 function getNavItems(slug: string) {
   return [
-    { href: `/s/${slug}/parent`, label: "Dashboard", icon: LayoutDashboard, exact: true, neon: "neon-icon-blue" },
-    { href: `/s/${slug}/parent/chat`, label: "Chat", icon: MessageSquare, neon: "neon-icon-blue" },
-    { href: `/s/${slug}/parent/documents`, label: "Documents", icon: FileText, neon: "neon-icon-cyan" },
-    { href: `/s/${slug}/parent/events`, label: "Calendar", icon: CalendarDays, neon: "neon-icon-green" },
-    { href: `/s/${slug}/parent/announcements`, label: "Announcements", icon: Megaphone, neon: "neon-icon-amber" },
-    { href: `/s/${slug}/parent/profile`, label: "Profile", icon: User, neon: "neon-icon-purple" },
+    { href: `/s/${slug}/parent`, label: "Dashboard", icon: LayoutDashboard, exact: true },
+    { href: `/s/${slug}/parent/chat`, label: "Chat", icon: MessageSquare },
+    { href: `/s/${slug}/parent/documents`, label: "Documents", icon: FileText },
+    { href: `/s/${slug}/parent/events`, label: "Calendar", icon: CalendarDays },
+    { href: `/s/${slug}/parent/announcements`, label: "Announcements", icon: Megaphone },
+    { href: `/s/${slug}/parent/profile`, label: "Profile", icon: User },
   ];
 }
 
@@ -57,69 +58,88 @@ export function ParentSidebarContent({ onNavigate, forceExpanded }: SidebarConte
 
   return (
     <>
-      <div className="flex items-center gap-2 border-b px-4 py-4  overflow-hidden">
-        <Logo size={collapsed ? 16 : 28} className="shrink-0 text-primary" />
+      <div className="flex items-center gap-2.5 px-3 py-3.5 overflow-hidden">
+        <Logo size={collapsed ? 18 : 22} className="shrink-0 text-primary" />
         {!collapsed && (
-          <span className="text-lg font-bold metallic-text truncate">{school.name}</span>
+          <span className="truncate text-sm font-semibold tracking-tight text-sidebar-foreground">
+            {school.name}
+          </span>
         )}
       </div>
 
       {memberships.length > 1 && (
-        <div className={cn("border-b py-2", collapsed ? "px-2" : "px-3")}>
+        <div className={cn("py-2", collapsed ? "px-2" : "px-3")}>
           <SchoolSwitcher collapsed={collapsed} />
         </div>
       )}
 
-      <nav className="flex-1 space-y-1 px-2 py-4 overflow-y-auto">
-        {navItems.map((item) => {
-          const isActive = item.exact
-            ? pathname === item.href
-            : pathname.startsWith(item.href);
+      <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 py-3">
+        {!collapsed && (
+          <p className="mb-2 px-2 text-[10px] font-mono uppercase tracking-[0.2em] text-sidebar-foreground/75 font-semibold">
+            Navigate
+          </p>
+        )}
+        <LayoutGroup id="parent-sidebar">
+          {navItems.map((item) => {
+            const isActive = item.exact
+              ? pathname === item.href
+              : pathname.startsWith(item.href);
 
-          const link = (
-            <Link
-              href={item.href}
-              onClick={onNavigate}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-sidebar-accent text-primary shadow-[inset_3px_0_8px_-2px_oklch(1_0_0/30%),inset_0_1px_0_oklch(1_0_0/8%)]"
-                  : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground",
-                collapsed && "justify-center px-2"
-              )}
-            >
-              <item.icon
-                className={cn(
-                  "h-5 w-5 shrink-0",
-                  isActive && item.neon
-                )}
-              />
-              {!collapsed && item.label}
-            </Link>
-          );
+            const link = (
+              <CursorSpotlight radius={180} intensity={0.06} className="block rounded-md">
+                <Link
+                  href={item.href}
+                  onClick={onNavigate}
+                  className={cn(
+                    "group sidebar-item relative flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium",
+                    isActive
+                      ? "text-sidebar-foreground"
+                      : "text-sidebar-foreground/75 hover:text-sidebar-foreground",
+                    collapsed && "justify-center px-2"
+                  )}
+                >
+                  {isActive && (
+                    <motion.span
+                      layoutId="parent-sidebar-active"
+                      aria-hidden
+                      className="pointer-events-none absolute inset-0 rounded-md bg-[oklch(1_0_0/0.04)] shadow-[inset_2px_0_0_oklch(0.88_0.006_260),inset_0_0_0_1px_oklch(1_0_0/0.06)]"
+                      transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                    />
+                  )}
+                  <item.icon
+                    strokeWidth={2.25}
+                    className="relative h-[18px] w-[18px] shrink-0 transition-transform duration-200 group-hover:scale-110 group-active:scale-95"
+                  />
+                  {!collapsed && (
+                    <span className="relative truncate">{item.label}</span>
+                  )}
+                </Link>
+              </CursorSpotlight>
+            );
 
-          return collapsed ? (
-            <Tooltip key={item.href}>
-              <TooltipTrigger asChild>{link}</TooltipTrigger>
-              <TooltipContent side="right">{item.label}</TooltipContent>
-            </Tooltip>
-          ) : (
-            <div key={item.href}>{link}</div>
-          );
-        })}
+            return collapsed ? (
+              <Tooltip key={item.href}>
+                <TooltipTrigger asChild>{link}</TooltipTrigger>
+                <TooltipContent side="right">{item.label}</TooltipContent>
+              </Tooltip>
+            ) : (
+              <div key={item.href}>{link}</div>
+            );
+          })}
+        </LayoutGroup>
       </nav>
 
-      {/* Join another school */}
-      <div className="border-t px-2 py-2">
+      <div className="px-2 py-1.5">
         {collapsed ? (
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
-                className="w-full justify-center text-sidebar-foreground/60"
+                size="sm"
+                className="w-full justify-center text-sidebar-foreground/55 hover:text-sidebar-foreground"
                 onClick={() => setJoinDialogOpen(true)}
               >
-                <PlusCircle className="h-5 w-5" />
+                <PlusCircle className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
             <TooltipContent side="right">Join School</TooltipContent>
@@ -127,10 +147,11 @@ export function ParentSidebarContent({ onNavigate, forceExpanded }: SidebarConte
         ) : (
           <Button
             variant="ghost"
-            className="w-full justify-start gap-3 text-sidebar-foreground/60"
+            size="sm"
+            className="w-full justify-start gap-2.5 text-sidebar-foreground/55 hover:text-sidebar-foreground"
             onClick={() => setJoinDialogOpen(true)}
           >
-            <PlusCircle className="h-5 w-5" />
+            <PlusCircle className="h-4 w-4" />
             Join School
           </Button>
         )}
@@ -138,23 +159,19 @@ export function ParentSidebarContent({ onNavigate, forceExpanded }: SidebarConte
 
       <JoinSchoolDialog open={joinDialogOpen} onOpenChange={setJoinDialogOpen} />
 
-      {/* User name */}
-      {!collapsed && userName && (
-        <div className="border-t px-4 py-2 ">
-          <p className="truncate text-xs text-sidebar-foreground/50">
-            {userName}
-          </p>
+      <div className="px-2 py-1.5">
+        <div className="flex items-center justify-center gap-1">
+          <NotificationBell />
+          <ThemeToggle />
         </div>
-      )}
-
-      {/* Notifications + Theme */}
-      <div className="border-t px-2 py-2  flex items-center justify-center gap-2">
-        <NotificationBell />
-        <ThemeToggle />
       </div>
 
-      {/* Sign out */}
-      <div className="border-t px-2 py-4 ">
+      <div className="px-2 py-2">
+        {!collapsed && userName && (
+          <p className="mb-1 px-2 truncate text-[10px] font-mono uppercase tracking-[0.18em] text-sidebar-foreground/75">
+            {userName}
+          </p>
+        )}
         <form action={logout}>
           {collapsed ? (
             <Tooltip>
@@ -162,9 +179,10 @@ export function ParentSidebarContent({ onNavigate, forceExpanded }: SidebarConte
                 <Button
                   type="submit"
                   variant="ghost"
-                  className="w-full justify-center text-sidebar-foreground/60"
+                  size="sm"
+                  className="w-full justify-center text-sidebar-foreground/55 hover:text-sidebar-foreground"
                 >
-                  <LogOut className="h-5 w-5" />
+                  <LogOut className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="right">Sign out</TooltipContent>
@@ -173,9 +191,10 @@ export function ParentSidebarContent({ onNavigate, forceExpanded }: SidebarConte
             <Button
               type="submit"
               variant="ghost"
-              className="w-full justify-start gap-3 text-sidebar-foreground/60"
+              size="sm"
+              className="w-full justify-start gap-2.5 text-sidebar-foreground/55 hover:text-sidebar-foreground"
             >
-              <LogOut className="h-5 w-5" />
+              <LogOut className="h-4 w-4" />
               Sign out
             </Button>
           )}
@@ -215,7 +234,7 @@ export function ParentSidebar() {
       variants={sidebarVariants}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className="hidden md:flex h-screen flex-col border-r border-sidebar-border bg-sidebar metallic-surface noise-overlay neon-border"
+      className="hidden md:flex h-screen flex-col bg-transparent relative z-20"
     >
       <ParentSidebarContent />
     </motion.aside>
