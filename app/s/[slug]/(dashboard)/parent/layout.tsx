@@ -2,7 +2,6 @@ import { createClient } from "@/lib/supabase/server";
 import { requireSchoolContext } from "@/lib/school-context";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AnnouncementBanner } from "@/components/parent/announcement-banner";
-import { OnboardingTour } from "@/components/parent/onboarding-tour";
 import { ParentSidebarProvider } from "@/components/parent/sidebar-context";
 import { ParentSidebar } from "@/components/parent/parent-sidebar";
 import { ParentMobileHeader } from "@/components/parent/mobile-header";
@@ -21,7 +20,7 @@ export default async function ParentLayout({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, onboarding_completed")
+    .select("full_name")
     .eq("id", user.id)
     .single();
 
@@ -66,7 +65,6 @@ export default async function ParentLayout({
             <main className="dashboard-cards flex-1 overflow-auto basis-0">{children}</main>
           </div>
         </div>
-        <OnboardingTour show={!profile?.onboarding_completed} />
       </TooltipProvider>
     </ParentSidebarProvider>
   );
