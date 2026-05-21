@@ -166,7 +166,7 @@ export function TopographicBackground({
       }
 
       // Sample noise into a grid
-      const step = 4; // pixel resolution of the grid
+      const step = 6; // pixel resolution of the grid (larger = far cheaper)
       const cols = Math.ceil(width / step) + 1;
       const rows = Math.ceil(height / step) + 1;
       const field = new Float32Array(cols * rows);
@@ -285,19 +285,30 @@ export function TopographicBackground({
       ctx.globalAlpha = 1;
     }
 
-    function tick() {
-      // Pause when tab is not visible
+    // Throttle redraws to ~20fps. The noise drift is slow enough that a
+    // lower redraw rate is visually identical, but recomputing the contour
+    // field 60×/sec saturates the main thread and makes the whole page
+    // (scroll, reveals, hover) feel choppy.
+    const prefersReduced = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+    const shouldAnimate = animate && !prefersReduced;
+    const minFrameGap = 1000 / 20;
+    let lastTime = 0;
+
+    function tick(now: number) {
+      frameRef.current = requestAnimationFrame(tick);
       if (document.hidden) {
-        frameRef.current = requestAnimationFrame(tick);
+        lastTime = now;
         return;
       }
-      if (animate) {
-        timeRef.current += resolvedSpeed;
-      }
+      const elapsed = now - lastTime;
+      if (elapsed < minFrameGap) return;
+      lastTime = now;
+      // Advance the noise field by real elapsed time (normalised to a
+      // 60fps baseline) so drift speed is independent of the redraw rate.
+      timeRef.current += resolvedSpeed * (elapsed / 16.667);
       drawContours(timeRef.current);
-      if (animate) {
-        frameRef.current = requestAnimationFrame(tick);
-      }
     }
 
     resize();
@@ -305,8 +316,7 @@ export function TopographicBackground({
     // Draw once immediately
     drawContours(timeRef.current);
 
-    // Only start animation loop if animate is true
-    if (animate) {
+    if (shouldAnimate) {
       frameRef.current = requestAnimationFrame(tick);
     }
 

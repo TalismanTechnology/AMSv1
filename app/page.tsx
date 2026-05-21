@@ -194,7 +194,7 @@ export default function LandingPage() {
         <AuroraMesh />
         <FloatingOrbs />
         <div className="relative z-10">
-          <div className="shine-sweep inline-block rounded-md">
+          <div className="inline-block">
             <SlotMachineHero className="text-6xl font-bold metallic-heading neon-text-soft sm:text-7xl lg:text-9xl">
               {"Your Questions\nAnswered Instantly"}
             </SlotMachineHero>
