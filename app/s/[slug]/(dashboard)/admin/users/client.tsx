@@ -52,7 +52,7 @@ import { MagicBentoCard } from "@/components/magic-bento";
 import { approveUser, approveAllPending, changeUserRole, deleteUser } from "@/actions/users";
 import { toast } from "sonner";
 import NextLink from "next/link";
-import { formatDistanceToNow } from "date-fns";
+import { TimeAgo } from "@/components/ui/time-ago";
 import type { Profile } from "@/lib/types";
 
 const GRADES = [
@@ -523,9 +523,7 @@ export function UsersClient({ users, schoolId, schoolSlug, joinCode, requireJoin
                   )}
                 </TableCell>
                 <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
-                  {formatDistanceToNow(new Date(user.created_at), {
-                    addSuffix: true,
-                  })}
+                  <TimeAgo date={user.created_at} />
                 </TableCell>
                 <TableCell>
                   <DropdownMenu>

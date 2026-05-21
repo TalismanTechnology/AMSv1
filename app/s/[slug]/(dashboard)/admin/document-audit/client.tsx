@@ -15,7 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { LogoSpinner } from "@/components/logo-spinner";
-import { formatDistanceToNow } from "date-fns";
+import { TimeAgo } from "@/components/ui/time-ago";
 import { runDocumentAudit, type StoredAudit } from "@/actions/document-audit";
 import type { AuditResult, CategoryResult } from "@/lib/ai/document-audit";
 import {
@@ -134,9 +134,14 @@ export function DocumentAuditClient({
         <div>
           <h1 className="text-xl font-bold metallic-heading">Document Audit</h1>
           <p className="text-xs text-muted-foreground">
-            {audit
-              ? `Last run ${formatDistanceToNow(new Date(audit.created_at), { addSuffix: true })} · ${audit.document_count} docs · ${TOTAL_CHECKLIST_ITEMS} criteria`
-              : `${TOTAL_CHECKLIST_ITEMS} criteria across ${SCHOOL_CHECKLIST.length} categories`}
+            {audit ? (
+              <>
+                Last run <TimeAgo date={audit.created_at} /> ·{" "}
+                {audit.document_count} docs · {TOTAL_CHECKLIST_ITEMS} criteria
+              </>
+            ) : (
+              `${TOTAL_CHECKLIST_ITEMS} criteria across ${SCHOOL_CHECKLIST.length} categories`
+            )}
           </p>
         </div>
         <Button size="sm" onClick={handleRunAudit} disabled={isPending}>

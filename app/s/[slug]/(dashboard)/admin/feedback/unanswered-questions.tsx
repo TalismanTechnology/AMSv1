@@ -20,7 +20,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { LogoSpinner } from "@/components/logo-spinner";
-import { formatDistanceToNow } from "date-fns";
+import { TimeAgo } from "@/components/ui/time-ago";
 import {
   dismissUnansweredQuestion,
   dismissUnansweredCluster,
@@ -198,9 +198,7 @@ export function UnansweredQuestionsSection({
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <span className="text-xs text-muted-foreground">
-                      {formatDistanceToNow(new Date(group.newestDate), {
-                        addSuffix: true,
-                      })}
+                      <TimeAgo date={group.newestDate} />
                     </span>
                     {expandedIndex === index ? (
                       <ChevronUp className="h-4 w-4" />
@@ -223,9 +221,7 @@ export function UnansweredQuestionsSection({
                         </span>
                         <div className="flex items-center gap-2 shrink-0">
                           <span className="text-xs text-muted-foreground">
-                            {formatDistanceToNow(new Date(q.created_at), {
-                              addSuffix: true,
-                            })}
+                            <TimeAgo date={q.created_at} />
                           </span>
                           <Button
                             variant="ghost"

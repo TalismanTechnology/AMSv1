@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/collapsible";
 import { DocumentViewer } from "@/components/shared/document-viewer";
 import { searchDocumentContent } from "@/actions/documents";
-import { formatDistanceToNow } from "date-fns";
+import { TimeAgo } from "@/components/ui/time-ago";
 import type { Document, Category, Folder, ContentSearchResult } from "@/lib/types";
 
 const FILE_TYPE_ICONS: Record<string, typeof FileText> = {
@@ -355,10 +355,7 @@ export function ParentDocumentsClient({
                                     </Badge>
                                   )}
                                   <span className="text-[10px] text-muted-foreground">
-                                    {formatDistanceToNow(
-                                      new Date(doc.created_at),
-                                      { addSuffix: true }
-                                    )}
+                                    <TimeAgo date={doc.created_at} />
                                   </span>
                                 </div>
                               </div>

@@ -152,8 +152,8 @@ export function EmbeddingsMockup() {
               key={i}
               className="absolute rounded-full bg-primary"
               style={{
-                top: `${d.top}%`,
-                left: `${d.left}%`,
+                top: `${d.top.toFixed(2)}%`,
+                left: `${d.left.toFixed(2)}%`,
                 width: `${d.size * 3}px`,
                 height: `${d.size * 3}px`,
                 boxShadow: "0 0 6px var(--glow-primary)",

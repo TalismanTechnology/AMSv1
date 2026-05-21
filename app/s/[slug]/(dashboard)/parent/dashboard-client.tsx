@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { formatDistanceToNow } from "date-fns";
+import { TimeAgo } from "@/components/ui/time-ago";
 import { MagicBentoGrid, MagicBentoCard } from "@/components/magic-bento";
 import { JoinSchoolDialog } from "@/components/shared/join-school-dialog";
 
@@ -177,9 +177,7 @@ export function DashboardClient({
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      {formatDistanceToNow(new Date(a.created_at), {
-                        addSuffix: true,
-                      })}
+                      <TimeAgo date={a.created_at} />
                     </p>
                   </div>
                 ))
