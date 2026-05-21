@@ -78,7 +78,7 @@ export function MessageBubble({
   return (
     <div className="flex flex-col gap-2">
       <CursorSpotlight radius={360} intensity={0.07} className="rounded-lg">
-        <div className="metallic-surface glass-noise relative rounded-lg border border-glass-border p-3.5">
+        <div className="chat-response-surface glass-noise relative rounded-lg border border-glass-border p-3.5">
           <div className="mb-2 flex items-center gap-1.5">
             <div className="flex h-4 w-4 items-center justify-center rounded-sm border border-glass-border bg-muted/40">
               <Sparkles className="h-2.5 w-2.5 text-muted-foreground" />

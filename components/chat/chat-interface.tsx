@@ -45,6 +45,7 @@ export function ChatInterface({
   const [input, setInput] = useState("");
   const [currentSessionId, setCurrentSessionId] = useState(sessionId);
   const [creatingSession, setCreatingSession] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const pendingMessageRef = useRef<string | null>(null);
   // Track IDs of messages loaded from DB so we can skip their entrance animation
@@ -194,6 +195,7 @@ export function ChatInterface({
 
   async function submitText(text: string) {
     if (!text.trim() || isLoading) return;
+    setSendError(null);
 
     // Intercept /preview command
     if (text.trim().startsWith("/preview ")) {
@@ -209,7 +211,13 @@ export function ChatInterface({
       setCreatingSession(true);
       const result = await createChatSession(schoolId!, text);
       setCreatingSession(false);
-      if (result.error || !result.sessionId) return;
+      if (result.error || !result.sessionId) {
+        setSendError(
+          result.error || "Couldn't start the chat session. Please try again."
+        );
+        setInput(text); // restore the message instead of silently dropping it
+        return;
+      }
       // Queue the message — it will be sent by the useEffect above
       // after React re-renders with the new transport
       pendingMessageRef.current = text;
@@ -273,7 +281,7 @@ export function ChatInterface({
     <SourcePanelProvider>
       <div className="flex h-full">
         {/* Chat column */}
-        <div className="flex flex-1 flex-col min-w-0">
+        <div className="relative flex flex-1 flex-col min-w-0">
           {/* Header with export */}
           {messages.length > 0 && (
             <div className="flex items-center justify-end border-b neon-divider px-4 py-1.5">
@@ -343,9 +351,9 @@ export function ChatInterface({
               {isLoading && !creatingSession && (!messages[messages.length - 1] || messages[messages.length - 1].role === "user" || !getMessageText(messages[messages.length - 1])) && (
                 <RetrievalLoadingStrip />
               )}
-              {error && (
+              {(error || sendError) && (
                 <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-                  Something went wrong: {error.message}
+                  Something went wrong: {error?.message || sendError}
                 </div>
               )}
             </div>

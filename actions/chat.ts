@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 
 export async function getChatSessions(schoolId: string) {
@@ -48,17 +49,44 @@ export async function createChatSession(schoolId: string, title?: string) {
 
   if (!user) return { error: "Not authenticated" };
 
+  // Authorize: super admins, or approved members of this school.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (profile?.role !== "super_admin") {
+    const { data: membership } = await supabase
+      .from("school_memberships")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("school_id", schoolId)
+      .eq("approved", true)
+      .single();
+    if (!membership) {
+      return { error: "You don't have access to this school's chat." };
+    }
+  }
+
   const sessionTitle = title
     ? title.slice(0, 60) + (title.length > 60 ? "..." : "")
     : "New chat";
 
-  const { data, error } = await supabase
+  // Insert with the admin client: the request is already authorized above, and
+  // the chat_sessions RLS policy (is_school_member) would otherwise reject
+  // super admins, who hold no school_memberships row.
+  const admin = createAdminClient();
+  const { data, error } = await admin
     .from("chat_sessions")
     .insert({ user_id: user.id, title: sessionTitle, school_id: schoolId })
     .select("id")
     .single();
 
-  if (error) return { error: error.message };
+  if (error) {
+    console.error("createChatSession insert failed:", error);
+    return { error: error.message };
+  }
   return { sessionId: data.id };
 }
 

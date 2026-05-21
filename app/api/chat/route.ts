@@ -45,21 +45,29 @@ export async function POST(request: NextRequest) {
     const { messages, sessionId, schoolId } = await request.json();
     debugLog(`REQUEST: sessionId=${sessionId}, schoolId=${schoolId}, messageCount=${messages?.length}`);
 
-    // Verify user is a member of this school
+    // Verify access: super admins, or approved members of this school
     if (schoolId) {
-      const { data: membership } = await supabase
-        .from("school_memberships")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("school_id", schoolId)
-        .eq("approved", true)
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
         .single();
 
-      if (!membership) {
-        return new Response(JSON.stringify({ error: "Access denied" }), {
-          status: 403,
-          headers: { "Content-Type": "application/json" },
-        });
+      if (profile?.role !== "super_admin") {
+        const { data: membership } = await supabase
+          .from("school_memberships")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("school_id", schoolId)
+          .eq("approved", true)
+          .single();
+
+        if (!membership) {
+          return new Response(JSON.stringify({ error: "Access denied" }), {
+            status: 403,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
       }
     }
 
