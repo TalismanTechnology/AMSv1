@@ -167,24 +167,38 @@ export async function register(formData: FormData) {
 
   const newUserId = signUpData.user?.id;
 
-  // Create school membership
-  if (newUserId && schoolId) {
-    await admin.from("school_memberships").insert({
+  if (!newUserId) {
+    return { error: "Account creation failed. Please try again." };
+  }
+
+  // Create the school membership. If this fails, roll back the auth user so
+  // we never leave an orphaned login with no school — that half-state would
+  // block re-registration with a misleading "User already registered" error.
+  const { error: membershipError } = await admin
+    .from("school_memberships")
+    .insert({
       user_id: newUserId,
       school_id: schoolId,
       role,
       approved: !requiresApproval,
     });
 
-    // If parent with child info, create children record
-    if (role === "parent" && childName && newUserId) {
-      await admin.from("children").insert({
-        parent_id: newUserId,
-        name: childName,
-        grade: childGrade || null,
-        school_id: schoolId,
-      });
-    }
+  if (membershipError) {
+    // Roll back: remove the half-created auth user (cascades to its profile).
+    await admin.auth.admin.deleteUser(newUserId);
+    return {
+      error: "Could not finish setting up your account. Please try again.",
+    };
+  }
+
+  // If parent with child info, create children record (best-effort).
+  if (role === "parent" && childName) {
+    await admin.from("children").insert({
+      parent_id: newUserId,
+      name: childName,
+      grade: childGrade || null,
+      school_id: schoolId,
+    });
   }
 
   if (schoolSlug) {
