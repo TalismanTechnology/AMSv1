@@ -37,16 +37,16 @@ export function LogoSpinner({ size = 16, className }: LogoSpinnerProps) {
         xmlns="http://www.w3.org/2000/svg"
         className={cn("opacity-70", className)}
       >
-        <path
-          d={HEAD_PATH.d}
-          fill="currentColor"
-          transform={`translate(${HEAD_PATH.translateX}, ${HEAD_PATH.translateY})`}
-        />
-        <path
-          d={BODY_PATH.d}
-          fill="currentColor"
-          transform={`translate(${BODY_PATH.translateX}, ${BODY_PATH.translateY})`}
-        />
+        <g fill="currentColor">
+          <path
+            d={HEAD_PATH.d}
+            transform={`translate(${HEAD_PATH.translateX}, ${HEAD_PATH.translateY})`}
+          />
+          <path
+            d={BODY_PATH.d}
+            transform={`translate(${BODY_PATH.translateX}, ${BODY_PATH.translateY})`}
+          />
+        </g>
       </svg>
     );
   }
@@ -62,16 +62,18 @@ export function LogoSpinner({ size = 16, className }: LogoSpinnerProps) {
       animate={{ scale: [0.85, 1, 0.85], opacity: [0.5, 1, 0.5] }}
       transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
     >
-      <path
-        d={HEAD_PATH.d}
-        fill="currentColor"
-        transform={`translate(${HEAD_PATH.translateX}, ${HEAD_PATH.translateY})`}
-      />
-      <path
-        d={BODY_PATH.d}
-        fill="currentColor"
-        transform={`translate(${BODY_PATH.translateX}, ${BODY_PATH.translateY})`}
-      />
+      {/* Head + body grouped so the pulsing opacity (animated on the svg)
+          composites as one unit instead of doubling where they overlap. */}
+      <g fill="currentColor">
+        <path
+          d={HEAD_PATH.d}
+          transform={`translate(${HEAD_PATH.translateX}, ${HEAD_PATH.translateY})`}
+        />
+        <path
+          d={BODY_PATH.d}
+          transform={`translate(${BODY_PATH.translateX}, ${BODY_PATH.translateY})`}
+        />
+      </g>
     </motion.svg>
   );
 }

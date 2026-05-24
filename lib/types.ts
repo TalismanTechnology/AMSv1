@@ -172,6 +172,22 @@ export interface AnalyticsEvent {
 
 export type EventType = "general" | "academic" | "sports" | "arts" | "meeting" | "holiday" | "other";
 
+export type EventCalendarKind = "division" | "category";
+
+// An admin-defined calendar parents can filter by. Two
+// kinds: 'division' (Lower/Middle/Upper) and 'category'
+// (Athletics, Arts, ...). Events are tagged with any
+// number of these via the event_calendar_links table.
+export interface EventCalendar {
+  id: string;
+  school_id: string;
+  kind: EventCalendarKind;
+  name: string;
+  color: string;
+  sort_order: number;
+  created_at: string;
+}
+
 export interface SchoolEvent {
   id: string;
   title: string;
@@ -185,6 +201,9 @@ export interface SchoolEvent {
   school_id: string;
   created_at: string;
   updated_at: string;
+  // Divisions + categories this event is tagged with.
+  // Populated when fetched with the event_calendars embed.
+  calendars?: EventCalendar[];
 }
 
 export type AnnouncementPriority = "normal" | "important" | "urgent";

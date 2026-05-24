@@ -34,8 +34,10 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { ManageCalendarsPopover } from "@/components/admin/manage-calendars-popover";
 import { cn } from "@/lib/utils";
-import type { SchoolEvent, EventType } from "@/lib/types";
+import { calendarColorClasses, KIND_LABELS } from "@/lib/event-calendars";
+import type { SchoolEvent, EventType, EventCalendar } from "@/lib/types";
 
 // ─── Color maps ───────────────────────────────────────────
 
@@ -117,6 +119,31 @@ function hourLabel(hour: number) {
   return `${hour - 12} PM`;
 }
 
+// ─── Calendar tag chips ───────────────────────────────────
+
+function CalendarChips({ event }: { event: SchoolEvent }) {
+  if (!event.calendars || event.calendars.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-1">
+      {event.calendars.map((cal) => {
+        const colors = calendarColorClasses(cal.color);
+        return (
+          <span
+            key={cal.id}
+            className={cn(
+              "flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium",
+              colors.chip
+            )}
+          >
+            <span className={cn("h-1.5 w-1.5 rounded-full", colors.dot)} />
+            {cal.name}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── Event Popover ────────────────────────────────────────
 
 function EventPopover({
@@ -171,6 +198,7 @@ function EventPopover({
             </p>
           )}
         </div>
+        <CalendarChips event={event} />
         {(onEdit || onDelete) && (
           <div className="flex items-center gap-1 pt-1 border-t">
             {onEdit && (
@@ -263,7 +291,7 @@ function MonthView({
               onClick={() => onSelectDate(day)}
               onDoubleClick={() => onCreateEventOnDate?.(dateStr)}
               className={cn(
-                "relative flex flex-col border-t min-h-[7.5rem] p-1.5 cursor-pointer transition-colors hover:bg-accent/30",
+                "relative flex flex-col border-t min-h-[5rem] p-1.5 cursor-pointer transition-colors hover:bg-accent/30",
                 !inMonth && "bg-muted/10 text-muted-foreground/30",
                 isSelected && "bg-primary/5 ring-1 ring-inset ring-primary/30",
                 today && !isSelected && "bg-accent/20"
@@ -521,6 +549,11 @@ interface CalendarViewProps {
   onCreateEventOnDate?: (date: string, startTime?: string) => void;
   onEditEvent?: (event: SchoolEvent) => void;
   onDeleteEvent?: (event: SchoolEvent) => void;
+  eventCalendars?: EventCalendar[];
+  // Set by admin callers to enable inline CRUD of divisions /
+  // categories from the filter strip. Requires schoolId.
+  manageCalendars?: boolean;
+  schoolId?: string;
 }
 
 export function CalendarView({
@@ -529,12 +562,47 @@ export function CalendarView({
   onCreateEventOnDate,
   onEditEvent,
   onDeleteEvent,
+  eventCalendars,
+  manageCalendars,
+  schoolId,
 }: CalendarViewProps) {
   const [view, setView] = useState<ViewMode>("month");
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [hiddenCalendarIds, setHiddenCalendarIds] = useState<Set<string>>(
+    new Set()
+  );
 
-  const eventsByDate = useMemo(() => groupEventsByDate(events), [events]);
+  function toggleCalendar(id: string) {
+    setHiddenCalendarIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  // An event passes a dimension's filter if it has no tag
+  // of that kind (universal / all-school) or at least one
+  // of its tags of that kind is still visible.
+  const filteredEvents = useMemo(() => {
+    if (hiddenCalendarIds.size === 0) return events;
+    return events.filter((event) => {
+      const cals = event.calendars ?? [];
+      const divs = cals.filter((c) => c.kind === "division");
+      const cats = cals.filter((c) => c.kind === "category");
+      const divOk =
+        divs.length === 0 || divs.some((c) => !hiddenCalendarIds.has(c.id));
+      const catOk =
+        cats.length === 0 || cats.some((c) => !hiddenCalendarIds.has(c.id));
+      return divOk && catOk;
+    });
+  }, [events, hiddenCalendarIds]);
+
+  const eventsByDate = useMemo(
+    () => groupEventsByDate(filteredEvents),
+    [filteredEvents]
+  );
 
   const selectedDateStr = format(selectedDate, "yyyy-MM-dd");
   const selectedEvents = eventsByDate.get(selectedDateStr) || [];
@@ -651,6 +719,66 @@ export function CalendarView({
           </div>
         </div>
       </div>
+
+      {/* Calendar filters — divisions + categories */}
+      {((eventCalendars && eventCalendars.length > 0) ||
+        (manageCalendars && schoolId)) && (
+        <div className="space-y-2 rounded-lg border bg-card/60 p-3 metallic-card">
+          {(["division", "category"] as const).map((kind) => {
+            const items = (eventCalendars ?? [])
+              .filter((c) => c.kind === kind)
+              .sort(
+                (a, b) =>
+                  a.sort_order - b.sort_order || a.name.localeCompare(b.name)
+              );
+            const isFirst = kind === "division";
+            const showManageHere =
+              isFirst && manageCalendars && schoolId;
+            if (items.length === 0 && !showManageHere) return null;
+            return (
+              <div key={kind} className="flex flex-wrap items-center gap-1.5">
+                <span className="w-[68px] shrink-0 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  {KIND_LABELS[kind].plural}
+                </span>
+                {items.map((cal) => {
+                  const on = !hiddenCalendarIds.has(cal.id);
+                  const colors = calendarColorClasses(cal.color);
+                  return (
+                    <button
+                      key={cal.id}
+                      type="button"
+                      onClick={() => toggleCalendar(cal.id)}
+                      aria-pressed={on}
+                      className={cn(
+                        "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-all",
+                        on
+                          ? cn(colors.chip, "border-transparent")
+                          : "border-border text-muted-foreground/50"
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "h-2 w-2 rounded-full",
+                          on ? colors.dot : "bg-muted-foreground/30"
+                        )}
+                      />
+                      {cal.name}
+                    </button>
+                  );
+                })}
+                {showManageHere && (
+                  <div className="ml-auto">
+                    <ManageCalendarsPopover
+                      calendars={eventCalendars ?? []}
+                      schoolId={schoolId!}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Week view: day headers above time grid */}
       {view === "week" && (
@@ -803,6 +931,7 @@ export function CalendarView({
                         {event.description}
                       </p>
                     )}
+                    <CalendarChips event={event} />
                   </div>
                   {(onEditEvent || onDeleteEvent) && (
                     <div className="flex items-center gap-1 ml-2 shrink-0">

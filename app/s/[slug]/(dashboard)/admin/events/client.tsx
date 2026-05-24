@@ -7,15 +7,20 @@ import { EventFormDialog } from "@/components/admin/event-form-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { deleteEvent } from "@/actions/events";
 import { toast } from "sonner";
-import type { SchoolEvent } from "@/lib/types";
+import type { SchoolEvent, EventCalendar } from "@/lib/types";
 
 interface EventsClientProps {
   events: SchoolEvent[];
+  eventCalendars: EventCalendar[];
   schoolId: string;
   schoolSlug: string;
 }
 
-export function EventsClient({ events, schoolId, schoolSlug }: EventsClientProps) {
+export function EventsClient({
+  events,
+  eventCalendars,
+  schoolId,
+}: EventsClientProps) {
   const [createOpen, setCreateOpen] = useState(false);
   const [defaultDate, setDefaultDate] = useState<string | undefined>();
   const [defaultTime, setDefaultTime] = useState<string | undefined>();
@@ -37,6 +42,9 @@ export function EventsClient({ events, schoolId, schoolSlug }: EventsClientProps
     <div>
       <CalendarView
         events={events}
+        eventCalendars={eventCalendars}
+        manageCalendars
+        schoolId={schoolId}
         onCreateEvent={() => {
           setDefaultDate(format(new Date(), "yyyy-MM-dd"));
           setDefaultTime(undefined);
@@ -57,6 +65,7 @@ export function EventsClient({ events, schoolId, schoolSlug }: EventsClientProps
         defaultDate={defaultDate}
         defaultTime={defaultTime}
         schoolId={schoolId}
+        eventCalendars={eventCalendars}
       />
 
       {editingEvent && (
@@ -67,6 +76,7 @@ export function EventsClient({ events, schoolId, schoolSlug }: EventsClientProps
             if (!open) setEditingEvent(null);
           }}
           schoolId={schoolId}
+          eventCalendars={eventCalendars}
         />
       )}
 

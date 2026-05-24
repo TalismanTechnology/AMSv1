@@ -45,16 +45,16 @@ export function LogoLoading({ size = 80, fullScreen }: LogoLoadingProps) {
           xmlns="http://www.w3.org/2000/svg"
           className="text-muted-foreground"
         >
-          <path
-            d={HEAD_PATH.d}
-            fill="currentColor"
-            transform={`translate(${HEAD_PATH.translateX}, ${HEAD_PATH.translateY})`}
-          />
-          <path
-            d={BODY_PATH.d}
-            fill="currentColor"
-            transform={`translate(${BODY_PATH.translateX}, ${BODY_PATH.translateY})`}
-          />
+          <g fill="currentColor">
+            <path
+              d={HEAD_PATH.d}
+              transform={`translate(${HEAD_PATH.translateX}, ${HEAD_PATH.translateY})`}
+            />
+            <path
+              d={BODY_PATH.d}
+              transform={`translate(${BODY_PATH.translateX}, ${BODY_PATH.translateY})`}
+            />
+          </g>
         </svg>
       </div>
     );
@@ -75,43 +75,54 @@ export function LogoLoading({ size = 80, fullScreen }: LogoLoadingProps) {
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
         >
-          {/* Head — bounces with slight delay */}
-          <motion.path
-            d={HEAD_PATH.d}
-            transform={`translate(${HEAD_PATH.translateX}, ${HEAD_PATH.translateY})`}
+          {/* Opacity pulses on the group, not the paths: head + body
+              overlap, so fading them individually doubles the opacity in
+              the overlap and shows as a denser patch. The bounce (scale/y)
+              stays per-path so the two pieces still move independently. */}
+          <motion.g
             fill="currentColor"
-            style={{ transformOrigin: "742px 385px" }}
-            animate={{
-              opacity: [0.3, 1, 1, 0.3],
-              scale: [0.85, 1, 1, 0.85],
-              y: [-15, 0, 0, -15],
-            }}
+            animate={{ opacity: [0.3, 1, 1, 0.3] }}
             transition={{
               duration: CYCLE_DURATION,
               repeat: Infinity,
               ease: "easeInOut",
               times: [0, 0.3, 0.7, 1],
             }}
-          />
-          {/* Body — bounces with offset timing */}
-          <motion.path
-            d={BODY_PATH.d}
-            transform={`translate(${BODY_PATH.translateX}, ${BODY_PATH.translateY})`}
-            fill="currentColor"
-            style={{ transformOrigin: "750px 500px" }}
-            animate={{
-              opacity: [0.3, 1, 1, 0.3],
-              scale: [0.85, 1, 1, 0.85],
-              y: [15, 0, 0, 15],
-            }}
-            transition={{
-              duration: CYCLE_DURATION,
-              repeat: Infinity,
-              ease: "easeInOut",
-              times: [0, 0.3, 0.7, 1],
-              delay: 0.1,
-            }}
-          />
+          >
+            {/* Head — bounces with slight delay */}
+            <motion.path
+              d={HEAD_PATH.d}
+              transform={`translate(${HEAD_PATH.translateX}, ${HEAD_PATH.translateY})`}
+              style={{ transformOrigin: "742px 385px" }}
+              animate={{
+                scale: [0.85, 1, 1, 0.85],
+                y: [-15, 0, 0, -15],
+              }}
+              transition={{
+                duration: CYCLE_DURATION,
+                repeat: Infinity,
+                ease: "easeInOut",
+                times: [0, 0.3, 0.7, 1],
+              }}
+            />
+            {/* Body — bounces with offset timing */}
+            <motion.path
+              d={BODY_PATH.d}
+              transform={`translate(${BODY_PATH.translateX}, ${BODY_PATH.translateY})`}
+              style={{ transformOrigin: "750px 500px" }}
+              animate={{
+                scale: [0.85, 1, 1, 0.85],
+                y: [15, 0, 0, 15],
+              }}
+              transition={{
+                duration: CYCLE_DURATION,
+                repeat: Infinity,
+                ease: "easeInOut",
+                times: [0, 0.3, 0.7, 1],
+                delay: 0.1,
+              }}
+            />
+          </motion.g>
         </svg>
         <motion.span
           className="text-xs text-muted-foreground"

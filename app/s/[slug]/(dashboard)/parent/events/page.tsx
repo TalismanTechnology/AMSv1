@@ -19,13 +19,29 @@ export default async function ParentEventsPage({
   const oneYearAhead = new Date();
   oneYearAhead.setFullYear(oneYearAhead.getFullYear() + 1);
 
-  const { data: events } = await supabase
-    .from("events")
-    .select("*")
-    .eq("school_id", school.id)
-    .gte("date", threeMonthsAgo.toISOString().split("T")[0])
-    .lte("date", oneYearAhead.toISOString().split("T")[0])
-    .order("date", { ascending: true });
+  const [{ data: events }, { data: eventCalendars }] = await Promise.all([
+    supabase
+      .from("events")
+      .select(
+        "*, calendars:event_calendars(id, school_id, kind, name, color, sort_order, created_at)"
+      )
+      .eq("school_id", school.id)
+      .gte("date", threeMonthsAgo.toISOString().split("T")[0])
+      .lte("date", oneYearAhead.toISOString().split("T")[0])
+      .order("date", { ascending: true }),
+    supabase
+      .from("event_calendars")
+      .select("*")
+      .eq("school_id", school.id)
+      .order("sort_order", { ascending: true }),
+  ]);
 
-  return <PageTransition><ParentEventsClient events={events || []} /></PageTransition>;
+  return (
+    <PageTransition>
+      <ParentEventsClient
+        events={events || []}
+        eventCalendars={eventCalendars || []}
+      />
+    </PageTransition>
+  );
 }

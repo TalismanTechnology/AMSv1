@@ -1,12 +1,16 @@
 "use client";
 
 import { CalendarView } from "@/components/shared/calendar-view";
-import type { SchoolEvent } from "@/lib/types";
+import type { SchoolEvent, EventCalendar } from "@/lib/types";
 
 interface ParentEventsClientProps {
   events: SchoolEvent[];
+  eventCalendars: EventCalendar[];
 }
 
-export function ParentEventsClient({ events }: ParentEventsClientProps) {
-  return <CalendarView events={events} />;
+export function ParentEventsClient({
+  events,
+  eventCalendars,
+}: ParentEventsClientProps) {
+  return <CalendarView events={events} eventCalendars={eventCalendars} />;
 }

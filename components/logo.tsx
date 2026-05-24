@@ -24,16 +24,13 @@ export function Logo({
       xmlns="http://www.w3.org/2000/svg"
       className={className}
     >
-      <path
-        d={HEAD_PATH}
-        fill="currentColor"
-        transform="translate(787.8125,319.375)"
-      />
-      <path
-        d={BODY_PATH}
-        fill="currentColor"
-        transform="translate(649,392)"
-      />
+      {/* Head + body grouped so the fill composites as one unit — the two
+          shapes overlap, so painting them separately at partial opacity
+          doubles up and shows as a denser patch. */}
+      <g fill="currentColor">
+        <path d={HEAD_PATH} transform="translate(787.8125,319.375)" />
+        <path d={BODY_PATH} transform="translate(649,392)" />
+      </g>
     </svg>
   );
 }

@@ -25,7 +25,6 @@ import { useParentSidebar } from "./sidebar-context";
 import { useSchool } from "@/components/shared/school-context";
 import { SchoolSwitcher } from "@/components/shared/school-switcher";
 import { NotificationBell } from "./notification-bell";
-import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { motion, LayoutGroup } from "framer-motion";
 import { sidebarVariants } from "@/lib/motion";
 import { CursorSpotlight } from "@/components/motion/cursor-spotlight";
@@ -162,7 +161,6 @@ export function ParentSidebarContent({ onNavigate, forceExpanded }: SidebarConte
       <div className="px-2 py-1.5">
         <div className="flex items-center justify-center gap-1">
           <NotificationBell />
-          <ThemeToggle />
         </div>
       </div>
 

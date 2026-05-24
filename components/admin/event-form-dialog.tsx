@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { Plus } from "lucide-react";
 import { LogoSpinner } from "@/components/logo-spinner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   Dialog,
   DialogContent,
@@ -20,8 +22,20 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { createEvent, updateEvent } from "@/actions/events";
+import { CalendarFormDialog } from "@/components/admin/calendar-form-dialog";
+import {
+  splitCalendars,
+  calendarColorClasses,
+  KIND_LABELS,
+} from "@/lib/event-calendars";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import type { SchoolEvent, EventType } from "@/lib/types";
+import type {
+  SchoolEvent,
+  EventType,
+  EventCalendar,
+  EventCalendarKind,
+} from "@/lib/types";
 
 const EVENT_TYPES: { value: EventType; label: string }[] = [
   { value: "general", label: "General" },
@@ -40,6 +54,7 @@ interface EventFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   schoolId: string;
+  eventCalendars: EventCalendar[];
 }
 
 export function EventFormDialog({
@@ -49,6 +64,7 @@ export function EventFormDialog({
   open,
   onOpenChange,
   schoolId,
+  eventCalendars,
 }: EventFormDialogProps) {
   const isEditing = !!event;
   const [title, setTitle] = useState(event?.title || "");
@@ -66,7 +82,20 @@ export function EventFormDialog({
   const [recurrenceEnd, setRecurrenceEnd] = useState(
     (event as SchoolEvent & { recurrence_end?: string })?.recurrence_end || ""
   );
+  const [selectedCalendarIds, setSelectedCalendarIds] = useState<string[]>(
+    event?.calendars?.map((c) => c.id) ?? []
+  );
   const [saving, setSaving] = useState(false);
+  const [createCalendarKind, setCreateCalendarKind] =
+    useState<EventCalendarKind | null>(null);
+
+  const { divisions, categories } = splitCalendars(eventCalendars);
+
+  function toggleCalendar(id: string) {
+    setSelectedCalendarIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }
 
   // Reset form when dialog opens so it picks up new defaultDate/defaultTime
   useEffect(() => {
@@ -81,6 +110,7 @@ export function EventFormDialog({
       setEventType("general");
       setRecurrence("none");
       setRecurrenceEnd("");
+      setSelectedCalendarIds([]);
     }
     if (open && isEditing && event) {
       setTitle(event.title || "");
@@ -90,6 +120,7 @@ export function EventFormDialog({
       setEndTime(event.end_time || "");
       setLocation(event.location || "");
       setEventType(event.event_type || "general");
+      setSelectedCalendarIds(event.calendars?.map((c) => c.id) ?? []);
     }
   }, [open]);
 
@@ -106,6 +137,7 @@ export function EventFormDialog({
         end_time: endTime || null,
         location: location || null,
         event_type: eventType,
+        calendar_ids: selectedCalendarIds,
       });
       if (result.error) toast.error(result.error);
       else {
@@ -123,6 +155,7 @@ export function EventFormDialog({
       formData.set("event_type", eventType);
       formData.set("recurrence", recurrence);
       formData.set("recurrence_end", recurrenceEnd);
+      formData.set("calendar_ids", JSON.stringify(selectedCalendarIds));
       const result = await createEvent(schoolId, formData);
       if (result.error) toast.error(result.error);
       else {
@@ -134,6 +167,7 @@ export function EventFormDialog({
         setEndTime("");
         setLocation("");
         setEventType("general");
+        setSelectedCalendarIds([]);
         onOpenChange(false);
       }
     }
@@ -141,6 +175,7 @@ export function EventFormDialog({
   }
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
@@ -170,11 +205,11 @@ export function EventFormDialog({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="event-date">Date</Label>
-              <Input
+              <DatePicker
                 id="event-date"
-                type="date"
                 value={date}
-                onChange={(e) => setDate(e.target.value)}
+                onChange={setDate}
+                allowClear={false}
               />
             </div>
             <div className="space-y-2">
@@ -225,6 +260,29 @@ export function EventFormDialog({
             />
           </div>
 
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label>{KIND_LABELS.division.plural}</Label>
+              <CalendarChipSelect
+                items={divisions}
+                kind="division"
+                selected={selectedCalendarIds}
+                onToggle={toggleCalendar}
+                onCreateNew={() => setCreateCalendarKind("division")}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>{KIND_LABELS.category.plural}</Label>
+              <CalendarChipSelect
+                items={categories}
+                kind="category"
+                selected={selectedCalendarIds}
+                onToggle={toggleCalendar}
+                onCreateNew={() => setCreateCalendarKind("category")}
+              />
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Recurrence</Label>
@@ -244,11 +302,11 @@ export function EventFormDialog({
             {recurrence !== "none" && (
               <div className="space-y-2">
                 <Label htmlFor="event-recurrence-end">Repeat until</Label>
-                <Input
+                <DatePicker
                   id="event-recurrence-end"
-                  type="date"
                   value={recurrenceEnd}
-                  onChange={(e) => setRecurrenceEnd(e.target.value)}
+                  onChange={setRecurrenceEnd}
+                  placeholder="No end date"
                 />
               </div>
             )}
@@ -273,5 +331,80 @@ export function EventFormDialog({
         </div>
       </DialogContent>
     </Dialog>
+
+    {createCalendarKind && (
+      <CalendarFormDialog
+        kind={createCalendarKind}
+        open={!!createCalendarKind}
+        onOpenChange={(o) => {
+          if (!o) setCreateCalendarKind(null);
+        }}
+        schoolId={schoolId}
+        onCreated={(cal) =>
+          setSelectedCalendarIds((prev) =>
+            prev.includes(cal.id) ? prev : [...prev, cal.id]
+          )
+        }
+      />
+    )}
+    </>
+  );
+}
+
+// Toggleable color-coded chips for picking divisions /
+// categories on an event, plus a trailing "+ New" button
+// that lets admins create a tag without leaving the form.
+function CalendarChipSelect({
+  items,
+  kind,
+  selected,
+  onToggle,
+  onCreateNew,
+}: {
+  items: EventCalendar[];
+  kind: EventCalendarKind;
+  selected: string[];
+  onToggle: (id: string) => void;
+  onCreateNew?: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {items.map((cal) => {
+        const on = selected.includes(cal.id);
+        const colors = calendarColorClasses(cal.color);
+        return (
+          <button
+            key={cal.id}
+            type="button"
+            onClick={() => onToggle(cal.id)}
+            aria-pressed={on}
+            className={cn(
+              "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+              on
+                ? cn(colors.chip, "border-transparent")
+                : "border-border text-muted-foreground hover:bg-accent"
+            )}
+          >
+            <span
+              className={cn(
+                "h-2 w-2 rounded-full",
+                on ? colors.dot : "bg-muted-foreground/40"
+              )}
+            />
+            {cal.name}
+          </button>
+        );
+      })}
+      {onCreateNew && (
+        <button
+          type="button"
+          onClick={onCreateNew}
+          className="flex items-center gap-1 rounded-full border border-dashed border-border px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+        >
+          <Plus className="h-3 w-3" />
+          New {KIND_LABELS[kind].singular.toLowerCase()}
+        </button>
+      )}
+    </div>
   );
 }

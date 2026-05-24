@@ -13,16 +13,26 @@ export default async function EventsPage({
 
   const supabase = await createClient();
 
-  const { data: events } = await supabase
-    .from("events")
-    .select("*")
-    .eq("school_id", school.id)
-    .order("date", { ascending: true });
+  const [{ data: events }, { data: eventCalendars }] = await Promise.all([
+    supabase
+      .from("events")
+      .select(
+        "*, calendars:event_calendars(id, school_id, kind, name, color, sort_order, created_at)"
+      )
+      .eq("school_id", school.id)
+      .order("date", { ascending: true }),
+    supabase
+      .from("event_calendars")
+      .select("*")
+      .eq("school_id", school.id)
+      .order("sort_order", { ascending: true }),
+  ]);
 
   return (
     <PageTransition>
       <EventsClient
         events={events || []}
+        eventCalendars={eventCalendars || []}
         schoolId={school.id}
         schoolSlug={slug}
       />

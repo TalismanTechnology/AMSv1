@@ -27,7 +27,6 @@ import { logout } from "@/actions/auth";
 import { useSidebar } from "./sidebar-context";
 import { useSchool } from "@/components/shared/school-context";
 import { SchoolSwitcher } from "@/components/shared/school-switcher";
-import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { motion, LayoutGroup } from "framer-motion";
 import { sidebarVariants } from "@/lib/motion";
 import { CursorSpotlight } from "@/components/motion/cursor-spotlight";
@@ -38,7 +37,7 @@ function getNavItems(slug: string) {
   return [
     { href: `/s/${slug}/admin`, label: "Dashboard", icon: LayoutDashboard },
     { href: `/s/${slug}/admin/documents`, label: "Documents", icon: FileText },
-    { href: `/s/${slug}/admin/events`, label: "Calendar", icon: CalendarDays },
+    { href: `/s/${slug}/admin/events`, label: "Events", icon: CalendarDays },
     { href: `/s/${slug}/admin/announcements`, label: "Announcements", icon: Megaphone },
     { href: `/s/${slug}/admin/users`, label: "Users", icon: Users },
     { href: `/s/${slug}/admin/analytics`, label: "Analytics", icon: BarChart3 },
@@ -138,7 +137,6 @@ export function AdminSidebarContent({ onNavigate, forceExpanded }: SidebarConten
       <div className="px-2 py-1.5">
         <div className="flex items-center justify-center gap-1">
           <NotificationBell />
-          <ThemeToggle />
         </div>
       </div>
 

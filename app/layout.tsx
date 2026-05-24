@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { TopographicBackground } from "@/components/ui/topographic-background";
@@ -36,32 +35,34 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className="dark">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
-          <div
+        <div
+          style={{
+            position: "relative",
+            isolation: "isolate",
+            minHeight: "100vh",
+          }}
+        >
+          {/* Fixed (not absolute) so the canvas only ever needs to be
+              viewport-sized — an absolute canvas spanning the whole
+              document gets clipped on long pages once it exceeds the
+              browser's max canvas size, leaving the lower page untextured. */}
+          <TopographicBackground
             style={{
-              position: "relative",
-              isolation: "isolate",
-              minHeight: "100vh",
+              position: "fixed",
+              inset: 0,
+              zIndex: -1,
             }}
-          >
-            <TopographicBackground
-              style={{
-                position: "absolute",
-                inset: 0,
-                zIndex: -1,
-              }}
-              intensity="full"
-            />
-            <TooltipProvider>
-              {children}
-              <Toaster />
-            </TooltipProvider>
-          </div>
-        </ThemeProvider>
+            intensity="full"
+          />
+          <TooltipProvider>
+            {children}
+            <Toaster />
+          </TooltipProvider>
+        </div>
       </body>
     </html>
   );
