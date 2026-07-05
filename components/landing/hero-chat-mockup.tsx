@@ -48,7 +48,7 @@ type AnswerToken =
   | { kind: "space"; text: string }
   | { kind: "cite"; n: number };
 
-const ANSWER_TOKENS: AnswerToken[] = ANSWER.flatMap((seg) =>
+const ANSWER_TOKENS: AnswerToken[] = ANSWER.flatMap((seg): AnswerToken[] =>
   "t" in seg
     ? seg.t
         .split(/(\s+)/)
