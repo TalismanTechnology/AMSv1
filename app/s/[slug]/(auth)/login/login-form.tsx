@@ -43,7 +43,7 @@ export function LoginForm({ schoolSlug, schoolId, schoolName }: LoginFormProps) 
       headline={
         <>
           Your questions, <span className="italic text-primary">answered</span>{" "}
-          clearly.
+          instantly.
         </>
       }
       subhead={`Sign in to ${schoolName} on AskMySchool and get instant, cited answers from official school documents.`}
