@@ -8,7 +8,7 @@ function getDefaultSettings(schoolId: string): Settings {
     logo_url: null,
     contact_info: null,
     custom_system_prompt: null,
-    ai_temperature: 0.7,
+    ai_temperature: 0.2,
     suggested_questions: [],
     welcome_message: null,
     disable_animations: false,

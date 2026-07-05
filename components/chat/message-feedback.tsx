@@ -31,15 +31,15 @@ export function MessageFeedback({ messageId, schoolId }: MessageFeedbackProps) {
   }
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-0.5">
       <Button
         variant="ghost"
         size="icon"
         className={cn(
-          "h-6 w-6",
+          "h-7 w-7 rounded-md transition-colors",
           rating === "up"
-            ? "text-green-500"
-            : "text-muted-foreground/40 hover:text-muted-foreground"
+            ? "text-ink"
+            : "text-muted-foreground/50 hover:bg-secondary hover:text-ink"
         )}
         onClick={() => handleRate("up")}
         disabled={submitting}
@@ -50,10 +50,10 @@ export function MessageFeedback({ messageId, schoolId }: MessageFeedbackProps) {
         variant="ghost"
         size="icon"
         className={cn(
-          "h-6 w-6",
+          "h-7 w-7 rounded-md transition-colors",
           rating === "down"
-            ? "text-red-500"
-            : "text-muted-foreground/40 hover:text-muted-foreground"
+            ? "text-destructive"
+            : "text-muted-foreground/50 hover:bg-secondary hover:text-ink"
         )}
         onClick={() => handleRate("down")}
         disabled={submitting}

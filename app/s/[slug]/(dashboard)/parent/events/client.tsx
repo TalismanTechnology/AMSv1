@@ -12,5 +12,9 @@ export function ParentEventsClient({
   events,
   eventCalendars,
 }: ParentEventsClientProps) {
-  return <CalendarView events={events} eventCalendars={eventCalendars} />;
+  return (
+    <div className="mx-auto max-w-7xl px-4 pb-12 pt-8 md:px-8 md:pt-10">
+      <CalendarView events={events} eventCalendars={eventCalendars} />
+    </div>
+  );
 }

@@ -7,13 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -27,7 +20,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { MagicBentoGrid, MagicBentoCard } from "@/components/magic-bento";
 import { updateProfile } from "@/actions/profile";
 import { addChild, updateChild, removeChild } from "@/actions/children";
 import { toast } from "sonner";
@@ -139,19 +131,27 @@ export function ProfileClient({
   }
 
   return (
-    <MagicBentoGrid className="mx-auto max-w-2xl space-y-6 p-4 md:p-8">
-      <h1 className="text-2xl font-bold text-foreground">Profile</h1>
+    <div className="mx-auto max-w-2xl px-4 pb-16 pt-12 md:px-8">
+      <header className="mb-10">
+        <h1 className="text-2xl font-semibold tracking-[-0.01em] text-ink">
+          Profile
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Manage your details and your children.
+        </p>
+      </header>
 
-      <MagicBentoCard className="rounded-xl">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <User className="h-5 w-5" />
+      <div className="space-y-10">
+      <section>
+        <div className="mb-4">
+          <h2 className="text-base font-semibold tracking-[-0.01em] text-ink">
             Personal Information
-          </CardTitle>
-          <CardDescription>Manage your account details.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+          </h2>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            Manage your account details.
+          </p>
+        </div>
+        <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="full-name">Full Name</Label>
             <div className="flex gap-2">
@@ -186,43 +186,49 @@ export function ProfileClient({
               year: "numeric",
             })}
           </div>
-        </CardContent>
-      </Card>
-      </MagicBentoCard>
+        </div>
+      </section>
 
-      <MagicBentoCard className="rounded-xl">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Children</CardTitle>
-              <CardDescription>
-                Manage your children&apos;s information.
-              </CardDescription>
-            </div>
-            <Button size="sm" onClick={openAddChild}>
-              <Plus className="mr-1 h-4 w-4" />
-              Add child
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {initialChildren.length === 0 ? (
-            <p className="py-4 text-center text-sm text-muted-foreground">
-              No children added yet. Click &quot;Add child&quot; to get started.
+      <section>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold tracking-[-0.01em] text-ink">
+              Children
+            </h2>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              Manage your children&apos;s information.
             </p>
+          </div>
+          <Button size="sm" onClick={openAddChild} className="shrink-0">
+            <Plus className="mr-1 h-4 w-4" />
+            Add child
+          </Button>
+        </div>
+        <div>
+          {initialChildren.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border py-8 text-center">
+              <User className="h-5 w-5 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">
+                No children added yet. Click &quot;Add child&quot; to get started.
+              </p>
+            </div>
           ) : (
-            <div className="space-y-3">
+            <div className="divide-y divide-border">
               {initialChildren.map((child) => (
                 <div
                   key={child.id}
-                  className="flex items-center justify-between rounded-lg border px-4 py-3"
+                  className="flex items-center justify-between gap-3 py-3"
                 >
-                  <div>
-                    <p className="font-medium">{child.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {child.grade}
-                    </p>
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border text-sm font-medium text-ink">
+                      {child.name.charAt(0).toUpperCase()}
+                    </span>
+                    <div>
+                      <p className="font-medium text-ink">{child.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {child.grade}
+                      </p>
+                    </div>
                   </div>
                   <div className="flex gap-1">
                     <Button
@@ -245,9 +251,8 @@ export function ProfileClient({
               ))}
             </div>
           )}
-        </CardContent>
-      </Card>
-      </MagicBentoCard>
+        </div>
+      </section>
 
       <Dialog open={childDialogOpen} onOpenChange={setChildDialogOpen}>
         <DialogContent className="sm:max-w-md">
@@ -314,6 +319,7 @@ export function ProfileClient({
         loading={deletingChild}
         onConfirm={handleDeleteChild}
       />
-    </MagicBentoGrid>
+      </div>
+    </div>
   );
 }

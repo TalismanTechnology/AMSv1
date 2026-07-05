@@ -27,7 +27,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { AnnouncementFormDialog } from "@/components/admin/announcement-form-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { MagicBentoCard } from "@/components/magic-bento";
 import { deleteAnnouncement } from "@/actions/announcements";
 import { toast } from "sonner";
 import type { Announcement, AnnouncementPriority } from "@/lib/types";
@@ -75,67 +74,86 @@ export function AnnouncementsClient({
 
   return (
     <div>
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <header className="mb-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Announcements</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-2xl font-semibold tracking-[-0.01em] text-ink">
+            Announcements
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             {announcements.length} announcement
-            {announcements.length !== 1 ? "s" : ""}
+            {announcements.length !== 1 ? "s" : ""} reaching your parent
+            community.
           </p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
+        <Button onClick={() => setCreateOpen(true)} className="shrink-0">
           <Plus className="mr-2 h-4 w-4" />
           Create announcement
         </Button>
-      </div>
+      </header>
 
       {announcements.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-lg border bg-card py-16">
-          <Megaphone className="mb-4 h-12 w-12 text-muted-foreground/50" />
-          <h3 className="text-lg font-medium text-foreground">
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <Megaphone className="mb-4 h-6 w-6 text-muted-foreground" />
+          <h3 className="text-sm font-medium text-ink">
             No announcements yet
           </h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Create your first announcement to notify parents.
+          <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+            Create your first announcement to keep parents informed about
+            what matters.
           </p>
         </div>
       ) : (
-        <MagicBentoCard enableParticles={false} className="rounded-lg">
-        <div className="rounded-lg border bg-card">
+        <section>
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>Title</TableHead>
-                <TableHead>Priority</TableHead>
-                <TableHead className="hidden md:table-cell">Pinned</TableHead>
-                <TableHead className="hidden md:table-cell">Expires</TableHead>
-                <TableHead className="hidden md:table-cell">Created</TableHead>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="text-xs font-medium text-muted-foreground">
+                  Title
+                </TableHead>
+                <TableHead className="text-xs font-medium text-muted-foreground">
+                  Priority
+                </TableHead>
+                <TableHead className="hidden text-xs font-medium text-muted-foreground md:table-cell">
+                  Pinned
+                </TableHead>
+                <TableHead className="hidden text-xs font-medium text-muted-foreground md:table-cell">
+                  Expires
+                </TableHead>
+                <TableHead className="hidden text-xs font-medium text-muted-foreground md:table-cell">
+                  Created
+                </TableHead>
                 <TableHead className="w-[50px]" />
               </TableRow>
             </TableHeader>
             <TableBody>
               {announcements.map((a) => (
-                <TableRow key={a.id}>
-                  <TableCell>
-                    <p className="font-medium">{a.title}</p>
+                <TableRow
+                  key={a.id}
+                  className="border-border transition-colors hover:bg-muted/40"
+                >
+                  <TableCell className="py-4">
+                    <div className="flex items-center gap-2">
+                      {a.pinned && (
+                        <Pin className="h-3.5 w-3.5 shrink-0 text-muted-foreground md:hidden" />
+                      )}
+                      <p className="font-medium text-ink">{a.title}</p>
+                    </div>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="py-4">
                     <Badge className={PRIORITY_COLORS[a.priority]}>
                       {a.priority}
                     </Badge>
                   </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    {a.pinned && (
-                      <Pin className="h-4 w-4 text-muted-foreground" />
-                    )}
+                  <TableCell className="hidden py-4 md:table-cell">
+                    {a.pinned && <Pin className="h-4 w-4 text-muted-foreground" />}
                   </TableCell>
-                  <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
+                  <TableCell className="hidden py-4 text-sm text-muted-foreground md:table-cell">
                     {a.expires_at ? formatDate(a.expires_at) : "\u2014"}
                   </TableCell>
-                  <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
+                  <TableCell className="hidden py-4 text-sm text-muted-foreground md:table-cell">
                     {formatDate(a.created_at)}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="py-4">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="sm">
@@ -163,8 +181,7 @@ export function AnnouncementsClient({
               ))}
             </TableBody>
           </Table>
-        </div>
-        </MagicBentoCard>
+        </section>
       )}
 
       <AnnouncementFormDialog

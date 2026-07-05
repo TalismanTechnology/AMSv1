@@ -76,15 +76,17 @@ export function CalendarFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className="sm:max-w-sm bg-card">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="text-xl font-semibold tracking-[-0.01em] text-ink">
             {isEditing ? `Edit ${label}` : `New ${label}`}
           </DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
+        <div className="space-y-5">
           <div className="space-y-2">
-            <Label htmlFor="calendar-name">Name</Label>
+            <Label htmlFor="calendar-name" className="text-ink-soft">
+              Name
+            </Label>
             <Input
               id="calendar-name"
               value={name}
@@ -99,7 +101,7 @@ export function CalendarFormDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>Color</Label>
+            <Label className="text-ink-soft">Color</Label>
             <div className="flex flex-wrap gap-2">
               {CALENDAR_COLOR_PALETTE.map((c) => {
                 const classes = calendarColorClasses(c);
@@ -123,7 +125,7 @@ export function CalendarFormDialog({
             </div>
           </div>
 
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end gap-2 border-t border-border pt-4">
             <Button
               variant="outline"
               onClick={() => onOpenChange(false)}
@@ -131,7 +133,11 @@ export function CalendarFormDialog({
             >
               Cancel
             </Button>
-            <Button onClick={handleSubmit} disabled={!name.trim() || saving}>
+            <Button
+              onClick={handleSubmit}
+              disabled={!name.trim() || saving}
+              className="bg-primary text-primary-foreground"
+            >
               {saving && <LogoSpinner className="mr-2" />}
               {isEditing ? "Save changes" : "Create"}
             </Button>

@@ -65,7 +65,12 @@ export function ChatExport({ messages, sessionTitle }: ChatExportProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-8 w-8" title="Export chat">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-ink"
+          title="Export chat"
+        >
           <Download className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>

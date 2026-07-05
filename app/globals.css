@@ -7,7 +7,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-inter);
+  --font-serif: var(--font-inter);
   --font-mono: var(--font-geist-mono);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -62,78 +63,116 @@
 
 /* ===== METALLIC CHROME PALETTE ===== */
 :root {
-  --radius: 0.75rem;
+  --radius: 0.9rem;
 
-  /* Topographic background — theme-aware */
-  --topo-line: #5fb8b8;
-  --topo-bg: oklch(0.13 0.02 270);
+  /* ===== EDITORIAL LIGHT PALETTE =====
+     Warm paper cream, deep ink navy, ember orange. Designed for depth:
+     layered warm surfaces + a rich soft-shadow elevation scale below. */
 
-  /* Base surfaces — navy-charcoal */
-  --background: oklch(0.16 0.02 270);
-  --foreground: oklch(0.88 0.008 250);
+  /* Topographic background — faint warm contour on paper */
+  --topo-line: #c9bfae;
+  --topo-bg: oklch(0.965 0.011 78);
 
-  /* Cards — gunmetal-tinted surface */
-  --card: oklch(0.19 0.015 265);
-  --card-foreground: oklch(0.88 0.008 250);
+  /* Base surfaces — warm paper cream */
+  --background: oklch(0.968 0.012 78);
+  --foreground: oklch(0.28 0.045 264);
 
-  /* Popovers/dropdowns */
-  --popover: oklch(0.21 0.015 265);
-  --popover-foreground: oklch(0.88 0.008 250);
+  /* Cards — near-white warm, floats above the paper */
+  --card: oklch(0.995 0.004 85);
+  --card-foreground: oklch(0.28 0.045 264);
 
-  /* Primary — bright platinum */
-  --primary: oklch(0.88 0.006 260);
-  --primary-foreground: oklch(0.16 0.02 270);
+  /* Popovers/dropdowns — fully opaque warm white */
+  --popover: oklch(0.995 0.004 85);
+  --popover-foreground: oklch(0.28 0.045 264);
 
-  /* Secondary — gunmetal mid-tone */
-  --secondary: oklch(0.25 0.012 265);
-  --secondary-foreground: oklch(0.82 0.006 255);
+  /* Primary — ember orange */
+  --primary: oklch(0.635 0.148 47);
+  --primary-foreground: oklch(0.99 0.01 85);
+
+  /* Secondary — warm sand surface */
+  --secondary: oklch(0.935 0.016 74);
+  --secondary-foreground: oklch(0.30 0.045 264);
 
   /* Muted */
-  --muted: oklch(0.22 0.012 265);
-  --muted-foreground: oklch(0.80 0.008 260);
+  --muted: oklch(0.945 0.012 76);
+  --muted-foreground: oklch(0.505 0.03 262);
 
-  /* Accent — blue-steel tinted hover */
-  --accent: oklch(0.28 0.025 250);
-  --accent-foreground: oklch(0.90 0.006 255);
+  /* Accent — warm hover wash */
+  --accent: oklch(0.925 0.024 62);
+  --accent-foreground: oklch(0.30 0.05 264);
 
-  /* Destructive — cool-shifted red */
-  --destructive: oklch(0.60 0.20 15);
+  /* Destructive — warm brick red */
+  --destructive: oklch(0.577 0.196 26);
 
-  /* Borders — metallic sheen edge */
-  --border: oklch(1 0 0 / 14%);
-  --input: oklch(1 0 0 / 12%);
-  --ring: oklch(0.88 0.006 260);
+  /* Borders — warm sand hairline */
+  --border: oklch(0.885 0.014 76);
+  --input: oklch(0.885 0.014 76);
+  --ring: oklch(0.635 0.148 47);
 
-  /* Charts — blue-steel / cool tones only */
-  --chart-1: oklch(0.62 0.08 240);
-  --chart-2: oklch(0.58 0.10 280);
-  --chart-3: oklch(0.65 0.06 220);
-  --chart-4: oklch(0.60 0.08 200);
-  --chart-5: oklch(0.55 0.06 260);
+  /* Charts — ember/navy editorial set */
+  --chart-1: oklch(0.635 0.148 47);
+  --chart-2: oklch(0.42 0.07 262);
+  --chart-3: oklch(0.72 0.11 72);
+  --chart-4: oklch(0.55 0.09 232);
+  --chart-5: oklch(0.60 0.13 20);
 
-  /* Sidebar — deep navy */
-  --sidebar: oklch(0.13 0.015 268);
-  --sidebar-foreground: oklch(0.82 0.006 255);
-  --sidebar-primary: oklch(0.88 0.006 260);
-  --sidebar-primary-foreground: oklch(0.13 0.015 268);
-  --sidebar-accent: oklch(0.20 0.015 265);
-  --sidebar-accent-foreground: oklch(0.90 0.006 255);
-  --sidebar-border: oklch(1 0 0 / 12%);
-  --sidebar-ring: oklch(0.88 0.006 260);
+  /* Sidebar — soft warm panel, one step off the paper */
+  --sidebar: oklch(0.955 0.014 76);
+  --sidebar-foreground: oklch(0.32 0.04 264);
+  --sidebar-primary: oklch(0.635 0.148 47);
+  --sidebar-primary-foreground: oklch(0.99 0.01 85);
+  --sidebar-accent: oklch(0.925 0.022 62);
+  --sidebar-accent-foreground: oklch(0.30 0.05 264);
+  --sidebar-border: oklch(0.885 0.014 76);
+  --sidebar-ring: oklch(0.635 0.148 47);
 
-  /* Glow — cool silver glow */
-  --glow-primary: oklch(0.92 0.012 250 / 28%);
-  --glow-primary-strong: oklch(0.92 0.012 250 / 45%);
+  /* Ink navy — for headings / editorial marks */
+  --ink: oklch(0.28 0.05 264);
+  --ink-soft: oklch(0.40 0.05 264);
 
-  /* Glass surfaces — metallic tinted */
-  --glass-bg: oklch(1 0 0 / 5%);
-  --glass-border: oklch(1 0 0 / 12%);
-  --glass-bg-hover: oklch(1 0 0 / 10%);
+  /* Ember tint helpers */
+  --ember: oklch(0.635 0.148 47);
+  --ember-soft: oklch(0.635 0.148 47 / 12%);
+
+  /* Glow — warm ember (used sparingly for focus/ctas) */
+  --glow-primary: oklch(0.635 0.148 47 / 22%);
+  --glow-primary-strong: oklch(0.635 0.148 47 / 34%);
+
+  /* Glass surfaces — warm frosted white */
+  --glass-bg: oklch(1 0 0 / 62%);
+  --glass-border: oklch(0.30 0.05 264 / 8%);
+  --glass-bg-hover: oklch(1 0 0 / 78%);
+
+  /* ===== DEPTH / ELEVATION SCALE =====
+     Warm-tinted, layered shadows — long soft ambient + tight contact.
+     This is what makes surfaces read as floating above the paper. */
+  --shadow-color: 28 38 74;               /* navy, as rgb triplet */
+  --elev-1:
+    0 1px 2px rgb(var(--shadow-color) / 0.05),
+    0 2px 6px rgb(var(--shadow-color) / 0.05);
+  --elev-2:
+    0 1px 2px rgb(var(--shadow-color) / 0.06),
+    0 6px 14px -4px rgb(var(--shadow-color) / 0.08),
+    0 12px 28px -10px rgb(var(--shadow-color) / 0.10);
+  --elev-3:
+    0 1px 2px rgb(var(--shadow-color) / 0.07),
+    0 10px 24px -8px rgb(var(--shadow-color) / 0.12),
+    0 28px 56px -20px rgb(var(--shadow-color) / 0.16);
+  --elev-4:
+    0 2px 4px rgb(var(--shadow-color) / 0.08),
+    0 18px 42px -12px rgb(var(--shadow-color) / 0.16),
+    0 44px 88px -28px rgb(var(--shadow-color) / 0.22);
+  --elev-float:
+    0 2px 4px rgb(var(--shadow-color) / 0.06),
+    0 30px 60px -18px rgb(var(--shadow-color) / 0.20),
+    0 60px 120px -40px rgb(var(--shadow-color) / 0.28);
+  /* crisp top inner highlight so surfaces catch the light */
+  --sheen-top: inset 0 1px 0 oklch(1 0 0 / 0.9);
 
   /* Semantic colors */
-  --success: oklch(0.72 0.17 155);
-  --warning: oklch(0.78 0.15 85);
-  --info: oklch(0.62 0.08 240);
+  --success: oklch(0.60 0.14 155);
+  --warning: oklch(0.70 0.15 70);
+  --info: oklch(0.55 0.10 240);
 
   /* ===== RAW METALLIC HEX PALETTE (for gradients) ===== */
   --metal-silver-light: #e8e8e8;
@@ -1076,4 +1115,510 @@ textarea:focus,
   box-shadow: 0 2px 12px oklch(0 0 0 / 30%);
   border-radius: 4px;
   overflow: hidden;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   LIGHT EDITORIAL OVERRIDE LAYER
+   Redefines the legacy metallic/neon utilities in terms of the warm paper
+   / ink navy / ember system. Appended last so it wins the cascade. The
+   through-line is DEPTH: every surface floats above the paper with a
+   layered soft shadow + a crisp top sheen.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+@layer base {
+  html { color-scheme: light; }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: oklch(0.635 0.148 47 / 22%);
+    color: var(--ink);
+  }
+}
+
+/* ── Serif display treatments ─────────────────────────────────────────── */
+.metallic-heading {
+  font-family: var(--font-serif);
+  font-weight: 560;
+  color: var(--ink);
+  letter-spacing: -0.021em;
+  line-height: 1.02;
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  filter: none;
+  text-shadow: none;
+}
+.metallic-text,
+.metallic-text-animated {
+  font-family: var(--font-serif);
+  font-weight: 560;
+  color: var(--ink);
+  background: none;
+  -webkit-background-clip: border-box;
+  background-clip: border-box;
+  -webkit-text-fill-color: currentColor;
+  animation: none;
+  filter: none;
+  text-shadow: none;
+}
+
+/* ── Neon → quiet ink ─────────────────────────────────────────────────── */
+.neon-text, .neon-text-soft { text-shadow: none; }
+.neon-border, .neon-border-strong {
+  box-shadow: none;
+  border-color: var(--border);
+}
+.neon-divider { box-shadow: none; border-color: var(--border); }
+.neon-icon-blue   { color: oklch(0.50 0.10 240); filter: none; }
+.neon-icon-amber  { color: var(--ember); filter: none; }
+.neon-icon-green  { color: var(--success); filter: none; }
+.neon-icon-purple { color: oklch(0.52 0.12 300); filter: none; }
+.neon-icon-red    { color: var(--destructive); filter: none; }
+
+/* ── Layered card: floats above the paper ─────────────────────────────── */
+.metallic-card {
+  position: relative;
+  background: linear-gradient(180deg, oklch(1 0 0) 0%, oklch(0.992 0.004 85) 100%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--elev-3), var(--sheen-top);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  transition: transform 0.4s var(--ease-out-expo, cubic-bezier(0.16,1,0.3,1)),
+              box-shadow 0.4s var(--ease-out-expo, cubic-bezier(0.16,1,0.3,1));
+}
+.metallic-card::before,
+.metallic-card::after { display: none !important; content: none !important; }
+.metallic-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--elev-4), var(--sheen-top);
+}
+
+/* ── Frosted warm surfaces (headers / nav / floating chrome) ──────────── */
+.metallic-surface,
+.metallic-glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--elev-2), var(--sheen-top);
+  backdrop-filter: blur(16px) saturate(1.3);
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+}
+.chat-response-surface {
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: var(--elev-2), var(--sheen-top);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* ── Sidebar items ────────────────────────────────────────────────────── */
+.sidebar-item-active {
+  background: var(--ember-soft);
+  color: var(--ink);
+  box-shadow: none;
+}
+.sidebar-item-active::before {
+  background: var(--ember);
+  box-shadow: none;
+  opacity: 1;
+}
+
+/* ── Neutralize dark-mode texture/sheen decorations ───────────────────── */
+.noise-overlay::after,
+.light-source::before,
+.shine-sweep::after { display: none !important; content: none !important; }
+.aurora-mesh { opacity: 0.35; mix-blend-mode: multiply; filter: saturate(0.6); }
+
+/* ── Frost buttons/cards ──────────────────────────────────────────────── */
+.frost-surface {
+  background: var(--glass-bg);
+  border: 1px solid var(--border);
+  box-shadow: var(--elev-1), var(--sheen-top);
+  backdrop-filter: blur(14px) saturate(1.3);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  color: var(--foreground);
+}
+.frost-surface:hover:not(:disabled) {
+  background: oklch(1 0 0 / 85%);
+  box-shadow: var(--elev-2), var(--sheen-top);
+}
+
+/* ── Warm scrollbar ───────────────────────────────────────────────────── */
+* {
+  scrollbar-color: oklch(0.30 0.05 264 / 22%) transparent;
+}
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: oklch(0.30 0.05 264 / 20%);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background: oklch(0.30 0.05 264 / 34%); background-clip: padding-box; }
+
+/* ── Default (ember) button: solid orange with depth ──────────────────── */
+[data-slot="button"][data-variant="default"],
+.neo [data-slot="button"][data-variant="default"] {
+  background: linear-gradient(180deg,
+    oklch(0.665 0.15 49) 0%, oklch(0.615 0.147 45) 100%) !important;
+  color: var(--primary-foreground) !important;
+  border: 1px solid oklch(0.55 0.14 42 / 0.6) !important;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow:
+    var(--elev-2),
+    inset 0 1px 0 oklch(1 0 0 / 0.28),
+    inset 0 -1px 0 oklch(0.40 0.12 40 / 0.35) !important;
+}
+[data-slot="button"][data-variant="default"]:hover:not(:disabled),
+.neo [data-slot="button"][data-variant="default"]:hover:not(:disabled) {
+  background: linear-gradient(180deg,
+    oklch(0.685 0.152 50) 0%, oklch(0.635 0.148 47) 100%) !important;
+  box-shadow:
+    var(--elev-3),
+    inset 0 1px 0 oklch(1 0 0 / 0.32) !important;
+  transform: translateY(-1px);
+}
+[data-slot="button"][data-variant="outline"],
+.neo [data-slot="button"][data-variant="outline"] {
+  background: var(--card) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--foreground);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: var(--elev-1), var(--sheen-top) !important;
+}
+[data-slot="button"][data-variant="outline"]:hover:not(:disabled),
+.neo [data-slot="button"][data-variant="outline"]:hover:not(:disabled) {
+  background: var(--secondary) !important;
+  box-shadow: var(--elev-2), var(--sheen-top) !important;
+}
+[data-slot="button"][data-variant="secondary"],
+.neo [data-slot="button"][data-variant="secondary"] {
+  background: var(--secondary) !important;
+  color: var(--secondary-foreground) !important;
+  border: 1px solid var(--border) !important;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: var(--elev-1) !important;
+}
+[data-slot="button"][data-variant="ghost"]:hover:not(:disabled) {
+  background: var(--accent);
+}
+
+/* ═══ .neo dashboard scope → light frosted ════════════════════════════ */
+.neo {
+  --background: var(--sidebar);
+  --card: oklch(0.995 0.004 85);
+  --sidebar: oklch(0.955 0.014 76);
+}
+.neo .metallic-card,
+.neo .bg-card {
+  background: linear-gradient(180deg, oklch(1 0 0) 0%, oklch(0.992 0.004 85) 100%);
+  border: 1px solid var(--border);
+  box-shadow: var(--elev-2), var(--sheen-top);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.neo .metallic-card::before,
+.neo .metallic-card::after { display: none !important; content: none !important; }
+.neo .metallic-surface {
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px) saturate(1.3);
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+}
+.neo .bg-sidebar,
+.neo [class*="bg-sidebar"]:not([class*="bg-sidebar-accent"]):not([class*="bg-sidebar-primary"]) {
+  backdrop-filter: blur(20px) saturate(1.2);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+  border-color: var(--sidebar-border);
+  box-shadow: var(--elev-1), var(--sheen-top);
+}
+.neo .bg-background {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.neo [data-slot="button"][data-variant="default"] {
+  box-shadow:
+    var(--elev-1),
+    inset 0 1px 0 oklch(1 0 0 / 0.28);
+}
+
+/* ── Dashboard plain cards ────────────────────────────────────────────── */
+.dashboard-cards [data-slot="card"]:not(.metallic-card) {
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: var(--elev-2), var(--sheen-top);
+}
+.dashboard-cards [data-slot="card"]:not(.metallic-card):hover {
+  box-shadow: var(--elev-3), var(--sheen-top);
+  transform: translateY(-2px);
+}
+
+/* ── docx viewer on light ─────────────────────────────────────────────── */
+.docx-viewer-container { background: var(--muted); }
+.docx-viewer-container section.docx-wrapper { box-shadow: var(--elev-2); }
+
+/* ═══ Editorial helper utilities (landing + surfaces) ═════════════════ */
+.font-serif-display { font-family: var(--font-serif); }
+.eyebrow {
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ember);
+}
+.text-ink { color: var(--ink); }
+.text-ink-soft { color: var(--ink-soft); }
+.elev-1 { box-shadow: var(--elev-1), var(--sheen-top); }
+.elev-2 { box-shadow: var(--elev-2), var(--sheen-top); }
+.elev-3 { box-shadow: var(--elev-3), var(--sheen-top); }
+.elev-4 { box-shadow: var(--elev-4), var(--sheen-top); }
+.elev-float { box-shadow: var(--elev-float), var(--sheen-top); }
+
+/* Hand-drawn ember underline swash under a hero word */
+.ink-underline {
+  position: relative;
+  display: inline-block;
+}
+.ink-underline::after {
+  content: "";
+  position: absolute;
+  left: -0.04em;
+  right: -0.04em;
+  bottom: -0.06em;
+  height: 0.34em;
+  background: no-repeat center / 100% 100%
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 20' preserveAspectRatio='none'%3E%3Cpath d='M2 13 C40 6 90 5 130 8 C160 10 185 12 198 9' fill='none' stroke='%23c96a35' stroke-width='3.2' stroke-linecap='round'/%3E%3C/svg%3E");
+  pointer-events: none;
+}
+
+/* Floating decorative depth blob (warm, very soft) */
+.depth-glow {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(60px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ═══ Form controls, overlays & plain cards → editorial light ═════════ */
+
+/* Kill the legacy white-noise screen grain (invisible-to-muddy on paper) */
+[data-slot="card"]:not(.metallic-card)::after,
+.neo .bg-card::after,
+.glass-noise::after { display: none !important; content: none !important; }
+
+/* Plain (non-metallic) cards — floating warm white */
+[data-slot="card"]:not(.metallic-card) {
+  background: var(--card) !important;
+  border: 1px solid var(--border) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: var(--elev-2), var(--sheen-top) !important;
+}
+
+/* Inputs / textareas / select triggers — recessed warm field */
+[data-slot="input"],
+[data-slot="select-trigger"],
+[data-slot="textarea"],
+textarea,
+input:not([type="checkbox"]):not([type="radio"]) {
+  background: oklch(1 0 0 / 0.7) !important;
+  border-color: var(--border) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: inset 0 1px 2px oklch(0.28 0.05 264 / 0.06) !important;
+  color: var(--foreground);
+}
+[data-slot="checkbox"] {
+  background: oklch(1 0 0 / 0.7) !important;
+  border-color: var(--border) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Ember focus ring (replaces the white neon focus) */
+input:focus,
+textarea:focus,
+[data-slot="select-trigger"]:focus,
+[data-slot="input"]:focus-visible,
+[data-slot="textarea"]:focus-visible {
+  box-shadow: 0 0 0 3px oklch(0.635 0.148 47 / 0.18) !important;
+  border-color: var(--ring) !important;
+  outline: none;
+}
+
+/* Overlays — warm hairline border + editorial elevation */
+[data-slot="dialog-content"],
+[data-slot="alert-dialog-content"],
+[data-slot="sheet-content"],
+[data-slot="popover-content"],
+[data-slot="select-content"],
+[data-slot="dropdown-menu-content"],
+[data-slot="dropdown-menu-sub-content"] {
+  background: var(--popover) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: var(--elev-4), var(--sheen-top) !important;
+}
+
+/* Neutralize the white-glow var used by separators / tables / dividers */
+[data-slot="table-container"],
+[data-slot="separator"],
+.neon-divider { box-shadow: none !important; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   MINIMALIST FLAT LAYER  (ChatGPT-style)
+   Keeps the warm paper/ink/ember palette but strips the site to a flat,
+   whitespace-driven, all-sans minimal system: no serif, no decorative
+   line-art or glows, layered shadows replaced by hairline borders.
+   Appended last so it wins the cascade.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --radius: 0.85rem;
+  /* Flatten the elevation scale — surfaces read via hairline borders, not lift */
+  --sheen-top: none;
+  --elev-1: none;
+  --elev-2: 0 1px 2px rgb(var(--shadow-color) / 0.04);
+  --elev-3: 0 1px 3px rgb(var(--shadow-color) / 0.05);
+  --elev-4: 0 8px 28px -8px rgb(var(--shadow-color) / 0.12);   /* dialogs/popovers only */
+  --elev-float: 0 1px 3px rgb(var(--shadow-color) / 0.05);
+  /* Slightly cleaner paper + hairline border */
+  --background: oklch(0.982 0.006 80);
+  --border: oklch(0.905 0.008 78);
+  --input: oklch(0.905 0.008 78);
+}
+
+/* ── All-sans typography (drop the serif display everywhere) ──────────── */
+.font-serif-display,
+.metallic-heading,
+.metallic-text,
+.metallic-text-animated {
+  font-family: var(--font-sans) !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.011em !important;
+  color: var(--ink);
+}
+
+/* ── Kill decorative depth ────────────────────────────────────────────── */
+.depth-glow { display: none !important; }
+.ink-underline::after { display: none !important; content: none !important; }
+.aurora-mesh { display: none !important; }
+
+/* ── Flat cards: hairline border, no lift ─────────────────────────────── */
+.metallic-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.metallic-card:hover {
+  transform: none;
+  box-shadow: none;
+  border-color: oklch(0.86 0.012 76);
+}
+.dashboard-cards [data-slot="card"]:not(.metallic-card),
+.dashboard-cards [data-slot="card"]:not(.metallic-card):hover,
+[data-slot="card"]:not(.metallic-card) {
+  box-shadow: none !important;
+  transform: none !important;
+  border: 1px solid var(--border) !important;
+  background: var(--card) !important;
+}
+
+/* ── Frosted surfaces → flat translucent ──────────────────────────────── */
+.metallic-surface,
+.metallic-glass,
+.chat-response-surface,
+.frost-surface {
+  box-shadow: none !important;
+  border: 1px solid var(--border) !important;
+}
+
+/* ── Flat buttons ─────────────────────────────────────────────────────── */
+[data-slot="button"][data-variant="default"],
+.neo [data-slot="button"][data-variant="default"] {
+  background: var(--primary) !important;
+  color: var(--primary-foreground) !important;
+  border: 1px solid transparent !important;
+  box-shadow: none !important;
+}
+[data-slot="button"][data-variant="default"]:hover:not(:disabled),
+.neo [data-slot="button"][data-variant="default"]:hover:not(:disabled) {
+  background: oklch(0.6 0.145 46) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+[data-slot="button"][data-variant="outline"],
+[data-slot="button"][data-variant="secondary"],
+.neo [data-slot="button"][data-variant="outline"],
+.neo [data-slot="button"][data-variant="secondary"] {
+  box-shadow: none !important;
+  border: 1px solid var(--border) !important;
+}
+[data-slot="button"][data-variant="outline"]:hover:not(:disabled) {
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* ── Overlays: keep one soft shadow so floating layers separate ───────── */
+[data-slot="dialog-content"],
+[data-slot="alert-dialog-content"],
+[data-slot="sheet-content"],
+[data-slot="popover-content"],
+[data-slot="select-content"],
+[data-slot="dropdown-menu-content"],
+[data-slot="dropdown-menu-sub-content"] {
+  box-shadow: var(--elev-4) !important;
+}
+
+/* ── Quieter eyebrow (kicker) for a calmer, minimal feel ──────────────── */
+.eyebrow {
+  letter-spacing: 0.14em;
+  font-weight: 600;
+}
+
+/* ═══ MINIMALIST PASS 2 — quieter, more whitespace, less color ═══════════ */
+
+/* Eyebrows: neutral + subtle instead of loud orange kickers */
+.eyebrow {
+  color: var(--muted-foreground) !important;
+  font-size: 0.7rem !important;
+  letter-spacing: 0.09em !important;
+  font-weight: 600 !important;
+  text-transform: uppercase;
+}
+
+/* Headings a touch lighter for a calmer, minimal tone */
+.font-serif-display,
+.metallic-heading {
+  font-weight: 600 !important;
+  letter-spacing: -0.014em !important;
+}
+
+/* Icon "chips": drop the ember-tinted circle, let icons sit in neutral space */
+.icon-chip-min {
+  background: transparent !important;
+  color: var(--ink-soft) !important;
+}
+
+/* ═══ Sidebar: no tan panel — match the page, flat, hairline divider only ═ */
+.neo {
+  --background: oklch(0.982 0.006 80) !important;   /* clean cream = page */
+  --sidebar: oklch(0.982 0.006 80) !important;      /* remove the tan bg */
+}
+.neo .bg-sidebar,
+.neo [class*="bg-sidebar"]:not([class*="bg-sidebar-accent"]):not([class*="bg-sidebar-primary"]) {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+  border-color: var(--border) !important;
 }

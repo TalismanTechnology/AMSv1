@@ -64,23 +64,29 @@ export function NotificationBell() {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative h-8 w-8">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="relative h-8 w-8 rounded-lg text-ink-soft transition-colors hover:bg-secondary hover:text-ink"
+        >
           <Bell className="h-4 w-4" />
           {unreadCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground">
+            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
               {unreadCount > 9 ? "9+" : unreadCount}
             </span>
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-80 p-0" align="end">
-        <div className="flex items-center justify-between border-b px-4 py-3">
-          <h4 className="text-sm font-semibold">Notifications</h4>
+      <PopoverContent className="w-80 overflow-hidden rounded-xl border-border p-0" align="end">
+        <div className="flex items-center justify-between border-b border-border bg-background px-4 py-3">
+          <h4 className="text-sm font-semibold tracking-[-0.01em] text-ink">
+            Notifications
+          </h4>
           {unreadCount > 0 && (
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 text-xs"
+              className="h-7 rounded-lg text-xs text-primary hover:bg-secondary"
               onClick={handleMarkAllRead}
             >
               <Check className="mr-1 h-3 w-3" />
@@ -90,30 +96,34 @@ export function NotificationBell() {
         </div>
         <ScrollArea className="max-h-80">
           {notifications.length === 0 ? (
-            <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-              No notifications yet
+            <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
+              <Bell className="h-5 w-5 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">No notifications yet</p>
             </div>
           ) : (
             notifications.map((n) => (
               <div
                 key={n.id}
                 className={cn(
-                  "border-b px-4 py-3 transition-colors cursor-pointer hover:bg-accent",
-                  !n.read && "bg-primary/5"
+                  "cursor-pointer border-b border-border px-4 py-3 transition-colors hover:bg-secondary",
+                  !n.read && "bg-secondary/60"
                 )}
                 onClick={() => {
                   if (!n.read) handleMarkRead(n.id);
                   if (n.link) window.location.href = n.link;
                 }}
               >
-                <div className="flex items-start gap-2">
-                  {!n.read && (
-                    <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" />
-                  )}
+                <div className="flex items-start gap-2.5">
+                  <span
+                    className={cn(
+                      "mt-1.5 h-2 w-2 shrink-0 rounded-full",
+                      n.read ? "bg-transparent" : "bg-primary"
+                    )}
+                  />
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">{n.title}</p>
+                    <p className="text-sm font-medium text-ink">{n.title}</p>
                     {n.body && (
-                      <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">
+                      <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
                         {n.body}
                       </p>
                     )}

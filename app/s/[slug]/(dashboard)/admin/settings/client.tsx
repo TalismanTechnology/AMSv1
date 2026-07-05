@@ -9,26 +9,27 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { updateSettings } from "@/actions/settings";
+import { updateSettings, updateEmailIngestion } from "@/actions/settings";
 import { toast } from "sonner";
-import { MagicBentoGrid, MagicBentoCard } from "@/components/magic-bento";
 import type { Settings } from "@/lib/types";
+
+interface EmailIngestionConfig {
+  enabled: boolean;
+  autoSort: boolean;
+  allowedDomains: string[];
+  token: string | null;
+  inboundDomain: string | null;
+}
 
 interface SettingsClientProps {
   settings: Settings;
   schoolId: string;
   schoolSlug: string;
   joinCode: string | null;
+  emailIngestion: EmailIngestionConfig;
 }
 
-export function SettingsClient({ settings, schoolId, schoolSlug, joinCode: initialJoinCode }: SettingsClientProps) {
+export function SettingsClient({ settings, schoolId, schoolSlug, joinCode: initialJoinCode, emailIngestion }: SettingsClientProps) {
   const [schoolName, setSchoolName] = useState(settings.school_name);
   const [contactInfo, setContactInfo] = useState(settings.contact_info || "");
   const [customPrompt, setCustomPrompt] = useState(
@@ -101,11 +102,13 @@ export function SettingsClient({ settings, schoolId, schoolSlug, joinCode: initi
   }
 
   return (
-    <MagicBentoGrid className="mx-auto max-w-2xl space-y-6">
-      <div className="flex items-start justify-between">
+    <div className="mx-auto max-w-2xl space-y-12">
+      <div className="flex items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Settings</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-2xl font-semibold text-ink tracking-[-0.01em]">
+            Settings
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             Configure your school&apos;s AskMySchool instance.
           </p>
         </div>
@@ -115,15 +118,16 @@ export function SettingsClient({ settings, schoolId, schoolSlug, joinCode: initi
         </Button>
       </div>
 
-      <MagicBentoCard className="rounded-xl">
-      <Card>
-        <CardHeader>
-          <CardTitle>School Information</CardTitle>
-          <CardDescription>
+      <section className="space-y-4">
+        <div className="space-y-1">
+          <h2 className="text-base font-semibold text-ink">
+            School Information
+          </h2>
+          <p className="text-sm text-muted-foreground">
             Basic information about your school.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+          </p>
+        </div>
+        <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="school-name">School Name</Label>
             <Input
@@ -143,19 +147,19 @@ export function SettingsClient({ settings, schoolId, schoolSlug, joinCode: initi
               placeholder="Phone, email, or address..."
             />
           </div>
-        </CardContent>
-      </Card>
-      </MagicBentoCard>
+        </div>
+      </section>
 
-      <MagicBentoCard className="rounded-xl">
-      <Card>
-        <CardHeader>
-          <CardTitle>Registration &amp; Access</CardTitle>
-          <CardDescription>
+      <section className="space-y-4">
+        <div className="space-y-1">
+          <h2 className="text-base font-semibold text-ink">
+            Registration &amp; Access
+          </h2>
+          <p className="text-sm text-muted-foreground">
             Control how parents join your school.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-5">
+          </p>
+        </div>
+        <div className="space-y-5">
           <div className="space-y-2">
             <Label htmlFor="join-code">School Join Code</Label>
             <div className="flex gap-2">
@@ -214,19 +218,21 @@ export function SettingsClient({ settings, schoolId, schoolSlug, joinCode: initi
               onCheckedChange={setRequireApproval}
             />
           </div>
-        </CardContent>
-      </Card>
-      </MagicBentoCard>
+        </div>
+      </section>
 
-      <MagicBentoCard className="rounded-xl">
-      <Card>
-        <CardHeader>
-          <CardTitle>AI Configuration</CardTitle>
-          <CardDescription>
+      <EmailIngestionSection schoolId={schoolId} config={emailIngestion} />
+
+      <section className="space-y-4">
+        <div className="space-y-1">
+          <h2 className="text-base font-semibold text-ink">
+            AI Configuration
+          </h2>
+          <p className="text-sm text-muted-foreground">
             Customize how the AI assistant responds to parents.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+          </p>
+        </div>
+        <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="custom-prompt">
               Custom System Prompt Additions
@@ -261,19 +267,19 @@ export function SettingsClient({ settings, schoolId, schoolSlug, joinCode: initi
               more creative.
             </p>
           </div>
-        </CardContent>
-      </Card>
-      </MagicBentoCard>
+        </div>
+      </section>
 
-      <MagicBentoCard className="rounded-xl">
-      <Card>
-        <CardHeader>
-          <CardTitle>Chat Settings</CardTitle>
-          <CardDescription>
+      <section className="space-y-4">
+        <div className="space-y-1">
+          <h2 className="text-base font-semibold text-ink">
+            Chat Settings
+          </h2>
+          <p className="text-sm text-muted-foreground">
             Configure the chat experience for parents.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+          </p>
+        </div>
+        <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="welcome-msg">Welcome Message</Label>
             <Textarea
@@ -289,7 +295,7 @@ export function SettingsClient({ settings, schoolId, schoolSlug, joinCode: initi
             <div className="space-y-2">
               {questions.map((q, i) => (
                 <div key={i} className="flex items-center gap-2">
-                  <span className="flex-1 rounded-md border bg-muted/50 px-3 py-1.5 text-sm">
+                  <span className="flex-1 rounded-full border border-border px-3.5 py-1.5 text-sm text-ink">
                     {q}
                   </span>
                   <Button
@@ -325,19 +331,19 @@ export function SettingsClient({ settings, schoolId, schoolSlug, joinCode: initi
               </Button>
             </div>
           </div>
-        </CardContent>
-      </Card>
-      </MagicBentoCard>
+        </div>
+      </section>
 
-      <MagicBentoCard className="rounded-xl">
-      <Card>
-        <CardHeader>
-          <CardTitle>Appearance</CardTitle>
-          <CardDescription>
+      <section className="space-y-4">
+        <div className="space-y-1">
+          <h2 className="text-base font-semibold text-ink">
+            Appearance
+          </h2>
+          <p className="text-sm text-muted-foreground">
             Customize the look and feel of the app.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+          </p>
+        </div>
+        <div>
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label htmlFor="disable-animations">Disable Animations</Label>
@@ -351,11 +357,195 @@ export function SettingsClient({ settings, schoolId, schoolSlug, joinCode: initi
               onCheckedChange={setDisableAnimations}
             />
           </div>
-        </CardContent>
-      </Card>
-      </MagicBentoCard>
+        </div>
+      </section>
 
       <div className="pb-8" />
-    </MagicBentoGrid>
+    </div>
+  );
+}
+
+function EmailIngestionSection({
+  schoolId,
+  config,
+}: {
+  schoolId: string;
+  config: EmailIngestionConfig;
+}) {
+  const [enabled, setEnabled] = useState(config.enabled);
+  const [autoSort, setAutoSort] = useState(config.autoSort);
+  const [domains, setDomains] = useState<string[]>(config.allowedDomains);
+  const [token, setToken] = useState<string | null>(config.token);
+  const [newDomain, setNewDomain] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const inboundAddress =
+    token && config.inboundDomain ? `${token}@${config.inboundDomain}` : null;
+
+  function addDomain() {
+    const value = newDomain.trim().toLowerCase().replace(/^[@*]+\.?/, "");
+    if (!value) return;
+    if (domains.includes(value)) {
+      setNewDomain("");
+      return;
+    }
+    setDomains((prev) => [...prev, value]);
+    setNewDomain("");
+  }
+
+  function removeDomain(index: number) {
+    setDomains((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function copyAddress() {
+    if (!inboundAddress) return;
+    navigator.clipboard.writeText(inboundAddress);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    const result = await updateEmailIngestion(schoolId, {
+      enabled,
+      autoSort,
+      allowedDomains: domains,
+    });
+    setSaving(false);
+
+    if (result.error) {
+      toast.error(result.error);
+      return;
+    }
+    if (result.token) setToken(result.token);
+    toast.success("Email settings saved");
+  }
+
+  return (
+    <section className="space-y-4">
+      <div className="space-y-1">
+        <h2 className="text-base font-semibold text-ink">Email Ingestion</h2>
+        <p className="text-sm text-muted-foreground">
+          Forward school emails to a private address and they become documents
+          automatically — attachments and the message body, sorted by AI.
+        </p>
+      </div>
+      <div className="space-y-5">
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label htmlFor="email-ingestion-enabled">Enable email ingestion</Label>
+            <p className="text-xs text-muted-foreground">
+              Accept emails at your school&apos;s private inbound address.
+            </p>
+          </div>
+          <Switch
+            id="email-ingestion-enabled"
+            checked={enabled}
+            onCheckedChange={setEnabled}
+          />
+        </div>
+
+        {inboundAddress && (
+          <div className="space-y-2">
+            <Label>Your inbound address</Label>
+            <div className="flex gap-2">
+              <Input
+                readOnly
+                value={inboundAddress}
+                className="font-mono"
+                onFocus={(e) => e.target.select()}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={copyAddress}
+                className="shrink-0"
+              >
+                {copied ? (
+                  <Check className="h-4 w-4 text-green-500" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Forward or send school emails here. Only senders from the allowed
+              domains below are accepted.
+            </p>
+          </div>
+        )}
+
+        <div className="space-y-2">
+          <Label>Allowed sender domains</Label>
+          <div className="space-y-2">
+            {domains.map((domain, i) => (
+              <div key={domain} className="flex items-center gap-2">
+                <span className="flex-1 rounded-full border border-border px-3.5 py-1.5 text-sm text-ink font-mono">
+                  @{domain}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 shrink-0 p-0"
+                  onClick={() => removeDomain(i)}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ))}
+            {domains.length === 0 && (
+              <p className="text-xs text-muted-foreground">
+                No domains yet. Add one to accept mail (e.g. lincolnhigh.org).
+              </p>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Input
+              value={newDomain}
+              onChange={(e) => setNewDomain(e.target.value)}
+              placeholder="lincolnhigh.org"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addDomain();
+                }
+              }}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={addDomain}
+              disabled={!newDomain.trim()}
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Only emails whose sender address ends with one of these domains are
+            ingested. Subdomains are matched too.
+          </p>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label htmlFor="auto-sort">Auto-sort into categories &amp; folders</Label>
+            <p className="text-xs text-muted-foreground">
+              Let AI file unsorted documents into your existing categories and
+              folders.
+            </p>
+          </div>
+          <Switch id="auto-sort" checked={autoSort} onCheckedChange={setAutoSort} />
+        </div>
+
+        <div className="flex justify-end">
+          <Button onClick={handleSave} disabled={saving}>
+            {saving && <LogoSpinner className="mr-2" />}
+            Save email settings
+          </Button>
+        </div>
+      </div>
+    </section>
   );
 }

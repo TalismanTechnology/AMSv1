@@ -35,25 +35,32 @@ export default async function PendingApprovalPage({
   }
 
   return (
-    <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4">
-      <div className="relative z-10 text-center space-y-8 max-w-md">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-500/10 border border-amber-500/20">
-          <Clock className="h-8 w-8 text-amber-500" />
-        </div>
+    <div className="relative z-10 flex min-h-screen flex-col items-center justify-center overflow-hidden px-6">
+      <div
+        aria-hidden
+        className="depth-glow left-1/2 top-1/4 h-96 w-96 -translate-x-1/2"
+        style={{ background: "oklch(0.72 0.15 70 / 14%)" }}
+      />
+      <div className="relative z-10 w-full max-w-md">
+        <div className="metallic-card rounded-3xl px-8 py-11 text-center sm:px-10">
+          <span className="mx-auto mb-7 flex size-16 items-center justify-center rounded-2xl bg-warning/15 text-warning elev-1">
+            <Clock className="h-8 w-8" />
+          </span>
 
-        <div className="space-y-2">
-          <h1 className="text-3xl font-bold metallic-heading">
-            Pending Approval
+          <p className="eyebrow">Almost there</p>
+          <h1 className="mt-3 font-serif-display text-3xl font-medium tracking-[-0.02em] text-ink">
+            Pending approval
           </h1>
-          <p className="text-muted-foreground">
-            Your request to join <strong>{school.name}</strong> is pending review.
-            A school administrator will approve your access.
+          <p className="mt-3 text-ink-soft">
+            Your request to join <strong className="text-ink">{school.name}</strong> is
+            pending review. A school administrator will approve your access.
           </p>
-        </div>
 
-        <PendingPoller slug={slug} />
+          <div className="mt-6">
+            <PendingPoller slug={slug} />
+          </div>
 
-        <div className="flex flex-col gap-3 items-center">
+        <div className="mt-6 flex flex-col items-center gap-3">
           {otherSchools.length > 0 && (
             <div className="space-y-2 w-full">
               <p className="text-sm text-muted-foreground">Your other schools:</p>
@@ -74,6 +81,10 @@ export default async function PendingApprovalPage({
             </Button>
           </form>
         </div>
+        </div>
+        <p className="mt-6 text-center text-xs text-muted-foreground">
+          Powered by AskMySchool
+        </p>
       </div>
     </div>
   );

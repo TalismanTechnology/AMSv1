@@ -4,8 +4,62 @@ import { convertToPdf } from "./convert-to-pdf";
 import { splitSegmentsIntoChunks } from "@/lib/ai/chunking";
 import { generateEmbeddings } from "@/lib/ai/embeddings";
 import { generateSummary } from "@/lib/ai/summary";
+import { classifyDocument } from "@/lib/ai/classify-document";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 const BATCH_SIZE = 5;
+
+interface SortableDoc {
+  id: string;
+  title: string;
+  school_id: string | null;
+  category_id: string | null;
+  folder_id: string | null;
+}
+
+/**
+ * When the school has auto-sort enabled and the document is missing a category
+ * or folder, ask the classifier to fill in the gaps from existing options.
+ * Returns a partial update ({} when nothing to do); never throws.
+ */
+async function maybeAutoSort(
+  supabase: SupabaseClient,
+  doc: SortableDoc,
+  content: string
+): Promise<{ category_id?: string; folder_id?: string }> {
+  try {
+    if (!doc.school_id) return {};
+    if (doc.category_id && doc.folder_id) return {};
+
+    const { data: school } = await supabase
+      .from("schools")
+      .select("auto_sort_enabled")
+      .eq("id", doc.school_id)
+      .single();
+
+    if (!school?.auto_sort_enabled) return {};
+
+    const [{ data: categories }, { data: folders }] = await Promise.all([
+      supabase.from("categories").select("id, name").eq("school_id", doc.school_id),
+      supabase.from("folders").select("id, name").eq("school_id", doc.school_id),
+    ]);
+
+    const result = await classifyDocument({
+      title: doc.title,
+      content,
+      categories: categories ?? [],
+      folders: folders ?? [],
+    });
+
+    const update: { category_id?: string; folder_id?: string } = {};
+    if (!doc.category_id && result.categoryId) update.category_id = result.categoryId;
+    if (!doc.folder_id && result.folderId) update.folder_id = result.folderId;
+    return update;
+  } catch (err) {
+    console.warn(`[processor] Auto-sort failed:`, err);
+    return {};
+  }
+}
 
 function logMem(label: string) {
   const mem = process.memoryUsage();
@@ -151,6 +205,11 @@ export async function processDocument(documentId: string) {
       console.warn(`[processor] Summary generation failed:`, err);
     }
 
+    // 8b. AI auto-sort: fill in category/folder when unset (non-fatal).
+    //     Runs for any unsorted document (emailed or manually uploaded)
+    //     when the school has auto-sort enabled.
+    const autoSort = await maybeAutoSort(supabase, doc, summary ?? text);
+
     // 9. Mark document as ready
     await supabase
       .from("documents")
@@ -160,6 +219,7 @@ export async function processDocument(documentId: string) {
         summary,
         ...(txtSaved ? { text_url: txtPath } : {}),
         ...(pdfPath ? { pdf_url: pdfPath } : {}),
+        ...autoSort,
         updated_at: new Date().toISOString(),
       })
       .eq("id", documentId);

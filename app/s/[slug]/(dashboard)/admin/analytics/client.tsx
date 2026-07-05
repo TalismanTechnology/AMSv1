@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import type { ReactNode } from "react";
 import {
   BarChart,
   Bar,
@@ -18,7 +19,6 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   MessageSquare,
@@ -30,7 +30,6 @@ import {
 } from "lucide-react";
 import { LogoSpinner } from "@/components/logo-spinner";
 import { AnimatedNumber } from "@/components/motion";
-import { MagicBentoGrid, MagicBentoCard } from "@/components/magic-bento";
 import { cn } from "@/lib/utils";
 import {
   getAnalyticsData,
@@ -39,14 +38,14 @@ import {
   type TimeRange,
 } from "@/actions/analytics";
 
-const PIE_COLORS = ["#4682b4", "#536872", "#c0c0c0", "#e5e4e2", "#3a6d96", "#8a8a8a"];
+const PIE_COLORS = ["#c96a35", "#2f3a63", "#c79a4a", "#5a7ba6", "#a3453a", "#7a8299"];
 
 const tooltipStyle = {
-  backgroundColor: "#1a1a2e",
-  border: "1px solid oklch(1 0 0 / 12%)",
-  borderRadius: "0.5rem",
-  color: "#e8e8e8",
-  boxShadow: "0 4px 24px oklch(0 0 0 / 30%)",
+  backgroundColor: "oklch(0.995 0.004 85)",
+  border: "1px solid oklch(0.885 0.014 76)",
+  borderRadius: "0.6rem",
+  color: "oklch(0.28 0.05 264)",
+  boxShadow: "0 10px 30px oklch(0.28 0.05 264 / 18%)",
 };
 
 const TIME_RANGES: { value: TimeRange; label: string }[] = [
@@ -99,19 +98,26 @@ export function AnalyticsClient({ data: initialData, schoolId, schoolSlug }: Ana
 
   return (
     <div>
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-bold metallic-heading">Analytics</h1>
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex rounded-lg border bg-muted/50 p-0.5">
+      <header className="mb-10 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-[-0.01em] text-ink">
+            Analytics
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            How your community engages with the assistant over time.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex gap-1">
             {TIME_RANGES.map((range) => (
               <button
                 key={range.value}
                 onClick={() => handleRangeChange(range.value)}
                 className={cn(
-                  "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                  "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
                   activeRange === range.value
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
+                    ? "text-primary"
+                    : "text-muted-foreground hover:text-ink"
                 )}
               >
                 {range.label}
@@ -132,7 +138,7 @@ export function AnalyticsClient({ data: initialData, schoolId, schoolSlug }: Ana
             Export CSV
           </Button>
         </div>
-      </div>
+      </header>
 
       {isPending && (
         <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
@@ -142,97 +148,42 @@ export function AnalyticsClient({ data: initialData, schoolId, schoolSlug }: Ana
       )}
 
       {/* Summary cards */}
-      <MagicBentoGrid className="mb-8 grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-        <MagicBentoCard enableParticles className="rounded-xl">
-          <Card className="metallic-card">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Questions ({activeRange === "all" ? "all" : activeRange})
-              </CardTitle>
-              <MessageSquare className="h-4 w-4 text-chart-1" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                <AnimatedNumber value={data.totalQuestions} />
-              </div>
-            </CardContent>
-          </Card>
-        </MagicBentoCard>
-
-        <MagicBentoCard enableParticles className="rounded-xl">
-          <Card className="metallic-card">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Unique Parents
-              </CardTitle>
-              <Users className="h-4 w-4 text-chart-4" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                <AnimatedNumber value={data.uniqueUsers} />
-              </div>
-            </CardContent>
-          </Card>
-        </MagicBentoCard>
-
-        <MagicBentoCard enableParticles className="rounded-xl">
-          <Card className="metallic-card">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Avg Questions/Day
-              </CardTitle>
-              <TrendingUp className="h-4 w-4 text-chart-3" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                <AnimatedNumber value={avgPerDay} />
-              </div>
-            </CardContent>
-          </Card>
-        </MagicBentoCard>
-
-        <MagicBentoCard enableParticles className="rounded-xl">
-          <Card className="metallic-card">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Documents
-              </CardTitle>
-              <FileText className="h-4 w-4 text-chart-2" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                <AnimatedNumber value={data.totalDocuments} />
-              </div>
-            </CardContent>
-          </Card>
-        </MagicBentoCard>
-
-        <MagicBentoCard enableParticles className="rounded-xl">
-          <Card className="metallic-card">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Active Sessions
-              </CardTitle>
-              <MessageCircle className="h-4 w-4 text-chart-5" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                <AnimatedNumber value={data.activeSessions} />
-              </div>
-            </CardContent>
-          </Card>
-        </MagicBentoCard>
-      </MagicBentoGrid>
+      <div className="mb-12 grid gap-8 border-y border-border py-8 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+        <StatCard
+          label={`Total Questions (${activeRange === "all" ? "all" : activeRange})`}
+          value={data.totalQuestions}
+          icon={<MessageSquare className="h-4 w-4" />}
+        />
+        <StatCard
+          label="Unique Parents"
+          value={data.uniqueUsers}
+          icon={<Users className="h-4 w-4" />}
+        />
+        <StatCard
+          label="Avg Questions/Day"
+          value={avgPerDay}
+          icon={<TrendingUp className="h-4 w-4" />}
+        />
+        <StatCard
+          label="Total Documents"
+          value={data.totalDocuments}
+          icon={<FileText className="h-4 w-4" />}
+        />
+        <StatCard
+          label="Active Sessions"
+          value={data.activeSessions}
+          icon={<MessageCircle className="h-4 w-4" />}
+        />
+      </div>
 
       {/* Charts grid */}
-      <MagicBentoGrid className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-8 lg:grid-cols-2">
         {/* Area Chart: Questions Trend */}
-        <MagicBentoCard enableParticles={false} className="rounded-xl">
-          <Card className="metallic-card">
-            <CardHeader>
-              <CardTitle className="text-base">Questions Trend</CardTitle>
-            </CardHeader>
-            <CardContent>
+        <section className="rounded-xl border border-border p-5">
+          <h2 className="mb-4 text-sm font-semibold text-ink">
+            Questions Trend
+          </h2>
+          <div>
               {data.dailyData.some((d) => d.questions > 0) ? (
                 <ResponsiveContainer width="100%" height={250}>
                   <AreaChart data={data.dailyData}>
@@ -285,21 +236,19 @@ export function AnalyticsClient({ data: initialData, schoolId, schoolSlug }: Ana
                   </AreaChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="flex h-[250px] items-center justify-center text-sm text-muted-foreground/70">
+                <div className="flex h-[250px] items-center justify-center text-sm text-muted-foreground">
                   No question data yet
                 </div>
               )}
-            </CardContent>
-          </Card>
-        </MagicBentoCard>
+          </div>
+        </section>
 
         {/* Pie Chart: Document Types */}
-        <MagicBentoCard enableParticles={false} className="rounded-xl">
-          <Card className="metallic-card">
-            <CardHeader>
-              <CardTitle className="text-base">Document Types</CardTitle>
-            </CardHeader>
-            <CardContent>
+        <section className="rounded-xl border border-border p-5">
+          <h2 className="mb-4 text-sm font-semibold text-ink">
+            Document Types
+          </h2>
+          <div>
               {data.documentTypes.length > 0 ? (
                 <ResponsiveContainer width="100%" height={250}>
                   <PieChart>
@@ -326,21 +275,19 @@ export function AnalyticsClient({ data: initialData, schoolId, schoolSlug }: Ana
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="flex h-[250px] items-center justify-center text-sm text-muted-foreground/70">
+                <div className="flex h-[250px] items-center justify-center text-sm text-muted-foreground">
                   No documents uploaded yet
                 </div>
               )}
-            </CardContent>
-          </Card>
-        </MagicBentoCard>
+          </div>
+        </section>
 
         {/* Bar Chart: Questions by Hour */}
-        <MagicBentoCard enableParticles={false} className="rounded-xl">
-          <Card className="metallic-card">
-            <CardHeader>
-              <CardTitle className="text-base">Questions by Hour</CardTitle>
-            </CardHeader>
-            <CardContent>
+        <section className="rounded-xl border border-border p-5">
+          <h2 className="mb-4 text-sm font-semibold text-ink">
+            Questions by Hour
+          </h2>
+          <div>
               {data.hourlyDistribution.some((h) => h.count > 0) ? (
                 <ResponsiveContainer width="100%" height={250}>
                   <BarChart data={data.hourlyDistribution}>
@@ -370,21 +317,19 @@ export function AnalyticsClient({ data: initialData, schoolId, schoolSlug }: Ana
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="flex h-[250px] items-center justify-center text-sm text-muted-foreground/70">
+                <div className="flex h-[250px] items-center justify-center text-sm text-muted-foreground">
                   No message data yet
                 </div>
               )}
-            </CardContent>
-          </Card>
-        </MagicBentoCard>
+          </div>
+        </section>
 
         {/* Line Chart: User Growth */}
-        <MagicBentoCard enableParticles={false} className="rounded-xl">
-          <Card className="metallic-card">
-            <CardHeader>
-              <CardTitle className="text-base">User Growth</CardTitle>
-            </CardHeader>
-            <CardContent>
+        <section className="rounded-xl border border-border p-5">
+          <h2 className="mb-4 text-sm font-semibold text-ink">
+            User Growth
+          </h2>
+          <div>
               {data.userGrowth.length > 0 &&
               data.userGrowth[data.userGrowth.length - 1].users > 0 ? (
                 <ResponsiveContainer width="100%" height={250}>
@@ -427,50 +372,71 @@ export function AnalyticsClient({ data: initialData, schoolId, schoolSlug }: Ana
                   </LineChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="flex h-[250px] items-center justify-center text-sm text-muted-foreground/70">
+                <div className="flex h-[250px] items-center justify-center text-sm text-muted-foreground">
                   No user data yet
                 </div>
               )}
-            </CardContent>
-          </Card>
-        </MagicBentoCard>
-      </MagicBentoGrid>
+          </div>
+        </section>
+      </div>
 
       {/* Top Questions - full width */}
-      <div className="mt-6">
-        <MagicBentoCard enableParticles={false} className="rounded-xl">
-          <Card className="metallic-card">
-            <CardHeader>
-              <CardTitle className="text-base">Most Asked Questions</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {data.topQuestions.length > 0 ? (
-                <div className="space-y-2">
-                  {data.topQuestions.map((q, i) => (
-                    <div
-                      key={i}
-                      className="flex items-start justify-between gap-4 rounded-lg px-3 py-2 hover:bg-glass-bg transition"
-                    >
-                      <div className="flex items-start gap-3">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full metallic-surface text-xs font-medium">
-                          {i + 1}
-                        </span>
-                        <p className="text-sm text-foreground">{q.question}</p>
-                      </div>
-                      <span className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-xs font-medium text-primary">
-                        {q.count}x
-                      </span>
-                    </div>
-                  ))}
+      <div className="mt-12">
+        <h2 className="mb-4 text-sm font-semibold text-ink">
+          Most Asked Questions
+        </h2>
+        {data.topQuestions.length > 0 ? (
+          <div className="divide-y divide-border">
+            {data.topQuestions.map((q, i) => (
+              <div
+                key={i}
+                className="flex items-start justify-between gap-4 py-3"
+              >
+                <div className="flex items-start gap-3">
+                  <span className="text-xs font-semibold text-muted-foreground tabular-nums">
+                    {i + 1}
+                  </span>
+                  <p className="text-sm text-ink">{q.question}</p>
                 </div>
-              ) : (
-                <div className="flex h-[200px] items-center justify-center text-sm text-muted-foreground/70">
-                  No questions asked yet
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </MagicBentoCard>
+                <span className="shrink-0 text-xs font-medium text-muted-foreground tabular-nums">
+                  {q.count}x
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex h-[200px] flex-col items-center justify-center gap-2 text-center">
+            <MessageSquare className="h-6 w-6 text-muted-foreground" />
+            <p className="text-sm font-medium text-ink">
+              No questions asked yet
+            </p>
+            <p className="max-w-xs text-sm text-muted-foreground">
+              Popular questions from parents will surface here.
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  icon,
+}: {
+  label: string;
+  value: number;
+  icon: ReactNode;
+}) {
+  return (
+    <div>
+      <div className="flex items-center gap-2 text-muted-foreground">
+        {icon}
+        <span className="text-sm">{label}</span>
+      </div>
+      <div className="mt-2 text-2xl font-semibold tabular-nums tracking-[-0.01em] text-ink">
+        <AnimatedNumber value={value} />
       </div>
     </div>
   );

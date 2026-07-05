@@ -251,27 +251,29 @@ export function DocumentUpload({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Upload documents</DialogTitle>
+          <DialogTitle className="text-xl font-semibold tracking-[-0.01em] text-ink">
+            Upload documents
+          </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
           {/* Dropzone */}
           <div
             {...getRootProps()}
-            className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition-colors ${
+            className={`group flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed p-8 text-center transition-colors ${
               isDragActive
                 ? "border-primary bg-primary/5"
-                : "border-border hover:border-primary/40"
+                : "border-border hover:bg-muted/40"
             }`}
           >
             <input {...getInputProps()} />
-            <Upload className="mb-2 h-6 w-6 text-muted-foreground/70" />
-            <p className="text-sm text-muted-foreground">
+            <Upload className="mb-3 h-5 w-5 text-muted-foreground" />
+            <p className="text-sm font-medium text-ink">
               {isDragActive
                 ? "Drop files here..."
                 : "Drag & drop files, or click to browse"}
             </p>
-            <p className="mt-1 text-xs text-muted-foreground/70">
+            <p className="mt-1 text-xs text-muted-foreground">
               PDF, Word, Excel, PowerPoint, Text (50MB each)
             </p>
           </div>
@@ -282,9 +284,9 @@ export function DocumentUpload({
               {items.map((item) => (
                 <div
                   key={item.id}
-                  className="flex items-start gap-3 rounded-lg border bg-muted/50 p-3"
+                  className="flex items-start gap-3 rounded-xl border border-border p-3"
                 >
-                  <FileText className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                  <FileText className="mt-1 h-4 w-4 shrink-0 text-muted-foreground" />
                   <div className="min-w-0 flex-1 space-y-1.5">
                     <Input
                       value={item.title}
@@ -351,10 +353,8 @@ export function DocumentUpload({
 
           {/* Shared metadata */}
           {items.length > 0 && (
-            <div className="space-y-3 rounded-lg border p-3">
-              <p className="text-xs font-medium text-muted-foreground">
-                Applied to all files
-              </p>
+            <div className="space-y-3 rounded-xl border border-border p-4">
+              <p className="text-sm text-muted-foreground">Applied to all files</p>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1">
                   <Label className="text-xs">Category</Label>

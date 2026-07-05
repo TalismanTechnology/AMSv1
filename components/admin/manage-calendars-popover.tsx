@@ -49,7 +49,7 @@ export function ManageCalendarsPopover({
     return (
       <div className="space-y-1.5">
         <div className="flex items-center justify-between">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-ink-soft">
             {KIND_LABELS[kind].plural}
           </span>
           <Button
@@ -119,8 +119,10 @@ export function ManageCalendarsPopover({
           align="end"
           className="w-80 space-y-4 bg-popover"
         >
-          <div>
-            <h3 className="text-sm font-semibold">Manage calendars</h3>
+          <div className="space-y-1 border-b border-border pb-3">
+            <h3 className="text-base font-semibold tracking-[-0.01em] text-ink">
+              Manage calendars
+            </h3>
             <p className="text-xs text-muted-foreground">
               Divisions and categories parents can filter by.
             </p>

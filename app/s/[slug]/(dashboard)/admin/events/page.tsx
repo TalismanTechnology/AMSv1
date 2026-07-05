@@ -13,26 +13,34 @@ export default async function EventsPage({
 
   const supabase = await createClient();
 
-  const [{ data: events }, { data: eventCalendars }] = await Promise.all([
-    supabase
-      .from("events")
-      .select(
-        "*, calendars:event_calendars(id, school_id, kind, name, color, sort_order, created_at)"
-      )
-      .eq("school_id", school.id)
-      .order("date", { ascending: true }),
-    supabase
-      .from("event_calendars")
-      .select("*")
-      .eq("school_id", school.id)
-      .order("sort_order", { ascending: true }),
-  ]);
+  const [{ data: events }, { data: eventCalendars }, { data: documents }] =
+    await Promise.all([
+      supabase
+        .from("events")
+        .select(
+          "*, calendars:event_calendars(id, school_id, kind, name, color, sort_order, created_at)"
+        )
+        .eq("school_id", school.id)
+        .order("date", { ascending: true }),
+      supabase
+        .from("event_calendars")
+        .select("*")
+        .eq("school_id", school.id)
+        .order("sort_order", { ascending: true }),
+      supabase
+        .from("documents")
+        .select("id, title, file_type")
+        .eq("school_id", school.id)
+        .eq("status", "ready")
+        .order("created_at", { ascending: false }),
+    ]);
 
   return (
     <PageTransition>
       <EventsClient
         events={events || []}
         eventCalendars={eventCalendars || []}
+        documents={documents || []}
         schoolId={school.id}
         schoolSlug={slug}
       />

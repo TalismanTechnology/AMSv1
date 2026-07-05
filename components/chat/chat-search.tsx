@@ -53,7 +53,7 @@ export function ChatSearch({ onSelectSession, onClose, schoolId }: ChatSearchPro
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center gap-2 border-b px-4 py-3">
+      <div className="flex items-center gap-2 border-b border-border px-4 py-3">
         <Search className="h-4 w-4 text-muted-foreground shrink-0" />
         <Input
           value={query}
@@ -81,22 +81,23 @@ export function ChatSearch({ onSelectSession, onClose, schoolId }: ChatSearchPro
         )}
         {!searching &&
           results.map((result) => (
-            <div
+            <button
+              type="button"
               key={result.id}
-              className="cursor-pointer border-b px-4 py-3 transition-colors hover:bg-accent"
+              className="group mx-2 my-1 flex w-[calc(100%-1rem)] cursor-pointer flex-col rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-secondary"
               onClick={() => onSelectSession(result.sessionId)}
             >
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+              <div className="mb-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
                 <MessageSquare className="h-3 w-3" />
                 <span className="truncate">{result.sessionTitle}</span>
                 <span className="ml-auto shrink-0">
                   <TimeAgo date={result.createdAt} />
                 </span>
               </div>
-              <p className="text-sm text-foreground line-clamp-2">
+              <p className="line-clamp-2 text-sm text-ink-soft">
                 {highlightMatch(result.content)}
               </p>
-            </div>
+            </button>
           ))}
       </ScrollArea>
     </div>

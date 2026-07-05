@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
 import {
   MessageSquare,
   Megaphone,
@@ -13,10 +12,8 @@ import {
   Clock,
   PlusCircle,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TimeAgo } from "@/components/ui/time-ago";
-import { MagicBentoGrid, MagicBentoCard } from "@/components/magic-bento";
 import { JoinSchoolDialog } from "@/components/shared/join-school-dialog";
 
 interface DashboardClientProps {
@@ -46,28 +43,24 @@ function getQuickActions(schoolSlug: string) {
       icon: MessageSquare,
       label: "Ask a Question",
       description: "Chat with the school AI assistant",
-      color: "neon-icon-blue",
     },
     {
       href: `/s/${schoolSlug}/parent/announcements`,
       icon: Megaphone,
       label: "Announcements",
       description: "View school announcements",
-      color: "neon-icon-amber",
     },
     {
       href: `/s/${schoolSlug}/parent/events`,
       icon: CalendarDays,
       label: "Calendar",
       description: "View school calendar",
-      color: "neon-icon-green",
     },
     {
       href: `/s/${schoolSlug}/parent/profile`,
       icon: User,
       label: "Profile",
       description: "Manage your account",
-      color: "neon-icon-purple",
     },
   ];
 }
@@ -85,158 +78,173 @@ export function DashboardClient({
   const greeting =
     hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
+  const today = new Date().toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+
   return (
-    <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-8 overflow-y-auto h-full">
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
-        <h1 className="text-2xl font-bold metallic-heading">
-          {greeting}, {firstName}
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Here&apos;s what&apos;s happening at your school
-        </p>
-      </motion.div>
+    <div className="h-full overflow-y-auto">
+      <div className="mx-auto max-w-3xl space-y-12 px-4 pb-16 pt-12 md:px-8">
+        {/* Greeting */}
+        <header>
+          <p className="text-sm text-muted-foreground">{today}</p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-[-0.01em] text-ink">
+            {greeting}, {firstName}
+          </h1>
+        </header>
 
-      {/* Quick Actions */}
-      <MagicBentoGrid className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {quickActions.map((action) => (
-          <MagicBentoCard key={action.href} enableClickRipple className="rounded-xl">
-            <Link href={action.href}>
-              <Card className="metallic-card cursor-pointer h-full">
-                <CardContent className="p-4 flex flex-col items-center text-center gap-2">
-                  <action.icon className={`h-8 w-8 ${action.color}`} />
-                  <p className="font-medium text-sm">{action.label}</p>
-                  <p className="text-xs text-muted-foreground hidden md:block">
-                    {action.description}
-                  </p>
-                </CardContent>
-              </Card>
-            </Link>
-          </MagicBentoCard>
-        ))}
-      </MagicBentoGrid>
+        {/* Quick Actions */}
+        <section aria-labelledby="quick-actions-heading">
+          <h2
+            id="quick-actions-heading"
+            className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground"
+          >
+            Shortcuts
+          </h2>
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+            {quickActions.map((action) => (
+              <Link
+                key={action.href}
+                href={action.href}
+                className="flex items-center gap-2.5 rounded-xl border border-border px-3.5 py-3 transition-colors hover:bg-secondary"
+              >
+                <action.icon className="h-[18px] w-[18px] shrink-0 text-muted-foreground" />
+                <span className="truncate text-sm font-medium text-ink">
+                  {action.label}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
 
-      {/* Join Another School */}
-      <MagicBentoCard enableClickRipple className="rounded-xl">
-        <Card
-          className="metallic-card cursor-pointer"
-          onClick={() => setJoinDialogOpen(true)}
-        >
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
-              <PlusCircle className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p className="font-medium text-sm">Join Another School</p>
-              <p className="text-xs text-muted-foreground">
-                Enter a school code to join an additional school
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </MagicBentoCard>
-
-      <JoinSchoolDialog open={joinDialogOpen} onOpenChange={setJoinDialogOpen} />
-
-      <MagicBentoGrid className="grid md:grid-cols-2 gap-6">
         {/* Recent Announcements */}
-        <MagicBentoCard enableParticles={false} className="rounded-xl">
-          <Card className="metallic-card">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base">Recent Announcements</CardTitle>
-                <Link
-                  href={`/s/${schoolSlug}/parent/announcements`}
-                  className="text-xs text-primary hover:underline flex items-center gap-1"
-                >
-                  View all <ArrowRight className="h-3 w-3" />
-                </Link>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {announcements.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No announcements yet
-                </p>
-              ) : (
-                announcements.map((a) => (
-                  <div key={a.id} className="space-y-1">
+        <section aria-labelledby="announcements-heading">
+          <div className="mb-3 flex items-baseline justify-between">
+            <h2
+              id="announcements-heading"
+              className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+            >
+              Recent Announcements
+            </h2>
+            <Link
+              href={`/s/${schoolSlug}/parent/announcements`}
+              className="group flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-ink"
+            >
+              View all
+              <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
+            </Link>
+          </div>
+          {announcements.length === 0 ? (
+            <p className="py-6 text-sm text-muted-foreground">No announcements yet</p>
+          ) : (
+            <div className="divide-y divide-border">
+              {announcements.map((a) => (
+                <div key={a.id} className="flex items-start gap-3 py-3">
+                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/40" />
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium truncate">{a.title}</p>
+                      <p className="truncate text-sm font-medium text-ink">
+                        {a.title}
+                      </p>
                       {a.priority !== "normal" && (
                         <Badge
                           variant={
                             a.priority === "urgent" ? "destructive" : "secondary"
                           }
-                          className="text-[10px] px-1.5 py-0"
+                          className="px-1.5 py-0 text-[10px]"
                         >
                           {a.priority}
                         </Badge>
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="mt-0.5 text-xs text-muted-foreground">
                       <TimeAgo date={a.created_at} />
                     </p>
                   </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-        </MagicBentoCard>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
 
         {/* Upcoming Calendar */}
-        <MagicBentoCard enableParticles={false} className="rounded-xl">
-          <Card className="metallic-card">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base">Upcoming</CardTitle>
-                <Link
-                  href={`/s/${schoolSlug}/parent/events`}
-                  className="text-xs text-primary hover:underline flex items-center gap-1"
-                >
-                  View all <ArrowRight className="h-3 w-3" />
-                </Link>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {events.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No upcoming events
-                </p>
-              ) : (
-                events.map((e) => (
-                  <div key={e.id} className="space-y-1">
-                    <p className="text-sm font-medium">{e.title}</p>
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <CalendarDays className="h-3 w-3" />
-                        {new Date(e.date + "T00:00:00").toLocaleDateString(
-                          undefined,
-                          { month: "short", day: "numeric" }
-                        )}
+        <section aria-labelledby="upcoming-heading">
+          <div className="mb-3 flex items-baseline justify-between">
+            <h2
+              id="upcoming-heading"
+              className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+            >
+              Upcoming
+            </h2>
+            <Link
+              href={`/s/${schoolSlug}/parent/events`}
+              className="group flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-ink"
+            >
+              View all
+              <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
+            </Link>
+          </div>
+          {events.length === 0 ? (
+            <p className="py-6 text-sm text-muted-foreground">No upcoming events</p>
+          ) : (
+            <div className="divide-y divide-border">
+              {events.map((e) => {
+                const d = new Date(e.date + "T00:00:00");
+                return (
+                  <div key={e.id} className="flex items-center gap-3 py-3">
+                    <div className="flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-lg border border-border leading-none">
+                      <span className="text-[0.55rem] font-semibold uppercase tracking-wide text-muted-foreground">
+                        {d.toLocaleDateString(undefined, { month: "short" })}
                       </span>
-                      {e.start_time && (
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {e.start_time}
-                        </span>
-                      )}
-                      {e.location && (
-                        <span className="flex items-center gap-1">
-                          <MapPin className="h-3 w-3" />
-                          {e.location}
-                        </span>
-                      )}
+                      <span className="text-base font-semibold text-ink">
+                        {d.getDate()}
+                      </span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-ink">
+                        {e.title}
+                      </p>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                        {e.start_time && (
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {e.start_time}
+                          </span>
+                        )}
+                        {e.location && (
+                          <span className="flex items-center gap-1">
+                            <MapPin className="h-3 w-3" />
+                            {e.location}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-        </MagicBentoCard>
-      </MagicBentoGrid>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        {/* Join Another School */}
+        <button
+          onClick={() => setJoinDialogOpen(true)}
+          className="group flex w-full items-center gap-3 rounded-xl border border-border px-4 py-3 text-left transition-colors hover:bg-secondary"
+        >
+          <PlusCircle className="h-[18px] w-[18px] shrink-0 text-muted-foreground" />
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-ink">Join Another School</p>
+            <p className="text-xs text-muted-foreground">
+              Enter a school code to join an additional school
+            </p>
+          </div>
+          <ArrowRight className="ml-auto h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+        </button>
+
+        <JoinSchoolDialog open={joinDialogOpen} onOpenChange={setJoinDialogOpen} />
+      </div>
     </div>
   );
 }

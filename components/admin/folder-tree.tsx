@@ -71,11 +71,9 @@ export function FolderTree({
   }
 
   return (
-    <div className="w-52 shrink-0 rounded-lg border bg-card p-3">
-      <div className="mb-2 flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">
-          Folders
-        </span>
+    <div className="w-52 shrink-0 self-start">
+      <div className="mb-3 flex items-center justify-between border-b border-border pb-2.5">
+        <span className="text-xs text-muted-foreground">Folders</span>
         <Button
           variant="ghost"
           size="sm"
@@ -89,13 +87,14 @@ export function FolderTree({
       <button
         onClick={() => onSelectFolder(null)}
         className={cn(
-          "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm",
+          "flex w-full items-center gap-1 rounded-xl px-2 py-1.5 text-sm transition-colors",
           selectedFolderId === null
-            ? "bg-sidebar-accent font-medium text-primary"
-            : "text-muted-foreground hover:bg-accent"
+            ? "bg-muted font-medium text-ink"
+            : "text-muted-foreground hover:bg-muted/50 hover:text-ink"
         )}
       >
-        <FileText className="h-4 w-4" />
+        <span className="w-3.5 shrink-0" />
+        <FileText className="h-4 w-4 shrink-0" />
         All Documents
       </button>
 
@@ -190,10 +189,10 @@ function FolderNode({
     <div>
       <div
         className={cn(
-          "group flex items-center gap-1 rounded-md px-2 py-1 text-sm",
+          "group flex items-center gap-1 rounded-xl px-2 py-1.5 text-sm transition-colors",
           selectedId === folder.id
-            ? "bg-sidebar-accent font-medium text-primary"
-            : "text-muted-foreground hover:bg-accent"
+            ? "bg-muted font-medium text-ink"
+            : "text-muted-foreground hover:bg-muted/50 hover:text-ink"
         )}
         style={{ paddingLeft: `${depth * 12 + 8}px` }}
       >

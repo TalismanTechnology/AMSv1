@@ -9,22 +9,24 @@ import {
   ScrollProgressBar,
   ScrollHeader,
   BlurReveal,
-  SlotMachineHero,
   motion,
   metallicCardEntrance,
 } from "@/components/motion";
 import { CursorSpotlight } from "@/components/motion/cursor-spotlight";
 import { MagneticButton } from "@/components/motion/magnetic-button";
 import { Logo } from "@/components/logo";
-import { HowItWorksDemo } from "@/components/landing/how-it-works-demo";
-import { FloatingOrbs } from "@/components/landing/floating-orbs";
-import { AuroraMesh } from "@/components/landing/aurora-mesh";
+import { EditorialHero } from "@/components/landing/editorial-hero";
 import {
   IngestionMockup,
   EmbeddingsMockup,
   RetrievalMockup,
   AnswerMockup,
 } from "@/components/landing/mockups";
+
+const navLinks = [
+  { label: "Under the hood", href: "#under-the-hood" },
+  { label: "Families", href: "#testimonials" },
+];
 
 const testimonials = [
   {
@@ -69,7 +71,7 @@ function Step({
   const textDirection = textFirst ? "left" : "right";
   const mockupDirection = textFirst ? "right" : "left";
   return (
-    <section className="relative mx-auto max-w-6xl px-6 py-28 sm:py-40">
+    <section className="relative mx-auto max-w-6xl px-6 py-24 sm:py-32">
       <div className="grid gap-12 md:grid-cols-2 md:items-start md:gap-16">
         {/* Copy column */}
         <RevealOnScrollDirectional
@@ -80,24 +82,22 @@ function Step({
             <motion.span
               aria-hidden
               initial={{ opacity: 0, x: textFirst ? -120 : 120, scale: 0.7 }}
-              whileInView={{ opacity: 0.08, x: 0, scale: 1 }}
+              whileInView={{ opacity: 0.1, x: 0, scale: 1 }}
               viewport={{ once: true, amount: 0.3 }}
               transition={{ duration: 0.8, ease: [0, 0, 0.2, 1] }}
-              className="pointer-events-none absolute -top-10 -left-2 select-none text-[7rem] font-bold leading-none tracking-tighter metallic-heading sm:-top-14 sm:text-[10rem]"
+              className="pointer-events-none absolute -top-10 -left-2 select-none font-serif-display text-[7rem] font-semibold leading-none tracking-tighter text-primary/25 sm:-top-14 sm:text-[10rem]"
             >
               {number}
             </motion.span>
             <div className="relative">
               <div className="inline-flex items-center gap-3">
-                <span className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                  Step {number}
-                </span>
-                <span className="h-px w-10 bg-glass-border" />
+                <span className="eyebrow">Step {number}</span>
+                <span className="h-px w-10 bg-border" />
               </div>
-              <h3 className="mt-4 text-3xl font-semibold metallic-heading neon-text-soft sm:text-4xl lg:text-5xl">
+              <h3 className="mt-4 font-serif-display text-3xl font-medium tracking-[-0.02em] text-ink sm:text-4xl lg:text-5xl">
                 {title}
               </h3>
-              <p className="mt-6 max-w-md text-base leading-relaxed text-muted-foreground">
+              <p className="mt-6 max-w-md text-base leading-relaxed text-ink-soft">
                 {description}
               </p>
               <motion.ul
@@ -123,7 +123,7 @@ function Step({
                     }}
                     className="flex items-start gap-2.5 text-sm text-foreground/85"
                   >
-                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary shadow-[0_0_8px_var(--glow-primary)]" />
+                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
                     <span>{h}</span>
                   </motion.li>
                 ))}
@@ -145,8 +145,8 @@ function Step({
               whileInView="visible"
               viewport={{ once: true, amount: 0.3 }}
             >
-              <CursorSpotlight radius={420} intensity={0.10} className="rounded-2xl">
-                <div className="metallic-card relative rounded-2xl p-6 backdrop-blur-sm sm:p-8">
+              <CursorSpotlight radius={420} intensity={0.06} className="rounded-2xl">
+                <div className="metallic-card relative rounded-2xl p-6 sm:p-8">
                   {mockup}
                 </div>
               </CursorSpotlight>
@@ -164,89 +164,61 @@ export default function LandingPage() {
       <ScrollProgressBar />
 
       {/* Header */}
-      <ScrollHeader className="fixed top-0 z-50 w-full">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-2">
-            <Logo
-              size={32}
-              className="text-primary drop-shadow-[0_0_8px_var(--glow-primary)] drop-shadow-[0_0_14px_oklch(1_0_0/40%)]"
-            />
-            <span className="text-xl font-semibold metallic-text">
+      <ScrollHeader className="fixed top-0 z-50 w-full px-4">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-6 bg-background/80 px-6 py-4 backdrop-blur-md">
+          <Link href="/" className="flex items-center gap-2">
+            <Logo size={26} className="text-primary" />
+            <span className="text-lg font-semibold tracking-[-0.01em] text-ink">
               AskMySchool
             </span>
-          </div>
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" asChild>
-              <Link href="/login">Log in</Link>
+          </Link>
+          <nav className="hidden items-center gap-8 md:flex">
+            {navLinks.map((l) => (
+              <a
+                key={l.href}
+                href={l.href}
+                className="text-sm text-ink-soft transition-colors hover:text-ink"
+              >
+                {l.label}
+              </a>
+            ))}
+          </nav>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" asChild className="hidden sm:inline-flex">
+              <Link href="/login">Sign in</Link>
             </Button>
-            <Button
-              asChild
-              className="shadow-[0_0_20px_var(--glow-primary),0_0_8px_oklch(1_0_0/30%)]"
-            >
-              <Link href="/register">Sign up</Link>
+            <Button asChild>
+              <Link href="/register">Get started</Link>
             </Button>
           </div>
         </div>
       </ScrollHeader>
 
       {/* Hero */}
-      <section className="relative z-10 flex min-h-[80svh] flex-col items-center justify-center overflow-hidden px-6 text-center">
-        <AuroraMesh />
-        <FloatingOrbs />
-        <div className="relative z-10">
-          <div className="inline-block">
-            <SlotMachineHero className="text-6xl font-bold metallic-heading neon-text-soft sm:text-7xl lg:text-9xl">
-              {"Your Questions\nAnswered Instantly"}
-            </SlotMachineHero>
-          </div>
-          <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground sm:text-xl">
-            Parents ask questions in plain English. AI finds the answer from
-            your school&apos;s official documents — with citations.
-          </p>
-          <div className="mt-8 flex items-center justify-center gap-4">
-            <MagneticButton strength={0.35} radius={90}>
-              <Button
-                size="lg"
-                asChild
-                className="shadow-[0_0_20px_var(--glow-primary),0_0_8px_oklch(1_0_0/30%)]"
-              >
-                <Link href="/register">Get started free</Link>
-              </Button>
-            </MagneticButton>
-            <Button variant="ghost" size="lg" asChild>
-              <Link href="/login">Log in</Link>
-            </Button>
-          </div>
-        </div>
-      </section>
+      <div className="pt-20">
+        <EditorialHero />
+      </div>
 
-
-      {/* ═══ Traditional Landing Page ═══ */}
+      {/* ═══ Editorial sections ═══ */}
       <div className="relative">
-
-        {/* How It Works — live demo */}
-        <section className="mx-auto max-w-5xl px-6 pt-4 pb-24">
-          <HowItWorksDemo />
-        </section>
-
         {/* Under the hood — intro */}
-        <section className="mx-auto max-w-4xl px-6 pt-24 pb-8 text-center">
+        <section
+          id="under-the-hood"
+          className="mx-auto max-w-4xl px-6 pt-24 pb-8 text-center scroll-mt-24"
+        >
           <BlurReveal>
-            <p className="text-xs font-mono uppercase tracking-[0.2em] text-muted-foreground">
-              Under the hood
-            </p>
-            <h2 className="mt-4 text-3xl font-semibold metallic-heading neon-text-soft sm:text-4xl lg:text-5xl">
+            <p className="eyebrow">Under the hood</p>
+            <h2 className="mt-4 font-serif-display text-3xl font-medium tracking-[-0.02em] text-ink sm:text-4xl lg:text-5xl">
               Retrieval-augmented generation,
               <br className="hidden sm:block" /> grounded in your documents.
             </h2>
-            <p className="mx-auto mt-6 max-w-2xl text-muted-foreground">
+            <p className="mx-auto mt-6 max-w-2xl text-ink-soft">
               Every answer is built from your school&apos;s own source
               material — never invented. Here&apos;s how it works, end to end.
             </p>
           </BlurReveal>
         </section>
 
-        {/* Step 1 — Ingestion */}
         <Step
           number="01"
           title="Multi-format ingestion"
@@ -260,7 +232,6 @@ export default function LandingPage() {
           mockupSide="right"
         />
 
-        {/* Step 2 — Embeddings */}
         <Step
           number="02"
           title="Semantic embeddings"
@@ -274,7 +245,6 @@ export default function LandingPage() {
           mockupSide="left"
         />
 
-        {/* Step 3 — Retrieval */}
         <Step
           number="03"
           title="Row-level secure retrieval"
@@ -288,7 +258,6 @@ export default function LandingPage() {
           mockupSide="right"
         />
 
-        {/* Step 4 — Answer */}
         <Step
           number="04"
           title="Grounded answers with citations"
@@ -303,28 +272,29 @@ export default function LandingPage() {
         />
 
         {/* Testimonials */}
-        <section className="mx-auto max-w-5xl px-6 py-24">
+        <section id="testimonials" className="mx-auto max-w-5xl px-6 py-24 scroll-mt-24">
           <BlurReveal>
-            <h2 className="text-center text-3xl font-semibold metallic-heading neon-text-soft sm:text-4xl">
+            <p className="eyebrow text-center">Loved by families</p>
+            <h2 className="mt-4 text-center font-serif-display text-3xl font-medium tracking-[-0.02em] text-ink sm:text-4xl">
               What parents are saying
             </h2>
           </BlurReveal>
-          <StaggerChildren className="mt-16 grid gap-8 sm:grid-cols-3">
+          <StaggerChildren className="mt-14 grid gap-8 sm:grid-cols-3">
             {testimonials.map((t, i) => (
               <motion.div key={i} variants={metallicCardEntrance}>
-                <CursorSpotlight radius={280} intensity={0.14} className="rounded-xl">
-                  <div className="metallic-card rounded-xl p-8">
-                    <p className="text-sm leading-relaxed text-muted-foreground italic">
+                <CursorSpotlight radius={280} intensity={0.06} className="rounded-xl">
+                  <div className="metallic-card h-full rounded-xl p-8">
+                    <p className="text-sm leading-relaxed text-ink-soft italic">
                       &ldquo;{t.quote}&rdquo;
                     </p>
                     <div className="mt-6 flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full metallic-surface border border-glass-border neon-border">
-                        <span className="text-sm font-medium metallic-text">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                        <span className="text-sm font-semibold text-primary">
                           {t.initials}
                         </span>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-foreground">
+                        <p className="text-sm font-semibold text-ink">
                           {t.name}
                         </p>
                         <p className="text-xs text-muted-foreground">{t.role}</p>
@@ -338,46 +308,44 @@ export default function LandingPage() {
         </section>
 
         {/* Final CTA */}
-        <section className="mx-auto max-w-4xl px-6 py-24 text-center">
+        <section className="mx-auto max-w-4xl px-6 pb-28 pt-8 text-center">
           <RevealOnScroll>
-            <CursorSpotlight radius={500} intensity={0.12} className="rounded-2xl">
-              <div className="metallic-card rounded-2xl p-12">
-                <div className="relative z-10">
-                  <h2 className="text-3xl font-semibold metallic-heading neon-text-soft sm:text-4xl">
-                    Ready to get started?
-                  </h2>
-                  <p className="mx-auto mt-4 max-w-xl text-muted-foreground">
-                    Sign up today and start getting instant answers from your
-                    school&apos;s documents. It&apos;s fast, accurate, and always
-                    up to date.
-                  </p>
-                  <div className="mt-8 flex items-center justify-center gap-4">
-                    <MagneticButton strength={0.4} radius={100}>
-                      <Button
-                        size="lg"
-                        asChild
-                        className="shadow-[0_0_20px_var(--glow-primary),0_0_8px_oklch(1_0_0/30%)]"
-                      >
-                        <Link href="/register">Create your account</Link>
-                      </Button>
-                    </MagneticButton>
-                  </div>
+            <div className="metallic-card relative overflow-hidden rounded-3xl p-12 sm:p-16">
+              <div
+                className="depth-glow left-1/2 top-0 h-64 w-64 -translate-x-1/2"
+                style={{ background: "oklch(0.635 0.148 47 / 14%)" }}
+              />
+              <div className="relative z-10">
+                <p className="eyebrow">Get started</p>
+                <h2 className="mt-4 font-serif-display text-3xl font-medium tracking-[-0.02em] text-ink sm:text-4xl">
+                  Ready to get answers you can{" "}
+                  <span className="italic text-primary">trust</span>?
+                </h2>
+                <p className="mx-auto mt-4 max-w-xl text-ink-soft">
+                  Sign up today and start getting instant answers from your
+                  school&apos;s documents. Fast, accurate, and always up to date.
+                </p>
+                <div className="mt-8 flex items-center justify-center gap-4">
+                  <MagneticButton strength={0.4} radius={100}>
+                    <Button size="lg" asChild className="h-12 px-6 text-base">
+                      <Link href="/register">Create your account</Link>
+                    </Button>
+                  </MagneticButton>
                 </div>
               </div>
-            </CursorSpotlight>
+            </div>
           </RevealOnScroll>
         </section>
       </div>
 
       {/* Footer */}
-      <footer className="border-t border-border/50 py-8 neon-divider">
+      <footer className="border-t border-border py-8">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-6 sm:flex-row">
           <div className="flex items-center gap-2">
-            <Logo
-              size={20}
-              className="text-primary drop-shadow-[0_0_6px_oklch(1_0_0/40%)]"
-            />
-            <span className="text-sm metallic-text">AskMySchool</span>
+            <Logo size={20} className="text-primary" />
+            <span className="font-serif-display text-sm font-semibold text-ink">
+              AskMySchool
+            </span>
           </div>
           <p className="text-xs text-muted-foreground">
             &copy; {new Date().getFullYear()} AskMySchool. All rights reserved.

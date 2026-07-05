@@ -150,11 +150,11 @@ ${followUpInstruction}`;
     citationRules +=
       "- Answer in your own words. Do NOT quote documents word-for-word. Paraphrase and summarize the information naturally.\n";
   }
-  if (chunks.length > 0) {
+  if (chunks.length > 0 || hasEvents) {
     citationRules +=
-      "- CITATIONS ARE REQUIRED. Every sentence that contains a fact drawn from DOCUMENT CONTEXT MUST end with an inline citation in square brackets that matches the source number above — for example [1] or [1][2]. Do this even when the fact feels obvious. An answer that uses DOCUMENT CONTEXT but contains zero [N] citations is wrong; rewrite it with citations.\n";
+      "- CITATIONS ARE REQUIRED. Every sentence that contains a fact drawn from DOCUMENT CONTEXT or SCHOOL EVENTS MUST end with an inline citation in square brackets that matches the [Source N] number above — for example [1] or [1][2]. This applies equally to calendar/event facts (dates, times, locations). Do this even when the fact feels obvious. An answer that uses this context but contains zero [N] citations is wrong; rewrite it with citations.\n";
     citationRules +=
-      "- Place each citation immediately after the sentence or clause it supports — never bunch citations at the end of the answer. If a single claim is supported by multiple sources, list them adjacently like [1][2]. Do not invent source numbers and do not cite a number that is not in DOCUMENT CONTEXT.\n";
+      "- Place each citation immediately after the sentence or clause it supports — never bunch citations at the end of the answer. If a single claim is supported by multiple sources, list them adjacently like [1][2]. Do not invent source numbers and do not cite a number that is not shown above.\n";
     citationRules +=
       "- Do NOT add citations to follow-up questions, greetings, or clarifying questions back to the parent.\n";
     citationRules +=

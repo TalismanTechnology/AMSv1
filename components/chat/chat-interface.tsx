@@ -284,7 +284,10 @@ export function ChatInterface({
         <div className="relative flex flex-1 flex-col min-w-0">
           {/* Header with export */}
           {messages.length > 0 && (
-            <div className="flex items-center justify-end border-b neon-divider px-4 py-1.5">
+            <div className="flex items-center justify-between px-4 py-2.5">
+              <p className="truncate text-sm font-medium text-ink">
+                {sessionTitle || "Conversation"}
+              </p>
               <ChatExport
                 messages={messages.map((m) => ({
                   role: m.role,
@@ -297,7 +300,7 @@ export function ChatInterface({
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto px-4 flex flex-col" ref={scrollRef}>
-            <div className="mx-auto max-w-3xl w-full space-y-6 py-6 pb-32">
+            <div className="mx-auto max-w-3xl w-full space-y-10 py-8 pb-32">
               {messages.length === 0 ? (
                 <SuggestedQuestions
                   onSelect={handleSuggestedQuestion}
@@ -343,7 +346,7 @@ export function ChatInterface({
                 })
               )}
               {creatingSession && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
                   <LogoSpinner size={20} />
                   Starting chat session...
                 </div>
@@ -352,7 +355,7 @@ export function ChatInterface({
                 <RetrievalLoadingStrip />
               )}
               {(error || sendError) && (
-                <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
                   Something went wrong: {error?.message || sendError}
                 </div>
               )}
@@ -360,27 +363,27 @@ export function ChatInterface({
           </div>
 
           {/* Floating Input */}
-          <div className="pointer-events-none absolute inset-x-0 bottom-6 z-10 px-4 pb-4 pt-10 bg-gradient-to-t from-background via-background/80 to-transparent">
+          <div className="pointer-events-none absolute inset-x-0 bottom-6 z-10 px-4 pb-4 pt-12 bg-gradient-to-t from-background via-background/85 to-transparent">
             <form
               onSubmit={handleSubmit}
-              className="pointer-events-auto mx-auto flex max-w-3xl items-end gap-1.5 rounded-2xl border border-glass-border bg-background/85 p-1.5 pl-2 backdrop-blur-md transition-colors focus-within:border-primary/40"
+              className="pointer-events-auto mx-auto flex max-w-3xl items-end gap-2 rounded-2xl border border-border bg-background p-2 pl-4 transition-colors focus-within:border-ink/20"
             >
               <Textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={onKeyDown}
-                placeholder="Ask a question about your school..."
+                placeholder="Ask a question about your school…"
                 rows={1}
-                className="min-h-[36px] resize-none border-0 bg-transparent shadow-none focus-visible:ring-0 focus-visible:border-transparent px-1 py-1.5"
+                className="min-h-[36px] resize-none border-0 bg-transparent px-0 py-1.5 text-ink shadow-none placeholder:text-muted-foreground focus-visible:border-transparent focus-visible:ring-0"
                 disabled={isLoading}
               />
               <Button
                 type="submit"
                 size="icon"
                 disabled={isLoading || !input.trim()}
-                className="h-9 w-9 shrink-0 rounded-full"
+                className="size-9 shrink-0 rounded-full bg-primary text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
               >
-                <Send className="h-3.5 w-3.5" />
+                <Send className="size-4" />
               </Button>
             </form>
           </div>

@@ -16,7 +16,6 @@ import {
   formatChunkLocation,
   type RelevantChunk,
 } from "@/lib/ai/rag";
-import type { ChatSourceLocation } from "@/lib/types";
 import { generateEmbedding } from "@/lib/ai/embeddings";
 import { assignToCluster } from "@/lib/ai/cluster-assignment";
 import { sendClusterAlert } from "@/lib/alerts/cluster-alerts";
@@ -25,10 +24,12 @@ import {
   fetchAnnouncementsForContext,
   fetchChildrenForContext,
   formatEventsContext,
+  buildEventSources,
   formatAnnouncementsContext,
   formatChildrenContext,
   getTodayString,
 } from "@/lib/ai/context";
+import type { ChatSource } from "@/lib/types";
 import { rewriteQueryWithContext } from "@/lib/ai/rewrite-query";
 
 export async function POST(request: NextRequest) {
@@ -128,7 +129,7 @@ export async function POST(request: NextRequest) {
       childrenResult.status === "fulfilled" ? childrenResult.value : [];
 
     let customPrompt = "";
-    let aiTemperature = 0.3;
+    let aiTemperature = 0.2;
     if (settings?.custom_system_prompt) {
       customPrompt = "\n\n" + settings.custom_system_prompt;
     }
@@ -143,6 +144,7 @@ export async function POST(request: NextRequest) {
     // filter to relevant, and cap. The same ordered set is fed to the LLM as
     // [Source 1..N] AND returned to the client as sources[N-1], so inline
     // [N] citations the model emits always map to a real source card.
+    const MAX_DOCUMENT_SOURCES = 3;
     const citableChunks: RelevantChunk[] = (() => {
       if (relevantChunks.length === 0) return [];
       const bestByDoc = new Map<string, RelevantChunk>();
@@ -155,32 +157,27 @@ export async function POST(request: NextRequest) {
       return [...bestByDoc.values()]
         .filter((c) => c.similarity >= 0.55)
         .sort((a, b) => b.similarity - a.similarity)
-        .slice(0, 5);
+        .slice(0, MAX_DOCUMENT_SOURCES);
     })();
+
+    // Events are citable sources numbered continuously after the documents.
+    // The same numbering is used for the [Source N] labels in the prompt AND
+    // the source cards returned to the client, so [N] citations always resolve.
+    const eventStartNumber = citableChunks.length + 1;
+    const eventSources = buildEventSources(events, eventStartNumber);
 
     // Build system prompt with documents, events, announcements, and children context
     const systemPrompt =
       buildSystemPrompt(citableChunks, {
-        eventsContext: formatEventsContext(events),
+        eventsContext: formatEventsContext(events, eventStartNumber),
         announcementsContext: formatAnnouncementsContext(announcements),
         childrenContext: formatChildrenContext(children),
         todayString: getTodayString(),
       }) + customPrompt;
 
-    // Prepare sources for the response — same set + same numbering as the
-    // labels in the system prompt above.
-    const sources: {
-      document_id: string;
-      title: string;
-      chunk_content: string;
-      similarity: number;
-      file_url?: string;
-      file_type?: string;
-      chunk_index: number;
-      source_number: number;
-      source_type: "document";
-      location: ChatSourceLocation | null;
-    }[] = citableChunks.map((chunk, i) => {
+    // Prepare document sources for the response — same set + same numbering as
+    // the labels in the system prompt above.
+    const sources: ChatSource[] = citableChunks.map((chunk, i) => {
       return {
         document_id: chunk.document_id,
         title: chunk.document_title || "Unknown",
@@ -194,6 +191,12 @@ export async function POST(request: NextRequest) {
         location: formatChunkLocation(chunk.metadata),
       };
     });
+
+    // Documents (always shown as cards) + the full numbered calendar. Event
+    // cards are only surfaced client-side when their [N] is actually cited, so
+    // the whole calendar isn't dumped as cards. Sent to the client for citation
+    // resolution; the DB save below keeps docs + only the cited events.
+    const allSources: ChatSource[] = [...sources, ...eventSources];
 
     // Save user message in the background (fire and forget)
     if (sessionId) {
@@ -330,6 +333,18 @@ export async function POST(request: NextRequest) {
           // Strip follow-up markers before saving to DB
           const markerIdx = text.indexOf("---FOLLOW_UPS---");
           const cleanText = markerIdx !== -1 ? text.slice(0, markerIdx).trimEnd() : text;
+          // Persist all document sources plus only the events the answer
+          // actually cited — the full calendar is scanned but not stored per
+          // message. Historical messages then replay exactly the cited cards.
+          const citedNumbers = new Set(
+            [...cleanText.matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1]))
+          );
+          const savedSources: ChatSource[] = [
+            ...sources,
+            ...eventSources.filter(
+              (s) => s.source_number != null && citedNumbers.has(s.source_number)
+            ),
+          ];
           adminSupabase
             .from("chat_messages")
             .insert({
@@ -337,7 +352,7 @@ export async function POST(request: NextRequest) {
               session_id: sessionId,
               role: "assistant",
               content: cleanText,
-              sources,
+              sources: savedSources,
               school_id: schoolId,
             })
             .then(({ error }) => { if (error) console.error("Failed to save assistant message:", error); });
@@ -349,8 +364,8 @@ export async function POST(request: NextRequest) {
     // alongside the streamed text (DefaultChatTransport parses these on the client)
     const stream = createUIMessageStream({
       execute: ({ writer }) => {
-        if (sources.length > 0) {
-          writer.write({ type: "data-sources", data: sources });
+        if (allSources.length > 0) {
+          writer.write({ type: "data-sources", data: allSources });
         }
         writer.write({ type: "data-message-id", data: assistantMessageId });
         writer.merge(result.toUIMessageStream());

@@ -60,10 +60,12 @@ export function DocumentPreviewCard({
     const config = SOURCE_TYPE_CONFIG[sourceType];
     const Icon = config.icon;
     return (
-      <div className="metallic-card flex w-full items-center gap-2 rounded-lg border border-border bg-muted/50 px-3 py-2 text-left text-sm">
-        <Icon className="h-4 w-4 shrink-0 text-primary" />
-        <span className="min-w-0 flex-1 truncate font-medium text-foreground">
-          {index != null ? `[${index}] ` : ""}
+      <div className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-sm text-muted-foreground">
+        <Icon className="size-3.5 shrink-0" />
+        <span className="min-w-0 flex-1 truncate text-ink-soft">
+          {index != null ? (
+            <span className="mr-1">[{index}]</span>
+          ) : null}
           {source.title}
         </span>
         <Badge variant="secondary" className="shrink-0 text-[10px]">
@@ -111,10 +113,17 @@ function DocumentSourceCard({
   return (
     <>
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-        <CollapsibleTrigger className="metallic-card flex w-full items-center gap-2 rounded-lg border border-border bg-muted/50 px-3 py-2 text-left text-sm transition-colors hover:bg-muted/80">
-          <FileIcon className="h-4 w-4 shrink-0 text-primary" />
-          <span className="min-w-0 flex-1 truncate font-medium text-foreground">
-            {index != null ? `[${index}] ` : ""}
+        <CollapsibleTrigger
+          className={cn(
+            "group flex w-full items-center gap-2.5 px-2 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-secondary",
+            isOpen ? "rounded-t-lg bg-secondary" : "rounded-lg"
+          )}
+        >
+          <FileIcon className="size-3.5 shrink-0" />
+          <span className="min-w-0 flex-1 truncate text-ink-soft">
+            {index != null ? (
+              <span className="mr-1">[{index}]</span>
+            ) : null}
             {source.title}
             {source.location?.label && (
               <span className="ml-1.5 text-xs font-normal text-muted-foreground">
@@ -128,19 +137,19 @@ function DocumentSourceCard({
             </Badge>
           )}
           {source.similarity != null && (
-            <span className="shrink-0 text-[10px] text-muted-foreground/60">
+            <span className="shrink-0 text-[0.65rem] font-medium tabular-nums text-muted-foreground">
               {Math.round(source.similarity * 100)}%
             </span>
           )}
           <ChevronDown
             className={cn(
-              "h-3.5 w-3.5 shrink-0 text-muted-foreground/70 transition-transform duration-200",
+              "size-3.5 shrink-0 text-muted-foreground transition-transform duration-200",
               isOpen && "rotate-180"
             )}
           />
         </CollapsibleTrigger>
 
-        <CollapsibleContent className="rounded-b-lg border border-t-0 border-border bg-card px-3 py-3 space-y-3">
+        <CollapsibleContent className="space-y-3 rounded-b-lg bg-secondary px-2 py-2.5">
           {/* Action bar — shown first so buttons are always accessible */}
           <div className="flex flex-wrap items-center gap-2">
             <Button

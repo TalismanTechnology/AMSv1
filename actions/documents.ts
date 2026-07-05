@@ -5,19 +5,7 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { logAudit } from "@/lib/audit";
 import type { PreviewResult, ContentSearchResult } from "@/lib/types";
-
-const BLOCKED_EXTENSIONS = ["png", "jpg", "jpeg", "webp", "gif", "bmp", "svg"];
-
-const TYPE_MAP: Record<string, string> = {
-  pdf: "pdf",
-  docx: "docx",
-  doc: "docx",
-  xlsx: "xlsx",
-  xls: "xlsx",
-  pptx: "pptx",
-  ppt: "pptx",
-  txt: "txt",
-};
+import { isBlockedFile, fileTypeFromName } from "@/lib/documents/file-types";
 
 function triggerProcessing(documentId: string) {
   // Use after() so processing runs after the response is sent.
@@ -54,15 +42,14 @@ export async function uploadDocument(formData: FormData) {
 
   if (!file || !title) return { error: "File and title are required" };
 
-  const ext = file.name.split(".").pop()?.toLowerCase() || "";
-  if (BLOCKED_EXTENSIONS.includes(ext)) {
+  if (isBlockedFile(file.name)) {
     return {
       error:
         "Image files are not supported. Please upload PDF, Word, Excel, PowerPoint, or TXT files.",
     };
   }
 
-  const fileType = TYPE_MAP[ext] || "txt";
+  const fileType = fileTypeFromName(file.name);
 
   // Upload to Supabase Storage
   const timestamp = Date.now();

@@ -108,15 +108,17 @@ export function AnnouncementFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg bg-card">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="text-xl font-semibold tracking-[-0.01em] text-ink">
             {isEditing ? "Edit announcement" : "Create announcement"}
           </DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
+        <div className="space-y-5">
           <div className="space-y-2">
-            <Label htmlFor="ann-title">Title</Label>
+            <Label htmlFor="ann-title" className="text-ink-soft">
+              Title
+            </Label>
             <Input
               id="ann-title"
               value={title}
@@ -126,7 +128,9 @@ export function AnnouncementFormDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="ann-content">Content</Label>
+            <Label htmlFor="ann-content" className="text-ink-soft">
+              Content
+            </Label>
             <Textarea
               id="ann-content"
               value={content}
@@ -137,7 +141,7 @@ export function AnnouncementFormDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>Priority</Label>
+            <Label className="text-ink-soft">Priority</Label>
             <Select value={priority} onValueChange={setPriority as (value: string) => void}>
               <SelectTrigger>
                 <SelectValue />
@@ -150,18 +154,22 @@ export function AnnouncementFormDialog({
             </Select>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-border px-4 py-3">
+            <Label htmlFor="ann-indefinite" className="text-ink cursor-pointer">
+              Indefinite (no expiration)
+            </Label>
             <Switch
               checked={indefinite}
               onCheckedChange={setIndefinite}
               id="ann-indefinite"
             />
-            <Label htmlFor="ann-indefinite">Indefinite (no expiration)</Label>
           </div>
 
           {!indefinite && (
             <div className="space-y-2">
-              <Label htmlFor="ann-expires">Expires on</Label>
+              <Label htmlFor="ann-expires" className="text-ink-soft">
+                Expires on
+              </Label>
               <Input
                 id="ann-expires"
                 type="date"
@@ -174,17 +182,19 @@ export function AnnouncementFormDialog({
             </div>
           )}
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-border px-4 py-3">
+            <Label htmlFor="ann-pinned" className="text-ink cursor-pointer">
+              Pin to top
+            </Label>
             <Switch
               checked={pinned}
               onCheckedChange={setPinned}
               id="ann-pinned"
             />
-            <Label htmlFor="ann-pinned">Pin to top</Label>
           </div>
 
           <div className="space-y-2">
-            <Label>Publish</Label>
+            <Label className="text-ink-soft">Publish</Label>
             <Select value={publishMode} onValueChange={(v) => setPublishMode(v as "now" | "scheduled")}>
               <SelectTrigger>
                 <SelectValue />
@@ -204,7 +214,7 @@ export function AnnouncementFormDialog({
             )}
           </div>
 
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end gap-2 border-t border-border pt-4">
             <Button
               variant="outline"
               onClick={() => onOpenChange(false)}
@@ -215,6 +225,7 @@ export function AnnouncementFormDialog({
             <Button
               onClick={handleSubmit}
               disabled={!title.trim() || !content.trim() || saving}
+              className="bg-primary text-primary-foreground"
             >
               {saving && <LogoSpinner className="mr-2" />}
               {isEditing ? "Save changes" : "Create"}

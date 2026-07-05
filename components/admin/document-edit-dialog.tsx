@@ -70,20 +70,24 @@ export function DocumentEditDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg bg-card">
         <DialogHeader>
-          <DialogTitle>Edit document</DialogTitle>
+          <DialogTitle className="text-xl font-semibold tracking-[-0.01em] text-ink">
+            Edit document
+          </DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
-          <div className="rounded-lg border bg-muted px-4 py-3">
-            <p className="text-sm font-medium">{document.file_name}</p>
-            <p className="text-xs uppercase text-muted-foreground">
+        <div className="space-y-5">
+          <div className="rounded-xl border border-border px-4 py-3">
+            <p className="text-sm font-medium text-ink">{document.file_name}</p>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">
               {document.file_type}
             </p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="edit-title">Title</Label>
+            <Label htmlFor="edit-title" className="text-ink-soft">
+              Title
+            </Label>
             <Input
               id="edit-title"
               value={title}
@@ -92,7 +96,9 @@ export function DocumentEditDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="edit-description">Description</Label>
+            <Label htmlFor="edit-description" className="text-ink-soft">
+              Description
+            </Label>
             <Textarea
               id="edit-description"
               value={description}
@@ -102,7 +108,7 @@ export function DocumentEditDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>Category</Label>
+            <Label className="text-ink-soft">Category</Label>
             <Select value={categoryId} onValueChange={setCategoryId}>
               <SelectTrigger>
                 <SelectValue placeholder="Select a category" />
@@ -119,7 +125,7 @@ export function DocumentEditDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>Folder</Label>
+            <Label className="text-ink-soft">Folder</Label>
             <Select value={folderId} onValueChange={setFolderId}>
               <SelectTrigger>
                 <SelectValue placeholder="No folder" />
@@ -136,11 +142,11 @@ export function DocumentEditDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>Tags (comma-separated)</Label>
+            <Label className="text-ink-soft">Tags (comma-separated)</Label>
             <Input value={tags} onChange={(e) => setTags(e.target.value)} />
           </div>
 
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end gap-2 border-t border-border pt-4">
             <Button
               variant="outline"
               onClick={() => onOpenChange(false)}
@@ -151,6 +157,7 @@ export function DocumentEditDialog({
             <Button
               onClick={handleSave}
               disabled={!title.trim() || saving}
+              className="bg-primary text-primary-foreground"
             >
               {saving && <LogoSpinner className="mr-2" />}
               Save changes

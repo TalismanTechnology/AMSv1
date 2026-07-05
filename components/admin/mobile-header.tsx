@@ -18,10 +18,12 @@ export function MobileHeader() {
   const { school } = useSchool();
 
   return (
-    <div className="flex items-center justify-between border-b bg-card metallic-surface neon-divider px-4 py-3 md:hidden">
-      <div className="flex items-center gap-2">
-        <Logo size={24} className="text-primary" />
-        <span className="font-bold metallic-text truncate">{school.name}</span>
+    <div className="flex items-center justify-between border-b border-border bg-background px-4 py-3 md:hidden">
+      <div className="flex items-center gap-2.5">
+        <Logo size={22} className="text-ink" />
+        <span className="truncate text-sm font-semibold tracking-[-0.01em] text-ink">
+          {school.name}
+        </span>
       </div>
       <div className="flex items-center gap-1">
         <NotificationBell />

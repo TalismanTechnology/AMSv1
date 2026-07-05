@@ -1,4 +1,10 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import type { ChatSource } from "@/lib/types";
+
+// Upper bound on how many calendar events we inject into a single prompt. The
+// model scans the whole school calendar, but we cap to keep the prompt bounded;
+// a school realistically stays well under this. Truncation is logged, never silent.
+const MAX_CALENDAR_EVENTS = 500;
 
 export interface EventContext {
   id: string;
@@ -21,35 +27,40 @@ export interface AnnouncementContext {
 }
 
 /**
- * Fetch upcoming and recent events (7 days past to 60 days future, max 30).
+ * Fetch the entire school calendar (all events, ordered by date) so the
+ * assistant can answer about any event — past or future — not just a rolling
+ * window. Capped at MAX_CALENDAR_EVENTS as a safety bound; truncation is logged.
  */
 export async function fetchEventsForContext(
   schoolId: string
 ): Promise<EventContext[]> {
   const supabase = createAdminClient();
 
-  const pastDate = new Date();
-  pastDate.setDate(pastDate.getDate() - 7);
-  const futureDate = new Date();
-  futureDate.setDate(futureDate.getDate() + 60);
-
-  const { data, error } = await supabase
+  // Fetch newest-first so that if a school ever exceeds the cap we keep all
+  // upcoming + recent events and drop only ancient history — then present the
+  // calendar chronologically (ascending) for the prompt.
+  const { data, error, count } = await supabase
     .from("events")
     .select(
-      "id, title, description, date, start_time, end_time, location, event_type"
+      "id, title, description, date, start_time, end_time, location, event_type",
+      { count: "exact" }
     )
     .eq("school_id", schoolId)
-    .gte("date", pastDate.toISOString().split("T")[0])
-    .lte("date", futureDate.toISOString().split("T")[0])
-    .order("date", { ascending: true })
-    .limit(30);
+    .order("date", { ascending: false })
+    .limit(MAX_CALENDAR_EVENTS);
 
   if (error) {
     console.error("Failed to fetch events for AI context:", error);
     return [];
   }
 
-  return data || [];
+  if (typeof count === "number" && count > MAX_CALENDAR_EVENTS) {
+    console.warn(
+      `[Calendar] School ${schoolId} has ${count} events; capped context to the most recent ${MAX_CALENDAR_EVENTS} (oldest history dropped).`
+    );
+  }
+
+  return (data || []).slice().reverse();
 }
 
 /**
@@ -81,24 +92,62 @@ export async function fetchAnnouncementsForContext(
 }
 
 /**
- * Format events as a concise text block for the system prompt.
+ * Human-readable one-line summary of an event (without any source number).
+ * Shared by the prompt block and the citable source card so they stay in sync.
  */
-export function formatEventsContext(events: EventContext[]): string {
+function formatEventLine(e: EventContext): string {
+  const parts = [`"${e.title}" on ${e.date}`];
+  if (e.start_time) {
+    parts.push(`from ${e.start_time}`);
+    if (e.end_time) parts.push(`to ${e.end_time}`);
+  }
+  if (e.location) parts.push(`at ${e.location}`);
+  parts.push(`(${e.event_type})`);
+  if (e.description) parts.push(`— ${e.description}`);
+  return parts.join(" ");
+}
+
+/**
+ * Format events as a citable text block for the system prompt. Each event is
+ * labelled with a source number ([Source N]) continuous with the document
+ * sources, so the model can cite calendar entries with [N] exactly like docs.
+ *
+ * @param startNumber the source number of the first event (document count + 1)
+ */
+export function formatEventsContext(
+  events: EventContext[],
+  startNumber: number
+): string {
   if (events.length === 0) return "";
 
-  const lines = events.map((e) => {
-    const parts = [`- "${e.title}" on ${e.date}`];
-    if (e.start_time) {
-      parts.push(`from ${e.start_time}`);
-      if (e.end_time) parts.push(`to ${e.end_time}`);
-    }
-    if (e.location) parts.push(`at ${e.location}`);
-    parts.push(`(${e.event_type})`);
-    if (e.description) parts.push(`— ${e.description}`);
-    return parts.join(" ");
-  });
+  const lines = events.map(
+    (e, i) => `[Source ${startNumber + i}] ${formatEventLine(e)}`
+  );
 
-  return `SCHOOL EVENTS (upcoming and recent):\n${lines.join("\n")}`;
+  return `SCHOOL EVENTS (full calendar — cite these with [N] just like documents):\n${lines.join(
+    "\n"
+  )}`;
+}
+
+/**
+ * Build citable source objects for events, numbered to match the labels
+ * produced by formatEventsContext for the same events + startNumber. The
+ * ordered set fed to the model as [Source N] and the sources returned to the
+ * client MUST use identical numbering, so both derive from this one place.
+ */
+export function buildEventSources(
+  events: EventContext[],
+  startNumber: number
+): ChatSource[] {
+  return events.map((e, i) => ({
+    document_id: e.id,
+    title: e.title,
+    chunk_content: formatEventLine(e),
+    similarity: 1,
+    source_number: startNumber + i,
+    source_type: "event" as const,
+    location: null,
+  }));
 }
 
 /**

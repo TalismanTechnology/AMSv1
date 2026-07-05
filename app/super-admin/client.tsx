@@ -8,13 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -105,11 +98,11 @@ export function SuperAdminClient({
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="max-w-4xl mx-auto space-y-10">
+      <div className="flex items-end justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold">Schools</h2>
-          <p className="text-muted-foreground">
+          <h2 className="text-2xl font-semibold text-ink tracking-[-0.01em]">Schools</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
             Manage all schools on the platform
           </p>
         </div>
@@ -167,16 +160,19 @@ export function SuperAdminClient({
         </Dialog>
       </div>
 
-      <div className="grid gap-4">
+      <div className="border-t border-border">
         {schools.map((school) => (
-          <Card key={school.id}>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-lg">{school.name}</CardTitle>
-                  <CardDescription>/s/{school.slug}</CardDescription>
+          <div key={school.id} className="border-b border-border py-5">
+            <div>
+              <div className="flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-base font-medium text-ink">{school.name}</p>
+                  <p className="text-sm text-muted-foreground">/s/{school.slug}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {school.school_memberships?.[0]?.count || 0} members
+                  </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex shrink-0 items-center gap-2">
                   <Dialog
                     open={editOpen === school.id}
                     onOpenChange={(open) => {
@@ -311,21 +307,14 @@ export function SuperAdminClient({
                   </Button>
                 </div>
               </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                {school.school_memberships?.[0]?.count || 0} members
-              </p>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         ))}
 
         {schools.length === 0 && (
-          <Card>
-            <CardContent className="py-8 text-center text-muted-foreground">
-              No schools yet. Create your first school to get started.
-            </CardContent>
-          </Card>
+          <div className="border-b border-border py-12 text-center text-sm text-muted-foreground">
+            No schools yet. Create your first school to get started.
+          </div>
         )}
       </div>
 

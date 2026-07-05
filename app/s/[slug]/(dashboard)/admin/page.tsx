@@ -1,14 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { requireSchoolContext } from "@/lib/school-context";
 import { StatsCards } from "@/components/admin/stats-cards";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import { PageTransition } from "@/components/motion";
-import { MagicBentoGrid, MagicBentoCard } from "@/components/magic-bento";
 
 export default async function AdminDashboard({
   params,
@@ -83,7 +81,15 @@ export default async function AdminDashboard({
   return (
     <PageTransition>
     <div>
-      <h1 className="mb-6 text-2xl font-bold text-foreground">Dashboard</h1>
+      <header className="mb-10">
+        <h1 className="text-2xl font-semibold tracking-[-0.01em] text-ink">
+          {school.name}
+        </h1>
+        <p className="mt-1 max-w-xl text-sm text-muted-foreground">
+          An overview of documents, families, and the questions parents are
+          asking today.
+        </p>
+      </header>
 
       <StatsCards
         totalDocuments={totalDocuments || 0}
@@ -94,98 +100,98 @@ export default async function AdminDashboard({
         questionsTotal={questionsTotal || 0}
       />
 
-      <MagicBentoGrid className="mt-8 grid gap-6 lg:grid-cols-2">
+      <div className="mt-12 grid gap-10 lg:grid-cols-2">
         {/* Recent Documents */}
-        <MagicBentoCard enableParticles={false} className="rounded-xl h-full">
-          <Card className="metallic-card h-full">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-base">Recent Documents</CardTitle>
-              <Button variant="ghost" size="sm" asChild>
-                <Link href={`/s/${slug}/admin/documents`}>
-                  View all <ArrowRight className="ml-1 h-4 w-4" />
-                </Link>
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {recentDocs && recentDocs.length > 0 ? (
-                <div className="space-y-3">
-                  {recentDocs.map((doc) => (
-                    <div
-                      key={doc.id}
-                      className="flex items-center justify-between"
-                    >
-                      <div>
-                        <p className="text-sm font-medium">{doc.title}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatDistanceToNow(new Date(doc.created_at), {
-                            addSuffix: true,
-                          })}
-                        </p>
-                      </div>
-                      <Badge
-                        variant={
-                          doc.status === "ready"
-                            ? "default"
-                            : doc.status === "error"
-                              ? "destructive"
-                              : "secondary"
-                        }
-                        className={
-                          doc.status === "ready"
-                            ? "bg-success/15 text-success"
-                            : ""
-                        }
-                      >
-                        {doc.status}
-                      </Badge>
-                    </div>
-                  ))}
+        <section>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-ink">Recent Documents</h2>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href={`/s/${slug}/admin/documents`}>
+                View all <ArrowRight className="ml-1 h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
+          {recentDocs && recentDocs.length > 0 ? (
+            <div className="divide-y divide-border">
+              {recentDocs.map((doc) => (
+                <div
+                  key={doc.id}
+                  className="flex items-center justify-between py-3"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-ink">{doc.title}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatDistanceToNow(new Date(doc.created_at), {
+                        addSuffix: true,
+                      })}
+                    </p>
+                  </div>
+                  <Badge
+                    variant={
+                      doc.status === "ready"
+                        ? "default"
+                        : doc.status === "error"
+                          ? "destructive"
+                          : "secondary"
+                    }
+                    className={
+                      doc.status === "ready"
+                        ? "bg-success/15 text-success"
+                        : ""
+                    }
+                  >
+                    {doc.status}
+                  </Badge>
                 </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">No documents yet.</p>
-              )}
-            </CardContent>
-          </Card>
-        </MagicBentoCard>
+              ))}
+            </div>
+          ) : (
+            <div className="py-8">
+              <p className="text-sm font-medium text-ink">Nothing here yet</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Uploaded documents will appear in this space.
+              </p>
+            </div>
+          )}
+        </section>
 
         {/* Pending Approvals */}
-        <MagicBentoCard enableParticles={false} className="rounded-xl h-full">
-          <Card className="metallic-card h-full">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-base">Pending Approvals</CardTitle>
-              <Button variant="ghost" size="sm" asChild>
-                <Link href={`/s/${slug}/admin/users`}>
-                  View all <ArrowRight className="ml-1 h-4 w-4" />
-                </Link>
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {pendingUsers && pendingUsers.length > 0 ? (
-                <div className="space-y-3">
-                  {pendingUsers.map((user) => (
-                    <div
-                      key={user.id}
-                      className="flex items-center justify-between"
-                    >
-                      <div>
-                        <p className="text-sm font-medium">
-                          {user.full_name || "Unnamed"}
-                        </p>
-                        <p className="text-xs text-muted-foreground">{user.email}</p>
-                      </div>
-                      <Badge variant="secondary">Pending</Badge>
-                    </div>
-                  ))}
+        <section>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-ink">Pending Approvals</h2>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href={`/s/${slug}/admin/users`}>
+                View all <ArrowRight className="ml-1 h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
+          {pendingUsers && pendingUsers.length > 0 ? (
+            <div className="divide-y divide-border">
+              {pendingUsers.map((user) => (
+                <div
+                  key={user.id}
+                  className="flex items-center justify-between py-3"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-ink">
+                      {user.full_name || "Unnamed"}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">{user.email}</p>
+                  </div>
+                  <Badge variant="secondary">Pending</Badge>
                 </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  No pending approvals.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        </MagicBentoCard>
-      </MagicBentoGrid>
+              ))}
+            </div>
+          ) : (
+            <div className="py-8">
+              <p className="text-sm font-medium text-ink">All caught up</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                No families are waiting for approval.
+              </p>
+            </div>
+          )}
+        </section>
+      </div>
     </div>
     </PageTransition>
   );

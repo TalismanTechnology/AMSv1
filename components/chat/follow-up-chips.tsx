@@ -1,7 +1,6 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ArrowRight } from "lucide-react";
 
 interface FollowUpChipsProps {
   followUps: string[];
@@ -12,7 +11,7 @@ export function FollowUpChips({ followUps, onSelect }: FollowUpChipsProps) {
   if (followUps.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap gap-2 mt-2">
+    <div className="mt-1 flex flex-wrap gap-2">
       {followUps.map((question, i) => (
         <motion.button
           key={i}
@@ -20,9 +19,8 @@ export function FollowUpChips({ followUps, onSelect }: FollowUpChipsProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 + i * 0.1 }}
           onClick={() => onSelect(question)}
-          className="frost-surface group inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs text-muted-foreground hover:-translate-y-0.5 hover:border-primary/30 hover:text-foreground"
+          className="inline-flex items-center rounded-full border border-border px-3.5 py-1.5 text-xs text-ink-soft transition-colors hover:bg-secondary hover:text-ink"
         >
-          <ArrowRight className="h-3 w-3 transition-transform duration-200 group-hover:translate-x-0.5" />
           {question}
         </motion.button>
       ))}

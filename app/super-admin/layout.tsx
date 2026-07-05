@@ -23,10 +23,10 @@ export default async function SuperAdminLayout({
   if (profile?.role !== "super_admin") redirect("/");
 
   return (
-    <div className="relative z-10 min-h-screen bg-background/60 backdrop-blur-sm">
-      <header className="border-b px-6 py-4">
+    <div className="relative z-10 min-h-screen bg-background">
+      <header className="border-b border-border px-6 py-4">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold">Super Admin</h1>
+          <h1 className="text-sm font-semibold text-ink tracking-[-0.01em]">Super Admin</h1>
           <form action={logout}>
             <button
               type="submit"
@@ -37,7 +37,7 @@ export default async function SuperAdminLayout({
           </form>
         </div>
       </header>
-      <main className="p-6">{children}</main>
+      <main className="px-6 py-10">{children}</main>
     </div>
   );
 }

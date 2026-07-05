@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus } from "lucide-react";
 import { LogoSpinner } from "@/components/logo-spinner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,12 +22,8 @@ import {
 } from "@/components/ui/dialog";
 import { createEvent, updateEvent } from "@/actions/events";
 import { CalendarFormDialog } from "@/components/admin/calendar-form-dialog";
-import {
-  splitCalendars,
-  calendarColorClasses,
-  KIND_LABELS,
-} from "@/lib/event-calendars";
-import { cn } from "@/lib/utils";
+import { CalendarChipSelect } from "@/components/admin/calendar-chip-select";
+import { splitCalendars, KIND_LABELS } from "@/lib/event-calendars";
 import { toast } from "sonner";
 import type {
   SchoolEvent,
@@ -177,13 +172,17 @@ export function EventFormDialog({
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg bg-card">
         <DialogHeader>
-          <DialogTitle>{isEditing ? "Edit event" : "Create event"}</DialogTitle>
+          <DialogTitle className="text-xl font-semibold tracking-[-0.01em] text-ink">
+            {isEditing ? "Edit event" : "Create event"}
+          </DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
+        <div className="space-y-5">
           <div className="space-y-2">
-            <Label htmlFor="event-title">Title</Label>
+            <Label htmlFor="event-title" className="text-ink-soft">
+              Title
+            </Label>
             <Input
               id="event-title"
               value={title}
@@ -193,7 +192,9 @@ export function EventFormDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="event-description">Description (optional)</Label>
+            <Label htmlFor="event-description" className="text-ink-soft">
+              Description (optional)
+            </Label>
             <Textarea
               id="event-description"
               value={description}
@@ -204,7 +205,9 @@ export function EventFormDialog({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="event-date">Date</Label>
+              <Label htmlFor="event-date" className="text-ink-soft">
+                Date
+              </Label>
               <DatePicker
                 id="event-date"
                 value={date}
@@ -213,7 +216,7 @@ export function EventFormDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label>Type</Label>
+              <Label className="text-ink-soft">Type</Label>
               <Select value={eventType} onValueChange={setEventType}>
                 <SelectTrigger>
                   <SelectValue />
@@ -231,7 +234,9 @@ export function EventFormDialog({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="event-start">Start time (optional)</Label>
+              <Label htmlFor="event-start" className="text-ink-soft">
+                Start time (optional)
+              </Label>
               <Input
                 id="event-start"
                 type="time"
@@ -240,7 +245,9 @@ export function EventFormDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="event-end">End time (optional)</Label>
+              <Label htmlFor="event-end" className="text-ink-soft">
+                End time (optional)
+              </Label>
               <Input
                 id="event-end"
                 type="time"
@@ -251,7 +258,9 @@ export function EventFormDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="event-location">Location (optional)</Label>
+            <Label htmlFor="event-location" className="text-ink-soft">
+              Location (optional)
+            </Label>
             <Input
               id="event-location"
               value={location}
@@ -260,9 +269,9 @@ export function EventFormDialog({
             />
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-4 rounded-xl border border-border p-4">
             <div className="space-y-1.5">
-              <Label>{KIND_LABELS.division.plural}</Label>
+              <Label className="text-ink-soft">{KIND_LABELS.division.plural}</Label>
               <CalendarChipSelect
                 items={divisions}
                 kind="division"
@@ -272,7 +281,7 @@ export function EventFormDialog({
               />
             </div>
             <div className="space-y-1.5">
-              <Label>{KIND_LABELS.category.plural}</Label>
+              <Label className="text-ink-soft">{KIND_LABELS.category.plural}</Label>
               <CalendarChipSelect
                 items={categories}
                 kind="category"
@@ -285,7 +294,7 @@ export function EventFormDialog({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Recurrence</Label>
+              <Label className="text-ink-soft">Recurrence</Label>
               <Select value={recurrence} onValueChange={setRecurrence}>
                 <SelectTrigger>
                   <SelectValue />
@@ -301,7 +310,9 @@ export function EventFormDialog({
             </div>
             {recurrence !== "none" && (
               <div className="space-y-2">
-                <Label htmlFor="event-recurrence-end">Repeat until</Label>
+                <Label htmlFor="event-recurrence-end" className="text-ink-soft">
+                  Repeat until
+                </Label>
                 <DatePicker
                   id="event-recurrence-end"
                   value={recurrenceEnd}
@@ -312,7 +323,7 @@ export function EventFormDialog({
             )}
           </div>
 
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end gap-2 border-t border-border pt-4">
             <Button
               variant="outline"
               onClick={() => onOpenChange(false)}
@@ -323,6 +334,7 @@ export function EventFormDialog({
             <Button
               onClick={handleSubmit}
               disabled={!title.trim() || !date || saving}
+              className="bg-primary text-primary-foreground"
             >
               {saving && <LogoSpinner className="mr-2" />}
               {isEditing ? "Save changes" : "Create event"}
@@ -348,63 +360,5 @@ export function EventFormDialog({
       />
     )}
     </>
-  );
-}
-
-// Toggleable color-coded chips for picking divisions /
-// categories on an event, plus a trailing "+ New" button
-// that lets admins create a tag without leaving the form.
-function CalendarChipSelect({
-  items,
-  kind,
-  selected,
-  onToggle,
-  onCreateNew,
-}: {
-  items: EventCalendar[];
-  kind: EventCalendarKind;
-  selected: string[];
-  onToggle: (id: string) => void;
-  onCreateNew?: () => void;
-}) {
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {items.map((cal) => {
-        const on = selected.includes(cal.id);
-        const colors = calendarColorClasses(cal.color);
-        return (
-          <button
-            key={cal.id}
-            type="button"
-            onClick={() => onToggle(cal.id)}
-            aria-pressed={on}
-            className={cn(
-              "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
-              on
-                ? cn(colors.chip, "border-transparent")
-                : "border-border text-muted-foreground hover:bg-accent"
-            )}
-          >
-            <span
-              className={cn(
-                "h-2 w-2 rounded-full",
-                on ? colors.dot : "bg-muted-foreground/40"
-              )}
-            />
-            {cal.name}
-          </button>
-        );
-      })}
-      {onCreateNew && (
-        <button
-          type="button"
-          onClick={onCreateNew}
-          className="flex items-center gap-1 rounded-full border border-dashed border-border px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-        >
-          <Plus className="h-3 w-3" />
-          New {KIND_LABELS[kind].singular.toLowerCase()}
-        </button>
-      )}
-    </div>
   );
 }

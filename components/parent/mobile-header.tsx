@@ -17,12 +17,21 @@ export function ParentMobileHeader() {
   const { school } = useSchool();
 
   return (
-    <div className="flex items-center justify-between border-b bg-card metallic-surface neon-divider px-4 py-3 md:hidden">
-      <div className="flex items-center gap-2">
-        <Logo size={24} className="text-primary" />
-        <span className="font-bold metallic-text truncate">{school.name}</span>
+    <div className="flex items-center justify-between border-b border-border bg-background px-4 py-3 md:hidden">
+      <div className="flex items-center gap-2.5">
+        <span className="flex h-8 w-8 items-center justify-center">
+          <Logo size={20} className="text-primary" />
+        </span>
+        <span className="truncate text-sm font-semibold tracking-[-0.01em] text-ink">
+          {school.name}
+        </span>
       </div>
-      <Button variant="ghost" size="icon" onClick={() => setOpen(true)}>
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => setOpen(true)}
+        className="rounded-lg text-ink-soft hover:bg-secondary hover:text-ink"
+      >
         <Menu className="h-5 w-5" />
       </Button>
       <Sheet open={open} onOpenChange={setOpen}>

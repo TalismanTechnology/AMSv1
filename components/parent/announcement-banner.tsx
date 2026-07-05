@@ -30,39 +30,46 @@ export function AnnouncementBanner({
   if (announcements.length === 0) return null;
 
   return (
-    <div>
-      {announcements.map((a) => (
-        <div
-          key={a.id}
-          className={cn(
-            "flex items-center justify-between gap-4 border-b neon-divider px-6 py-2 text-sm",
-            a.priority === "urgent"
-              ? "bg-destructive/10 text-destructive"
-              : "bg-primary/5 text-primary"
-          )}
-        >
-          <div className="flex min-w-0 items-center gap-2">
-            {a.priority === "urgent" ? (
-              <AlertTriangle className="h-4 w-4 shrink-0" />
-            ) : (
-              <Megaphone className="h-4 w-4 shrink-0" />
-            )}
-            <span className="truncate font-medium">{a.title}</span>
-            <span className="hidden truncate text-xs opacity-70 sm:inline">
-              &mdash; {a.content.slice(0, 80)}
-              {a.content.length > 80 ? "..." : ""}
-            </span>
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 w-6 shrink-0 p-0"
-            onClick={() => handleDismiss(a.id)}
+    <div className="space-y-2 px-4 pt-3 md:px-6">
+      {announcements.map((a) => {
+        const isUrgent = a.priority === "urgent";
+        return (
+          <div
+            key={a.id}
+            className="flex items-center justify-between gap-4 rounded-xl border border-border px-4 py-2.5 text-sm"
           >
-            <X className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-      ))}
+            <div className="flex min-w-0 items-center gap-3">
+              <span
+                className={cn(
+                  "shrink-0",
+                  isUrgent ? "text-destructive" : "text-muted-foreground"
+                )}
+              >
+                {isUrgent ? (
+                  <AlertTriangle className="h-4 w-4" />
+                ) : (
+                  <Megaphone className="h-4 w-4" />
+                )}
+              </span>
+              <div className="flex min-w-0 items-baseline gap-2">
+                <span className="truncate font-semibold text-ink">{a.title}</span>
+                <span className="hidden truncate text-xs text-ink-soft sm:inline">
+                  {a.content.slice(0, 80)}
+                  {a.content.length > 80 ? "..." : ""}
+                </span>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 shrink-0 rounded-lg p-0 text-ink-soft hover:bg-secondary hover:text-ink"
+              onClick={() => handleDismiss(a.id)}
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        );
+      })}
     </div>
   );
 }

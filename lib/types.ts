@@ -9,6 +9,10 @@ export interface School {
   contact_info: string | null;
   domain: string | null;
   join_code: string | null;
+  inbound_email_token: string | null;
+  allowed_sender_domains: string[] | null;
+  email_ingestion_enabled: boolean | null;
+  auto_sort_enabled: boolean | null;
   created_at: string;
   updated_at: string;
 }
@@ -71,6 +75,7 @@ export interface Document {
   file_type: string;
   file_url: string;
   pdf_url?: string | null;
+  text_url?: string | null;
   file_size: number | null;
   category_id: string | null;
   folder_id: string | null;

@@ -144,11 +144,13 @@ export function DocumentTable({ documents, onEdit, onView, schoolId }: DocumentT
 
   if (documents.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center rounded-lg border bg-card py-16">
-        <FileText className="mb-4 h-12 w-12 text-muted-foreground/50" />
-        <h3 className="text-lg font-medium text-foreground">No documents yet</h3>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Upload your first document to get started.
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <FileText className="mb-4 h-6 w-6 text-muted-foreground" />
+        <h3 className="text-xl font-semibold tracking-[-0.01em] text-ink">
+          No documents yet
+        </h3>
+        <p className="mt-1.5 max-w-xs text-sm text-muted-foreground">
+          Upload your first document to start building your school&apos;s knowledge base.
         </p>
       </div>
     );
@@ -157,8 +159,8 @@ export function DocumentTable({ documents, onEdit, onView, schoolId }: DocumentT
   return (
     <>
       {selected.size > 0 && (
-        <div className="flex items-center gap-3 rounded-lg border bg-accent/50 px-4 py-2 mb-3">
-          <span className="text-sm font-medium">
+        <div className="mb-3 flex items-center gap-3 rounded-xl border border-border px-4 py-2.5">
+          <span className="text-sm font-medium text-ink">
             {selected.size} selected
           </span>
           <Button
@@ -179,10 +181,10 @@ export function DocumentTable({ documents, onEdit, onView, schoolId }: DocumentT
         </div>
       )}
 
-      <div className="rounded-lg border bg-card">
+      <div>
         <Table>
           <TableHeader>
-            <TableRow>
+            <TableRow className="border-b border-border hover:bg-transparent">
               <TableHead className="w-[40px]">
                 <Checkbox
                   checked={
@@ -191,26 +193,40 @@ export function DocumentTable({ documents, onEdit, onView, schoolId }: DocumentT
                   onCheckedChange={toggleSelectAll}
                 />
               </TableHead>
-              <TableHead>Title</TableHead>
-              <TableHead className="hidden md:table-cell">Type</TableHead>
-              <TableHead className="hidden md:table-cell">Category</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="hidden md:table-cell">Uploaded</TableHead>
+              <TableHead className="text-xs font-normal text-muted-foreground">
+                Title
+              </TableHead>
+              <TableHead className="hidden text-xs font-normal text-muted-foreground md:table-cell">
+                Type
+              </TableHead>
+              <TableHead className="hidden text-xs font-normal text-muted-foreground md:table-cell">
+                Category
+              </TableHead>
+              <TableHead className="text-xs font-normal text-muted-foreground">
+                Status
+              </TableHead>
+              <TableHead className="hidden text-xs font-normal text-muted-foreground md:table-cell">
+                Uploaded
+              </TableHead>
               <TableHead className="w-[50px]" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {documents.map((doc) => (
-              <TableRow key={doc.id}>
+              <TableRow
+                key={doc.id}
+                data-state={selected.has(doc.id) ? "selected" : undefined}
+                className="border-b border-border transition-colors last:border-0 hover:bg-muted/40"
+              >
                 <TableCell>
                   <Checkbox
                     checked={selected.has(doc.id)}
                     onCheckedChange={() => toggleSelect(doc.id)}
                   />
                 </TableCell>
-                <TableCell>
+                <TableCell className="py-4">
                   <div>
-                    <p className="font-medium">{doc.title}</p>
+                    <p className="font-medium text-ink">{doc.title}</p>
                     {doc.summary && (
                       <p className="mt-0.5 max-w-sm text-xs text-muted-foreground/80 line-clamp-2">
                         {doc.summary}

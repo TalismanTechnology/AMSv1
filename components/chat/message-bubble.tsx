@@ -1,14 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { User, Sparkles } from "lucide-react";
 import { MarkdownRenderer } from "./markdown-renderer";
 import { TypewriterText } from "./typewriter-text";
 import { FollowUpChips } from "./follow-up-chips";
 import { MessageFeedback } from "./message-feedback";
 import { SourceCard } from "./source-card";
 import { useSourcePanel } from "./source-panel-context";
-import { CursorSpotlight } from "@/components/motion/cursor-spotlight";
 import { parseFollowUps } from "@/lib/chat-utils";
 import type { ChatSource } from "@/lib/types";
 
@@ -58,64 +56,58 @@ export function MessageBubble({
 
   if (isUser) {
     return (
-      <div className="flex justify-end gap-2.5">
-        <div className="glass-noise max-w-[80%] rounded-2xl rounded-tr-sm border border-primary/25 bg-primary/10 px-3.5 py-2 text-sm text-foreground">
+      <div className="flex justify-end">
+        {/* Subtle warm-sand bubble, right-aligned */}
+        <div className="max-w-[80%] rounded-2xl bg-secondary px-4 py-2.5 text-sm leading-relaxed text-ink">
           <div className="whitespace-pre-wrap">{content}</div>
-        </div>
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-glass-border bg-primary/15">
-          <User className="h-3.5 w-3.5 text-primary" />
         </div>
       </div>
     );
   }
 
+  // Documents are always shown as source cards; non-document sources (events,
+  // announcements) come from the full calendar/board and are only surfaced when
+  // the answer actually cites them, so we don't dump the whole calendar.
+  const citedNumbers = new Set(
+    [...displayContent.matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1]))
+  );
   const sortedSources = sources?.length
-    ? [...sources].sort(
-        (a, b) => (a.source_number ?? 0) - (b.source_number ?? 0)
-      )
+    ? [...sources]
+        .filter((s) => {
+          const type = s.source_type ?? "document";
+          if (type === "document") return true;
+          return s.source_number != null && citedNumbers.has(s.source_number);
+        })
+        .sort((a, b) => (a.source_number ?? 0) - (b.source_number ?? 0))
     : [];
 
   return (
-    <div className="flex flex-col gap-2">
-      <CursorSpotlight radius={360} intensity={0.07} className="rounded-lg">
-        <div className="chat-response-surface glass-noise relative rounded-lg border border-glass-border p-3.5">
-          <div className="mb-2 flex items-center gap-1.5">
-            <div className="flex h-4 w-4 items-center justify-center rounded-sm border border-glass-border bg-muted/40">
-              <Sparkles className="h-2.5 w-2.5 text-muted-foreground" />
-            </div>
-            <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
-              AskMySchool
-            </p>
-          </div>
-          <div className="text-sm leading-relaxed text-foreground">
-            {showTypewriter ? (
-              <TypewriterText
-                content={displayContent}
-                sources={sources}
-                onSourceClick={openSource}
-                onComplete={handleTypewriterComplete}
-                messageId={messageId}
-                skipCitationAnimation={skipAnimations}
-              />
-            ) : (
-              <MarkdownRenderer
-                content={displayContent}
-                sources={sources}
-                onSourceClick={openSource}
-                messageId={messageId}
-                skipCitationAnimation={skipAnimations}
-              />
-            )}
-          </div>
-        </div>
-      </CursorSpotlight>
-
-      {messageId && (
-        <MessageFeedback messageId={messageId} schoolId={schoolId} />
-      )}
+    <div className="flex flex-col gap-3">
+      {/* Answer text rendered directly on the page — no bubble */}
+      <div className="text-[0.95rem] leading-relaxed text-ink">
+        {showTypewriter ? (
+          <TypewriterText
+            content={displayContent}
+            sources={sources}
+            onSourceClick={openSource}
+            onComplete={handleTypewriterComplete}
+            messageId={messageId}
+            skipCitationAnimation={skipAnimations}
+          />
+        ) : (
+          <MarkdownRenderer
+            content={displayContent}
+            sources={sources}
+            onSourceClick={openSource}
+            messageId={messageId}
+            skipCitationAnimation={skipAnimations}
+          />
+        )}
+      </div>
 
       {sortedSources.length > 0 && (
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-0.5">
+          <p className="mb-1 text-xs text-muted-foreground">Sources</p>
           {sortedSources.map((source) => (
             <SourceCard
               key={`${source.document_id}-${source.source_number}`}
@@ -124,6 +116,10 @@ export function MessageBubble({
             />
           ))}
         </div>
+      )}
+
+      {messageId && (
+        <MessageFeedback messageId={messageId} schoolId={schoolId} />
       )}
 
       {isLastAssistant && followUps.length > 0 && onFollowUpSelect && (

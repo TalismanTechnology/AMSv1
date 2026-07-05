@@ -267,13 +267,13 @@ function PanelContent() {
       >
         <div className="flex min-w-0 flex-col gap-0.5">
           <div className="flex items-center gap-2 min-w-0">
-            <FileText className="h-5 w-5 shrink-0 text-primary" />
-            <h3 className="truncate font-semibold text-foreground text-sm">
+            <FileText className="size-4 shrink-0 text-muted-foreground" />
+            <h3 className="truncate text-sm font-medium text-ink">
               {activeSource.title}
             </h3>
           </div>
           {activeSource.location?.label && (
-            <p className="pl-7 text-xs text-muted-foreground">
+            <p className="pl-6 text-xs text-muted-foreground">
               {activeSource.location.label}
             </p>
           )}
@@ -309,11 +309,12 @@ function PanelContent() {
         initial={{ opacity: 0, x: -6 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.25, ease: ease.out, delay: 0.15 }}
-        className="border-b border-border px-4 py-2"
+        className="border-b border-border px-4 py-2.5"
       >
-        <Badge variant="secondary" className="text-xs">
+        <span className="inline-flex items-center gap-1.5 text-[0.7rem] font-medium text-muted-foreground">
+          <span className="size-1.5 rounded-full bg-muted-foreground/60" />
           {Math.round(activeSource.similarity * 100)}% match
-        </Badge>
+        </span>
       </motion.div>
 
       <motion.div
@@ -357,12 +358,12 @@ function PanelContent() {
                 <LogoSpinner size={24} />
               </div>
             ) : segments ? (
-              <div className="whitespace-pre-wrap text-sm text-foreground/90 leading-relaxed">
+              <div className="whitespace-pre-wrap text-sm leading-relaxed text-ink-soft">
                 {segments.before}
                 {segments.match && (
                   <mark
                     ref={highlightRef}
-                    className="rounded-sm bg-primary/30 px-0.5 text-foreground ring-1 ring-primary/70 shadow-[0_0_12px_var(--glow-primary,oklch(0.7_0.18_220/0.5))]"
+                    className="rounded-sm bg-primary/20 px-0.5 text-ink ring-1 ring-primary/40"
                   >
                     {segments.match}
                   </mark>
@@ -396,7 +397,7 @@ export function SourcePanel() {
             animate={{ width: 480, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
             transition={{ duration: duration.normal, ease: ease.smooth }}
-            className="flex h-full flex-col overflow-hidden border-l border-border bg-card neon-border"
+            className="flex h-full flex-col overflow-hidden border-l border-border bg-background"
           >
             <PanelContent />
           </motion.div>

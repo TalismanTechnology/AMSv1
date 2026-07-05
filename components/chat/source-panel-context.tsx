@@ -30,6 +30,18 @@ export function SourcePanelProvider({
   });
 
   const openSource = useCallback(async (source: ChatSource) => {
+    // Non-document sources (events, announcements) have no backing document to
+    // fetch — show the detail we already carry on the source itself.
+    if (source.source_type && source.source_type !== "document") {
+      setState({
+        isOpen: true,
+        activeSource: source,
+        fullContent: source.chunk_content,
+        isLoadingContent: false,
+      });
+      return;
+    }
+
     setState({
       isOpen: true,
       activeSource: source,

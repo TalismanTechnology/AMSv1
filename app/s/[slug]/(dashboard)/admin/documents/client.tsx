@@ -18,7 +18,6 @@ import { DocumentViewer } from "@/components/shared/document-viewer";
 import { FolderTree } from "@/components/admin/folder-tree";
 import { CategoryManager } from "@/components/admin/category-manager";
 import { useSidebar } from "@/components/admin/sidebar-context";
-import { MagicBentoCard } from "@/components/magic-bento";
 import { Badge } from "@/components/ui/badge";
 import { searchDocumentContent } from "@/actions/documents";
 import type { Document, Category, Folder, ContentSearchResult } from "@/lib/types";
@@ -126,13 +125,16 @@ export function DocumentsClient({
   }, [documents, selectedFolderId, searchQuery, statusFilter, categoryFilter]);
 
   return (
-    <div>
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="relative">
+      <header className="relative mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Documents</h1>
-          <p className="text-sm text-muted-foreground">
-            {filteredDocs.length} document{filteredDocs.length !== 1 ? "s" : ""}
-            {selectedFolderId ? " in this folder" : " total"}
+          <h1 className="text-2xl font-semibold text-ink tracking-[-0.01em]">
+            Documents
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            <span className="text-ink">{filteredDocs.length}</span>{" "}
+            document{filteredDocs.length !== 1 ? "s" : ""}
+            {selectedFolderId ? " in this folder" : " in your library"}.
           </p>
         </div>
         <div className="flex gap-2">
@@ -145,9 +147,9 @@ export function DocumentsClient({
             Upload document
           </Button>
         </div>
-      </div>
+      </header>
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+      <div className="relative mb-4 flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -214,25 +216,25 @@ export function DocumentsClient({
 
       {/* Content search results */}
       {searchMode === "content" && searchQuery.length >= 3 && (
-        <div className="mb-4">
+        <div className="relative mb-4">
           {isSearchingContent ? (
-            <p className="text-sm text-muted-foreground">Searching content...</p>
+            <p className="text-sm text-ink-soft">Searching content...</p>
           ) : contentResults.length > 0 ? (
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground">
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground mb-2">
                 {contentResults.length} content match{contentResults.length !== 1 && "es"}
               </p>
               {contentResults.map((r, i) => (
                 <div
                   key={`${r.document_id}-${r.chunk_index}-${i}`}
-                  className="cursor-pointer rounded-lg border bg-card p-3 transition-colors hover:bg-accent/50"
+                  className="cursor-pointer rounded-xl px-3 py-3 transition-colors hover:bg-muted/60"
                   onClick={() => {
                     const doc = documents.find((d) => d.id === r.document_id);
                     if (doc) setViewingDoc(doc);
                   }}
                 >
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium">{r.document_title}</p>
+                    <p className="text-sm font-medium text-ink">{r.document_title}</p>
                     <Badge variant="secondary" className="text-xs">
                       Section {r.chunk_index + 1}
                     </Badge>
@@ -244,30 +246,38 @@ export function DocumentsClient({
               ))}
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">No content matches found.</p>
+            <div className="rounded-xl border border-border p-8 text-center">
+              <FileSearch className="mx-auto mb-3 h-7 w-7 text-muted-foreground" />
+              <p className="text-lg font-semibold text-ink tracking-[-0.01em]">
+                No content matches
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Try a different phrase or search by title instead.
+              </p>
+            </div>
           )}
         </div>
       )}
 
-      <div className="flex gap-4">
+      <div className="relative flex gap-4">
         <div className="hidden md:block">
-          <MagicBentoCard enableParticles={false} className="rounded-lg">
+          <div className="rounded-xl border border-border">
             <FolderTree
               folders={folders}
               selectedFolderId={selectedFolderId}
               onSelectFolder={setSelectedFolderId}
               schoolId={schoolId}
             />
-          </MagicBentoCard>
+          </div>
         </div>
-        <MagicBentoCard enableParticles={false} className="flex-1 min-w-0 rounded-lg">
+        <div className="min-w-0 flex-1 rounded-xl border border-border">
           <DocumentTable
             documents={filteredDocs}
             onEdit={setEditingDoc}
             onView={setViewingDoc}
             schoolId={schoolId}
           />
-        </MagicBentoCard>
+        </div>
       </div>
 
       <DocumentUpload

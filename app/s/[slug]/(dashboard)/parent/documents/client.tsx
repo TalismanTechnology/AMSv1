@@ -24,7 +24,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { MagicBentoCard } from "@/components/magic-bento";
 import {
   Collapsible,
   CollapsibleTrigger,
@@ -165,15 +164,17 @@ export function ParentDocumentsClient({
   }
 
   return (
-    <div className="mx-auto max-w-4xl p-4 md:p-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-foreground">Documents</h1>
-        <p className="text-sm text-muted-foreground">
-          Browse school documents and resources
+    <div className="mx-auto max-w-4xl px-4 pb-16 pt-12 md:px-8">
+      <header className="mb-8">
+        <h1 className="text-2xl font-semibold tracking-[-0.01em] text-ink">
+          Documents
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Browse school documents and resources.
         </p>
-      </div>
+      </header>
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+      <div className="mb-6 flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -239,14 +240,14 @@ export function ParentDocumentsClient({
               {contentResults.map((r, i) => (
                 <div
                   key={`${r.document_id}-${r.chunk_index}-${i}`}
-                  className="cursor-pointer rounded-lg border bg-card p-3 transition-colors hover:bg-accent/50"
+                  className="cursor-pointer rounded-xl border border-border p-3 transition-colors hover:bg-secondary"
                   onClick={() => {
                     const doc = documents.find((d) => d.id === r.document_id);
                     if (doc) setViewingDoc(doc);
                   }}
                 >
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium">{r.document_title}</p>
+                    <p className="text-sm font-medium text-ink">{r.document_title}</p>
                     <Badge variant="secondary" className="text-xs">
                       Section {r.chunk_index + 1}
                     </Badge>
@@ -264,11 +265,9 @@ export function ParentDocumentsClient({
       )}
 
       {filteredDocs.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16">
-          <FileText className="mb-4 h-12 w-12 text-muted-foreground/50" />
-          <h3 className="text-lg font-medium text-foreground">
-            No documents found
-          </h3>
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <FileText className="mb-3 h-6 w-6 text-muted-foreground" />
+          <h3 className="text-base font-semibold text-ink">No documents found</h3>
           <p className="mt-1 text-sm text-muted-foreground">
             {hasActiveFilters
               ? "Try adjusting your search or filters."
@@ -285,18 +284,21 @@ export function ParentDocumentsClient({
                 open={isOpen}
                 onOpenChange={() => toggleFolder(group.id)}
               >
-                <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left transition-colors hover:bg-accent/50">
-                  {isOpen ? (
-                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  )}
-                  {isOpen ? (
-                    <FolderOpen className="h-4 w-4 text-primary" />
-                  ) : (
-                    <FolderClosed className="h-4 w-4 text-primary" />
-                  )}
-                  <span className="font-medium text-foreground">
+                <CollapsibleTrigger className="group flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors hover:bg-secondary">
+                  <ChevronRight
+                    className={
+                      "h-4 w-4 text-muted-foreground transition-transform duration-200 " +
+                      (isOpen ? "rotate-90" : "")
+                    }
+                  />
+                  <span className="text-muted-foreground">
+                    {isOpen ? (
+                      <FolderOpen className="h-[18px] w-[18px]" />
+                    ) : (
+                      <FolderClosed className="h-[18px] w-[18px]" />
+                    )}
+                  </span>
+                  <span className="text-sm font-medium tracking-[-0.01em] text-ink">
                     {group.name}
                   </span>
                   <Badge
@@ -307,61 +309,53 @@ export function ParentDocumentsClient({
                   </Badge>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
-                  <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                  <div className="mt-1 grid gap-2 pl-2 sm:grid-cols-2">
                     {group.docs.map((doc) => {
                       const FileIcon =
                         FILE_TYPE_ICONS[doc.file_type] || FileText;
                       return (
-                        <MagicBentoCard
+                        <button
                           key={doc.id}
-                         
-                          enableParticles={false}
-                          className="rounded-xl"
+                          onClick={() => setViewingDoc(doc)}
+                          className="w-full rounded-xl border border-border p-4 text-left transition-colors hover:bg-secondary"
                         >
-                          <button
-                            onClick={() => setViewingDoc(doc)}
-                            className="w-full text-left rounded-xl border bg-card p-4 transition-colors hover:bg-accent/50"
-                          >
-                            <div className="flex items-start gap-3">
-                              <div className="rounded-lg bg-primary/10 p-2.5">
-                                <FileIcon className="h-5 w-5 text-primary" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <h3 className="font-medium text-foreground truncate">
-                                  {doc.title}
-                                </h3>
-                                {doc.description && (
-                                  <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
-                                    {doc.description}
-                                  </p>
-                                )}
-                                <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <div className="flex items-start gap-3">
+                            <FileIcon className="mt-0.5 h-[18px] w-[18px] shrink-0 text-muted-foreground" />
+                            <div className="flex-1 min-w-0">
+                              <h3 className="truncate text-sm font-medium tracking-[-0.01em] text-ink">
+                                {doc.title}
+                              </h3>
+                              {doc.description && (
+                                <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
+                                  {doc.description}
+                                </p>
+                              )}
+                              <div className="mt-2 flex flex-wrap items-center gap-2">
+                                <Badge
+                                  variant="secondary"
+                                  className="text-[10px] uppercase"
+                                >
+                                  {doc.file_type}
+                                </Badge>
+                                {doc.category && (
                                   <Badge
-                                    variant="secondary"
-                                    className="text-[10px] uppercase"
+                                    style={{
+                                      backgroundColor:
+                                        doc.category.color + "20",
+                                      color: doc.category.color,
+                                    }}
+                                    className="text-[10px]"
                                   >
-                                    {doc.file_type}
+                                    {doc.category.name}
                                   </Badge>
-                                  {doc.category && (
-                                    <Badge
-                                      style={{
-                                        backgroundColor:
-                                          doc.category.color + "20",
-                                        color: doc.category.color,
-                                      }}
-                                      className="text-[10px]"
-                                    >
-                                      {doc.category.name}
-                                    </Badge>
-                                  )}
-                                  <span className="text-[10px] text-muted-foreground">
-                                    <TimeAgo date={doc.created_at} />
-                                  </span>
-                                </div>
+                                )}
+                                <span className="text-[10px] text-muted-foreground">
+                                  <TimeAgo date={doc.created_at} />
+                                </span>
                               </div>
                             </div>
-                          </button>
-                        </MagicBentoCard>
+                          </div>
+                        </button>
                       );
                     })}
                   </div>

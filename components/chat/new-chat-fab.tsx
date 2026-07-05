@@ -22,15 +22,13 @@ export function NewChatFab({ visible, onClick }: NewChatFabProps) {
           className="fixed bottom-24 right-6 z-50"
         >
           <MagneticButton strength={0.2} radius={60}>
-            <div className="fab-glow-pulse relative rounded-full">
-              <Button
-                onClick={onClick}
-                size="lg"
-                className="relative h-12 w-12 rounded-full shadow-lg"
-              >
-                <Plus className="h-5 w-5" />
-              </Button>
-            </div>
+            <Button
+              onClick={onClick}
+              size="lg"
+              className="relative h-12 w-12 rounded-full bg-primary text-primary-foreground transition-opacity hover:opacity-90 elev-1"
+            >
+              <Plus className="size-5" />
+            </Button>
           </MagneticButton>
         </motion.div>
       )}

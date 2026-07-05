@@ -29,7 +29,6 @@ import { useSchool } from "@/components/shared/school-context";
 import { SchoolSwitcher } from "@/components/shared/school-switcher";
 import { motion, LayoutGroup } from "framer-motion";
 import { sidebarVariants } from "@/lib/motion";
-import { CursorSpotlight } from "@/components/motion/cursor-spotlight";
 import { Logo } from "@/components/logo";
 import { DevPanelTrigger } from "@/components/dev-panel/dev-panel-trigger";
 import { NotificationBell } from "@/components/parent/notification-bell";
@@ -63,10 +62,10 @@ export function AdminSidebarContent({ onNavigate, forceExpanded }: SidebarConten
 
   return (
     <>
-      <div className="flex items-center gap-2.5 px-3 py-3.5 overflow-hidden">
+      <div className="flex items-center gap-2.5 px-3 py-4 overflow-hidden">
         <DevPanelTrigger collapsed={collapsed} />
         {!collapsed && (
-          <span className="truncate text-sm font-semibold tracking-tight text-sidebar-foreground">
+          <span className="font-serif-display truncate text-[15px] font-semibold tracking-[-0.02em] text-sidebar-foreground">
             {school.name}
           </span>
         )}
@@ -79,11 +78,6 @@ export function AdminSidebarContent({ onNavigate, forceExpanded }: SidebarConten
       )}
 
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 py-3">
-        {!collapsed && (
-          <p className="mb-2 px-2 text-[10px] font-mono uppercase tracking-[0.2em] text-sidebar-foreground/75 font-semibold">
-            Manage
-          </p>
-        )}
         <LayoutGroup id="admin-sidebar">
           {navItems.map((item) => {
             const isActive =
@@ -91,35 +85,25 @@ export function AdminSidebarContent({ onNavigate, forceExpanded }: SidebarConten
               (item.href !== adminBase && pathname.startsWith(item.href));
 
             const link = (
-              <CursorSpotlight radius={180} intensity={0.06} className="block rounded-md">
-                <Link
-                  href={item.href}
-                  onClick={onNavigate}
-                  className={cn(
-                    "group sidebar-item relative flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium",
-                    isActive
-                      ? "text-sidebar-foreground"
-                      : "text-sidebar-foreground/75 hover:text-sidebar-foreground",
-                    collapsed && "justify-center px-2"
-                  )}
-                >
-                  {isActive && (
-                    <motion.span
-                      layoutId="admin-sidebar-active"
-                      aria-hidden
-                      className="pointer-events-none absolute inset-0 rounded-md bg-[oklch(1_0_0/0.04)] shadow-[inset_2px_0_0_oklch(0.88_0.006_260),inset_0_0_0_1px_oklch(1_0_0/0.06)]"
-                      transition={{ type: "spring", stiffness: 420, damping: 34 }}
-                    />
-                  )}
-                  <item.icon
-                    strokeWidth={2.25}
-                    className="relative h-[18px] w-[18px] shrink-0 transition-transform duration-200 group-hover:scale-110 group-active:scale-95"
-                  />
-                  {!collapsed && (
-                    <span className="relative truncate">{item.label}</span>
-                  )}
-                </Link>
-              </CursorSpotlight>
+              <Link
+                href={item.href}
+                onClick={onNavigate}
+                className={cn(
+                  "group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors",
+                  isActive
+                    ? "bg-secondary font-medium text-sidebar-foreground"
+                    : "text-sidebar-foreground/70 hover:bg-secondary hover:text-sidebar-foreground",
+                  collapsed && "justify-center px-2"
+                )}
+              >
+                <item.icon
+                  strokeWidth={2}
+                  className="h-[18px] w-[18px] shrink-0"
+                />
+                {!collapsed && (
+                  <span className="truncate">{item.label}</span>
+                )}
+              </Link>
             );
 
             return collapsed ? (

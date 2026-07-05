@@ -81,14 +81,16 @@ export function CategoryManager({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Manage Labels</DialogTitle>
+          <DialogTitle className="text-xl font-semibold tracking-[-0.01em] text-ink">
+            Manage Labels
+          </DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-2">
             {categories.map((cat) => (
               <div
                 key={cat.id}
-                className="flex items-center justify-between rounded-md border px-3 py-2"
+                className="flex items-center justify-between rounded-xl px-3 py-2 transition-colors hover:bg-muted/40"
               >
                 <Badge
                   style={{
@@ -109,14 +111,19 @@ export function CategoryManager({
               </div>
             ))}
             {categories.length === 0 && (
-              <p className="py-4 text-center text-sm text-muted-foreground">
-                No categories yet.
-              </p>
+              <div className="py-6 text-center">
+                <p className="text-base font-semibold text-ink">
+                  No labels yet
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Create your first label below to group documents.
+                </p>
+              </div>
             )}
           </div>
 
-          <div className="space-y-3 border-t pt-4">
-            <Label className="text-sm font-medium">Add new category</Label>
+          <div className="space-y-3 border-t border-border pt-4">
+            <Label className="text-sm text-muted-foreground">Add new category</Label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}

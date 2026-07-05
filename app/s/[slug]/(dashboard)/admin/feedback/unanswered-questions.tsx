@@ -1,12 +1,10 @@
 "use client";
 
 import { useState, useTransition, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { MagicBentoCard } from "@/components/magic-bento";
 import {
   HelpCircle,
   ChevronDown,
@@ -126,8 +124,10 @@ export function UnansweredQuestionsSection({
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
-        <HelpCircle className="h-5 w-5 text-amber-500" />
-        <h2 className="text-lg font-semibold">Unanswered Questions</h2>
+        <HelpCircle className="h-4 w-4 text-muted-foreground" />
+        <h2 className="text-lg font-semibold text-ink tracking-[-0.01em]">
+          Unanswered Questions
+        </h2>
         <Badge variant="secondary">
           {searchQuery ? `${filteredCount} / ${totalCount}` : totalCount}
         </Badge>
@@ -155,32 +155,36 @@ export function UnansweredQuestionsSection({
         )}
       </div>
       {filteredGroups.length === 0 ? (
-        <MagicBentoCard enableParticles={false} className="rounded-lg">
-          <div className="rounded-lg border bg-card p-8 text-center text-muted-foreground">
-            {searchQuery ? "No questions match your search" : "No unanswered questions"}
-          </div>
-        </MagicBentoCard>
+        <div className="rounded-xl border border-border p-10 text-center">
+          <HelpCircle className="mx-auto mb-3 h-7 w-7 text-muted-foreground" />
+          <p className="text-lg font-semibold text-ink tracking-[-0.01em]">
+            {searchQuery ? "No questions match your search" : "Nothing unanswered"}
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {searchQuery
+              ? "Try a broader search term."
+              : "The assistant is finding answers to everything parents ask."}
+          </p>
+        </div>
       ) : (
-      <div className="grid gap-3">
+      <div className="grid gap-2">
         {filteredGroups.map((group, index) => (
-          <MagicBentoCard
+          <div
             key={index}
-           
-            enableParticles={false}
-            className="rounded-lg"
+            className="rounded-xl border border-border"
           >
-            <Card className="metallic-card">
-              <CardHeader
-                className="pb-2 cursor-pointer"
+            <div>
+              <div
+                className="px-4 py-3 cursor-pointer"
                 onClick={() =>
                   setExpandedIndex(expandedIndex === index ? null : index)
                 }
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 min-w-0">
-                    <CardTitle className="text-sm truncate">
+                    <h3 className="truncate text-base font-semibold text-ink tracking-[-0.01em]">
                       {group.label}
-                    </CardTitle>
+                    </h3>
                     <Badge variant="outline" className="shrink-0">
                       {group.count}
                     </Badge>
@@ -207,9 +211,9 @@ export function UnansweredQuestionsSection({
                     )}
                   </div>
                 </div>
-              </CardHeader>
+              </div>
               {expandedIndex === index && (
-                <CardContent className="pt-0">
+                <div className="px-4 pb-4">
                   <div className="space-y-1">
                     {group.questions.map((q) => (
                       <div
@@ -303,10 +307,10 @@ export function UnansweredQuestionsSection({
                       </Button>
                     </div>
                   )}
-                </CardContent>
+                </div>
               )}
-            </Card>
-          </MagicBentoCard>
+            </div>
+          </div>
         ))}
       </div>
       )}

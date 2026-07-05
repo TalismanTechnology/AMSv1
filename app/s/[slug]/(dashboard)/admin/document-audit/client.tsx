@@ -11,7 +11,6 @@ import {
   CheckCircle2,
   XCircle,
   FileText,
-  ChevronRight,
   X,
 } from "lucide-react";
 import { LogoSpinner } from "@/components/logo-spinner";
@@ -128,12 +127,14 @@ export function DocumentAuditClient({
   }
 
   return (
-    <div className="p-4 md:p-6 flex flex-col h-[calc(100vh-3.5rem)] overflow-hidden">
+    <div className="relative p-4 md:p-6 flex flex-col h-[calc(100vh-3.5rem)] overflow-hidden">
       {/* Header row */}
-      <div className="flex items-center justify-between mb-4 shrink-0">
+      <div className="relative flex items-end justify-between mb-6 shrink-0">
         <div>
-          <h1 className="text-xl font-bold metallic-heading">Document Audit</h1>
-          <p className="text-xs text-muted-foreground">
+          <h1 className="text-2xl font-semibold text-ink tracking-[-0.01em]">
+            Document Audit
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             {audit ? (
               <>
                 Last run <TimeAgo date={audit.created_at} /> ·{" "}
@@ -144,7 +145,12 @@ export function DocumentAuditClient({
             )}
           </p>
         </div>
-        <Button size="sm" onClick={handleRunAudit} disabled={isPending}>
+        <Button
+          size="sm"
+          onClick={handleRunAudit}
+          disabled={isPending}
+          className="shrink-0"
+        >
           {isPending ? (
             <LogoSpinner size={14} className="mr-1.5" />
           ) : (
@@ -166,8 +172,11 @@ export function DocumentAuditClient({
 
       {/* Empty state */}
       {!auditData && !isPending && (
-        <div className="flex-1 flex flex-col items-center justify-center gap-3">
-          <ShieldCheck className="h-10 w-10 text-muted-foreground" />
+        <div className="relative flex-1 flex flex-col items-center justify-center gap-3">
+          <ShieldCheck className="h-7 w-7 text-muted-foreground" />
+          <p className="text-lg font-semibold text-ink tracking-[-0.01em]">
+            No audit yet
+          </p>
           <p className="text-sm text-muted-foreground max-w-sm text-center">
             Run your first audit to compare your documents against{" "}
             {TOTAL_CHECKLIST_ITEMS} checklist items.
@@ -177,7 +186,7 @@ export function DocumentAuditClient({
 
       {/* Results */}
       {auditData && stats && (
-        <div className="flex flex-col flex-1 min-h-0 gap-3">
+        <div className="relative flex flex-col flex-1 min-h-0 gap-3">
           {/* Stat bar */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 shrink-0">
             <StatPill
@@ -278,17 +287,17 @@ export function DocumentAuditClient({
             <div
               className={`flex flex-col min-h-0 ${selectedCategory ? "w-1/2" : "w-full"} transition-all`}
             >
-              <div className="overflow-y-auto rounded-lg border bg-card">
+              <div className="overflow-y-auto rounded-xl border border-border">
                 <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-card z-10 border-b">
+                  <thead className="sticky top-0 bg-background z-10 border-b border-border">
                     <tr className="text-xs text-muted-foreground">
-                      <th className="text-left font-medium px-3 py-2">
+                      <th className="text-left font-medium px-3 py-2.5">
                         Category
                       </th>
-                      <th className="text-center font-medium px-2 py-2 w-20 hidden sm:table-cell">
+                      <th className="text-center font-medium px-2 py-2.5 w-20 hidden sm:table-cell">
                         Coverage
                       </th>
-                      <th className="text-right font-medium px-3 py-2 w-16">
+                      <th className="text-right font-medium px-3 py-2.5 w-16">
                         Score
                       </th>
                     </tr>
@@ -318,15 +327,15 @@ export function DocumentAuditClient({
                               isSelected ? null : cat.categoryId
                             )
                           }
-                          className={`cursor-pointer border-b last:border-0 transition-colors ${
+                          className={`cursor-pointer border-b border-border last:border-0 transition-colors ${
                             isSelected
-                              ? "bg-accent"
-                              : "hover:bg-accent/50"
+                              ? "bg-muted"
+                              : "hover:bg-muted/60"
                           }`}
                         >
-                          <td className="px-3 py-2">
+                          <td className="px-3 py-2.5">
                             <div className="flex items-center gap-2">
-                              <span className="font-medium truncate">
+                              <span className="font-medium text-ink truncate">
                                 {cat.categoryName}
                               </span>
                               {missCrit > 0 && (
@@ -368,11 +377,11 @@ export function DocumentAuditClient({
 
             {/* Detail panel */}
             {selectedCat && (
-              <div className="w-1/2 flex flex-col min-h-0 rounded-lg border bg-card">
+              <div className="w-1/2 flex flex-col min-h-0 rounded-xl border border-border">
                 {/* Panel header */}
-                <div className="flex items-center justify-between px-3 py-2 border-b shrink-0">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
                   <div className="min-w-0">
-                    <h3 className="text-sm font-semibold truncate">
+                    <h3 className="text-base font-semibold text-ink tracking-[-0.01em] truncate">
                       {selectedCat.categoryName}
                     </h3>
                     <p className="text-xs text-muted-foreground">
@@ -465,12 +474,12 @@ function StatPill({
   color: string;
 }) {
   return (
-    <div className="rounded-lg border bg-card px-3 py-2">
-      <p className="text-[10px] text-muted-foreground uppercase tracking-wide">
-        {label}
+    <div className="px-1 py-1">
+      <p className={`text-2xl font-semibold leading-tight ${color}`}>
+        {value}
       </p>
-      <p className={`text-lg font-bold leading-tight ${color}`}>{value}</p>
-      <p className="text-[10px] text-muted-foreground">{sub}</p>
+      <p className="text-sm text-muted-foreground">{label}</p>
+      <p className="text-xs text-muted-foreground/70">{sub}</p>
     </div>
   );
 }

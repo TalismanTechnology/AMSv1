@@ -9,10 +9,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ThumbsUp, ThumbsDown } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-import { MagicBentoGrid, MagicBentoCard } from "@/components/magic-bento";
 import { getUnansweredQuestions } from "@/actions/unanswered-questions";
 import { UnansweredQuestionsSection } from "./unanswered-questions";
 
@@ -46,133 +44,120 @@ export default async function FeedbackPage({
   const unansweredCount = unansweredGroups.reduce((sum, g) => sum + g.count, 0);
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
-      <h1 className="text-2xl font-bold metallic-heading">Feedback & Review</h1>
+    <div className="relative space-y-10 p-4 md:p-6">
+      <header className="relative">
+        <h1 className="text-2xl font-semibold text-ink tracking-[-0.01em]">
+          Feedback &amp; Review
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          How parents are responding to the assistant, and where it&apos;s
+          falling short.
+        </p>
+      </header>
 
-      <MagicBentoGrid className="grid grid-cols-1 gap-4 sm:grid-cols-4">
-        <MagicBentoCard enableParticles className="rounded-xl">
-          <Card className="metallic-card">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-muted-foreground">
-                Total Ratings
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold">{total}</p>
-            </CardContent>
-          </Card>
-        </MagicBentoCard>
-        <MagicBentoCard enableParticles className="rounded-xl">
-          <Card className="metallic-card">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-muted-foreground">
-                Positive Rate
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <p className="text-2xl font-bold text-green-500">{positiveRate}%</p>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-0.5 text-green-500">
-                    <ThumbsUp className="h-3 w-3" /> {totalUp}
-                  </span>
-                  <span className="flex items-center gap-0.5 text-red-500">
-                    <ThumbsDown className="h-3 w-3" /> {totalDown}
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </MagicBentoCard>
-        <MagicBentoCard enableParticles className="rounded-xl">
-          <Card className="metallic-card">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-muted-foreground">
-                Thumbs Down
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold text-red-500">{thumbsDownFeedback.length}</p>
-            </CardContent>
-          </Card>
-        </MagicBentoCard>
-        <MagicBentoCard enableParticles className="rounded-xl">
-          <Card className="metallic-card">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-muted-foreground">
-                Unanswered
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold text-amber-500">{unansweredCount}</p>
-            </CardContent>
-          </Card>
-        </MagicBentoCard>
-      </MagicBentoGrid>
+      <div className="relative grid grid-cols-2 gap-6 sm:grid-cols-4">
+        <div>
+          <p className="text-2xl font-semibold text-ink">{total}</p>
+          <p className="text-sm text-muted-foreground">Total Ratings</p>
+        </div>
+        <div>
+          <div className="flex items-baseline gap-3">
+            <p className="text-2xl font-semibold text-ink">{positiveRate}%</p>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="flex items-center gap-0.5 text-green-600">
+                <ThumbsUp className="h-3 w-3" /> {totalUp}
+              </span>
+              <span className="flex items-center gap-0.5 text-red-500">
+                <ThumbsDown className="h-3 w-3" /> {totalDown}
+              </span>
+            </div>
+          </div>
+          <p className="text-sm text-muted-foreground">Positive Rate</p>
+        </div>
+        <div>
+          <p className="text-2xl font-semibold text-ink">
+            {thumbsDownFeedback.length}
+          </p>
+          <p className="text-sm text-muted-foreground">Thumbs Down</p>
+        </div>
+        <div>
+          <p className="text-2xl font-semibold text-ink">{unansweredCount}</p>
+          <p className="text-sm text-muted-foreground">Unanswered</p>
+        </div>
+      </div>
 
       {/* Thumbs Down Section */}
-      <div className="space-y-4">
+      <div className="relative space-y-4">
         <div className="flex items-center gap-2">
-          <ThumbsDown className="h-5 w-5 text-red-500" />
-          <h2 className="text-lg font-semibold">Negative Feedback</h2>
+          <ThumbsDown className="h-4 w-4 text-muted-foreground" />
+          <h2 className="text-lg font-semibold text-ink tracking-[-0.01em]">
+            Negative Feedback
+          </h2>
           <Badge variant="secondary">{thumbsDownFeedback.length}</Badge>
         </div>
         <p className="text-sm text-muted-foreground">
           Messages where users indicated the response was not helpful.
         </p>
-        <MagicBentoCard enableParticles={false} className="rounded-lg">
-          <div className="rounded-lg border bg-card">
-            <Table>
-              <TableHeader>
+        <div className="overflow-hidden rounded-xl border border-border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-xs font-medium text-muted-foreground">
+                  Message
+                </TableHead>
+                <TableHead className="hidden text-xs font-medium text-muted-foreground md:table-cell">
+                  User
+                </TableHead>
+                <TableHead className="hidden text-xs font-medium text-muted-foreground md:table-cell">
+                  When
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {thumbsDownFeedback.length === 0 ? (
                 <TableRow>
-                  <TableHead>Message</TableHead>
-                  <TableHead className="hidden md:table-cell">User</TableHead>
-                  <TableHead className="hidden md:table-cell">When</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {thumbsDownFeedback.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={3}
-                      className="text-center text-muted-foreground py-8"
-                    >
+                  <TableCell colSpan={3} className="py-12 text-center">
+                    <ThumbsDown className="mx-auto mb-3 h-7 w-7 text-muted-foreground" />
+                    <p className="text-lg font-semibold text-ink tracking-[-0.01em]">
                       No negative feedback yet
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  thumbsDownFeedback.map((f) => {
-                    const user = f.profiles as unknown as {
-                      full_name: string | null;
-                      email: string;
-                    } | null;
-                    const message = f.chat_messages as unknown as {
-                      content: string;
-                      role: string;
-                    } | null;
-                    return (
-                      <TableRow key={f.id}>
-                        <TableCell className="max-w-md">
-                          <p className="text-sm truncate">
-                            {message?.content?.slice(0, 120) || "\u2014"}
-                          </p>
-                        </TableCell>
-                        <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
-                          {user?.full_name || user?.email || "Unknown"}
-                        </TableCell>
-                        <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
-                          {formatDistanceToNow(new Date(f.created_at), {
-                            addSuffix: true,
-                          })}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </MagicBentoCard>
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      The assistant is keeping parents happy so far.
+                    </p>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                thumbsDownFeedback.map((f) => {
+                  const user = f.profiles as unknown as {
+                    full_name: string | null;
+                    email: string;
+                  } | null;
+                  const message = f.chat_messages as unknown as {
+                    content: string;
+                    role: string;
+                  } | null;
+                  return (
+                    <TableRow key={f.id} className="transition-colors hover:bg-muted/60">
+                      <TableCell className="max-w-md py-4">
+                        <p className="truncate text-sm text-ink">
+                          {message?.content?.slice(0, 120) || "\u2014"}
+                        </p>
+                      </TableCell>
+                      <TableCell className="hidden py-4 text-sm text-muted-foreground md:table-cell">
+                        {user?.full_name || user?.email || "Unknown"}
+                      </TableCell>
+                      <TableCell className="hidden py-4 text-sm text-muted-foreground md:table-cell">
+                        {formatDistanceToNow(new Date(f.created_at), {
+                          addSuffix: true,
+                        })}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
 
       {/* Unanswered Questions Section */}

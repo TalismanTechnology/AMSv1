@@ -1,13 +1,14 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { TopographicBackground } from "@/components/ui/topographic-background";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Single clean humanist sans across the whole minimalist UI.
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
+  display: "swap",
 });
 
 const geistMono = Geist_Mono({
@@ -17,10 +18,7 @@ const geistMono = Geist_Mono({
 
 export const viewport: Viewport = {
   viewportFit: "cover",
-  themeColor: [
-    { media: "(prefers-color-scheme: dark)", color: "#1a1a2e" },
-    { media: "(prefers-color-scheme: light)", color: "#fafafa" },
-  ],
+  themeColor: "#f4efe4",
 };
 
 export const metadata: Metadata = {
@@ -35,9 +33,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${inter.variable} ${geistMono.variable} antialiased`}
       >
         <div
           style={{
@@ -46,18 +44,6 @@ export default function RootLayout({
             minHeight: "100vh",
           }}
         >
-          {/* Fixed (not absolute) so the canvas only ever needs to be
-              viewport-sized — an absolute canvas spanning the whole
-              document gets clipped on long pages once it exceeds the
-              browser's max canvas size, leaving the lower page untextured. */}
-          <TopographicBackground
-            style={{
-              position: "fixed",
-              inset: 0,
-              zIndex: -1,
-            }}
-            intensity="full"
-          />
           <TooltipProvider>
             {children}
             <Toaster />

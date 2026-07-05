@@ -7,6 +7,11 @@ const resend = process.env.RESEND_API_KEY
 const DEFAULT_FROM =
   process.env.EMAIL_FROM || "AskMySchool <noreply@askmyschool.com>";
 
+/** The shared Resend client, or null when RESEND_API_KEY is unset. */
+export function getResendClient(): Resend | null {
+  return resend;
+}
+
 /**
  * Send an email via Resend. No-ops gracefully when RESEND_API_KEY is not set.
  */

@@ -48,7 +48,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { MagicBentoCard } from "@/components/magic-bento";
 import { approveUser, approveAllPending, changeUserRole, deleteUser } from "@/actions/users";
 import { toast } from "sonner";
 import NextLink from "next/link";
@@ -216,11 +215,15 @@ export function UsersClient({ users, schoolId, schoolSlug, joinCode, requireJoin
   if (users.length === 0) {
     return (
       <div>
-        <h1 className="mb-6 text-2xl font-bold text-foreground">Users</h1>
+        <header className="mb-10">
+          <h1 className="text-2xl font-semibold text-ink tracking-[-0.01em]">
+            Users
+          </h1>
+        </header>
 
-        <div className="flex flex-col items-center justify-center rounded-lg border bg-card py-12">
-          <Users className="mb-4 h-12 w-12 text-muted-foreground/50" />
-          <h3 className="text-lg font-medium text-foreground">
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <Users className="mb-4 h-8 w-8 text-muted-foreground" />
+          <h3 className="text-base font-semibold text-ink">
             No users registered yet
           </h3>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -228,108 +231,98 @@ export function UsersClient({ users, schoolId, schoolSlug, joinCode, requireJoin
           </p>
         </div>
 
-        <div className="mt-6 space-y-4">
-          <h2 className="text-lg font-semibold text-foreground">Parent Onboarding</h2>
+        <div className="mt-8 space-y-6">
+          <h2 className="text-base font-semibold text-ink">
+            Parent Onboarding
+          </h2>
 
           {/* Registration Link */}
-          <MagicBentoCard enableParticles={false} className="rounded-lg">
-          <div className="rounded-lg border bg-card p-4">
-            <div className="flex items-start gap-3">
-              <Link className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-foreground">Registration Link</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  Share this link with parents to let them create an account.
-                </p>
+          <div className="flex items-start gap-3">
+            <Link className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-foreground">Registration Link</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Share this link with parents to let them create an account.
+              </p>
+              <div className="mt-2 flex items-center gap-2">
+                <code className="flex-1 truncate rounded bg-muted px-2.5 py-1.5 text-xs">
+                  {registrationUrl}
+                </code>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={copyRegistrationLink}
+                  className="shrink-0"
+                >
+                  {linkCopied ? (
+                    <><Check className="mr-1.5 h-3.5 w-3.5 text-green-500" /> Copied</>
+                  ) : (
+                    <><Copy className="mr-1.5 h-3.5 w-3.5" /> Copy</>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Join Code */}
+          <div className="flex items-start gap-3">
+            <KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-medium text-foreground">Join Code</p>
+                <Badge variant={requireJoinCode ? "default" : "outline"} className="text-[10px]">
+                  {requireJoinCode ? "Required" : "Optional"}
+                </Badge>
+              </div>
+              {joinCode ? (
                 <div className="mt-2 flex items-center gap-2">
-                  <code className="flex-1 truncate rounded bg-muted px-2.5 py-1.5 text-xs">
-                    {registrationUrl}
+                  <code className="rounded bg-muted px-2.5 py-1.5 text-sm font-mono font-semibold tracking-wider">
+                    {joinCode}
                   </code>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={copyRegistrationLink}
+                    onClick={copyJoinCode}
                     className="shrink-0"
                   >
-                    {linkCopied ? (
+                    {codeCopied ? (
                       <><Check className="mr-1.5 h-3.5 w-3.5 text-green-500" /> Copied</>
                     ) : (
                       <><Copy className="mr-1.5 h-3.5 w-3.5" /> Copy</>
                     )}
                   </Button>
                 </div>
-              </div>
+              ) : (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  No join code set.{" "}
+                  <NextLink
+                    href={`/s/${schoolSlug}/admin/settings`}
+                    className="text-primary underline underline-offset-2"
+                  >
+                    Configure in Settings
+                  </NextLink>
+                </p>
+              )}
             </div>
           </div>
-          </MagicBentoCard>
-
-          {/* Join Code */}
-          <MagicBentoCard enableParticles={false} className="rounded-lg">
-          <div className="rounded-lg border bg-card p-4">
-            <div className="flex items-start gap-3">
-              <KeyRound className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium text-foreground">Join Code</p>
-                  <Badge variant={requireJoinCode ? "default" : "outline"} className="text-[10px]">
-                    {requireJoinCode ? "Required" : "Optional"}
-                  </Badge>
-                </div>
-                {joinCode ? (
-                  <div className="mt-2 flex items-center gap-2">
-                    <code className="rounded bg-muted px-2.5 py-1.5 text-sm font-mono font-semibold tracking-wider">
-                      {joinCode}
-                    </code>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={copyJoinCode}
-                      className="shrink-0"
-                    >
-                      {codeCopied ? (
-                        <><Check className="mr-1.5 h-3.5 w-3.5 text-green-500" /> Copied</>
-                      ) : (
-                        <><Copy className="mr-1.5 h-3.5 w-3.5" /> Copy</>
-                      )}
-                    </Button>
-                  </div>
-                ) : (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    No join code set.{" "}
-                    <NextLink
-                      href={`/s/${schoolSlug}/admin/settings`}
-                      className="text-primary underline underline-offset-2"
-                    >
-                      Configure in Settings
-                    </NextLink>
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-          </MagicBentoCard>
 
           {/* Approval Setting */}
-          <MagicBentoCard enableParticles={false} className="rounded-lg">
-          <div className="rounded-lg border bg-card p-4">
-            <div className="flex items-start gap-3">
-              <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium text-foreground">Admin Approval</p>
-                  <Badge variant={requireApproval ? "default" : "outline"} className="text-[10px]">
-                    {requireApproval ? "Required" : "Off"}
-                  </Badge>
-                </div>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {requireApproval
-                    ? "New parents will need your approval before they can access the dashboard."
-                    : "Parents will have immediate access after registering."}
-                </p>
+          <div className="flex items-start gap-3">
+            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-medium text-foreground">Admin Approval</p>
+                <Badge variant={requireApproval ? "default" : "outline"} className="text-[10px]">
+                  {requireApproval ? "Required" : "Off"}
+                </Badge>
               </div>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {requireApproval
+                  ? "New parents will need your approval before they can access the dashboard."
+                  : "Parents will have immediate access after registering."}
+              </p>
             </div>
           </div>
-          </MagicBentoCard>
 
           <div className="flex justify-end">
             <Button variant="outline" size="sm" asChild>
@@ -346,12 +339,14 @@ export function UsersClient({ users, schoolId, schoolSlug, joinCode, requireJoin
 
   return (
     <div>
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Users</h1>
-          <p className="text-sm text-muted-foreground">
-            {filteredAndSorted.length} of {users.length} user
-            {users.length !== 1 ? "s" : ""}
+          <h1 className="text-2xl font-semibold text-ink tracking-[-0.01em]">
+            Users
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            <span className="font-medium text-ink">{filteredAndSorted.length}</span>{" "}
+            of {users.length} user{users.length !== 1 ? "s" : ""} shown.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -380,11 +375,11 @@ export function UsersClient({ users, schoolId, schoolSlug, joinCode, requireJoin
             </SelectContent>
           </Select>
         </div>
-      </div>
+      </header>
 
       {/* Onboarding quick-info bar */}
-      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border bg-card px-4 py-3 text-sm">
-        <div className="flex items-center gap-2 text-muted-foreground">
+      <div className="mb-4 flex flex-wrap items-center gap-3 border-b border-border pb-4 text-sm">
+        <div className="flex items-center gap-2 text-ink-soft">
           <Link className="h-4 w-4" />
           <Button variant="ghost" size="sm" className="h-auto px-1 py-0 text-sm" onClick={copyRegistrationLink}>
             {linkCopied ? (
@@ -421,41 +416,40 @@ export function UsersClient({ users, schoolId, schoolSlug, joinCode, requireJoin
         </div>
       </div>
 
-      <MagicBentoCard enableParticles={false} className="rounded-lg">
-      <div className="rounded-lg border bg-card">
+      <div>
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead
-                className="cursor-pointer select-none"
+                className="cursor-pointer select-none text-[0.7rem] uppercase tracking-[0.12em] text-ink-soft"
                 onClick={() => toggleSort("full_name")}
               >
                 Name
                 <SortIcon column="full_name" />
               </TableHead>
               <TableHead
-                className="hidden cursor-pointer select-none md:table-cell"
+                className="hidden cursor-pointer select-none text-[0.7rem] uppercase tracking-[0.12em] text-ink-soft md:table-cell"
                 onClick={() => toggleSort("email")}
               >
                 Email
                 <SortIcon column="email" />
               </TableHead>
               <TableHead
-                className="cursor-pointer select-none"
+                className="cursor-pointer select-none text-[0.7rem] uppercase tracking-[0.12em] text-ink-soft"
                 onClick={() => toggleSort("role")}
               >
                 Role
                 <SortIcon column="role" />
               </TableHead>
               <TableHead
-                className="hidden cursor-pointer select-none md:table-cell"
+                className="hidden cursor-pointer select-none text-[0.7rem] uppercase tracking-[0.12em] text-ink-soft md:table-cell"
                 onClick={() => toggleSort("child_grade")}
               >
                 Children
                 <SortIcon column="child_grade" />
               </TableHead>
               <TableHead
-                className="hidden cursor-pointer select-none md:table-cell"
+                className="hidden cursor-pointer select-none text-[0.7rem] uppercase tracking-[0.12em] text-ink-soft md:table-cell"
                 onClick={() => toggleSort("created_at")}
               >
                 Joined
@@ -468,32 +462,34 @@ export function UsersClient({ users, schoolId, schoolSlug, joinCode, requireJoin
             {filteredAndSorted.map((user) => (
               <TableRow
                 key={user.id}
-                className={!user.approved ? "opacity-60" : undefined}
+                className={`transition-colors hover:bg-muted/40 ${
+                  !user.approved ? "opacity-60" : ""
+                }`}
               >
-                <TableCell className="font-medium">
+                <TableCell className="py-4 font-medium text-ink">
                   <div className="flex items-center gap-2">
                     {user.full_name || "\u2014"}
                     {!user.approved && (
-                      <Badge variant="outline" className="text-xs">
+                      <Badge className="rounded-full border border-amber-500/30 bg-amber-500/15 text-[10px] uppercase tracking-wide text-amber-600">
                         Pending
                       </Badge>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground md:hidden">{user.email}</p>
+                  <p className="text-xs text-ink-soft md:hidden">{user.email}</p>
                 </TableCell>
-                <TableCell className="hidden md:table-cell">{user.email}</TableCell>
-                <TableCell>
+                <TableCell className="hidden py-4 text-ink-soft md:table-cell">{user.email}</TableCell>
+                <TableCell className="py-4">
                   <Badge
                     className={
                       user.role === "admin"
-                        ? "bg-chart-2/15 text-chart-2"
-                        : "bg-chart-1/15 text-chart-1"
+                        ? "rounded-full border border-border bg-muted text-xs font-medium uppercase tracking-wide text-ink"
+                        : "rounded-full border border-border bg-muted text-xs font-medium uppercase tracking-wide text-ink-soft"
                     }
                   >
                     {user.role === "admin" ? "School Admin" : "Parent"}
                   </Badge>
                 </TableCell>
-                <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
+                <TableCell className="hidden py-4 text-sm text-ink-soft md:table-cell">
                   {user.children && user.children.length > 0 ? (
                     user.children.length === 1 ? (
                       <span>
@@ -522,10 +518,10 @@ export function UsersClient({ users, schoolId, schoolSlug, joinCode, requireJoin
                     user.child_grade || "\u2014"
                   )}
                 </TableCell>
-                <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
+                <TableCell className="hidden py-4 text-sm text-ink-soft md:table-cell">
                   <TimeAgo date={user.created_at} />
                 </TableCell>
-                <TableCell>
+                <TableCell className="py-4">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="sm">
@@ -563,18 +559,20 @@ export function UsersClient({ users, schoolId, schoolSlug, joinCode, requireJoin
             ))}
             {filteredAndSorted.length === 0 && (
               <TableRow>
-                <TableCell
-                  colSpan={6}
-                  className="py-8 text-center text-sm text-muted-foreground"
-                >
-                  No users match the selected grade filter.
+                <TableCell colSpan={6} className="py-12 text-center">
+                  <Users className="mx-auto mb-3 h-6 w-6 text-muted-foreground" />
+                  <p className="text-base font-semibold text-ink">
+                    No matching users
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    No users match the selected grade filter.
+                  </p>
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
       </div>
-      </MagicBentoCard>
 
       <ConfirmDialog
         open={!!deleteId}
