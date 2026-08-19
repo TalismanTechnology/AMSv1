@@ -13,6 +13,11 @@ export interface School {
   allowed_sender_domains: string[] | null;
   email_ingestion_enabled: boolean | null;
   auto_sort_enabled: boolean | null;
+  blackbaud_verification_enabled: boolean | null;
+  sso_enabled: boolean | null;
+  sso_domain: string | null;
+  sso_provider_id: string | null;
+  sso_button_label: string | null;
   created_at: string;
   updated_at: string;
 }

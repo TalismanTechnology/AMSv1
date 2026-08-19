@@ -11,7 +11,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { login } from "@/actions/auth";
-import { GoogleSignInButton } from "@/components/google-sign-in-button";
 import { AuthShell } from "@/components/auth/auth-shell";
 
 export function LoginForm() {
@@ -78,17 +77,6 @@ export function LoginForm() {
             {error}
           </div>
         )}
-
-        <GoogleSignInButton />
-
-        <div className="relative my-5">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t border-border" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase tracking-wider">
-            <span className="bg-card px-3 text-muted-foreground">or</span>
-          </div>
-        </div>
 
         <form action={handleSubmit} className="space-y-4">
           <div className="space-y-2">

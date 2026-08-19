@@ -11,19 +11,28 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { login } from "@/actions/auth";
-import { GoogleSignInButton } from "@/components/google-sign-in-button";
 import { AuthShell } from "@/components/auth/auth-shell";
 
 interface LoginFormProps {
   schoolSlug: string;
   schoolId: string;
   schoolName: string;
+  blackbaudEnabled: boolean;
 }
 
-export function LoginForm({ schoolSlug, schoolId, schoolName }: LoginFormProps) {
+export function LoginForm({
+  schoolSlug,
+  schoolId,
+  schoolName,
+  blackbaudEnabled,
+}: LoginFormProps) {
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(searchParams.get("error"));
   const [loading, setLoading] = useState(false);
+  const [verifyEmail, setVerifyEmail] = useState("");
+  const [verifyState, setVerifyState] = useState<
+    "idle" | "sending" | "sent" | "error"
+  >("idle");
 
   async function handleSubmit(formData: FormData) {
     setLoading(true);
@@ -32,6 +41,25 @@ export function LoginForm({ schoolSlug, schoolId, schoolName }: LoginFormProps) 
     if (result?.error) {
       setError(result.error);
       setLoading(false);
+    }
+  }
+
+  async function handleVerify(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setVerifyState("sending");
+
+    try {
+      const response = await fetch("/api/auth/verify-blackbaud", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ schoolSlug, email: verifyEmail }),
+      });
+
+      // The endpoint answers identically whether or not the email is on file,
+      // so "sent" here means "request accepted", not "we found you".
+      setVerifyState(response.ok ? "sent" : "error");
+    } catch {
+      setVerifyState("error");
     }
   }
 
@@ -84,16 +112,76 @@ export function LoginForm({ schoolSlug, schoolId, schoolName }: LoginFormProps) 
           </div>
         )}
 
-        <GoogleSignInButton schoolSlug={schoolSlug} />
+        {blackbaudEnabled && (
+          <div className="mb-5 rounded-xl border border-primary/20 bg-primary/[0.04] p-5">
+            <p className="eyebrow text-primary">Verify with school records</p>
+            <p className="mt-2 text-sm leading-relaxed text-ink-soft">
+              Enter the email {schoolName} has on file and we&apos;ll send you a
+              sign-in link. No password needed.
+            </p>
 
-        <div className="relative my-5">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t border-border" />
+            {verifyState === "sent" ? (
+              <p
+                aria-live="polite"
+                className="mt-4 rounded-lg border border-primary/25 bg-card p-3 text-sm text-ink"
+              >
+                If your email is on file with {schoolName}, we&apos;ve sent a
+                sign-in link. Check your inbox.
+              </p>
+            ) : (
+              <form onSubmit={handleVerify} className="mt-4 space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="verify-email" className="sr-only">
+                    School email address
+                  </Label>
+                  <Input
+                    id="verify-email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="parent@example.com"
+                    value={verifyEmail}
+                    onChange={(event) => setVerifyEmail(event.target.value)}
+                    required
+                  />
+                </div>
+
+                {verifyState === "error" && (
+                  <p
+                    aria-live="polite"
+                    className="text-sm text-destructive"
+                  >
+                    Something went wrong. Please try again in a moment.
+                  </p>
+                )}
+
+                <Button
+                  type="submit"
+                  variant="secondary"
+                  className="h-11 w-full"
+                  disabled={verifyState === "sending"}
+                >
+                  {verifyState === "sending" && (
+                    <LogoSpinner className="mr-2" />
+                  )}
+                  Send sign-in link
+                </Button>
+              </form>
+            )}
           </div>
-          <div className="relative flex justify-center text-xs uppercase tracking-wider">
-            <span className="bg-card px-3 text-muted-foreground">or</span>
+        )}
+
+        {/* Only meaningful when something sits above the password form; with
+            the verify panel hidden this would be an orphaned rule. */}
+        {blackbaudEnabled && (
+          <div className="relative my-5">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase tracking-wider">
+              <span className="bg-card px-3 text-muted-foreground">or</span>
+            </div>
           </div>
-        </div>
+        )}
 
         <form action={handleSubmit} className="space-y-4">
           <input type="hidden" name="school_slug" value={schoolSlug} />

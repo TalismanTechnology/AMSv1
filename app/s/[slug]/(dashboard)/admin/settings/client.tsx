@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Plus, X, Copy, Check } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Plus, X, Copy, Check, RefreshCw, ExternalLink } from "lucide-react";
 import { LogoSpinner } from "@/components/logo-spinner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { TimeAgo } from "@/components/ui/time-ago";
 import { updateSettings, updateEmailIngestion } from "@/actions/settings";
+import {
+  syncBlackbaudRoster,
+  updateBlackbaudVerification,
+} from "@/actions/blackbaud";
+import { updateSsoSettings } from "@/actions/sso";
 import { toast } from "sonner";
 import type { Settings } from "@/lib/types";
 
@@ -21,15 +27,51 @@ interface EmailIngestionConfig {
   inboundDomain: string | null;
 }
 
+export type BlackbaudCallbackResult = "connected" | "denied" | "error" | null;
+
+export interface BlackbaudConnection {
+  status: string;
+  lastSyncedAt: string | null;
+  lastError: string | null;
+  environmentId: string | null;
+}
+
+export interface BlackbaudConfig {
+  verificationEnabled: boolean;
+  rosterCount: number;
+  connection: BlackbaudConnection | null;
+}
+
+export interface SsoConfig {
+  enabled: boolean;
+  domain: string;
+  providerId: string;
+  buttonLabel: string;
+  acsUrl: string | null;
+  metadataUrl: string | null;
+}
+
 interface SettingsClientProps {
   settings: Settings;
   schoolId: string;
   schoolSlug: string;
   joinCode: string | null;
   emailIngestion: EmailIngestionConfig;
+  blackbaud: BlackbaudConfig;
+  blackbaudCallback: BlackbaudCallbackResult;
+  sso: SsoConfig;
 }
 
-export function SettingsClient({ settings, schoolId, schoolSlug, joinCode: initialJoinCode, emailIngestion }: SettingsClientProps) {
+export function SettingsClient({
+  settings,
+  schoolId,
+  schoolSlug,
+  joinCode: initialJoinCode,
+  emailIngestion,
+  blackbaud,
+  blackbaudCallback,
+  sso,
+}: SettingsClientProps) {
   const [schoolName, setSchoolName] = useState(settings.school_name);
   const [contactInfo, setContactInfo] = useState(settings.contact_info || "");
   const [customPrompt, setCustomPrompt] = useState(
@@ -223,6 +265,15 @@ export function SettingsClient({ settings, schoolId, schoolSlug, joinCode: initi
 
       <EmailIngestionSection schoolId={schoolId} config={emailIngestion} />
 
+      <SsoSection schoolId={schoolId} config={sso} />
+
+      <BlackbaudSection
+        schoolId={schoolId}
+        schoolSlug={schoolSlug}
+        config={blackbaud}
+        callback={blackbaudCallback}
+      />
+
       <section className="space-y-4">
         <div className="space-y-1">
           <h2 className="text-base font-semibold text-ink">
@@ -362,6 +413,447 @@ export function SettingsClient({ settings, schoolId, schoolSlug, joinCode: initi
 
       <div className="pb-8" />
     </div>
+  );
+}
+
+function SsoSection({
+  schoolId,
+  config,
+}: {
+  schoolId: string;
+  config: SsoConfig;
+}) {
+  const [enabled, setEnabled] = useState(config.enabled);
+  const [domain, setDomain] = useState(config.domain);
+  const [providerId, setProviderId] = useState(config.providerId);
+  const [buttonLabel, setButtonLabel] = useState(config.buttonLabel);
+  const [saving, setSaving] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
+
+  const hasRoute = Boolean(domain.trim() || providerId.trim());
+
+  function copy(value: string, key: string) {
+    navigator.clipboard.writeText(value);
+    setCopied(key);
+    setTimeout(() => setCopied(null), 2000);
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    const result = await updateSsoSettings(schoolId, {
+      enabled,
+      domain,
+      providerId,
+      buttonLabel,
+    });
+    setSaving(false);
+
+    if (result.error) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success("Single sign-on settings saved");
+  }
+
+  return (
+    <section className="space-y-4">
+      <div className="space-y-1">
+        <h2 className="text-base font-semibold text-ink">Single Sign-On</h2>
+        <p className="text-sm text-muted-foreground">
+          Let families sign in with the same account they already use for the
+          school website, by pointing AskMySchool at your school&apos;s identity
+          provider.
+        </p>
+      </div>
+
+      <div className="space-y-5">
+        {/* The provider must exist in Supabase before this panel can route to
+            it; saying so here prevents a dead sign-in button. */}
+        <div className="rounded-lg border border-border bg-card p-4">
+          <p className="text-sm font-medium text-ink">
+            Registration is a one-time setup step
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            Your identity provider has to be registered against our Supabase
+            project before this school can route to it. Send the two URLs below
+            to whoever administers your school&apos;s IdP, then record the
+            resulting domain or provider ID here.
+          </p>
+
+          <dl className="mt-4 space-y-2">
+            {[
+              { key: "acs", label: "ACS URL", value: config.acsUrl },
+              {
+                key: "metadata",
+                label: "Metadata / EntityID",
+                value: config.metadataUrl,
+              },
+            ].map((row) => (
+              <div key={row.key} className="space-y-1">
+                <dt className="text-xs text-muted-foreground">{row.label}</dt>
+                <dd className="flex gap-2">
+                  <Input
+                    readOnly
+                    value={row.value ?? "NEXT_PUBLIC_SUPABASE_URL not set"}
+                    className="font-mono text-xs"
+                    onFocus={(e) => e.target.select()}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="shrink-0"
+                    disabled={!row.value}
+                    onClick={() => row.value && copy(row.value, row.key)}
+                    aria-label={`Copy ${row.label}`}
+                  >
+                    {copied === row.key ? (
+                      <Check className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
+                  </Button>
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="sso-domain">Sign-in domain</Label>
+          <Input
+            id="sso-domain"
+            value={domain}
+            onChange={(e) => setDomain(e.target.value)}
+            placeholder="lincolnhigh.org"
+            className="font-mono"
+          />
+          <p className="text-xs text-muted-foreground">
+            The email domain registered against your identity provider. Families
+            with an address at this domain are sent to your school&apos;s login.
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="sso-provider-id">Provider ID</Label>
+          <Input
+            id="sso-provider-id"
+            value={providerId}
+            onChange={(e) => setProviderId(e.target.value)}
+            placeholder="Optional — only if your IdP has no domain of its own"
+            className="font-mono"
+          />
+          <p className="text-xs text-muted-foreground">
+            The UUID from{" "}
+            <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">
+              supabase sso list
+            </code>
+            . Either a domain or a provider ID is required.
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="sso-label">Button label</Label>
+          <Input
+            id="sso-label"
+            value={buttonLabel}
+            onChange={(e) => setButtonLabel(e.target.value)}
+            placeholder="Continue with your school account"
+          />
+          <p className="text-xs text-muted-foreground">
+            What families see on the sign-in button. Use the name they recognize
+            from the school website.
+          </p>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label htmlFor="sso-enabled">Enable single sign-on</Label>
+            <p className="text-xs text-muted-foreground">
+              {hasRoute
+                ? "Shows the sign-in button on your school's login page."
+                : "Add a domain or provider ID first."}
+            </p>
+          </div>
+          <Switch
+            id="sso-enabled"
+            checked={enabled}
+            disabled={!hasRoute && !enabled}
+            onCheckedChange={setEnabled}
+          />
+        </div>
+
+        <div className="flex justify-end">
+          <Button onClick={handleSave} disabled={saving}>
+            {saving && <LogoSpinner className="mr-2" />}
+            Save SSO settings
+          </Button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+const CALLBACK_MESSAGES: Record<
+  Exclude<BlackbaudCallbackResult, null>,
+  { tone: "good" | "bad"; title: string; body: string }
+> = {
+  connected: {
+    tone: "good",
+    title: "Blackbaud connected",
+    body: "Run a sync to pull this school's parent roster across.",
+  },
+  denied: {
+    tone: "bad",
+    title: "Authorization declined",
+    body: "The consent screen was cancelled, so nothing was connected.",
+  },
+  error: {
+    tone: "bad",
+    title: "Authorization failed",
+    body: "Blackbaud rejected the request or the session expired. Try connecting again.",
+  },
+};
+
+// status -> how the panel reads. Anything unrecognized falls through to the
+// "unknown" row rather than rendering a blank dot.
+const STATUS_PRESENTATION: Record<
+  string,
+  { label: string; dot: string; detail: string }
+> = {
+  connected: {
+    label: "Connected",
+    dot: "bg-emerald-500",
+    detail: "Roster syncs nightly.",
+  },
+  expired: {
+    label: "Authorization expired",
+    dot: "bg-amber-500",
+    detail: "Reconnect to restore roster syncing.",
+  },
+  error: {
+    label: "Sync error",
+    dot: "bg-red-500",
+    detail: "The last sync did not complete.",
+  },
+};
+
+function BlackbaudSection({
+  schoolId,
+  schoolSlug,
+  config,
+  callback,
+}: {
+  schoolId: string;
+  schoolSlug: string;
+  config: BlackbaudConfig;
+  callback: BlackbaudCallbackResult;
+}) {
+  const [enabled, setEnabled] = useState(config.verificationEnabled);
+  const [rosterCount, setRosterCount] = useState(config.rosterCount);
+  const [savingToggle, setSavingToggle] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [notice, setNotice] = useState(callback);
+
+  // The callback lands here as ?blackbaud=... — read it once, then drop it so a
+  // refresh or a shared URL doesn't replay a stale outcome.
+  useEffect(() => {
+    if (!callback) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("blackbaud");
+    window.history.replaceState(null, "", url.toString());
+  }, [callback]);
+
+  const connection = config.connection;
+  const presentation = connection
+    ? STATUS_PRESENTATION[connection.status] ?? {
+        label: connection.status,
+        dot: "bg-muted-foreground",
+        detail: "Unrecognized connection state.",
+      }
+    : null;
+
+  async function handleToggle(next: boolean) {
+    setEnabled(next);
+    setSavingToggle(true);
+    const result = await updateBlackbaudVerification(schoolId, next);
+    setSavingToggle(false);
+
+    if (result.error) {
+      setEnabled(!next); // roll back — the write did not land
+      toast.error(result.error);
+      return;
+    }
+    toast.success(
+      next ? "Roster verification required" : "Roster verification turned off"
+    );
+  }
+
+  async function handleSync() {
+    setSyncing(true);
+    const result = await syncBlackbaudRoster(schoolId);
+    setSyncing(false);
+
+    if (result.error) {
+      toast.error(result.error);
+      return;
+    }
+    setRosterCount(result.upserted ?? 0);
+    toast.success(
+      `Synced ${result.upserted ?? 0} parents${
+        result.deactivated ? ` · ${result.deactivated} deactivated` : ""
+      }`
+    );
+  }
+
+  return (
+    <section className="space-y-4">
+      <div className="space-y-1">
+        <h2 className="text-base font-semibold text-ink">Blackbaud</h2>
+        <p className="text-sm text-muted-foreground">
+          Connect your school&apos;s Blackbaud environment to verify parents
+          against the official guardian roster before granting access.
+        </p>
+      </div>
+
+      {notice && (
+        <div
+          role="status"
+          className={`flex items-start justify-between gap-4 rounded-lg border bg-card p-4 ${
+            CALLBACK_MESSAGES[notice].tone === "good"
+              ? "border-emerald-500/40"
+              : "border-red-500/40"
+          }`}
+        >
+          <div className="space-y-0.5">
+            <p className="text-sm font-medium text-ink">
+              {CALLBACK_MESSAGES[notice].title}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {CALLBACK_MESSAGES[notice].body}
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 shrink-0 p-0"
+            onClick={() => setNotice(null)}
+            aria-label="Dismiss"
+          >
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      )}
+
+      <div className="space-y-5">
+        <div className="rounded-lg border border-border bg-card p-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span
+                  aria-hidden
+                  className={`h-2 w-2 rounded-full ${
+                    presentation ? presentation.dot : "bg-muted-foreground/50"
+                  }`}
+                />
+                <span className="text-sm font-medium text-ink">
+                  {presentation ? presentation.label : "Not connected"}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {presentation
+                  ? presentation.detail
+                  : "No Blackbaud environment is linked to this school yet."}
+              </p>
+            </div>
+
+            <div className="text-right">
+              <p className="text-2xl font-semibold tabular-nums text-ink tracking-[-0.02em]">
+                {rosterCount.toLocaleString()}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {rosterCount === 1 ? "parent on roster" : "parents on roster"}
+              </p>
+            </div>
+          </div>
+
+          {connection && (
+            <dl className="mt-4 space-y-1.5 border-t border-border pt-4 text-xs">
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground">Last synced</dt>
+                <dd className="text-ink-soft">
+                  {connection.lastSyncedAt ? (
+                    <TimeAgo date={connection.lastSyncedAt} />
+                  ) : (
+                    "Never"
+                  )}
+                </dd>
+              </div>
+              {connection.environmentId && (
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted-foreground">Environment</dt>
+                  <dd className="font-mono text-ink-soft">
+                    {connection.environmentId}
+                  </dd>
+                </div>
+              )}
+              {connection.lastError && (
+                <div className="flex justify-between gap-4">
+                  <dt className="shrink-0 text-muted-foreground">Last error</dt>
+                  <dd className="break-words text-right text-red-500">
+                    {connection.lastError}
+                  </dd>
+                </div>
+              )}
+            </dl>
+          )}
+
+          <div className="mt-5 flex flex-wrap gap-2">
+            {/* Full page navigation on purpose — the route 302s to Blackbaud. */}
+            <Button asChild variant={connection ? "outline" : "default"}>
+              <a
+                href={`/api/blackbaud/connect?school=${encodeURIComponent(
+                  schoolSlug
+                )}`}
+              >
+                <ExternalLink className="mr-2 h-4 w-4" />
+                {connection ? "Reconnect Blackbaud" : "Connect Blackbaud"}
+              </a>
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleSync}
+              disabled={!connection || syncing}
+            >
+              {syncing ? (
+                <LogoSpinner className="mr-2" />
+              ) : (
+                <RefreshCw className="mr-2 h-4 w-4" />
+              )}
+              Sync now
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label htmlFor="blackbaud-verification">
+              Require roster match for access
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Only people whose email appears on the synced Blackbaud roster are
+              approved as parents.
+            </p>
+          </div>
+          <Switch
+            id="blackbaud-verification"
+            checked={enabled}
+            disabled={savingToggle || (!connection && !enabled)}
+            onCheckedChange={handleToggle}
+          />
+        </div>
+      </div>
+    </section>
   );
 }
 

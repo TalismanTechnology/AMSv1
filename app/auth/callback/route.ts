@@ -122,10 +122,10 @@ export async function GET(request: Request) {
     );
   }
 
-  // No membership — Google account isn't linked to a school. Sign out and
+  // No membership — this identity isn't linked to a school. Sign out and
   // point them at their school's login page.
   await supabase.auth.signOut();
   return NextResponse.redirect(
-    `${origin}/login?error=${encodeURIComponent("No school account found for this Google email. Use your school's login page to register.")}`
+    `${origin}/login?error=${encodeURIComponent("No school account found for this email. Use your school's login page to sign in or register.")}`
   );
 }

@@ -16,6 +16,7 @@ export default async function LoginPage({ params }: LoginPageProps) {
       schoolSlug={school.slug}
       schoolId={school.id}
       schoolName={school.name}
+      blackbaudEnabled={school.blackbaud_verification_enabled ?? false}
     />
   );
 }
