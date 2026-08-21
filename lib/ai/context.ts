@@ -92,13 +92,129 @@ export async function fetchAnnouncementsForContext(
 }
 
 /**
- * Human-readable one-line summary of an event (without any source number).
- * Shared by the prompt block and the citable source card so they stay in sync.
+ * A calendar entry as the assistant sees it: one logical event, which may span
+ * several consecutive days. The `events` table stores one row per day, so a
+ * two-week recess arrives as ~10 rows — see groupEventOccurrences.
  */
-function formatEventLine(e: EventContext): string {
-  const parts = [`"${e.title}" on ${e.date}`];
+export interface CalendarEntry {
+  id: string; // first occurrence's event id
+  title: string;
+  description: string | null;
+  date: string; // first day (YYYY-MM-DD)
+  date_end: string | null; // last day, when the entry spans more than one day
+  start_time: string | null;
+  end_time: string | null;
+  location: string | null;
+  event_type: string;
+}
+
+const MS_PER_DAY = 86_400_000;
+
+/** Parse a YYYY-MM-DD calendar date as UTC midnight (no local-timezone drift). */
+function parseCalendarDate(date: string): number {
+  return Date.parse(`${date}T00:00:00Z`);
+}
+
+/**
+ * True when `next` continues the run that ends at `prev`: the same day, the
+ * following day, or the next school day across a weekend (Fri → Mon). Multi-day
+ * school events are routinely imported as weekday-only rows, so the weekend gap
+ * must not split the run.
+ */
+function continuesRun(prev: string, next: string): boolean {
+  const prevMs = parseCalendarDate(prev);
+  const nextMs = parseCalendarDate(next);
+  if (Number.isNaN(prevMs) || Number.isNaN(nextMs)) return false;
+
+  const gapDays = (nextMs - prevMs) / MS_PER_DAY;
+  if (gapDays < 0 || gapDays > 3) return false;
+  if (gapDays <= 1) return true;
+
+  // Bridge the gap only if every skipped day is a weekend day.
+  for (let d = 1; d < gapDays; d++) {
+    const day = new Date(prevMs + d * MS_PER_DAY).getUTCDay();
+    if (day !== 0 && day !== 6) return false;
+  }
+  return true;
+}
+
+/** Occurrences of the same logical event share title, time, place, and type. */
+function occurrenceKey(e: EventContext): string {
+  return [
+    e.title.trim().toLowerCase(),
+    e.start_time ?? "",
+    e.end_time ?? "",
+    (e.location ?? "").trim().toLowerCase(),
+    e.event_type,
+  ].join("|");
+}
+
+/**
+ * Collapse runs of consecutive same-event rows into single date-ranged entries.
+ *
+ * Without this, a 10-school-day recess becomes 10 separately numbered sources
+ * and the model dutifully cites all ten — one sentence trailing a wall of
+ * identical citation chips. Grouping must happen before numbering so the prompt
+ * labels and the returned source cards stay aligned.
+ *
+ * Input is expected in ascending date order (as fetchEventsForContext returns).
+ */
+export function groupEventOccurrences(events: EventContext[]): CalendarEntry[] {
+  const entries: CalendarEntry[] = [];
+  // Last entry produced for each occurrence key, so a run can be extended even
+  // when unrelated events sit between its days in the date-ordered list.
+  const openRuns = new Map<string, { entry: CalendarEntry; lastDate: string }>();
+  const descriptions = new Map<CalendarEntry, Set<string>>();
+
+  for (const event of events) {
+    const key = occurrenceKey(event);
+    const open = openRuns.get(key);
+
+    if (open && continuesRun(open.lastDate, event.date)) {
+      if (event.date !== open.entry.date) open.entry.date_end = event.date;
+      if (event.description) descriptions.get(open.entry)?.add(event.description);
+      openRuns.set(key, { entry: open.entry, lastDate: event.date });
+      continue;
+    }
+
+    const entry: CalendarEntry = {
+      id: event.id,
+      title: event.title,
+      description: event.description,
+      date: event.date,
+      date_end: null,
+      start_time: event.start_time,
+      end_time: event.end_time,
+      location: event.location,
+      event_type: event.event_type,
+    };
+    entries.push(entry);
+    descriptions.set(entry, new Set(event.description ? [event.description] : []));
+    openRuns.set(key, { entry, lastDate: event.date });
+  }
+
+  // Merged occurrences may carry differing descriptions — keep them all rather
+  // than silently dropping detail from later days of the run.
+  return entries.map((entry) => {
+    const texts = [...(descriptions.get(entry) ?? [])];
+    return { ...entry, description: texts.length > 0 ? texts.join(" ") : null };
+  });
+}
+
+/**
+ * Human-readable one-line summary of a calendar entry (without any source
+ * number). Shared by the prompt block and the citable source card so they
+ * stay in sync.
+ */
+function formatEventLine(e: CalendarEntry): string {
+  const isRange = !!e.date_end && e.date_end !== e.date;
+  const parts = [
+    isRange
+      ? `"${e.title}" from ${e.date} through ${e.date_end}`
+      : `"${e.title}" on ${e.date}`,
+  ];
   if (e.start_time) {
-    parts.push(`from ${e.start_time}`);
+    parts.push(isRange ? `each day from ${e.start_time}` : `from ${e.start_time}`);
     if (e.end_time) parts.push(`to ${e.end_time}`);
   }
   if (e.location) parts.push(`at ${e.location}`);
@@ -115,7 +231,7 @@ function formatEventLine(e: EventContext): string {
  * @param startNumber the source number of the first event (document count + 1)
  */
 export function formatEventsContext(
-  events: EventContext[],
+  events: CalendarEntry[],
   startNumber: number
 ): string {
   if (events.length === 0) return "";
@@ -136,7 +252,7 @@ export function formatEventsContext(
  * client MUST use identical numbering, so both derive from this one place.
  */
 export function buildEventSources(
-  events: EventContext[],
+  events: CalendarEntry[],
   startNumber: number
 ): ChatSource[] {
   return events.map((e, i) => ({

@@ -24,6 +24,7 @@ import {
   fetchAnnouncementsForContext,
   fetchChildrenForContext,
   formatEventsContext,
+  groupEventOccurrences,
   buildEventSources,
   formatAnnouncementsContext,
   formatChildrenContext,
@@ -163,13 +164,17 @@ export async function POST(request: NextRequest) {
     // Events are citable sources numbered continuously after the documents.
     // The same numbering is used for the [Source N] labels in the prompt AND
     // the source cards returned to the client, so [N] citations always resolve.
+    // Multi-day events are stored one row per day; collapse each run into a
+    // single dated entry first so a two-week recess is one citable source
+    // rather than ten identical ones.
+    const calendar = groupEventOccurrences(events);
     const eventStartNumber = citableChunks.length + 1;
-    const eventSources = buildEventSources(events, eventStartNumber);
+    const eventSources = buildEventSources(calendar, eventStartNumber);
 
     // Build system prompt with documents, events, announcements, and children context
     const systemPrompt =
       buildSystemPrompt(citableChunks, {
-        eventsContext: formatEventsContext(events, eventStartNumber),
+        eventsContext: formatEventsContext(calendar, eventStartNumber),
         announcementsContext: formatAnnouncementsContext(announcements),
         childrenContext: formatChildrenContext(children),
         todayString: getTodayString(),
