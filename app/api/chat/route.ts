@@ -12,9 +12,12 @@ import {
 import { google } from "@ai-sdk/google";
 import {
   searchDocuments,
+  keywordSearchChunks,
+  buildCitableDocuments,
   buildSystemPrompt,
   formatChunkLocation,
   type RelevantChunk,
+  type KeywordHit,
 } from "@/lib/ai/rag";
 import { generateEmbedding } from "@/lib/ai/embeddings";
 import { assignToCluster } from "@/lib/ai/cluster-assignment";
@@ -88,13 +91,23 @@ export async function POST(request: NextRequest) {
       debugLog(`Query rewritten: "${lastMessageText.slice(0, 60)}" → "${searchQuery.slice(0, 60)}"`);
     }
 
-    // Search for relevant document chunks (non-fatal — continue without sources on failure)
+    // Retrieve with both strategies in parallel (non-fatal — continue without
+    // sources on failure). Semantic search finds passages that mean the same
+    // thing; keyword search finds the reference pages (directories, fee tables)
+    // that embeddings consistently under-rank. Recall is deliberately wide —
+    // buildCitableDocuments does the narrowing.
     let relevantChunks: RelevantChunk[] = [];
-    try {
-      relevantChunks = await searchDocuments(searchQuery, 15, 0.5, schoolId);
-    } catch (error) {
-      console.error("RAG search failed (continuing without sources):", error);
-    }
+    let keywordHits: KeywordHit[] = [];
+    const [vectorResult, keywordResult] = await Promise.allSettled([
+      searchDocuments(searchQuery, 40, 0.45, schoolId),
+      schoolId
+        ? keywordSearchChunks(searchQuery, schoolId)
+        : Promise.resolve([] as KeywordHit[]),
+    ]);
+    if (vectorResult.status === "fulfilled") relevantChunks = vectorResult.value;
+    else console.error("RAG search failed (continuing without sources):", vectorResult.reason);
+    if (keywordResult.status === "fulfilled") keywordHits = keywordResult.value;
+    else console.error("Keyword search failed (continuing without it):", keywordResult.reason);
 
     // Debug: log RAG results
     if (relevantChunks.length > 0) {
@@ -141,25 +154,11 @@ export async function POST(request: NextRequest) {
     // Log context availability for debugging
     console.log(`[Chat] Context for school ${schoolId}: ${relevantChunks.length} doc chunks, ${events.length} events, ${announcements.length} announcements`);
 
-    // Deduplicate chunks by document (keep highest-similarity chunk per doc),
-    // filter to relevant, and cap. The same ordered set is fed to the LLM as
-    // [Source 1..N] AND returned to the client as sources[N-1], so inline
-    // [N] citations the model emits always map to a real source card.
-    const MAX_DOCUMENT_SOURCES = 3;
-    const citableChunks: RelevantChunk[] = (() => {
-      if (relevantChunks.length === 0) return [];
-      const bestByDoc = new Map<string, RelevantChunk>();
-      for (const chunk of relevantChunks) {
-        const existing = bestByDoc.get(chunk.document_id);
-        if (!existing || chunk.similarity > existing.similarity) {
-          bestByDoc.set(chunk.document_id, chunk);
-        }
-      }
-      return [...bestByDoc.values()]
-        .filter((c) => c.similarity >= 0.55)
-        .sort((a, b) => b.similarity - a.similarity)
-        .slice(0, MAX_DOCUMENT_SOURCES);
-    })();
+    // Assemble one citable excerpt per relevant document: its best matching
+    // passages plus their neighbours, stitched in document order. The same
+    // ordered set is fed to the LLM as [Source 1..N] AND returned to the client
+    // as sources[N-1], so inline [N] citations always map to a real source card.
+    const citableChunks = await buildCitableDocuments(relevantChunks, keywordHits);
 
     // Events are citable sources numbered continuously after the documents.
     // The same numbering is used for the [Source N] labels in the prompt AND
@@ -185,11 +184,13 @@ export async function POST(request: NextRequest) {
     const sources: ChatSource[] = citableChunks.map((chunk, i) => {
       return {
         document_id: chunk.document_id,
-        title: chunk.document_title || "Unknown",
-        chunk_content: chunk.content,
+        title: chunk.title,
+        // The matching passage, not the full stitched excerpt the model saw —
+        // this is what the sidebar highlights inside the document.
+        chunk_content: chunk.best_chunk_content,
         similarity: chunk.similarity,
-        file_url: chunk.document_file_url,
-        file_type: chunk.document_file_type,
+        file_url: chunk.file_url,
+        file_type: chunk.file_type,
         chunk_index: chunk.chunk_index,
         source_number: i + 1,
         source_type: "document" as const,

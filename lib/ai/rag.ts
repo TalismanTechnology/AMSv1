@@ -55,6 +55,105 @@ export function formatChunkLocation(
   return null;
 }
 
+/** A chunk surfaced by full-text search rather than by embedding similarity. */
+export interface KeywordHit {
+  document_id: string;
+  chunk_index: number;
+  content: string;
+  rank: number;
+}
+
+// Question words and filler that would either match everything or nothing.
+const KEYWORD_STOPWORDS = new Set([
+  "a", "about", "am", "an", "and", "any", "are", "at", "be", "by", "can", "could",
+  "do", "does", "did", "for", "from", "get", "has", "have", "how", "i", "if", "in",
+  "is", "it", "its", "know", "me", "my", "need", "of", "on", "or", "our", "please",
+  "see", "should", "so", "tell", "that", "the", "their", "there", "they", "this",
+  "to", "up", "want", "was", "we", "what", "when", "where", "which", "who", "whom",
+  "why", "will", "with", "would", "you", "your",
+]);
+
+function extractKeywords(query: string): string[] {
+  return [
+    ...new Set(
+      query
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N}\s'-]/gu, " ")
+        .split(/\s+/)
+        .filter((w) => w.length > 2 && !KEYWORD_STOPWORDS.has(w))
+    ),
+  ];
+}
+
+/**
+ * Full-text search over chunk content, complementing the embedding search.
+ *
+ * Embeddings under-rank reference material — a phone directory or a fee table
+ * is mostly proper nouns and digits, so it matches a conversational question
+ * weakly no matter how squarely it answers it. Literal term matching finds
+ * exactly those pages.
+ *
+ * Runs all terms together (precise) AND each term on its own, then interleaves
+ * the per-term results. The single-term passes matter most: in "what's the
+ * phone number for the nurse?", the rare word is "nurse", but a whole-phrase
+ * search ranks chatty passages about phones above the one line that pairs the
+ * nurse with her extension. Giving every term its own slate guarantees the
+ * distinctive one is represented.
+ */
+const MAX_KEYWORD_TERMS = 6;
+const HITS_PER_TERM = 8;
+
+export async function keywordSearchChunks(
+  query: string,
+  schoolId: string,
+  limit = 30
+): Promise<KeywordHit[]> {
+  const keywords = extractKeywords(query).slice(0, MAX_KEYWORD_TERMS);
+  if (keywords.length === 0) return [];
+
+  const supabase = createAdminClient();
+
+  const run = async (tsQuery: string, rowLimit: number): Promise<KeywordHit[]> => {
+    const { data, error } = await supabase.rpc("search_document_chunks", {
+      p_school_id: schoolId,
+      p_query: tsQuery,
+      p_limit: rowLimit,
+    });
+    if (error) {
+      console.error(`Keyword search error for "${tsQuery}":`, error);
+      return [];
+    }
+    return (data || []) as KeywordHit[];
+  };
+
+  const [allTerms, ...perTerm] = await Promise.all([
+    keywords.length > 1
+      ? run(keywords.join(" "), limit)
+      : Promise.resolve([] as KeywordHit[]),
+    ...keywords.map((k) => run(k, HITS_PER_TERM)),
+  ]);
+
+  // Chunks matching every term come first, then one hit per term in turn so no
+  // single common word ("school") monopolises the budget.
+  const merged: KeywordHit[] = [];
+  const seen = new Set<string>();
+  const take = (hit: KeywordHit) => {
+    const key = `${hit.document_id}:${hit.chunk_index}`;
+    if (seen.has(key) || merged.length >= limit) return;
+    seen.add(key);
+    merged.push(hit);
+  };
+
+  allTerms.forEach(take);
+  for (let round = 0; round < HITS_PER_TERM; round++) {
+    for (const hits of perTerm) {
+      if (hits[round]) take(hits[round]);
+    }
+  }
+
+  return merged;
+}
+
 export async function searchDocuments(
   query: string,
   matchCount = 8,
@@ -113,8 +212,216 @@ export async function searchDocuments(
   });
 }
 
-export function buildSystemPrompt(
+/**
+ * One document's contribution to the prompt: several stitched-together excerpts
+ * presented under a single [Source N]. Grouping at the document level (rather
+ * than one source per chunk) lets a long handbook contribute several passages
+ * without producing a stack of identically-titled source cards.
+ */
+export interface CitableDocument {
+  document_id: string;
+  title: string;
+  content: string; // stitched excerpts, in document order — for the prompt
+  // The single best-matching chunk, verbatim. The source sidebar locates this
+  // inside the full document to highlight it, which the stitched excerpt (gap
+  // markers, trimmed seams) would defeat — and it keeps the payload we stream
+  // and store per message small.
+  best_chunk_content: string;
+  similarity: number; // best matching chunk's score
+  chunk_index: number; // best matching chunk, for the source card
+  metadata: ChunkMetadata;
+  file_url?: string;
+  file_type?: string;
+  tags?: string[];
+  category?: string;
+  folder?: string;
+}
+
+// How much of each document reaches the model. Deliberately generous: a missed
+// answer that was sitting in the handbook costs far more than a longer prompt.
+const MAX_CITED_DOCUMENTS = 5;
+const MAX_VECTOR_SEEDS_PER_DOCUMENT = 5;
+const MAX_KEYWORD_SEEDS_PER_DOCUMENT = 4;
+const MAX_CHUNKS_PER_DOCUMENT = 12;
+// A document must have at least one genuinely similar chunk to be cited at all.
+// Keyword hits then decide *which* of its passages are shown, but can't promote
+// an unrelated document — that would also mask genuinely unanswered questions.
+const MIN_CITABLE_SIMILARITY = 0.5;
+// Chunks are split with overlap, so neighbours repeat text at the seam.
+const MAX_SEAM_OVERLAP = 400;
+
+/**
+ * Join consecutive excerpts, removing the duplicated text where two adjacent
+ * chunks overlap, and marking real gaps so the model doesn't read skipped
+ * material as continuous prose.
+ */
+function stitchChunks(ordered: { content: string; chunk_index: number }[]): string {
+  let out = "";
+  let prevIndex: number | null = null;
+
+  for (const chunk of ordered) {
+    if (out === "") {
+      out = chunk.content;
+      prevIndex = chunk.chunk_index;
+      continue;
+    }
+
+    if (prevIndex != null && chunk.chunk_index > prevIndex + 1) {
+      out += "\n[...]\n" + chunk.content;
+      prevIndex = chunk.chunk_index;
+      continue;
+    }
+
+    // Adjacent: drop the longest suffix of what we have that repeats as a
+    // prefix of the next chunk.
+    const window = Math.min(MAX_SEAM_OVERLAP, out.length, chunk.content.length);
+    let overlap = 0;
+    for (let len = window; len > 20; len--) {
+      if (out.endsWith(chunk.content.slice(0, len))) {
+        overlap = len;
+        break;
+      }
+    }
+    out += chunk.content.slice(overlap);
+    prevIndex = chunk.chunk_index;
+  }
+
+  return out;
+}
+
+/**
+ * Turn ranked chunk hits into per-document citable excerpts.
+ *
+ * Semantic ranking alone is unreliable for lookup-style facts: a phone
+ * directory page matches "what's the nurse's number?" weakly because it is
+ * mostly names and digits. So each document's best chunks are expanded to
+ * include their immediate neighbours, which is where the specific detail
+ * usually sits relative to the passage that matched.
+ */
+export async function buildCitableDocuments(
   chunks: RelevantChunk[],
+  keywordHits: KeywordHit[] = []
+): Promise<CitableDocument[]> {
+  const relevant = chunks.filter((c) => c.similarity >= MIN_CITABLE_SIMILARITY);
+  if (relevant.length === 0) return [];
+
+  // Group hits by document, strongest document first.
+  const byDocument = new Map<string, RelevantChunk[]>();
+  for (const chunk of relevant) {
+    const existing = byDocument.get(chunk.document_id);
+    if (existing) existing.push(chunk);
+    else byDocument.set(chunk.document_id, [chunk]);
+  }
+
+  const documents = [...byDocument.entries()]
+    .map(([documentId, hits]) => ({
+      documentId,
+      hits: [...hits].sort((a, b) => b.similarity - a.similarity),
+    }))
+    .sort((a, b) => b.hits[0].similarity - a.hits[0].similarity)
+    .slice(0, MAX_CITED_DOCUMENTS);
+
+  const keywordsByDocument = new Map<string, KeywordHit[]>();
+  for (const hit of keywordHits) {
+    const existing = keywordsByDocument.get(hit.document_id);
+    if (existing) existing.push(hit);
+    else keywordsByDocument.set(hit.document_id, [hit]);
+  }
+
+  // Decide which chunk indexes each document contributes: its best semantic
+  // matches, its best literal matches, and the chunk either side of each — the
+  // specific detail (a number, a deadline) often sits just past the boundary of
+  // the passage that matched.
+  const wanted = documents.map(({ documentId, hits }) => {
+    const vectorSeeds = hits
+      .slice(0, MAX_VECTOR_SEEDS_PER_DOCUMENT)
+      .map((h) => h.chunk_index);
+    const keywordSeeds = (keywordsByDocument.get(documentId) || [])
+      .slice(0, MAX_KEYWORD_SEEDS_PER_DOCUMENT)
+      .map((h) => h.chunk_index);
+
+    // Alternate the two rankings so neither strategy monopolises the budget,
+    // and pull each seed's neighbours in with it — otherwise the cap is spent
+    // entirely on seeds and the adjacent detail is never fetched.
+    const seeds: number[] = [];
+    for (let i = 0; i < Math.max(vectorSeeds.length, keywordSeeds.length); i++) {
+      if (vectorSeeds[i] != null) seeds.push(vectorSeeds[i]);
+      if (keywordSeeds[i] != null) seeds.push(keywordSeeds[i]);
+    }
+
+    const indexes = new Set<number>();
+    for (const seed of seeds) {
+      if (indexes.size >= MAX_CHUNKS_PER_DOCUMENT) break;
+      for (const index of [seed, seed - 1, seed + 1]) {
+        if (index >= 0 && indexes.size < MAX_CHUNKS_PER_DOCUMENT) indexes.add(index);
+      }
+    }
+    return { documentId, hits, indexes };
+  });
+
+  // Fetch the text we don't already have — one round trip for all documents;
+  // the (document, index) pairs are matched up after.
+  const known = new Map<string, string>();
+  for (const chunk of relevant) {
+    known.set(`${chunk.document_id}:${chunk.chunk_index}`, chunk.content);
+  }
+  for (const hit of keywordHits) {
+    known.set(`${hit.document_id}:${hit.chunk_index}`, hit.content);
+  }
+  const missingIndexes = new Set<number>();
+  for (const { documentId, indexes } of wanted) {
+    for (const index of indexes) {
+      if (!known.has(`${documentId}:${index}`)) missingIndexes.add(index);
+    }
+  }
+
+  if (missingIndexes.size > 0) {
+    const supabase = createAdminClient();
+    const { data: neighbours, error } = await supabase
+      .from("document_chunks")
+      .select("document_id, chunk_index, content")
+      .in("document_id", wanted.map((w) => w.documentId))
+      .in("chunk_index", [...missingIndexes]);
+
+    if (error) {
+      // Non-fatal: fall back to the matched chunks alone.
+      console.error("Failed to fetch neighbouring chunks:", error);
+    } else {
+      for (const n of neighbours || []) {
+        known.set(`${n.document_id}:${n.chunk_index}`, n.content);
+      }
+    }
+  }
+
+  return wanted.map(({ documentId, hits, indexes }) => {
+    const best = hits[0];
+    const ordered = [...indexes]
+      .sort((a, b) => a - b)
+      .map((chunk_index) => ({
+        chunk_index,
+        content: known.get(`${documentId}:${chunk_index}`) || "",
+      }))
+      .filter((c) => c.content !== "");
+
+    return {
+      document_id: documentId,
+      title: best.document_title || "Unknown Document",
+      content: stitchChunks(ordered),
+      best_chunk_content: best.content,
+      similarity: best.similarity,
+      chunk_index: best.chunk_index,
+      metadata: best.metadata,
+      file_url: best.document_file_url,
+      file_type: best.document_file_type,
+      tags: best.document_tags,
+      category: best.document_category,
+      folder: best.document_folder,
+    };
+  });
+}
+
+export function buildSystemPrompt(
+  chunks: CitableDocument[],
   options?: {
     eventsContext?: string;
     announcementsContext?: string;
@@ -173,11 +480,11 @@ ${followUpInstruction}`;
           const meta: string[] = [];
           const loc = formatChunkLocation(chunk.metadata);
           if (loc) meta.push(loc.label);
-          if (chunk.document_tags?.length) meta.push(`Tags: ${chunk.document_tags.join(", ")}`);
-          if (chunk.document_category) meta.push(`Category: ${chunk.document_category}`);
-          if (chunk.document_folder) meta.push(`Folder: ${chunk.document_folder}`);
+          if (chunk.tags?.length) meta.push(`Tags: ${chunk.tags.join(", ")}`);
+          if (chunk.category) meta.push(`Category: ${chunk.category}`);
+          if (chunk.folder) meta.push(`Folder: ${chunk.folder}`);
           const metaStr = meta.length > 0 ? ` | ${meta.join(" | ")}` : "";
-          return `[Source ${i + 1}: "${chunk.document_title}"${metaStr}]\n${chunk.content}`;
+          return `[Source ${i + 1}: "${chunk.title}"${metaStr}]\n${chunk.content}`;
         })
         .join("\n\n---\n\n")}`
     );
