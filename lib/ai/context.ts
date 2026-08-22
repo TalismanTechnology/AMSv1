@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { formatGrade } from "@/lib/grades";
 import type { ChatSource } from "@/lib/types";
 
 // Upper bound on how many calendar events we inject into a single prompt. The
@@ -317,12 +318,21 @@ export async function fetchChildrenForContext(
 
 /**
  * Format children as a text block for the system prompt.
+ *
+ * Grades are spelled out ("8th Grade", never "8") and labelled as grade levels.
+ * The raw stored value is a bare number, and "Lucas (8)" reads to a model as an
+ * eight-year-old — which then skews every answer about divisions, deadlines,
+ * and age-appropriate policies.
  */
 export function formatChildrenContext(children: ChildContext[]): string {
   if (children.length === 0) return "";
 
-  const lines = children.map((c) => `- ${c.name} (${c.grade})`);
-  return `PARENT'S CHILDREN:\n${lines.join("\n")}`;
+  const lines = children.map(
+    (c) => `- ${c.name} — enrolled in ${formatGrade(c.grade)}`
+  );
+  return `PARENT'S CHILDREN (school grade levels, NOT ages — never state or infer a child's age from these):\n${lines.join(
+    "\n"
+  )}`;
 }
 
 /**
