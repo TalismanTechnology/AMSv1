@@ -24,6 +24,11 @@ ${truncated}
 Write a 2-3 sentence summary of what this document contains and why it would be useful to parents. Be specific and factual. Do not use phrases like "This document..." or "This text...".`,
     maxOutputTokens: 150,
     temperature: 0.3,
+    // Gemini 2.5 charges thinking tokens against maxOutputTokens. Left on,
+    // reasoning ate 143 of the 150 and summaries came back truncated to a few
+    // characters (literally `The "MS`). A 2-3 sentence summary needs no
+    // deliberation.
+    providerOptions: { google: { thinkingConfig: { thinkingBudget: 0 } } },
   });
 
   return summary.trim();
