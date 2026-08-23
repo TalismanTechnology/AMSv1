@@ -164,13 +164,15 @@ export default function LandingPage() {
       <ScrollProgressBar />
 
       {/* Header */}
-      <ScrollHeader className="fixed top-0 z-50 w-full px-4">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 bg-background/80 px-4 py-4 backdrop-blur-md sm:gap-6 sm:px-6">
-          {/* min-w-0 + truncate: on a 320px screen the wordmark gives way
-              rather than pushing the sign-in and sign-up buttons off-screen. */}
+      <ScrollHeader className="fixed top-0 z-50 w-full px-2 sm:px-4">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 bg-background/80 px-3 py-4 backdrop-blur-md sm:gap-6 sm:px-6">
+          {/* Below 375px the wordmark cannot fit beside both buttons without
+              shrinking the tap targets, so the mark stands alone there. Above
+              it, min-w-0 + truncate keep the text yielding first if a font
+              renders wider than expected — never the buttons. */}
           <Link href="/" className="flex min-w-0 items-center gap-2">
             <Logo size={26} className="shrink-0 text-primary" />
-            <span className="truncate text-base font-semibold tracking-[-0.01em] text-ink sm:text-lg">
+            <span className="hidden truncate text-base font-semibold tracking-[-0.01em] text-ink min-[375px]:block sm:text-lg">
               AskMySchool
             </span>
           </Link>
@@ -188,10 +190,10 @@ export default function LandingPage() {
           {/* Sign in stays visible at every width — hiding it below `sm` left
               returning parents with no way into the app from a phone. */}
           <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
-            <Button variant="ghost" asChild className="px-2.5 sm:px-4">
+            <Button variant="ghost" asChild className="px-2 sm:px-4">
               <Link href="/login">Sign in</Link>
             </Button>
-            <Button asChild className="px-3 sm:px-4">
+            <Button asChild className="px-2.5 sm:px-4">
               <Link href="/register">Get started</Link>
             </Button>
           </div>
