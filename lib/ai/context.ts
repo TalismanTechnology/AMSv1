@@ -327,10 +327,16 @@ export async function fetchChildrenForContext(
 export function formatChildrenContext(children: ChildContext[]): string {
   if (children.length === 0) return "";
 
+  // Numbered so the model tracks them as distinct people rather than blurring
+  // two children into one when it answers.
   const lines = children.map(
-    (c) => `- ${c.name} — enrolled in ${formatGrade(c.grade)}`
+    (c, i) => `${i + 1}. ${c.name} — enrolled in ${formatGrade(c.grade)}`
   );
-  return `PARENT'S CHILDREN (school grade levels, NOT ages — never state or infer a child's age from these):\n${lines.join(
+  const count =
+    children.length === 1 ? "1 child" : `${children.length} children`;
+  // The gender warning sits here, beside the names, as well as in the rules —
+  // models otherwise guess from the name and address a child as "he"/"she".
+  return `PARENT'S CHILDREN (${count}; school grade levels, NOT ages — never state or infer a child's age from these). The school record has no gender for these children: refer to each one by name or as "they", never "he"/"she"/"son"/"daughter", even if the parent used such a word:\n${lines.join(
     "\n"
   )}`;
 }

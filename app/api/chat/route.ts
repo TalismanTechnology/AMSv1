@@ -85,8 +85,29 @@ export async function POST(request: NextRequest) {
         .map((p: { text: string }) => p.text)
         .join("") || "";
 
-    // Rewrite follow-up questions into standalone queries for better RAG search
-    const searchQuery = await rewriteQueryWithContext(messages, lastMessageText);
+    // Start the context fetches now; only the children are needed before the
+    // rewrite, so the rest stay in flight through retrieval.
+    const adminSupabase = createAdminClient();
+    const restOfContext = Promise.allSettled([
+      fetchEventsForContext(schoolId),
+      fetchAnnouncementsForContext(schoolId),
+      adminSupabase
+        .from("settings")
+        .select("custom_system_prompt, ai_temperature")
+        .eq("school_id", schoolId)
+        .single()
+        .then((r) => r.data),
+    ]);
+    const children = await fetchChildrenForContext(user.id, schoolId);
+
+    // Rewrite follow-up questions into standalone queries for better RAG
+    // search. Children are passed so "and my other kid?" resolves to a grade
+    // level the documents are actually organised by.
+    const searchQuery = await rewriteQueryWithContext(
+      messages,
+      lastMessageText,
+      children
+    );
     if (searchQuery !== lastMessageText) {
       debugLog(`Query rewritten: "${lastMessageText.slice(0, 60)}" → "${searchQuery.slice(0, 60)}"`);
     }
@@ -116,20 +137,10 @@ export async function POST(request: NextRequest) {
       debugLog(`RAG: 0 chunks found for query: "${lastMessageText.slice(0, 80)}"`);
     }
 
-    // Fetch events, announcements, children, and settings in parallel (all non-fatal)
-    const adminSupabase = createAdminClient();
-    const [eventsResult, announcementsResult, settingsResult, childrenResult] =
-      await Promise.allSettled([
-        fetchEventsForContext(schoolId),
-        fetchAnnouncementsForContext(schoolId),
-        adminSupabase
-          .from("settings")
-          .select("custom_system_prompt, ai_temperature")
-          .eq("school_id", schoolId)
-          .single()
-          .then((r) => r.data),
-        fetchChildrenForContext(user.id, schoolId),
-      ]);
+    // Events, announcements and settings were kicked off before the rewrite
+    // (all non-fatal — an empty result just means less context)
+    const [eventsResult, announcementsResult, settingsResult] =
+      await restOfContext;
 
     const events =
       eventsResult.status === "fulfilled" ? eventsResult.value : [];
@@ -139,8 +150,6 @@ export async function POST(request: NextRequest) {
         : [];
     const settings =
       settingsResult.status === "fulfilled" ? settingsResult.value : null;
-    const children =
-      childrenResult.status === "fulfilled" ? childrenResult.value : [];
 
     let customPrompt = "";
     let aiTemperature = 0.2;
@@ -176,6 +185,7 @@ export async function POST(request: NextRequest) {
         eventsContext: formatEventsContext(calendar, eventStartNumber),
         announcementsContext: formatAnnouncementsContext(announcements),
         childrenContext: formatChildrenContext(children),
+        childCount: children.length,
         todayString: getTodayString(),
       }) + customPrompt;
 

@@ -25,6 +25,7 @@ export interface ChunkMetadata {
   sheet?: string;         // XLSX sheet name
   slide?: number;         // PPTX slide number (1-indexed)
   section?: string;       // DOCX section heading text
+  email_subject?: string; // EML subject line
   [key: string]: unknown;
 }
 
@@ -51,6 +52,13 @@ export function formatChunkLocation(
   }
   if (typeof section === "string" && section.trim()) {
     return { label: `§ ${section.trim()}`, section: section.trim() };
+  }
+  const emailSubject = metadata.email_subject;
+  if (typeof emailSubject === "string" && emailSubject.trim()) {
+    const subject = emailSubject.trim();
+    // Subjects run long; a citation chip has to stay readable.
+    const trimmed = subject.length > 60 ? `${subject.slice(0, 57)}…` : subject;
+    return { label: `Email: ${trimmed}`, section: subject };
   }
   return null;
 }
@@ -426,10 +434,13 @@ export function buildSystemPrompt(
     eventsContext?: string;
     announcementsContext?: string;
     childrenContext?: string;
+    /** How many children the parent has — drives the disambiguation rules. */
+    childCount?: number;
     todayString?: string;
   }
 ): string {
-  const { eventsContext, announcementsContext, childrenContext, todayString } = options || {};
+  const { eventsContext, announcementsContext, childrenContext, childCount, todayString } =
+    options || {};
 
   const dateInfo = todayString ? `\n${todayString}\n` : "";
   const hasEvents = !!eventsContext;
@@ -502,10 +513,26 @@ ${followUpInstruction}`;
       ? "- No matching documents were found, but school events and/or announcements below may contain the answer. Use them.\n"
       : "";
 
+  // With more than one child, the failure mode isn't missing information — it's
+  // attributing one child's answer to the other, or inventing a gender for a
+  // child the school record describes only by name and grade.
+  const multiChildRules =
+    childrenContext && (childCount ?? 0) > 1
+      ? `
+MULTIPLE CHILDREN — KEEP THEM STRAIGHT:
+- This parent has ${childCount} children, listed above. Treat them as distinct people and always refer to each one BY NAME. Never write "your child" when you mean a specific one, and never merge two children's answers into one statement.
+- You do NOT know any child's gender. Never use "he", "she", "his", "her", "son", or "daughter" for them — use the child's name, or "they/their". This holds even if the parent used a gendered word: they know which child they mean, you do not.
+- If the parent names a child, or names a grade or division, answer for that child only.
+- If the parent says "my son", "my daughter", or "my child" without naming one, do not guess. If the answer is the same for every child, give it once. If it differs, give each child's answer labelled by name.
+- Only ask which child they mean when the answer genuinely differs AND you cannot simply answer for each of them.
+- Carry the child forward across turns: a follow-up like "what about the other one?" refers to the child you did NOT just answer about — name them explicitly in your reply so the parent can see which one you mean.
+`
+      : "";
+
   return `You are a helpful school assistant that answers parents' questions using official school documents, events, and announcements.
 ${dateInfo}
 ${contextBlock}
-
+${multiChildRules}
 IMPORTANT RULES:
 - Answer based on ALL the provided context above (documents, events, and announcements)
 ${noDocsNote}- If the context doesn't contain enough information to answer, say so honestly
