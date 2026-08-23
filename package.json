@@ -9,7 +9,9 @@
     "lint": "eslint",
     "test": "tsx --test lib/email/inbound.test.ts lib/documents/eml.test.ts",
     "seed:demo": "NODE_OPTIONS='--max-old-space-size=4096' tsx scripts/seed-demo.ts",
-    "migrate:clusters": "NODE_OPTIONS='--max-old-space-size=4096' tsx scripts/migrate-clusters.ts"
+    "migrate:clusters": "NODE_OPTIONS='--max-old-space-size=4096' tsx scripts/migrate-clusters.ts",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.42",
@@ -47,6 +49,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
