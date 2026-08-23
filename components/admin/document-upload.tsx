@@ -31,35 +31,17 @@ import {
 } from "@/components/ui/dialog";
 import { createDocumentRecord } from "@/actions/documents";
 import { createClient } from "@/lib/supabase/client";
+import {
+  ACCEPTED_UPLOAD_TYPES,
+  fileTypeFromName,
+} from "@/lib/documents/file-types";
 import { toast } from "sonner";
 import type { Category, Folder } from "@/lib/types";
 
-const ACCEPTED_TYPES = {
-  "application/pdf": [".pdf"],
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [
-    ".docx",
-  ],
-  "application/msword": [".doc"],
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [
-    ".xlsx",
-  ],
-  "application/vnd.ms-excel": [".xls"],
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation": [
-    ".pptx",
-  ],
-  "text/plain": [".txt"],
-};
-
-const TYPE_MAP: Record<string, string> = {
-  pdf: "pdf",
-  docx: "docx",
-  doc: "docx",
-  xlsx: "xlsx",
-  xls: "xlsx",
-  pptx: "pptx",
-  ppt: "pptx",
-  txt: "txt",
-};
+// Both lists come from lib/documents/file-types so the browser allowlist and
+// the server's type mapping stay in step. They were previously hand-copied
+// here, which meant adding a format required remembering to edit two files.
+const ACCEPTED_TYPES = ACCEPTED_UPLOAD_TYPES;
 
 type FileStatus = "idle" | "uploading" | "processing" | "ready" | "error";
 
@@ -169,8 +151,7 @@ export function DocumentUpload({
 
     updateItem(item.id, { status: "uploading", progress: 10 });
 
-    const ext = item.file.name.split(".").pop()?.toLowerCase() || "";
-    const fileType = TYPE_MAP[ext] || "txt";
+    const fileType = fileTypeFromName(item.file.name);
     const timestamp = Date.now();
     const safeName = item.file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
     const storageKey = `${schoolId}/${timestamp}-${safeName}`;

@@ -28,6 +28,13 @@ export async function extractSegments(
     return [{ text: buffer.toString("utf-8"), metadata: {} }];
   }
 
+  if (fileType === "eml") {
+    return extractEmlSegments(buffer).catch((err) => {
+      console.warn("[parser] EML parse failed, falling back to raw text:", err);
+      return [{ text: buffer.toString("utf-8"), metadata: {} }];
+    });
+  }
+
   if (fileType === "pdf") {
     return extractPdfSegments(buffer);
   }
@@ -55,6 +62,18 @@ export async function extractSegments(
 
   // Unknown type — best-effort flat text via officeparser
   return officeParserFallback(buffer);
+}
+
+// One segment for the whole message. The subject rides along in metadata so
+// every chunk split out of a long email still cites which email it came from,
+// not just the document title.
+async function extractEmlSegments(buffer: Buffer): Promise<ParsedSegment[]> {
+  const { parseEml } = await import("./eml");
+  const email = await parseEml(buffer);
+
+  if (!email.text.trim()) return [];
+
+  return [{ text: email.text, metadata: { email_subject: email.subject } }];
 }
 
 async function officeParserFallback(
