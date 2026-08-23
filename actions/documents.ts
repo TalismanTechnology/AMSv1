@@ -45,7 +45,7 @@ export async function uploadDocument(formData: FormData) {
   if (isBlockedFile(file.name)) {
     return {
       error:
-        "Image files are not supported. Please upload PDF, Word, Excel, PowerPoint, or TXT files.",
+        "Image files are not supported. Please upload PDF, Word, Excel, PowerPoint, TXT, or saved email (.eml) files.",
     };
   }
 
