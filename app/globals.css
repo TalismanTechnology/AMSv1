@@ -555,6 +555,17 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Scroll-reveal sections start translated horizontally, so anything not yet
+   revealed sticks out past the viewport and the page scrolls sideways (~36px
+   on a phone). Clip that overshoot.
+   `clip` rather than `hidden`: hidden on html/body silently turns every
+   descendant `position: sticky` into static, which would break the pinned
+   mockup columns on the landing page. */
+html,
+body {
+  overflow-x: clip;
+}
+
 /* ===== METALLIC TEXT TREATMENTS ===== */
 
 .metallic-text {
