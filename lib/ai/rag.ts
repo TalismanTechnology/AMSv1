@@ -25,6 +25,7 @@ export interface ChunkMetadata {
   sheet?: string;         // XLSX sheet name
   slide?: number;         // PPTX slide number (1-indexed)
   section?: string;       // DOCX section heading text
+  email_subject?: string; // EML subject line
   [key: string]: unknown;
 }
 
@@ -51,6 +52,13 @@ export function formatChunkLocation(
   }
   if (typeof section === "string" && section.trim()) {
     return { label: `§ ${section.trim()}`, section: section.trim() };
+  }
+  const emailSubject = metadata.email_subject;
+  if (typeof emailSubject === "string" && emailSubject.trim()) {
+    const subject = emailSubject.trim();
+    // Subjects run long; a citation chip has to stay readable.
+    const trimmed = subject.length > 60 ? `${subject.slice(0, 57)}…` : subject;
+    return { label: `Email: ${trimmed}`, section: subject };
   }
   return null;
 }
