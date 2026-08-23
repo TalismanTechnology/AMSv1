@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireSchoolContext } from "@/lib/school-context";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -14,15 +15,22 @@ export default async function ParentLayout({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const { user, school } = await requireSchoolContext(slug);
+  const { user, school, role } = await requireSchoolContext(slug);
 
   const supabase = await createClient();
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name")
+    .select("full_name, onboarding_completed")
     .eq("id", user.id)
     .single();
+
+  // Onboarding is required, so it is enforced here rather than by a link the
+  // parent could route around. Admins viewing the parent surface are exempt —
+  // they have no children to record.
+  if (role === "parent" && !profile?.onboarding_completed) {
+    redirect(`/s/${slug}/welcome`);
+  }
 
   // Fetch banner announcements (pinned or urgent, non-expired) for this school
   const now = new Date().toISOString();

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { findRosterMatch } from "@/lib/blackbaud/roster";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -41,7 +42,7 @@ export async function GET(request: Request) {
   if (schoolSlug) {
     const { data: school } = await admin
       .from("schools")
-      .select("id, slug")
+      .select("id, slug, blackbaud_verification_enabled")
       .eq("slug", schoolSlug)
       .single();
 
@@ -58,6 +59,45 @@ export async function GET(request: Request) {
       .maybeSingle();
 
     if (!existing) {
+      // First sign-in for this person at this school. When the school gates on
+      // Blackbaud, their guardian roster decides who gets in — not self-service
+      // registration and not an admin approval queue.
+      if (school.blackbaud_verification_enabled) {
+        const rosterMatch = user.email
+          ? await findRosterMatch(school.id, user.email)
+          : null;
+
+        if (!rosterMatch) {
+          // Authenticated with the school's own IdP but not a guardian on the
+          // roster — staff, students, alumni, or a parent the school hasn't
+          // synced yet. Sign out so they aren't left in a half-authenticated
+          // state with no membership.
+          await supabase.auth.signOut();
+          return NextResponse.redirect(
+            loginUrl(
+              "Your account isn't listed as a parent or guardian in your school's records. Please contact your school office."
+            )
+          );
+        }
+
+        const { error: insertError } = await admin
+          .from("school_memberships")
+          .insert({
+            user_id: user.id,
+            school_id: school.id,
+            role: "parent",
+            // The roster match IS the approval — no pending queue.
+            approved: true,
+          });
+
+        if (insertError) {
+          await supabase.auth.signOut();
+          return NextResponse.redirect(loginUrl(insertError.message));
+        }
+
+        return NextResponse.redirect(`${origin}/s/${school.slug}/parent`);
+      }
+
       const { data: settings } = await admin
         .from("settings")
         .select("require_approval")

@@ -167,7 +167,11 @@ export async function updateSession(request: NextRequest) {
 
     // Fetch profile + membership in parallel (single round-trip)
     const [{ data: profile }, { data: membership }] = await Promise.all([
-      supabase.from("profiles").select("role").eq("id", user.id).single(),
+      supabase
+        .from("profiles")
+        .select("role, onboarding_completed")
+        .eq("id", user.id)
+        .single(),
       supabase
         .from("school_memberships")
         .select("role, approved")
@@ -189,6 +193,31 @@ export async function updateSession(request: NextRequest) {
         return supabaseResponse;
       }
       return redirectTo(request, `/s/${slug}/parent`);
+    }
+
+    // First-run onboarding is required, so it is enforced here rather than in
+    // the parent layout alone. A layout redirect fires after the Suspense shell
+    // has already streamed, which degrades to a one-second meta refresh — the
+    // parent sees the dashboard flash before being bounced. Returning 307 here
+    // means the dashboard is never sent at all.
+    const needsOnboarding =
+      !isSuperAdmin &&
+      membership?.role === "parent" &&
+      membership.approved &&
+      !profile?.onboarding_completed;
+
+    if (needsOnboarding && !rest.startsWith("/welcome")) {
+      return redirectTo(request, `/s/${slug}/welcome`);
+    }
+
+    // Already onboarded — don't let them back onto the first-run form.
+    if (!needsOnboarding && rest.startsWith("/welcome")) {
+      return redirectTo(
+        request,
+        isSuperAdmin || membership?.role === "admin"
+          ? `/s/${slug}/admin`
+          : `/s/${slug}/parent`
+      );
     }
 
     // /s/{slug}/parent/* or any other school route — require membership
