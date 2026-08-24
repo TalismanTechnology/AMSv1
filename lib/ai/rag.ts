@@ -468,17 +468,29 @@ ${followUpInstruction}`;
     citationRules +=
       "- Answer in your own words. Do NOT quote documents word-for-word. Paraphrase and summarize the information naturally.\n";
   }
-  if (chunks.length > 0 || hasEvents) {
+  if (chunks.length > 0) {
     citationRules +=
-      "- CITATIONS ARE REQUIRED. Every sentence that contains a fact drawn from DOCUMENT CONTEXT or SCHOOL EVENTS MUST end with an inline citation in square brackets that matches the [Source N] number above — for example [1] or [1][2]. This applies equally to calendar/event facts (dates, times, locations). Do this even when the fact feels obvious. An answer that uses this context but contains zero [N] citations is wrong; rewrite it with citations.\n";
+      "- CITATIONS ARE REQUIRED FOR DOCUMENTS. Every sentence that contains a fact drawn from DOCUMENT CONTEXT MUST end with an inline citation in square brackets that matches the [Source N] number above — for example [1] or [1][2]. Do this even when the fact feels obvious. An answer that uses DOCUMENT CONTEXT but contains zero [N] citations is wrong; rewrite it with citations.\n";
     citationRules +=
       "- Place each citation immediately after the sentence or clause it supports — never bunch citations at the end of the answer. If a single claim is supported by multiple sources, list them adjacently like [1][2]. Do not invent source numbers and do not cite a number that is not shown above.\n";
     citationRules +=
       "- Do NOT add citations to follow-up questions, greetings, or clarifying questions back to the parent.\n";
+  }
+  if (hasEvents) {
     citationRules +=
-      "- DO NOT fabricate specifics that aren't in DOCUMENT CONTEXT, EVENTS, or ANNOUNCEMENTS. Never invent contact methods (email addresses, phone numbers, portal names, app names), policies, dates, or procedures. If the context only partially answers the question, share what IS in the context (with citations) and say plainly that the rest isn't covered — then suggest contacting the school office. It is better to give a short, honest answer than a longer answer padded with plausible-sounding but unsourced details.\n";
+      "- NEVER cite SCHOOL EVENTS. Calendar facts (dates, times, locations of events) carry NO citation at all — write them as plain sentences with no [N] anywhere. The calendar entries are not numbered and have no source card, so any bracketed number attached to a calendar fact is broken. If a sentence mixes a document fact with a calendar fact, cite only the document part.\n";
+  }
+  if (chunks.length > 0 || hasEvents) {
+    citationRules +=
+      "- DO NOT fabricate specifics that aren't in DOCUMENT CONTEXT, EVENTS, or ANNOUNCEMENTS. Never invent contact methods (email addresses, phone numbers, portal names, app names), policies, dates, or procedures. If the context only partially answers the question, share what IS in the context (with citations where the fact came from a document) and say plainly that the rest isn't covered — then suggest contacting the school office. It is better to give a short, honest answer than a longer answer padded with plausible-sounding but unsourced details.\n";
+  }
+  if (chunks.length > 0) {
     citationRules +=
       "- Worked example of correct citation behavior:\n  Question: \"When does school start?\"\n  DOCUMENT CONTEXT: [Source 1: \"Daily Schedule\"] First bell rings at 8:25 AM. Classes begin at 8:30 AM.\n  Good answer: \"Classes begin at 8:30 AM, with the first bell at 8:25 AM [1].\"\n  Bad answer (no citation): \"Classes begin at 8:30 AM, with the first bell at 8:25 AM.\"\n  Bad answer (fabrication): \"Classes begin at 8:30 AM [1]. The school day ends at 3:15 PM.\" (the second sentence isn't in DOCUMENT CONTEXT — drop it or say it isn't covered)\n";
+  }
+  if (hasEvents) {
+    citationRules +=
+      "- Worked example for calendar facts:\n  Question: \"When is winter break?\"\n  SCHOOL EVENTS: \"Winter Break\" from 2025-12-22 through 2026-01-02 (holiday)\n  Good answer: \"Winter break runs from December 22 through January 2, with classes resuming January 5.\"\n  Bad answer (citing the calendar): \"Winter break runs from December 22 through January 2 [16][17][18].\"\n";
   }
 
   // Build context sections — placed BEFORE rules so the model sees data first

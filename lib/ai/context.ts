@@ -1,6 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatGrade } from "@/lib/grades";
-import type { ChatSource } from "@/lib/types";
 
 // Upper bound on how many calendar events we inject into a single prompt. The
 // model scans the whole school calendar, but we cap to keep the prompt bounded;
@@ -225,46 +224,22 @@ function formatEventLine(e: CalendarEntry): string {
 }
 
 /**
- * Format events as a citable text block for the system prompt. Each event is
- * labelled with a source number ([Source N]) continuous with the document
- * sources, so the model can cite calendar entries with [N] exactly like docs.
+ * Format events as a text block for the system prompt.
  *
- * @param startNumber the source number of the first event (document count + 1)
+ * Calendar entries are deliberately NOT numbered as sources: the calendar is
+ * the school's own record, and numbering it turned a single answer about, say,
+ * winter break into a stack of near-identical "[16] Winter Break" citation
+ * chips. The model reads the calendar and answers from it directly; only
+ * documents carry [N] citations.
  */
-export function formatEventsContext(
-  events: CalendarEntry[],
-  startNumber: number
-): string {
+export function formatEventsContext(events: CalendarEntry[]): string {
   if (events.length === 0) return "";
 
-  const lines = events.map(
-    (e, i) => `[Source ${startNumber + i}] ${formatEventLine(e)}`
-  );
+  const lines = events.map((e) => `- ${formatEventLine(e)}`);
 
-  return `SCHOOL EVENTS (full calendar — cite these with [N] just like documents):\n${lines.join(
+  return `SCHOOL EVENTS (full calendar — authoritative, but NOT a citable source: never attach [N] to a fact taken from here):\n${lines.join(
     "\n"
   )}`;
-}
-
-/**
- * Build citable source objects for events, numbered to match the labels
- * produced by formatEventsContext for the same events + startNumber. The
- * ordered set fed to the model as [Source N] and the sources returned to the
- * client MUST use identical numbering, so both derive from this one place.
- */
-export function buildEventSources(
-  events: CalendarEntry[],
-  startNumber: number
-): ChatSource[] {
-  return events.map((e, i) => ({
-    document_id: e.id,
-    title: e.title,
-    chunk_content: formatEventLine(e),
-    similarity: 1,
-    source_number: startNumber + i,
-    source_type: "event" as const,
-    location: null,
-  }));
 }
 
 /**

@@ -28,7 +28,6 @@ import {
   fetchChildrenForContext,
   formatEventsContext,
   groupEventOccurrences,
-  buildEventSources,
   formatAnnouncementsContext,
   formatChildrenContext,
   getTodayString,
@@ -169,20 +168,16 @@ export async function POST(request: NextRequest) {
     // as sources[N-1], so inline [N] citations always map to a real source card.
     const citableChunks = await buildCitableDocuments(relevantChunks, keywordHits);
 
-    // Events are citable sources numbered continuously after the documents.
-    // The same numbering is used for the [Source N] labels in the prompt AND
-    // the source cards returned to the client, so [N] citations always resolve.
-    // Multi-day events are stored one row per day; collapse each run into a
-    // single dated entry first so a two-week recess is one citable source
-    // rather than ten identical ones.
+    // The calendar is prompt context, not a citable source — see
+    // formatEventsContext. Multi-day events are still collapsed from their
+    // one-row-per-day storage into single dated entries so the prompt reads as
+    // one line per event rather than ten identical ones.
     const calendar = groupEventOccurrences(events);
-    const eventStartNumber = citableChunks.length + 1;
-    const eventSources = buildEventSources(calendar, eventStartNumber);
 
     // Build system prompt with documents, events, announcements, and children context
     const systemPrompt =
       buildSystemPrompt(citableChunks, {
-        eventsContext: formatEventsContext(calendar, eventStartNumber),
+        eventsContext: formatEventsContext(calendar),
         announcementsContext: formatAnnouncementsContext(announcements),
         childrenContext: formatChildrenContext(children),
         childCount: children.length,
@@ -208,11 +203,9 @@ export async function POST(request: NextRequest) {
       };
     });
 
-    // Documents (always shown as cards) + the full numbered calendar. Event
-    // cards are only surfaced client-side when their [N] is actually cited, so
-    // the whole calendar isn't dumped as cards. Sent to the client for citation
-    // resolution; the DB save below keeps docs + only the cited events.
-    const allSources: ChatSource[] = [...sources, ...eventSources];
+    // Documents are the only citable sources; the calendar never produces
+    // cards, so what the client receives is exactly what [N] can resolve to.
+    const allSources: ChatSource[] = sources;
 
     // Save user message in the background (fire and forget)
     if (sessionId) {
@@ -349,18 +342,9 @@ export async function POST(request: NextRequest) {
           // Strip follow-up markers before saving to DB
           const markerIdx = text.indexOf("---FOLLOW_UPS---");
           const cleanText = markerIdx !== -1 ? text.slice(0, markerIdx).trimEnd() : text;
-          // Persist all document sources plus only the events the answer
-          // actually cited — the full calendar is scanned but not stored per
-          // message. Historical messages then replay exactly the cited cards.
-          const citedNumbers = new Set(
-            [...cleanText.matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1]))
-          );
-          const savedSources: ChatSource[] = [
-            ...sources,
-            ...eventSources.filter(
-              (s) => s.source_number != null && citedNumbers.has(s.source_number)
-            ),
-          ];
+          // Only document sources are persisted — the calendar is scanned for
+          // every question but is never a citable card.
+          const savedSources: ChatSource[] = sources;
           adminSupabase
             .from("chat_messages")
             .insert({
