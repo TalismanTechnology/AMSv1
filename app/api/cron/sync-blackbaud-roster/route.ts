@@ -1,26 +1,9 @@
-import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { syncRoster } from "@/lib/blackbaud/roster";
+import { isCronAuthorized } from "@/lib/blackbaud/cron-auth";
 
 export const maxDuration = 300;
-
-function isAuthorized(request: Request, secret: string): boolean {
-  // Prefer the header: query strings land in access logs and proxy logs.
-  const header = request.headers.get("authorization");
-  const presented = header?.startsWith("Bearer ")
-    ? header.slice(7)
-    : new URL(request.url).searchParams.get("key");
-
-  if (!presented || presented.length !== secret.length) {
-    return false;
-  }
-
-  return crypto.timingSafeEqual(
-    Buffer.from(presented),
-    Buffer.from(secret)
-  );
-}
 
 // Refresh every connected school's parent roster.
 //   GET /api/cron/sync-blackbaud-roster
@@ -31,7 +14,7 @@ export async function GET(request: Request) {
   if (!secret) {
     return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
   }
-  if (!isAuthorized(request, secret)) {
+  if (!isCronAuthorized(request, secret)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

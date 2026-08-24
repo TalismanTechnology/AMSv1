@@ -16,8 +16,12 @@ import {
   updateBlackbaudVerification,
 } from "@/actions/blackbaud";
 import { updateSsoSettings } from "@/actions/sso";
+import {
+  BlackbaudCalendarFeeds,
+  type FeedWithMapping,
+} from "@/components/admin/blackbaud-calendar-feeds";
 import { toast } from "sonner";
-import type { Settings } from "@/lib/types";
+import type { EventCalendar, Settings } from "@/lib/types";
 
 interface EmailIngestionConfig {
   enabled: boolean;
@@ -40,6 +44,11 @@ export interface BlackbaudConfig {
   verificationEnabled: boolean;
   rosterCount: number;
   connection: BlackbaudConnection | null;
+  // Calendar feeds are independent of the OAuth connection above: Blackbaud
+  // exposes school calendars as iCal subscriptions, not through the SKY API,
+  // so a school can sync events without authorizing the app at all.
+  calendarFeeds: FeedWithMapping[];
+  eventCalendars: EventCalendar[];
 }
 
 export interface SsoConfig {
@@ -852,6 +861,13 @@ function BlackbaudSection({
             onCheckedChange={handleToggle}
           />
         </div>
+
+        <BlackbaudCalendarFeeds
+          schoolId={schoolId}
+          schoolSlug={schoolSlug}
+          feeds={config.calendarFeeds}
+          calendars={config.eventCalendars}
+        />
       </div>
     </section>
   );

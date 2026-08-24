@@ -198,6 +198,9 @@ export interface EventCalendar {
   created_at: string;
 }
 
+/** Where an event came from. Blackbaud events arrive via a synced iCal feed. */
+export type EventSource = "manual" | "import" | "blackbaud";
+
 export interface SchoolEvent {
   id: string;
   title: string;
@@ -209,6 +212,8 @@ export interface SchoolEvent {
   event_type: EventType;
   created_by: string | null;
   school_id: string;
+  source: EventSource;
+  blackbaud_event_id: string | null;
   created_at: string;
   updated_at: string;
   // Divisions + categories this event is tagged with.
@@ -244,4 +249,61 @@ export interface Settings {
   require_join_code: boolean;
   require_approval: boolean;
   updated_at: string;
+}
+
+// ── Blackbaud calendar sync ──────────────────────────
+
+/** An iCal subscription published by a school's Blackbaud site. */
+export interface BlackbaudCalendarFeed {
+  id: string;
+  school_id: string;
+  label: string;
+  url: string;
+  timezone: string;
+  is_active: boolean;
+  last_synced_at: string | null;
+  last_error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type StagedEventStatus =
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "superseded";
+
+/** How an occurrence got its division/category tags. */
+export type TagSource = "none" | "mapping" | "ai";
+
+/**
+ * One synced occurrence awaiting review. Nothing here is visible to parents
+ * until an admin approves it into public.events.
+ */
+export interface StagedBlackbaudEvent {
+  id: string;
+  school_id: string;
+  feed_id: string;
+  external_uid: string;
+  occurrence_start: string;
+  title: string;
+  description: string | null;
+  location: string | null;
+  all_day: boolean;
+  local_date: string;
+  local_end_date: string | null;
+  local_start_time: string | null;
+  local_end_time: string | null;
+  raw_categories: string[];
+  suggested_event_type: EventType;
+  tag_source: TagSource;
+  tag_confidence: number | null;
+  status: StagedEventStatus;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  first_seen_at: string;
+  last_seen_at: string;
+  // Populated when fetched with the suggestions embed.
+  suggestedCalendars?: EventCalendar[];
+  feedLabel?: string;
 }
