@@ -23,24 +23,8 @@ import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { updateProfile } from "@/actions/profile";
 import { addChild, updateChild, removeChild } from "@/actions/children";
 import { toast } from "sonner";
+import { GRADES, formatGrade } from "@/lib/grades";
 import type { Profile, Child } from "@/lib/types";
-
-const GRADES = [
-  { value: "Pre-K", label: "Pre-K" },
-  { value: "K", label: "Kindergarten" },
-  { value: "1", label: "1st Grade" },
-  { value: "2", label: "2nd Grade" },
-  { value: "3", label: "3rd Grade" },
-  { value: "4", label: "4th Grade" },
-  { value: "5", label: "5th Grade" },
-  { value: "6", label: "6th Grade" },
-  { value: "7", label: "7th Grade" },
-  { value: "8", label: "8th Grade" },
-  { value: "9", label: "9th Grade" },
-  { value: "10", label: "10th Grade" },
-  { value: "11", label: "11th Grade" },
-  { value: "12", label: "12th Grade" },
-];
 
 interface ProfileClientProps {
   profile: Profile;
@@ -226,7 +210,7 @@ export function ProfileClient({
                     <div>
                       <p className="font-medium text-ink">{child.name}</p>
                       <p className="text-sm text-muted-foreground">
-                        {child.grade}
+                        {formatGrade(child.grade)}
                       </p>
                     </div>
                   </div>
@@ -272,10 +256,10 @@ export function ProfileClient({
               />
             </div>
             <div className="space-y-2">
-              <Label>Grade</Label>
+              <Label htmlFor="child-grade">Grade level</Label>
               <Select value={childGrade} onValueChange={setChildGrade}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select grade" />
+                <SelectTrigger id="child-grade" aria-describedby="child-grade-hint">
+                  <SelectValue placeholder="Select grade level" />
                 </SelectTrigger>
                 <SelectContent>
                   {GRADES.map((g) => (
@@ -285,6 +269,9 @@ export function ProfileClient({
                   ))}
                 </SelectContent>
               </Select>
+              <p id="child-grade-hint" className="text-xs text-muted-foreground">
+                The grade your child is enrolled in — not their age.
+              </p>
             </div>
             <div className="flex justify-end gap-2">
               <Button

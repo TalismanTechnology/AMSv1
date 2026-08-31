@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test lib/email/inbound.test.ts lib/documents/eml.test.ts",
+    "test": "tsx --test lib/email/inbound.test.ts lib/blackbaud/blackbaud.test.ts lib/blackbaud/calendar.test.ts lib/documents/eml.test.ts",
     "seed:demo": "NODE_OPTIONS='--max-old-space-size=4096' tsx scripts/seed-demo.ts",
     "migrate:clusters": "NODE_OPTIONS='--max-old-space-size=4096' tsx scripts/migrate-clusters.ts"
   },
@@ -25,6 +25,7 @@
     "docx-preview": "^0.3.7",
     "framer-motion": "^12.34.0",
     "gsap": "^3.14.2",
+    "ical.js": "^2.2.1",
     "jszip": "^3.10.1",
     "libreoffice-convert": "^1.8.1",
     "lucide-react": "^0.563.0",

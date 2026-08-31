@@ -12,9 +12,12 @@ import {
 import { google } from "@ai-sdk/google";
 import {
   searchDocuments,
+  keywordSearchChunks,
+  buildCitableDocuments,
   buildSystemPrompt,
   formatChunkLocation,
   type RelevantChunk,
+  type KeywordHit,
 } from "@/lib/ai/rag";
 import { generateEmbedding } from "@/lib/ai/embeddings";
 import { assignToCluster } from "@/lib/ai/cluster-assignment";
@@ -24,7 +27,7 @@ import {
   fetchAnnouncementsForContext,
   fetchChildrenForContext,
   formatEventsContext,
-  buildEventSources,
+  groupEventOccurrences,
   formatAnnouncementsContext,
   formatChildrenContext,
   getTodayString,
@@ -81,19 +84,50 @@ export async function POST(request: NextRequest) {
         .map((p: { text: string }) => p.text)
         .join("") || "";
 
-    // Rewrite follow-up questions into standalone queries for better RAG search
-    const searchQuery = await rewriteQueryWithContext(messages, lastMessageText);
+    // Start the context fetches now; only the children are needed before the
+    // rewrite, so the rest stay in flight through retrieval.
+    const adminSupabase = createAdminClient();
+    const restOfContext = Promise.allSettled([
+      fetchEventsForContext(schoolId),
+      fetchAnnouncementsForContext(schoolId),
+      adminSupabase
+        .from("settings")
+        .select("custom_system_prompt, ai_temperature")
+        .eq("school_id", schoolId)
+        .single()
+        .then((r) => r.data),
+    ]);
+    const children = await fetchChildrenForContext(user.id, schoolId);
+
+    // Rewrite follow-up questions into standalone queries for better RAG
+    // search. Children are passed so "and my other kid?" resolves to a grade
+    // level the documents are actually organised by.
+    const searchQuery = await rewriteQueryWithContext(
+      messages,
+      lastMessageText,
+      children
+    );
     if (searchQuery !== lastMessageText) {
       debugLog(`Query rewritten: "${lastMessageText.slice(0, 60)}" → "${searchQuery.slice(0, 60)}"`);
     }
 
-    // Search for relevant document chunks (non-fatal — continue without sources on failure)
+    // Retrieve with both strategies in parallel (non-fatal — continue without
+    // sources on failure). Semantic search finds passages that mean the same
+    // thing; keyword search finds the reference pages (directories, fee tables)
+    // that embeddings consistently under-rank. Recall is deliberately wide —
+    // buildCitableDocuments does the narrowing.
     let relevantChunks: RelevantChunk[] = [];
-    try {
-      relevantChunks = await searchDocuments(searchQuery, 15, 0.5, schoolId);
-    } catch (error) {
-      console.error("RAG search failed (continuing without sources):", error);
-    }
+    let keywordHits: KeywordHit[] = [];
+    const [vectorResult, keywordResult] = await Promise.allSettled([
+      searchDocuments(searchQuery, 40, 0.45, schoolId),
+      schoolId
+        ? keywordSearchChunks(searchQuery, schoolId)
+        : Promise.resolve([] as KeywordHit[]),
+    ]);
+    if (vectorResult.status === "fulfilled") relevantChunks = vectorResult.value;
+    else console.error("RAG search failed (continuing without sources):", vectorResult.reason);
+    if (keywordResult.status === "fulfilled") keywordHits = keywordResult.value;
+    else console.error("Keyword search failed (continuing without it):", keywordResult.reason);
 
     // Debug: log RAG results
     if (relevantChunks.length > 0) {
@@ -102,20 +136,10 @@ export async function POST(request: NextRequest) {
       debugLog(`RAG: 0 chunks found for query: "${lastMessageText.slice(0, 80)}"`);
     }
 
-    // Fetch events, announcements, children, and settings in parallel (all non-fatal)
-    const adminSupabase = createAdminClient();
-    const [eventsResult, announcementsResult, settingsResult, childrenResult] =
-      await Promise.allSettled([
-        fetchEventsForContext(schoolId),
-        fetchAnnouncementsForContext(schoolId),
-        adminSupabase
-          .from("settings")
-          .select("custom_system_prompt, ai_temperature")
-          .eq("school_id", schoolId)
-          .single()
-          .then((r) => r.data),
-        fetchChildrenForContext(user.id, schoolId),
-      ]);
+    // Events, announcements and settings were kicked off before the rewrite
+    // (all non-fatal — an empty result just means less context)
+    const [eventsResult, announcementsResult, settingsResult] =
+      await restOfContext;
 
     const events =
       eventsResult.status === "fulfilled" ? eventsResult.value : [];
@@ -125,8 +149,6 @@ export async function POST(request: NextRequest) {
         : [];
     const settings =
       settingsResult.status === "fulfilled" ? settingsResult.value : null;
-    const children =
-      childrenResult.status === "fulfilled" ? childrenResult.value : [];
 
     let customPrompt = "";
     let aiTemperature = 0.2;
@@ -140,38 +162,25 @@ export async function POST(request: NextRequest) {
     // Log context availability for debugging
     console.log(`[Chat] Context for school ${schoolId}: ${relevantChunks.length} doc chunks, ${events.length} events, ${announcements.length} announcements`);
 
-    // Deduplicate chunks by document (keep highest-similarity chunk per doc),
-    // filter to relevant, and cap. The same ordered set is fed to the LLM as
-    // [Source 1..N] AND returned to the client as sources[N-1], so inline
-    // [N] citations the model emits always map to a real source card.
-    const MAX_DOCUMENT_SOURCES = 3;
-    const citableChunks: RelevantChunk[] = (() => {
-      if (relevantChunks.length === 0) return [];
-      const bestByDoc = new Map<string, RelevantChunk>();
-      for (const chunk of relevantChunks) {
-        const existing = bestByDoc.get(chunk.document_id);
-        if (!existing || chunk.similarity > existing.similarity) {
-          bestByDoc.set(chunk.document_id, chunk);
-        }
-      }
-      return [...bestByDoc.values()]
-        .filter((c) => c.similarity >= 0.55)
-        .sort((a, b) => b.similarity - a.similarity)
-        .slice(0, MAX_DOCUMENT_SOURCES);
-    })();
+    // Assemble one citable excerpt per relevant document: its best matching
+    // passages plus their neighbours, stitched in document order. The same
+    // ordered set is fed to the LLM as [Source 1..N] AND returned to the client
+    // as sources[N-1], so inline [N] citations always map to a real source card.
+    const citableChunks = await buildCitableDocuments(relevantChunks, keywordHits);
 
-    // Events are citable sources numbered continuously after the documents.
-    // The same numbering is used for the [Source N] labels in the prompt AND
-    // the source cards returned to the client, so [N] citations always resolve.
-    const eventStartNumber = citableChunks.length + 1;
-    const eventSources = buildEventSources(events, eventStartNumber);
+    // The calendar is prompt context, not a citable source — see
+    // formatEventsContext. Multi-day events are still collapsed from their
+    // one-row-per-day storage into single dated entries so the prompt reads as
+    // one line per event rather than ten identical ones.
+    const calendar = groupEventOccurrences(events);
 
     // Build system prompt with documents, events, announcements, and children context
     const systemPrompt =
       buildSystemPrompt(citableChunks, {
-        eventsContext: formatEventsContext(events, eventStartNumber),
+        eventsContext: formatEventsContext(calendar),
         announcementsContext: formatAnnouncementsContext(announcements),
         childrenContext: formatChildrenContext(children),
+        childCount: children.length,
         todayString: getTodayString(),
       }) + customPrompt;
 
@@ -180,11 +189,13 @@ export async function POST(request: NextRequest) {
     const sources: ChatSource[] = citableChunks.map((chunk, i) => {
       return {
         document_id: chunk.document_id,
-        title: chunk.document_title || "Unknown",
-        chunk_content: chunk.content,
+        title: chunk.title,
+        // The matching passage, not the full stitched excerpt the model saw —
+        // this is what the sidebar highlights inside the document.
+        chunk_content: chunk.best_chunk_content,
         similarity: chunk.similarity,
-        file_url: chunk.document_file_url,
-        file_type: chunk.document_file_type,
+        file_url: chunk.file_url,
+        file_type: chunk.file_type,
         chunk_index: chunk.chunk_index,
         source_number: i + 1,
         source_type: "document" as const,
@@ -192,11 +203,9 @@ export async function POST(request: NextRequest) {
       };
     });
 
-    // Documents (always shown as cards) + the full numbered calendar. Event
-    // cards are only surfaced client-side when their [N] is actually cited, so
-    // the whole calendar isn't dumped as cards. Sent to the client for citation
-    // resolution; the DB save below keeps docs + only the cited events.
-    const allSources: ChatSource[] = [...sources, ...eventSources];
+    // Documents are the only citable sources; the calendar never produces
+    // cards, so what the client receives is exactly what [N] can resolve to.
+    const allSources: ChatSource[] = sources;
 
     // Save user message in the background (fire and forget)
     if (sessionId) {
@@ -333,18 +342,9 @@ export async function POST(request: NextRequest) {
           // Strip follow-up markers before saving to DB
           const markerIdx = text.indexOf("---FOLLOW_UPS---");
           const cleanText = markerIdx !== -1 ? text.slice(0, markerIdx).trimEnd() : text;
-          // Persist all document sources plus only the events the answer
-          // actually cited — the full calendar is scanned but not stored per
-          // message. Historical messages then replay exactly the cited cards.
-          const citedNumbers = new Set(
-            [...cleanText.matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1]))
-          );
-          const savedSources: ChatSource[] = [
-            ...sources,
-            ...eventSources.filter(
-              (s) => s.source_number != null && citedNumbers.has(s.source_number)
-            ),
-          ];
+          // Only document sources are persisted — the calendar is scanned for
+          // every question but is never a citable card.
+          const savedSources: ChatSource[] = sources;
           adminSupabase
             .from("chat_messages")
             .insert({

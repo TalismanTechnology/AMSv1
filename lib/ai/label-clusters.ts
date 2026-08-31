@@ -35,6 +35,10 @@ ${clusterDescriptions}
 Respond with one label per line, in order. Just the labels, no numbering or extra text.`,
     maxOutputTokens: 200,
     temperature: 0.2,
+    // Thinking tokens count against maxOutputTokens on Gemini 2.5 and were
+    // consuming nearly the whole budget, cutting the label list short — the
+    // trailing clusters silently lost their labels.
+    providerOptions: { google: { thinkingConfig: { thinkingBudget: 0 } } },
   });
 
   const labels = text

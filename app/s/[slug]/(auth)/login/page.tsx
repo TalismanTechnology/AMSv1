@@ -16,6 +16,10 @@ export default async function LoginPage({ params }: LoginPageProps) {
       schoolSlug={school.slug}
       schoolId={school.id}
       schoolName={school.name}
+      ssoEnabled={school.sso_enabled ?? false}
+      ssoDomain={school.sso_domain}
+      ssoProviderId={school.sso_provider_id}
+      ssoButtonLabel={school.sso_button_label}
     />
   );
 }

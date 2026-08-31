@@ -52,24 +52,8 @@ import { approveUser, approveAllPending, changeUserRole, deleteUser } from "@/ac
 import { toast } from "sonner";
 import NextLink from "next/link";
 import { TimeAgo } from "@/components/ui/time-ago";
+import { GRADES, formatGrade } from "@/lib/grades";
 import type { Profile } from "@/lib/types";
-
-const GRADES = [
-  "Pre-K",
-  "Kindergarten",
-  "1st",
-  "2nd",
-  "3rd",
-  "4th",
-  "5th",
-  "6th",
-  "7th",
-  "8th",
-  "9th",
-  "10th",
-  "11th",
-  "12th",
-];
 
 type SortKey = "full_name" | "email" | "role" | "child_grade" | "created_at";
 type SortDir = "asc" | "desc";
@@ -366,10 +350,10 @@ export function UsersClient({ users, schoolId, schoolSlug, joinCode, requireJoin
               <SelectValue placeholder="Filter by grade" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Grades</SelectItem>
+              <SelectItem value="all">All grade levels</SelectItem>
               {GRADES.map((g) => (
-                <SelectItem key={g} value={g}>
-                  {g}
+                <SelectItem key={g.value} value={g.value}>
+                  {g.label}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -495,7 +479,7 @@ export function UsersClient({ users, schoolId, schoolSlug, joinCode, requireJoin
                       <span>
                         {user.children[0].name}{" "}
                         <span className="text-xs opacity-60">
-                          ({user.children[0].grade})
+                          ({formatGrade(user.children[0].grade)})
                         </span>
                       </span>
                     ) : (
@@ -508,14 +492,14 @@ export function UsersClient({ users, schoolId, schoolSlug, joinCode, requireJoin
                         <TooltipContent>
                           {user.children.map((c) => (
                             <div key={c.id}>
-                              {c.name} ({c.grade})
+                              {c.name} ({formatGrade(c.grade)})
                             </div>
                           ))}
                         </TooltipContent>
                       </Tooltip>
                     )
                   ) : (
-                    user.child_grade || "\u2014"
+                    formatGrade(user.child_grade) || "\u2014"
                   )}
                 </TableCell>
                 <TableCell className="hidden py-4 text-sm text-ink-soft md:table-cell">

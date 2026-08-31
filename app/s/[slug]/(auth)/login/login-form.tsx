@@ -11,19 +11,36 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { login } from "@/actions/auth";
-import { GoogleSignInButton } from "@/components/google-sign-in-button";
 import { AuthShell } from "@/components/auth/auth-shell";
+import { SsoSignInButton } from "@/components/auth/sso-sign-in-button";
 
 interface LoginFormProps {
   schoolSlug: string;
   schoolId: string;
   schoolName: string;
+  ssoEnabled: boolean;
+  ssoDomain: string | null;
+  ssoProviderId: string | null;
+  ssoButtonLabel: string | null;
 }
 
-export function LoginForm({ schoolSlug, schoolId, schoolName }: LoginFormProps) {
+export function LoginForm({
+  schoolSlug,
+  schoolId,
+  schoolName,
+  ssoEnabled,
+  ssoDomain,
+  ssoProviderId,
+  ssoButtonLabel,
+}: LoginFormProps) {
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(searchParams.get("error"));
   const [loading, setLoading] = useState(false);
+  // On an SSO school, parents sign in through their school's identity provider.
+  // Password sign-in still exists for staff and admins, but stays collapsed so
+  // parents aren't offered a second path — SSO accounts can't be merged with
+  // password accounts, so anyone using both ends up as two separate people.
+  const [showStaffSignIn, setShowStaffSignIn] = useState(!ssoEnabled);
 
   async function handleSubmit(formData: FormData) {
     setLoading(true);
@@ -84,55 +101,88 @@ export function LoginForm({ schoolSlug, schoolId, schoolName }: LoginFormProps) 
           </div>
         )}
 
-        <GoogleSignInButton schoolSlug={schoolSlug} />
+        {ssoEnabled && (
+          <SsoSignInButton
+            domain={ssoDomain}
+            providerId={ssoProviderId}
+            label={ssoButtonLabel}
+            schoolSlug={schoolSlug}
+          />
+        )}
 
-        <div className="relative my-5">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t border-border" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase tracking-wider">
-            <span className="bg-card px-3 text-muted-foreground">or</span>
-          </div>
-        </div>
+        {ssoEnabled && !showStaffSignIn && (
+          <p className="mt-5 text-center text-sm text-ink-soft">
+            Use the same login you use for the {schoolName} website. Your
+            account is matched against the school&apos;s parent records.
+          </p>
+        )}
 
-        <form action={handleSubmit} className="space-y-4">
-          <input type="hidden" name="school_slug" value={schoolSlug} />
-          <input type="hidden" name="school_id" value={schoolId} />
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              name="email"
-              type="email"
-              placeholder="parent@example.com"
-              required
-            />
+        {/* Only meaningful when something sits above the password form. */}
+        {ssoEnabled && showStaffSignIn && (
+          <div className="relative my-5">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase tracking-wider">
+              <span className="bg-card px-3 text-muted-foreground">
+                staff sign-in
+              </span>
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              placeholder="Enter your password"
-              required
-            />
-          </div>
-          <Button type="submit" className="h-11 w-full" disabled={loading}>
-            {loading && <LogoSpinner className="mr-2" />}
-            Sign in
-          </Button>
-        </form>
+        )}
 
-        <p className="mt-6 text-center text-sm text-ink-soft">
-          Don&apos;t have an account?{" "}
-          <Link
-            href={`/s/${schoolSlug}/register`}
-            className="font-medium text-primary hover:underline"
+        {showStaffSignIn && (
+          <form action={handleSubmit} className="space-y-4">
+            <input type="hidden" name="school_slug" value={schoolSlug} />
+            <input type="hidden" name="school_id" value={schoolId} />
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                placeholder="you@example.com"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                placeholder="Enter your password"
+                required
+              />
+            </div>
+            <Button type="submit" className="h-11 w-full" disabled={loading}>
+              {loading && <LogoSpinner className="mr-2" />}
+              Sign in
+            </Button>
+          </form>
+        )}
+
+        {ssoEnabled ? (
+          <button
+            type="button"
+            onClick={() => setShowStaffSignIn((shown) => !shown)}
+            className="mt-6 w-full text-center text-sm text-ink-soft underline-offset-4 hover:text-ink hover:underline"
           >
-            Sign up
-          </Link>
-        </p>
+            {showStaffSignIn
+              ? "Back to parent sign-in"
+              : "School staff sign-in"}
+          </button>
+        ) : (
+          <p className="mt-6 text-center text-sm text-ink-soft">
+            Don&apos;t have an account?{" "}
+            <Link
+              href={`/s/${schoolSlug}/register`}
+              className="font-medium text-primary hover:underline"
+            >
+              Sign up
+            </Link>
+          </p>
+        )}
       </div>
     </AuthShell>
   );
