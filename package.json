@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test lib/email/inbound.test.ts lib/documents/eml.test.ts",
+    "test": "tsx --test lib/email/inbound.test.ts lib/documents/eml.test.ts lib/ai/classify-document.test.ts",
     "seed:demo": "NODE_OPTIONS='--max-old-space-size=4096' tsx scripts/seed-demo.ts",
     "migrate:clusters": "NODE_OPTIONS='--max-old-space-size=4096' tsx scripts/migrate-clusters.ts"
   },

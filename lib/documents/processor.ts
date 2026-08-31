@@ -4,10 +4,14 @@ import { convertToPdf } from "./convert-to-pdf";
 import { splitSegmentsIntoChunks } from "@/lib/ai/chunking";
 import { generateEmbeddings } from "@/lib/ai/embeddings";
 import { generateSummary } from "@/lib/ai/summary";
-import { classifyDocument } from "@/lib/ai/classify-document";
+import { classifyDocument, toFolderOptions } from "@/lib/ai/classify-document";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const BATCH_SIZE = 5;
+
+/** How many recent filed documents to scan when collecting example titles. */
+const EXAMPLE_POOL = 300;
+const MAX_EXAMPLES_PER_OPTION = 3;
 
 interface SortableDoc {
   id: string;
@@ -15,6 +19,36 @@ interface SortableDoc {
   school_id: string | null;
   category_id: string | null;
   folder_id: string | null;
+}
+
+interface FiledDoc {
+  title: string | null;
+  category_id: string | null;
+  folder_id: string | null;
+}
+
+/**
+ * Group recent document titles by the bucket they were filed into. These go
+ * into the prompt as worked examples — a folder name alone rarely says what
+ * belongs in it, but three documents already sitting there do.
+ */
+function exampleTitles(
+  rows: FiledDoc[],
+  key: "category_id" | "folder_id"
+): Map<string, { examples: string[] }> {
+  const byId = new Map<string, { examples: string[] }>();
+
+  for (const row of rows) {
+    const id = row[key];
+    const title = row.title?.trim();
+    if (!id || !title) continue;
+
+    const current = byId.get(id)?.examples ?? [];
+    if (current.length >= MAX_EXAMPLES_PER_OPTION) continue;
+    byId.set(id, { examples: [...current, title] });
+  }
+
+  return byId;
 }
 
 /**
@@ -39,16 +73,40 @@ async function maybeAutoSort(
 
     if (!school?.auto_sort_enabled) return {};
 
-    const [{ data: categories }, { data: folders }] = await Promise.all([
-      supabase.from("categories").select("id, name").eq("school_id", doc.school_id),
-      supabase.from("folders").select("id, name").eq("school_id", doc.school_id),
-    ]);
+    const [{ data: categories }, { data: folders }, { data: filed }] =
+      await Promise.all([
+        supabase
+          .from("categories")
+          .select("id, name, description")
+          .eq("school_id", doc.school_id),
+        supabase
+          .from("folders")
+          .select("id, name, parent_id")
+          .eq("school_id", doc.school_id),
+        supabase
+          .from("documents")
+          .select("title, category_id, folder_id")
+          .eq("school_id", doc.school_id)
+          .eq("status", "ready")
+          .neq("id", doc.id)
+          .order("created_at", { ascending: false })
+          .limit(EXAMPLE_POOL),
+      ]);
+
+    const filedRows: FiledDoc[] = filed ?? [];
+    const categoryExamples = exampleTitles(filedRows, "category_id");
+    const folderExamples = exampleTitles(filedRows, "folder_id");
 
     const result = await classifyDocument({
       title: doc.title,
       content,
-      categories: categories ?? [],
-      folders: folders ?? [],
+      categories: (categories ?? []).map((c) => ({
+        id: c.id,
+        name: c.name,
+        description: c.description,
+        examples: categoryExamples.get(c.id)?.examples,
+      })),
+      folders: toFolderOptions(folders ?? [], folderExamples),
     });
 
     const update: { category_id?: string; folder_id?: string } = {};
