@@ -43,3 +43,6 @@ chat-debug.log
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# chat eval output
+eval-results/

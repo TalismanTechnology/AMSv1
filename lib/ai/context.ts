@@ -316,15 +316,22 @@ export function formatChildrenContext(children: ChildContext[]): string {
   )}`;
 }
 
+// Schools have no timezone of their own yet; every current school is on US
+// Eastern, which is also the default for calendar feeds (migration 024).
+const SCHOOL_TIME_ZONE = "America/New_York";
+
 /**
  * Formatted current date for temporal reasoning in the prompt.
+ *
+ * Formatted in the school's zone, not the server's: on a UTC server a parent
+ * asking at 9pm Eastern would otherwise be told it is already tomorrow.
  */
-export function getTodayString(): string {
-  const now = new Date();
+export function getTodayString(now: Date = new Date()): string {
   return `Today's date is ${now.toLocaleDateString("en-US", {
     weekday: "long",
     year: "numeric",
     month: "long",
     day: "numeric",
+    timeZone: SCHOOL_TIME_ZONE,
   })}.`;
 }

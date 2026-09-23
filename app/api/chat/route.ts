@@ -5,35 +5,17 @@ import { appendFileSync } from "fs";
 const debugLog = (msg: string) => { const line = `[${new Date().toISOString()}] ${msg}\n`; console.log(line.trim()); try { appendFileSync("chat-debug.log", line); } catch {} };
 import {
   streamText,
-  convertToModelMessages,
   createUIMessageStream,
   createUIMessageStreamResponse,
 } from "ai";
 import { google } from "@ai-sdk/google";
-import {
-  searchDocuments,
-  keywordSearchChunks,
-  buildCitableDocuments,
-  buildSystemPrompt,
-  formatChunkLocation,
-  type RelevantChunk,
-  type KeywordHit,
-} from "@/lib/ai/rag";
 import { generateEmbedding } from "@/lib/ai/embeddings";
 import { assignToCluster } from "@/lib/ai/cluster-assignment";
 import { sendClusterAlert } from "@/lib/alerts/cluster-alerts";
-import {
-  fetchEventsForContext,
-  fetchAnnouncementsForContext,
-  fetchChildrenForContext,
-  formatEventsContext,
-  groupEventOccurrences,
-  formatAnnouncementsContext,
-  formatChildrenContext,
-  getTodayString,
-} from "@/lib/ai/context";
+import { fetchChildrenForContext } from "@/lib/ai/context";
+import { CHAT_MODEL_ID, prepareChatTurn } from "@/lib/ai/chat-turn";
+import { parseFollowUps } from "@/lib/chat-utils";
 import type { ChatSource } from "@/lib/types";
-import { rewriteQueryWithContext } from "@/lib/ai/rewrite-query";
 
 export async function POST(request: NextRequest) {
   try {
@@ -49,29 +31,36 @@ export async function POST(request: NextRequest) {
     const { messages, sessionId, schoolId } = await request.json();
     debugLog(`REQUEST: sessionId=${sessionId}, schoolId=${schoolId}, messageCount=${messages?.length}`);
 
+    // Every search is scoped to one school; an unscoped request has nothing
+    // it may legitimately read.
+    if (!schoolId) {
+      return new Response(JSON.stringify({ error: "schoolId is required" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
     // Verify access: super admins, or approved members of this school
-    if (schoolId) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (profile?.role !== "super_admin") {
+      const { data: membership } = await supabase
+        .from("school_memberships")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("school_id", schoolId)
+        .eq("approved", true)
         .single();
 
-      if (profile?.role !== "super_admin") {
-        const { data: membership } = await supabase
-          .from("school_memberships")
-          .select("id")
-          .eq("user_id", user.id)
-          .eq("school_id", schoolId)
-          .eq("approved", true)
-          .single();
-
-        if (!membership) {
-          return new Response(JSON.stringify({ error: "Access denied" }), {
-            status: 403,
-            headers: { "Content-Type": "application/json" },
-          });
-        }
+      if (!membership) {
+        return new Response(JSON.stringify({ error: "Access denied" }), {
+          status: 403,
+          headers: { "Content-Type": "application/json" },
+        });
       }
     }
 
@@ -84,124 +73,29 @@ export async function POST(request: NextRequest) {
         .map((p: { text: string }) => p.text)
         .join("") || "";
 
-    // Start the context fetches now; only the children are needed before the
-    // rewrite, so the rest stay in flight through retrieval.
     const adminSupabase = createAdminClient();
-    const restOfContext = Promise.allSettled([
-      fetchEventsForContext(schoolId),
-      fetchAnnouncementsForContext(schoolId),
-      adminSupabase
-        .from("settings")
-        .select("custom_system_prompt, ai_temperature")
-        .eq("school_id", schoolId)
-        .single()
-        .then((r) => r.data),
-    ]);
-    const children = await fetchChildrenForContext(user.id, schoolId);
-
-    // Rewrite follow-up questions into standalone queries for better RAG
-    // search. Children are passed so "and my other kid?" resolves to a grade
-    // level the documents are actually organised by.
-    const searchQuery = await rewriteQueryWithContext(
+    const {
+      searchQuery,
+      systemPrompt,
+      sources,
+      relevantChunks,
+      modelMessages,
+      temperature,
+    } = await prepareChatTurn({
       messages,
       lastMessageText,
-      children
-    );
+      schoolId,
+      children: fetchChildrenForContext(user.id, schoolId),
+    });
+
     if (searchQuery !== lastMessageText) {
       debugLog(`Query rewritten: "${lastMessageText.slice(0, 60)}" → "${searchQuery.slice(0, 60)}"`);
     }
-
-    // Retrieve with both strategies in parallel (non-fatal — continue without
-    // sources on failure). Semantic search finds passages that mean the same
-    // thing; keyword search finds the reference pages (directories, fee tables)
-    // that embeddings consistently under-rank. Recall is deliberately wide —
-    // buildCitableDocuments does the narrowing.
-    let relevantChunks: RelevantChunk[] = [];
-    let keywordHits: KeywordHit[] = [];
-    const [vectorResult, keywordResult] = await Promise.allSettled([
-      searchDocuments(searchQuery, 40, 0.45, schoolId),
-      schoolId
-        ? keywordSearchChunks(searchQuery, schoolId)
-        : Promise.resolve([] as KeywordHit[]),
-    ]);
-    if (vectorResult.status === "fulfilled") relevantChunks = vectorResult.value;
-    else console.error("RAG search failed (continuing without sources):", vectorResult.reason);
-    if (keywordResult.status === "fulfilled") keywordHits = keywordResult.value;
-    else console.error("Keyword search failed (continuing without it):", keywordResult.reason);
-
-    // Debug: log RAG results
     if (relevantChunks.length > 0) {
       debugLog(`RAG: ${relevantChunks.length} chunks found. Top: "${relevantChunks[0].document_title}" (sim: ${relevantChunks[0].similarity.toFixed(3)})`);
     } else {
       debugLog(`RAG: 0 chunks found for query: "${lastMessageText.slice(0, 80)}"`);
     }
-
-    // Events, announcements and settings were kicked off before the rewrite
-    // (all non-fatal — an empty result just means less context)
-    const [eventsResult, announcementsResult, settingsResult] =
-      await restOfContext;
-
-    const events =
-      eventsResult.status === "fulfilled" ? eventsResult.value : [];
-    const announcements =
-      announcementsResult.status === "fulfilled"
-        ? announcementsResult.value
-        : [];
-    const settings =
-      settingsResult.status === "fulfilled" ? settingsResult.value : null;
-
-    let customPrompt = "";
-    let aiTemperature = 0.2;
-    if (settings?.custom_system_prompt) {
-      customPrompt = "\n\n" + settings.custom_system_prompt;
-    }
-    if (settings?.ai_temperature != null) {
-      aiTemperature = Number(settings.ai_temperature);
-    }
-
-    // Log context availability for debugging
-    console.log(`[Chat] Context for school ${schoolId}: ${relevantChunks.length} doc chunks, ${events.length} events, ${announcements.length} announcements`);
-
-    // Assemble one citable excerpt per relevant document: its best matching
-    // passages plus their neighbours, stitched in document order. The same
-    // ordered set is fed to the LLM as [Source 1..N] AND returned to the client
-    // as sources[N-1], so inline [N] citations always map to a real source card.
-    const citableChunks = await buildCitableDocuments(relevantChunks, keywordHits);
-
-    // The calendar is prompt context, not a citable source — see
-    // formatEventsContext. Multi-day events are still collapsed from their
-    // one-row-per-day storage into single dated entries so the prompt reads as
-    // one line per event rather than ten identical ones.
-    const calendar = groupEventOccurrences(events);
-
-    // Build system prompt with documents, events, announcements, and children context
-    const systemPrompt =
-      buildSystemPrompt(citableChunks, {
-        eventsContext: formatEventsContext(calendar),
-        announcementsContext: formatAnnouncementsContext(announcements),
-        childrenContext: formatChildrenContext(children),
-        childCount: children.length,
-        todayString: getTodayString(),
-      }) + customPrompt;
-
-    // Prepare document sources for the response — same set + same numbering as
-    // the labels in the system prompt above.
-    const sources: ChatSource[] = citableChunks.map((chunk, i) => {
-      return {
-        document_id: chunk.document_id,
-        title: chunk.title,
-        // The matching passage, not the full stitched excerpt the model saw —
-        // this is what the sidebar highlights inside the document.
-        chunk_content: chunk.best_chunk_content,
-        similarity: chunk.similarity,
-        file_url: chunk.file_url,
-        file_type: chunk.file_type,
-        chunk_index: chunk.chunk_index,
-        source_number: i + 1,
-        source_type: "document" as const,
-        location: formatChunkLocation(chunk.metadata),
-      };
-    });
 
     // Documents are the only citable sources; the calendar never produces
     // cards, so what the client receives is exactly what [N] can resolve to.
@@ -313,35 +207,17 @@ export async function POST(request: NextRequest) {
     // Pre-generate the assistant message ID so we can send it to the client for feedback
     const assistantMessageId = crypto.randomUUID();
 
-    // Sanitize messages: strip custom stream parts (data-sources, data-message-id)
-    // that the client sends back in conversation history — these are not valid
-    // UIMessage part types and cause Gemini to reject the request.
-    const sanitizedMessages = messages
-      .map((m: Record<string, unknown>) => ({
-        ...m,
-        parts: Array.isArray(m.parts)
-          ? m.parts.filter((p: { type: string }) =>
-              ["text", "reasoning", "tool-invocation", "file", "source-url", "step-start"].includes(p.type)
-            )
-          : [],
-      }))
-      .filter((m: { parts: unknown[] }) => m.parts.length > 0);
-
-    // Convert UIMessages to ModelMessages for streamText
-    const modelMessages = await convertToModelMessages(sanitizedMessages);
-
     // Stream the response, save assistant message on finish
     const result = streamText({
-      model: google("gemini-2.5-flash"),
+      model: google(CHAT_MODEL_ID),
       system: systemPrompt,
       messages: modelMessages,
-      temperature: aiTemperature,
+      temperature,
       maxRetries: 5,
       onFinish: async ({ text }) => {
         if (sessionId && text.trim()) {
           // Strip follow-up markers before saving to DB
-          const markerIdx = text.indexOf("---FOLLOW_UPS---");
-          const cleanText = markerIdx !== -1 ? text.slice(0, markerIdx).trimEnd() : text;
+          const cleanText = parseFollowUps(text).content;
           // Only document sources are persisted — the calendar is scanned for
           // every question but is never a citable card.
           const savedSources: ChatSource[] = sources;
