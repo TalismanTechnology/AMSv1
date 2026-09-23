@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   motion,
   AnimatePresence,
@@ -112,13 +112,20 @@ type Phase =
   | "hold";
 
 /**
- * The floating product preview that anchors the hero. A self-contained looping
- * demo: the question slides in, the assistant "thinks", the answer reveals with
- * a typewriter clip and inline citation badges that pop in place, then the cited
- * source document opens in a side panel with the referenced passage highlighted
- * — the same grounding loop the real product runs. Pure UI, no API calls.
+ * The looping product demo shown below the hero. A self-contained animation:
+ * the question slides in, the assistant "thinks", the answer reveals with a
+ * word-by-word clip and inline citation badges that pop in place, then the
+ * cited source document opens in a side panel with the referenced passage
+ * highlighted — the same grounding loop the real product runs. Pure UI, no
+ * API calls.
+ *
+ * Colors are theme tokens (`--card`, `--border`, `--ink`, `--primary`, ...)
+ * except inside the source-document panel: that page is meant to look like a
+ * printed handbook page regardless of site theme, so its text uses fixed
+ * neutral grays rather than `--ink` — under the dark landing scope `--ink`
+ * resolves to white, which would be invisible against the white paper.
  */
-export function HeroChatMockup() {
+export function ProductDemoMockup() {
   const containerRef = useRef<HTMLDivElement>(null);
   const isInView = useInView(containerRef, { margin: "-10% 0px" });
   const reduceMotion = useReducedMotion();
@@ -127,12 +134,6 @@ export function HeroChatMockup() {
   const [loopKey, setLoopKey] = useState(0);
 
   useEffect(() => {
-    if (reduceMotion) {
-      setPhase("document");
-      return;
-    }
-    if (!isInView) return;
-
     let cancelled = false;
     const timers: ReturnType<typeof setTimeout>[] = [];
     const after = (ms: number, fn: () => void) => {
@@ -142,7 +143,31 @@ export function HeroChatMockup() {
       timers.push(id);
     };
 
-    setPhase("idle");
+    if (reduceMotion) {
+      // `prefers-reduced-motion` is unknowable on the server, so the
+      // server-rendered HTML — and the client's first hydration pass,
+      // which must match it — both assume it's off and render the "idle"
+      // frame. Flipping straight to "document" here, deferred by one tick
+      // via `after` rather than called bare in the effect body, updates it
+      // only after mount: exactly the "sync with an external system, in a
+      // callback" case the state-in-effect rule itself carves out, without
+      // hydration ever having to reconcile markup the server couldn't know.
+      after(0, () => setPhase("document"));
+      return () => {
+        cancelled = true;
+        for (const id of timers) clearTimeout(id);
+      };
+    }
+
+    if (!isInView) return;
+
+    // A loop restart (loopKey just incremented) re-enters this effect with
+    // `phase` still at "hold" from the previous cycle — every `show*` flag
+    // below is already true for that phase, so without resetting first the
+    // question, answer, and document would all pop in at once instead of
+    // staggering. Routed through the timer scheduler rather than called
+    // directly, so it doesn't fire synchronously within the effect body.
+    after(0, () => setPhase("idle"));
     after(T.questionIn, () => {
       setPhase("question");
       after(T.thinking, () => {
@@ -181,7 +206,7 @@ export function HeroChatMockup() {
   return (
     <div
       ref={containerRef}
-      className="overflow-hidden rounded-[var(--radius)] border border-border bg-card"
+      className="overflow-hidden rounded-[var(--radius)] border border-border bg-card shadow-[0_24px_60px_-24px_rgba(45,58,46,0.25)]"
     >
       {/* Window chrome */}
       <div className="flex items-center gap-3 border-b border-border/70 bg-secondary/60 px-4 py-3">
@@ -192,12 +217,14 @@ export function HeroChatMockup() {
         </div>
         <div className="flex items-center gap-1.5">
           <Logo size={16} className="text-primary" />
-          <span className="font-serif-display text-sm font-semibold text-ink">
-            AskMySchool
-          </span>
+          {/* Plain UI chrome label, not a headline — kept off the display
+              face so it stays legible at 14px. */}
+          <span className="text-sm font-semibold text-ink">AskMySchool</span>
         </div>
         <div className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
-          <span className="inline-flex items-center gap-1">
+          {/* Hidden at phone width: with the traffic lights and wordmark the
+              chrome row is already full, and this clipped the avatar. */}
+          <span className="hidden items-center gap-1 sm:inline-flex">
             <Plus className="size-3.5" /> New chat
           </span>
           <span className="flex size-6 items-center justify-center rounded-full bg-primary/12 text-[0.65rem] font-semibold text-primary">
@@ -243,7 +270,7 @@ export function HeroChatMockup() {
                   transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
                   className="flex justify-end"
                 >
-                  <div className="max-w-[80%] rounded-2xl rounded-tr-sm bg-secondary px-3.5 py-2 text-sm text-ink shadow-[var(--elev-1)]">
+                  <div className="max-w-[80%] rounded-2xl rounded-tr-sm bg-secondary px-3.5 py-2 text-sm text-ink">
                     {QUESTION}
                   </div>
                 </motion.div>
@@ -267,11 +294,11 @@ export function HeroChatMockup() {
                   </span>
 
                   {showThinking ? (
-                    <div className="rounded-2xl rounded-tl-sm border border-border bg-card px-4 py-3 shadow-[var(--elev-2)]">
+                    <div className="rounded-2xl rounded-tl-sm border border-border bg-card px-4 py-3">
                       <ThinkingDots />
                     </div>
                   ) : (
-                    <div className="min-w-0 flex-1 rounded-2xl rounded-tl-sm border border-border bg-card p-3.5 shadow-[var(--elev-2)]">
+                    <div className="min-w-0 flex-1 rounded-2xl rounded-tl-sm border border-border bg-card p-3.5">
                       <motion.p
                         initial={reduceMotion ? "visible" : "hidden"}
                         animate="visible"
@@ -313,7 +340,7 @@ export function HeroChatMockup() {
           </div>
 
           {/* Composer */}
-          <div className="flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2.5 shadow-[var(--elev-1)]">
+          <div className="flex items-center gap-2 rounded-full border border-border bg-secondary px-4 py-2.5">
             <span className="flex-1 truncate text-sm text-muted-foreground">
               Ask another question…
             </span>
@@ -345,7 +372,7 @@ export function HeroChatMockup() {
               animate={{ width: 256, opacity: 1 }}
               exit={{ width: 0, opacity: 0 }}
               transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
-              className="hidden shrink-0 overflow-hidden border-l border-border bg-background sm:block"
+              className="hidden shrink-0 overflow-hidden border-l border-border sm:block"
             >
               <SourceDocPanel reduceMotion={!!reduceMotion} />
             </motion.div>
@@ -389,24 +416,28 @@ function CitationBadge({
   );
 }
 
-/** The opened source document, mirroring the product's source panel: header,
- *  similarity chip, and the body with the cited passage highlighted. */
 /** A greeked line of body text — a thin bar standing in for a line of prose,
- *  so the cited passage reads as one paragraph on a full page of a document. */
+ *  so the cited passage reads as one paragraph on a full page of a document.
+ *  Fixed neutral color: this sits on the white paper, not the dark chrome. */
 function GreekLine({ width }: { width: string }) {
   return (
     <span
-      className="block h-[0.32rem] rounded-full bg-ink/[0.07]"
+      className="block h-[0.32rem] rounded-full bg-neutral-900/[0.07]"
       style={{ width }}
     />
   );
 }
 
+/** The opened source document, mirroring the product's source panel: header,
+ *  similarity chip, and the body with the cited passage highlighted. Viewer
+ *  chrome uses fixed near-black neutrals (not the theme's navy-tinted
+ *  originals) so it reads as plain dark UI rather than a mismatched color
+ *  cast next to the page's true-black surroundings. */
 function SourceDocPanel({ reduceMotion }: { reduceMotion: boolean }) {
   return (
-    <div className="flex h-full w-[256px] flex-col bg-[oklch(0.32_0.02_260)]">
+    <div className="flex h-full w-[256px] flex-col bg-[#1a1a1c]">
       {/* Viewer toolbar — dark PDF-app chrome */}
-      <div className="flex items-center justify-between gap-2 border-b border-black/20 bg-[oklch(0.28_0.02_260)] px-2.5 py-1.5">
+      <div className="flex items-center justify-between gap-2 border-b border-white/10 bg-[#121214] px-2.5 py-1.5">
         <div className="flex min-w-0 items-center gap-1.5">
           <span className="flex size-4 items-center justify-center rounded-[3px] bg-[#d0402f]">
             <FileText className="size-2.5 text-white" />
@@ -419,7 +450,7 @@ function SourceDocPanel({ reduceMotion }: { reduceMotion: boolean }) {
       </div>
 
       {/* Page-nav strip */}
-      <div className="flex items-center justify-between gap-2 border-b border-black/20 bg-[oklch(0.25_0.02_260)] px-2.5 py-1">
+      <div className="flex items-center justify-between gap-2 border-b border-white/10 bg-[#0c0c0e] px-2.5 py-1">
         <div className="flex items-center gap-1 text-white/60">
           <ChevronUp className="size-3" />
           <span className="rounded-[3px] bg-black/25 px-1.5 py-0.5 text-[0.6rem] font-medium tabular-nums text-white/85">
@@ -438,16 +469,17 @@ function SourceDocPanel({ reduceMotion }: { reduceMotion: boolean }) {
       <div className="flex-1 overflow-hidden px-3 py-3">
         <div className="relative mx-auto h-full">
           {/* stacked page behind, for depth */}
-          <div className="absolute inset-x-2 -bottom-1 top-1.5 rounded-[2px] bg-black/25" />
+          <div className="absolute inset-x-2 -bottom-1 top-1.5 rounded-[2px] bg-black/40" />
 
-          {/* the page */}
-          <div className="relative flex h-full flex-col rounded-[2px] bg-[oklch(0.99_0.004_90)] shadow-[0_6px_20px_-4px_oklch(0_0_0/0.45)] ring-1 ring-black/10">
+          {/* the page — always a white sheet with dark ink, independent of
+              the surrounding site theme */}
+          <div className="relative flex h-full flex-col rounded-[2px] bg-[#fdfcfa] shadow-[0_6px_20px_-4px_rgba(0,0,0,0.55)] ring-1 ring-black/10">
             {/* running head */}
-            <div className="flex items-center justify-between border-b border-ink/[0.06] px-4 pt-3 pb-1.5">
-              <span className="truncate text-[0.5rem] font-medium uppercase tracking-[0.14em] text-ink/35">
+            <div className="flex items-center justify-between border-b border-black/[0.06] px-4 pt-3 pb-1.5">
+              <span className="truncate text-[0.5rem] font-medium uppercase tracking-[0.14em] text-neutral-400">
                 {SOURCE_DOC.runningHead}
               </span>
-              <span className="text-[0.5rem] tabular-nums text-ink/35">
+              <span className="text-[0.5rem] tabular-nums text-neutral-400">
                 {SOURCE_DOC.pageNum}
               </span>
             </div>
@@ -461,10 +493,10 @@ function SourceDocPanel({ reduceMotion }: { reduceMotion: boolean }) {
                 <GreekLine width="70%" />
               </div>
 
-              <p className="mb-1.5 font-serif-display text-[0.62rem] font-semibold uppercase tracking-[0.12em] text-ink/70">
+              <p className="mb-1.5 text-[0.62rem] font-semibold uppercase tracking-[0.12em] text-neutral-600">
                 {SOURCE_DOC.heading}
               </p>
-              <p className="text-justify text-[0.72rem] leading-[1.6] text-ink/80 [hyphens:auto]">
+              <p className="text-justify text-[0.72rem] leading-[1.6] text-neutral-800 [hyphens:auto]">
                 {SOURCE_DOC.before}
                 <motion.mark
                   initial={
@@ -474,7 +506,7 @@ function SourceDocPanel({ reduceMotion }: { reduceMotion: boolean }) {
                   }
                   animate={{ backgroundColor: "oklch(0.635 0.148 47 / 0.24)" }}
                   transition={{ duration: 0.6, delay: 0.5 }}
-                  className="rounded-[1px] text-ink"
+                  className="rounded-[1px] text-neutral-900"
                 >
                   {SOURCE_DOC.highlight}
                 </motion.mark>
@@ -490,7 +522,7 @@ function SourceDocPanel({ reduceMotion }: { reduceMotion: boolean }) {
 
             {/* page footer — folio line */}
             <div className="mt-auto px-4 pb-3 pt-1 text-center">
-              <span className="font-serif-display text-[0.55rem] tabular-nums text-ink/40">
+              <span className="text-[0.55rem] tabular-nums text-neutral-400">
                 — {SOURCE_DOC.pageNum} —
               </span>
             </div>

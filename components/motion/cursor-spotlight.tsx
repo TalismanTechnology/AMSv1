@@ -25,7 +25,13 @@ export function CursorSpotlight({
   const ref = useRef<HTMLDivElement>(null);
   const reduce = useReducedMotion();
 
+  // Same markup with or without reduced motion — see magnetic-button.tsx for
+  // why: branching the render on `useReducedMotion()` (which is null during
+  // SSR) caused a hydration mismatch for reduced-motion users. The spotlight
+  // layer is always rendered at --spot-opacity 0; reduced motion just never
+  // raises it.
   function onMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (reduce) return;
     const el = ref.current;
     if (!el) return;
     if (e.pointerType === "touch") return;
@@ -39,10 +45,6 @@ export function CursorSpotlight({
     const el = ref.current;
     if (!el) return;
     el.style.setProperty("--spot-opacity", "0");
-  }
-
-  if (reduce) {
-    return <div className={className}>{children}</div>;
   }
 
   const spotColor = color.replace("VAR_OPACITY", "var(--spot-opacity, 0)");

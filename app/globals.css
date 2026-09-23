@@ -7,8 +7,20 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-inter);
-  --font-serif: var(--font-inter);
+  --font-sans: "Helvetica Neue Light", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-serif: "Helvetica Neue Light", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  /* Brand tokens (cream / forest) as utilities: bg-brand-dark, text-brand-dark/50, … */
+  --color-brand-dark: #2d3a2e;
+  --color-brand-green: #3d5a3e;
+  --color-brand-light: #f5f3ef;
+  --color-brand-cream: #faf8f5;
+  /* Display faces for the landing "answers from" wordmark row */
+  --font-helvetica-neue: "Helvetica Neue Light", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-playfair: "Playfair Display", serif;
+  --font-oswald: "Oswald", sans-serif;
+  --font-montserrat: "Montserrat", sans-serif;
+  --font-roboto-slab: "Roboto Slab", serif;
+  --font-raleway: "Raleway", sans-serif;
   --font-mono: var(--font-geist-mono);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -65,88 +77,89 @@
 :root {
   --radius: 0.9rem;
 
-  /* ===== EDITORIAL LIGHT PALETTE =====
-     Warm paper cream, deep ink navy, ember orange. Designed for depth:
-     layered warm surfaces + a rich soft-shadow elevation scale below. */
+  /* ===== CREAM / FOREST PALETTE =====
+     Cream paper (#faf8f5), forest ink (#2d3a2e), green for hover and focus
+     (#3d5a3e), one lighter cream (#f5f3ef) for secondary surfaces. Quiet,
+     editorial, light Helvetica Neue. */
 
   /* Topographic background — faint warm contour on paper */
-  --topo-line: #c9bfae;
-  --topo-bg: oklch(0.965 0.011 78);
+  --topo-line: #ddd8ce;
+  --topo-bg: #faf8f5;
 
   /* Base surfaces — warm paper cream */
-  --background: oklch(0.968 0.012 78);
-  --foreground: oklch(0.28 0.045 264);
+  --background: #faf8f5;
+  --foreground: #2d3a2e;
 
   /* Cards — near-white warm, floats above the paper */
-  --card: oklch(0.995 0.004 85);
-  --card-foreground: oklch(0.28 0.045 264);
+  --card: #ffffff;
+  --card-foreground: #2d3a2e;
 
   /* Popovers/dropdowns — fully opaque warm white */
-  --popover: oklch(0.995 0.004 85);
-  --popover-foreground: oklch(0.28 0.045 264);
+  --popover: #ffffff;
+  --popover-foreground: #2d3a2e;
 
-  /* Primary — ember orange */
-  --primary: oklch(0.635 0.148 47);
-  --primary-foreground: oklch(0.99 0.01 85);
+  /* Primary — forest */
+  --primary: #2d3a2e;
+  --primary-foreground: #ffffff;
 
   /* Secondary — warm sand surface */
-  --secondary: oklch(0.935 0.016 74);
-  --secondary-foreground: oklch(0.30 0.045 264);
+  --secondary: #f5f3ef;
+  --secondary-foreground: #2d3a2e;
 
   /* Muted */
-  --muted: oklch(0.945 0.012 76);
-  --muted-foreground: oklch(0.505 0.03 262);
+  --muted: #f5f3ef;
+  --muted-foreground: #727b73;
 
   /* Accent — warm hover wash */
-  --accent: oklch(0.925 0.024 62);
-  --accent-foreground: oklch(0.30 0.05 264);
+  --accent: #efece6;
+  --accent-foreground: #2d3a2e;
 
   /* Destructive — warm brick red */
   --destructive: oklch(0.577 0.196 26);
 
   /* Borders — warm sand hairline */
-  --border: oklch(0.885 0.014 76);
-  --input: oklch(0.885 0.014 76);
-  --ring: oklch(0.635 0.148 47);
+  --border: rgba(45, 58, 46, 0.15);
+  --input: rgba(45, 58, 46, 0.15);
+  --ring: #3d5a3e;
 
-  /* Charts — ember/navy editorial set */
-  --chart-1: oklch(0.635 0.148 47);
-  --chart-2: oklch(0.42 0.07 262);
-  --chart-3: oklch(0.72 0.11 72);
-  --chart-4: oklch(0.55 0.09 232);
-  --chart-5: oklch(0.60 0.13 20);
+  /* Charts — forest ramp plus one warm accent for contrast */
+  --chart-1: #2d3a2e;
+  --chart-2: #3d5a3e;
+  --chart-3: #7a9a7c;
+  --chart-4: #b5c2b6;
+  --chart-5: #c9a86a;
 
   /* Sidebar — soft warm panel, one step off the paper */
-  --sidebar: oklch(0.955 0.014 76);
-  --sidebar-foreground: oklch(0.32 0.04 264);
-  --sidebar-primary: oklch(0.635 0.148 47);
-  --sidebar-primary-foreground: oklch(0.99 0.01 85);
-  --sidebar-accent: oklch(0.925 0.022 62);
-  --sidebar-accent-foreground: oklch(0.30 0.05 264);
-  --sidebar-border: oklch(0.885 0.014 76);
-  --sidebar-ring: oklch(0.635 0.148 47);
+  --sidebar: #f5f3ef;
+  --sidebar-foreground: #2d3a2e;
+  --sidebar-primary: #2d3a2e;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #ebe8e1;
+  --sidebar-accent-foreground: #2d3a2e;
+  --sidebar-border: rgba(45, 58, 46, 0.15);
+  --sidebar-ring: #3d5a3e;
 
-  /* Ink navy — for headings / editorial marks */
-  --ink: oklch(0.28 0.05 264);
-  --ink-soft: oklch(0.40 0.05 264);
+  /* Forest ink — headings and body copy */
+  --ink: #2d3a2e;
+  --ink-soft: #4f5c50;
 
-  /* Ember tint helpers */
-  --ember: oklch(0.635 0.148 47);
-  --ember-soft: oklch(0.635 0.148 47 / 12%);
+  /* Accent tint helpers (name kept: ~90 components reference --ember) */
+  --ember: #3d5a3e;
+  --ember-soft: rgba(61, 90, 62, 0.12);
 
-  /* Glow — warm ember (used sparingly for focus/ctas) */
-  --glow-primary: oklch(0.635 0.148 47 / 22%);
-  --glow-primary-strong: oklch(0.635 0.148 47 / 34%);
+  /* Glow — green, used sparingly for focus/ctas */
+  --glow-primary: rgba(61, 90, 62, 0.22);
+  --glow-primary-strong: rgba(61, 90, 62, 0.34);
 
   /* Glass surfaces — warm frosted white */
   --glass-bg: oklch(1 0 0 / 62%);
-  --glass-border: oklch(0.30 0.05 264 / 8%);
+  --glass-border: rgba(45, 58, 46, 0.08);
   --glass-bg-hover: oklch(1 0 0 / 78%);
 
   /* ===== DEPTH / ELEVATION SCALE =====
      Warm-tinted, layered shadows — long soft ambient + tight contact.
      This is what makes surfaces read as floating above the paper. */
-  --shadow-color: 28 38 74;               /* navy, as rgb triplet */
+  --shadow-color: 45 58 46;               /* forest, as rgb triplet */
   --elev-1:
     0 1px 2px rgb(var(--shadow-color) / 0.05),
     0 2px 6px rgb(var(--shadow-color) / 0.05);
@@ -1146,7 +1159,7 @@ textarea:focus,
     text-rendering: optimizeLegibility;
   }
   ::selection {
-    background: oklch(0.635 0.148 47 / 22%);
+    background: rgba(61, 90, 62, 0.22);
     color: var(--ink);
   }
 }
@@ -1289,7 +1302,7 @@ textarea:focus,
 [data-slot="button"][data-variant="default"]:hover:not(:disabled),
 .neo [data-slot="button"][data-variant="default"]:hover:not(:disabled) {
   background: linear-gradient(180deg,
-    oklch(0.685 0.152 50) 0%, oklch(0.635 0.148 47) 100%) !important;
+    #3d5a3e 0%, #2d3a2e 100%) !important;
   box-shadow:
     var(--elev-3),
     inset 0 1px 0 oklch(1 0 0 / 0.32) !important;
@@ -1445,7 +1458,7 @@ input:not([type="checkbox"]):not([type="radio"]) {
   border-color: var(--border) !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  box-shadow: inset 0 1px 2px oklch(0.28 0.05 264 / 0.06) !important;
+  box-shadow: inset 0 1px 2px rgba(45, 58, 46, 0.06) !important;
   color: var(--foreground);
 }
 [data-slot="checkbox"] {
@@ -1461,7 +1474,7 @@ textarea:focus,
 [data-slot="select-trigger"]:focus,
 [data-slot="input"]:focus-visible,
 [data-slot="textarea"]:focus-visible {
-  box-shadow: 0 0 0 3px oklch(0.635 0.148 47 / 0.18) !important;
+  box-shadow: 0 0 0 3px rgba(61, 90, 62, 0.2) !important;
   border-color: var(--ring) !important;
   outline: none;
 }
@@ -1501,10 +1514,10 @@ textarea:focus,
   --elev-3: 0 1px 3px rgb(var(--shadow-color) / 0.05);
   --elev-4: 0 8px 28px -8px rgb(var(--shadow-color) / 0.12);   /* dialogs/popovers only */
   --elev-float: 0 1px 3px rgb(var(--shadow-color) / 0.05);
-  /* Slightly cleaner paper + hairline border */
-  --background: oklch(0.982 0.006 80);
-  --border: oklch(0.905 0.008 78);
-  --input: oklch(0.905 0.008 78);
+  /* Cream paper + forest hairline border */
+  --background: #faf8f5;
+  --border: rgba(45, 58, 46, 0.15);
+  --input: rgba(45, 58, 46, 0.15);
 }
 
 /* ── All-sans typography (drop the serif display everywhere) ──────────── */
@@ -1513,8 +1526,8 @@ textarea:focus,
 .metallic-text,
 .metallic-text-animated {
   font-family: var(--font-sans) !important;
-  font-weight: 600 !important;
-  letter-spacing: -0.011em !important;
+  font-weight: 400 !important;
+  letter-spacing: -0.025em !important;
   color: var(--ink);
 }
 
@@ -1534,7 +1547,7 @@ textarea:focus,
 .metallic-card:hover {
   transform: none;
   box-shadow: none;
-  border-color: oklch(0.86 0.012 76);
+  border-color: rgba(45, 58, 46, 0.28);
 }
 .dashboard-cards [data-slot="card"]:not(.metallic-card),
 .dashboard-cards [data-slot="card"]:not(.metallic-card):hover,
@@ -1560,11 +1573,12 @@ textarea:focus,
   background: var(--primary) !important;
   color: var(--primary-foreground) !important;
   border: 1px solid transparent !important;
+  border-radius: 999px;
   box-shadow: none !important;
 }
 [data-slot="button"][data-variant="default"]:hover:not(:disabled),
 .neo [data-slot="button"][data-variant="default"]:hover:not(:disabled) {
-  background: oklch(0.6 0.145 46) !important;
+  background: #3d5a3e !important;
   box-shadow: none !important;
   transform: none !important;
 }
@@ -1574,6 +1588,7 @@ textarea:focus,
 .neo [data-slot="button"][data-variant="secondary"] {
   box-shadow: none !important;
   border: 1px solid var(--border) !important;
+  border-radius: 999px;
 }
 [data-slot="button"][data-variant="outline"]:hover:not(:disabled) {
   transform: none !important;
@@ -1601,18 +1616,18 @@ textarea:focus,
 
 /* Eyebrows: neutral + subtle instead of loud orange kickers */
 .eyebrow {
-  color: var(--muted-foreground) !important;
-  font-size: 0.7rem !important;
-  letter-spacing: 0.09em !important;
-  font-weight: 600 !important;
+  color: rgba(45, 58, 46, 0.5) !important;
+  font-size: 0.75rem !important;
+  letter-spacing: 0.25em !important;
+  font-weight: 400 !important;
   text-transform: uppercase;
 }
 
-/* Headings a touch lighter for a calmer, minimal tone */
+/* Headings: the light Helvetica Neue face, tight tracking — no synthetic bold */
 .font-serif-display,
 .metallic-heading {
-  font-weight: 600 !important;
-  letter-spacing: -0.014em !important;
+  font-weight: 400 !important;
+  letter-spacing: -0.025em !important;
 }
 
 /* Icon "chips": drop the ember-tinted circle, let icons sit in neutral space */
@@ -1623,8 +1638,8 @@ textarea:focus,
 
 /* ═══ Sidebar: no tan panel — match the page, flat, hairline divider only ═ */
 .neo {
-  --background: oklch(0.982 0.006 80) !important;   /* clean cream = page */
-  --sidebar: oklch(0.982 0.006 80) !important;      /* remove the tan bg */
+  --background: #faf8f5 !important;   /* cream = page */
+  --sidebar: #faf8f5 !important;      /* no separate panel tint */
 }
 .neo .bg-sidebar,
 .neo [class*="bg-sidebar"]:not([class*="bg-sidebar-accent"]):not([class*="bg-sidebar-primary"]) {
@@ -1632,4 +1647,175 @@ textarea:focus,
   -webkit-backdrop-filter: none !important;
   box-shadow: none !important;
   border-color: var(--border) !important;
+}
+
+/* ═══ LANDING PAGE — PALOMAR LAYER ══════════════════════════════════════
+   The marketing page shares the app's cream / forest tokens above; this
+   only adds what the hero needs: its entrance keyframes and stagger steps.
+   (Brand color and display-font utilities are declared in @theme.) */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fade-down {
+  from { opacity: 0; transform: translateY(-12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up   { animation: fade-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-fade-down { animation: fade-down 0.7s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.stagger-1 { animation-delay: 0ms; }
+.stagger-2 { animation-delay: 120ms; }
+.stagger-3 { animation-delay: 240ms; }
+.stagger-4 { animation-delay: 360ms; }
+.stagger-5 { animation-delay: 480ms; }
+.stagger-6 { animation-delay: 600ms; }
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up,
+  .animate-fade-down {
+    animation: none;
+  }
+}
+
+/* ── FAQ accordion (Radix) ────────────────────────────────────────────────
+   The shared collapse keyframes above read the *collapsible* height
+   variable; Accordion exposes its own, so it needs its own pair. */
+@keyframes lp-acc-down {
+  from { height: 0; opacity: 0; }
+  to { height: var(--radix-accordion-content-height); opacity: 1; }
+}
+@keyframes lp-acc-up {
+  from { height: var(--radix-accordion-content-height); opacity: 1; }
+  to { height: 0; opacity: 0; }
+}
+.lp-acc-content[data-state="open"] {
+  animation: lp-acc-down 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.lp-acc-content[data-state="closed"] {
+  animation: lp-acc-up 0.2s ease-in;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-acc-content {
+    animation: none !important;
+  }
+}
+
+/* ═══ LANDING PAGE — DEPTH LAYER ════════════════════════════════════════
+   The flat layer above nulls the app-wide elevation scale on purpose. The
+   marketing page wants real, physical lift, so it carries its own shadow
+   tokens scoped to `.landing`, plus the grain, tile, slab, and marquee
+   helpers the landing sections share. Nothing here leaks into the app. */
+.landing {
+  --lp-shadow-color: 45 58 46;
+  --lp-shadow-1:
+    0 1px 2px rgb(var(--lp-shadow-color) / 0.05),
+    0 2px 6px rgb(var(--lp-shadow-color) / 0.05);
+  --lp-shadow-2:
+    0 1px 2px rgb(var(--lp-shadow-color) / 0.06),
+    0 8px 18px -6px rgb(var(--lp-shadow-color) / 0.10),
+    0 16px 36px -14px rgb(var(--lp-shadow-color) / 0.12);
+  --lp-shadow-3:
+    0 1px 2px rgb(var(--lp-shadow-color) / 0.07),
+    0 12px 28px -10px rgb(var(--lp-shadow-color) / 0.14),
+    0 32px 64px -24px rgb(var(--lp-shadow-color) / 0.20);
+  --lp-shadow-4:
+    0 2px 4px rgb(var(--lp-shadow-color) / 0.08),
+    0 24px 48px -16px rgb(var(--lp-shadow-color) / 0.18),
+    0 56px 112px -36px rgb(var(--lp-shadow-color) / 0.26);
+  --lp-shadow-float:
+    0 2px 4px rgb(var(--lp-shadow-color) / 0.06),
+    0 40px 80px -24px rgb(var(--lp-shadow-color) / 0.24),
+    0 80px 160px -48px rgb(var(--lp-shadow-color) / 0.30);
+  --lp-sheen: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  --lp-ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Film grain over photos and plates. A tiny pre-rendered tile at low
+   opacity, not an SVG turbulence filter or a blend mode: those force the
+   compositor to re-blend every layer the grain sits on, on every scroll
+   frame, and were the single biggest source of jank on this page. */
+.lp-grain {
+  background-image: url("/images/landing/grain.png");
+  background-size: 160px 160px;
+  opacity: 0.16;
+}
+
+/* A photograph mounted as an object */
+.lp-plate {
+  box-shadow: var(--lp-shadow-3);
+  background: #efece6;
+}
+
+/* White tile: hairline edge, top sheen, lift on hover */
+.lp-tile {
+  background: #ffffff;
+  border: 1px solid rgba(45, 58, 46, 0.12);
+  box-shadow: var(--lp-shadow-2), var(--lp-sheen);
+  transition:
+    transform 0.45s var(--lp-ease),
+    box-shadow 0.45s var(--lp-ease),
+    border-color 0.3s ease;
+}
+.lp-tile-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--lp-shadow-4), var(--lp-sheen);
+  border-color: rgba(45, 58, 46, 0.2);
+}
+
+/* Forest tile: deep, with an inner sage glow so it isn't a flat slab */
+.lp-tile-accent {
+  background:
+    radial-gradient(120% 90% at 100% 0%, rgba(122, 154, 124, 0.35) 0%, rgba(122, 154, 124, 0) 55%),
+    radial-gradient(80% 60% at 0% 100%, rgba(61, 90, 62, 0.6) 0%, rgba(61, 90, 62, 0) 60%),
+    #2d3a2e;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    var(--lp-shadow-4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+/* Cream slab: the "page behind the page" used to stack plates */
+.lp-slab {
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(45, 58, 46, 0.1);
+  box-shadow: var(--lp-shadow-1);
+}
+
+/* Question ticker. The rows animate forever, so keep them on their own
+   compositor layers. */
+@keyframes lp-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.lp-marquee [style*="lp-marquee"] {
+  will-change: transform;
+}
+
+/* Skip painting heavy product visuals while they're far off-screen. The
+   animations keep running; the browser just doesn't rasterize them until
+   they approach the viewport. */
+.lp-offscreen-skip {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 320px;
+}
+.lp-marquee:hover [style*="lp-marquee"] {
+  animation-play-state: paused;
+}
+
+/* Gentle float for the chips that orbit the demo */
+@keyframes lp-float {
+  0%, 100% { transform: translateY(0) rotate(var(--lp-tilt, 0deg)); }
+  50% { transform: translateY(-8px) rotate(var(--lp-tilt, 0deg)); }
+}
+.lp-float {
+  animation: lp-float 6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-marquee [style*="lp-marquee"],
+  .lp-float {
+    animation: none !important;
+  }
+  .lp-tile-hover:hover {
+    transform: none;
+  }
 }

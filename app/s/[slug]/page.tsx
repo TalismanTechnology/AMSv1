@@ -21,7 +21,7 @@ export default async function SchoolLandingPage({
       <div
         aria-hidden
         className="depth-glow left-1/2 top-1/4 h-[420px] w-[420px] -translate-x-1/2"
-        style={{ background: "oklch(0.635 0.148 47 / 12%)" }}
+        style={{ background: "rgba(61, 90, 62, 0.12)" }}
       />
       <div className="relative z-10 w-full max-w-lg">
         <div className="metallic-card rounded-3xl px-8 py-12 text-center sm:px-12">

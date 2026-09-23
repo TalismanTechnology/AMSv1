@@ -213,15 +213,12 @@ export function RetrievalMockup() {
           <motion.div
             key={d.name}
             className="flex items-center gap-2 text-[11px]"
+            // Opacity pulse rather than a `filter: brightness()` sweep: a
+            // filter animation repaints on the CPU every frame, opacity
+            // stays on the compositor. Same visible rhythm.
             animate={
               d.approved
-                ? {
-                    filter: [
-                      "brightness(1)",
-                      "brightness(1.5)",
-                      "brightness(1)",
-                    ],
-                  }
+                ? { opacity: [0.7, 1, 0.7] }
                 : { opacity: [0.55, 0.4, 0.55] }
             }
             transition={{

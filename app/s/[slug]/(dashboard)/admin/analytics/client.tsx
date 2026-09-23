@@ -38,14 +38,14 @@ import {
   type TimeRange,
 } from "@/actions/analytics";
 
-const PIE_COLORS = ["#c96a35", "#2f3a63", "#c79a4a", "#5a7ba6", "#a3453a", "#7a8299"];
+const PIE_COLORS = ["#2d3a2e", "#3d5a3e", "#7a9a7c", "#b5c2b6", "#c9a86a", "#8a8f88"];
 
 const tooltipStyle = {
-  backgroundColor: "oklch(0.995 0.004 85)",
-  border: "1px solid oklch(0.885 0.014 76)",
+  backgroundColor: "#ffffff",
+  border: "1px solid rgba(45, 58, 46, 0.15)",
   borderRadius: "0.6rem",
-  color: "oklch(0.28 0.05 264)",
-  boxShadow: "0 10px 30px oklch(0.28 0.05 264 / 18%)",
+  color: "#2d3a2e",
+  boxShadow: "0 10px 30px rgba(45, 58, 46, 0.18)",
 };
 
 const TIME_RANGES: { value: TimeRange; label: string }[] = [

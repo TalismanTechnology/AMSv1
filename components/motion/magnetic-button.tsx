@@ -30,7 +30,14 @@ export function MagneticButton({
   const sx = useSpring(x, { stiffness: 220, damping: 18, mass: 0.4 });
   const sy = useSpring(y, { stiffness: 220, damping: 18, mass: 0.4 });
 
+  // The markup below is the same whether or not motion is reduced.
+  // `prefers-reduced-motion` is only knowable on the client, so branching the
+  // render on it (the old `if (reduce) return <div>`) made a reduced-motion
+  // client's first paint disagree with the server HTML — a hydration error on
+  // every page using this. Reduced motion instead turns the handlers into
+  // no-ops, so the springs simply stay at 0.
   function onMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (reduce) return;
     if (e.pointerType === "touch") return;
     const el = ref.current;
     if (!el) return;
@@ -53,10 +60,6 @@ export function MagneticButton({
   function onLeave() {
     x.set(0);
     y.set(0);
-  }
-
-  if (reduce) {
-    return <div className={className}>{children}</div>;
   }
 
   return (
