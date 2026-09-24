@@ -1,18 +1,20 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isCronAuthorized } from "@/lib/blackbaud/cron-auth";
 
 // Publish scheduled announcements whose publish_at has passed.
-// Trigger via Vercel Cron or an external scheduler:
-//   GET /api/cron/publish-announcements?key=<CRON_SECRET>
+//   GET /api/cron/publish-announcements
+//   Authorization: Bearer <CRON_SECRET>   (or ?key=<CRON_SECRET>)
+//
+// Vercel Cron presents the secret as a Bearer header, so this route has to
+// accept the same two forms as the Blackbaud sync routes.
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const key = searchParams.get("key");
+  const secret = process.env.CRON_SECRET;
 
-  // Shared-secret auth — CRON_SECRET must be set
-  if (!process.env.CRON_SECRET) {
+  if (!secret) {
     return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
   }
-  if (key !== process.env.CRON_SECRET) {
+  if (!isCronAuthorized(request, secret)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
