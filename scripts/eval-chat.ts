@@ -14,6 +14,8 @@
  *   npx tsx scripts/eval-chat.ts --runs 3        # repeat to see variance
  *   npx tsx scripts/eval-chat.ts --only eid,sick-who-to-call
  *   npx tsx scripts/eval-chat.ts --label baseline
+ *   EVAL_JUDGE_MODEL=gemini-3.8-flash npx tsx scripts/eval-chat.ts \
+ *     --rejudge eval-results/baseline-….json   # re-grade saved answers
  *
  * Results are written to eval-results/<label>-<timestamp>.json.
  */
@@ -21,7 +23,7 @@ import { config } from "dotenv";
 import { resolve } from "path";
 config({ path: resolve(process.cwd(), ".env.local"), quiet: true });
 
-import { mkdirSync, writeFileSync } from "fs";
+import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import { parseArgs } from "util";
 import { generateObject, generateText, type UIMessage } from "ai";
 import { google } from "@ai-sdk/google";
@@ -37,6 +39,9 @@ const DEFAULT_SCHOOL_SLUG = "demo";
 // A stronger model than the one under test. (gemini-2.5-pro is closed to new
 // API keys.)
 const JUDGE_MODEL_ID = process.env.EVAL_JUDGE_MODEL || "gemini-3.1-pro-preview";
+// Set to trial a different answer model on the same questions before
+// switching production (lib/ai/chat-turn.ts) over to it.
+const ANSWER_MODEL_ID = process.env.EVAL_ANSWER_MODEL || CHAT_MODEL_ID;
 const CONCURRENCY = 4;
 
 const { values: args } = parseArgs({
@@ -45,6 +50,7 @@ const { values: args } = parseArgs({
     runs: { type: "string", default: "1" },
     only: { type: "string" },
     label: { type: "string", default: "run" },
+    rejudge: { type: "string" },
   },
 });
 
@@ -145,7 +151,7 @@ async function runCase(c: EvalCase, run: number, schoolId: string): Promise<Case
     });
 
     const { text } = await generateText({
-      model: google(CHAT_MODEL_ID),
+      model: google(ANSWER_MODEL_ID),
       system: turn.systemPrompt,
       messages: turn.modelMessages,
       temperature: turn.temperature,
@@ -227,27 +233,7 @@ function rate(results: CaseResult[], pick: (r: CaseResult) => boolean): string {
   return `${n}/${results.length} (${Math.round((100 * n) / results.length)}%)`;
 }
 
-async function main() {
-  const supabase = createAdminClient();
-  const { data: school, error } = await supabase
-    .from("schools")
-    .select("id, name")
-    .eq("slug", args.school)
-    .single();
-  if (error || !school) throw new Error(`School "${args.school}" not found: ${error?.message}`);
-
-  const only = args.only?.split(",").map((s) => s.trim());
-  const cases = only ? CASES.filter((c) => only.includes(c.id)) : CASES;
-  if (cases.length === 0) throw new Error(`No cases match --only ${args.only}`);
-  const runs = Math.max(1, Number(args.runs) || 1);
-
-  console.log(
-    `Evaluating ${cases.length} cases × ${runs} run(s) on "${school.name}" — answer model ${CHAT_MODEL_ID}, judge ${JUDGE_MODEL_ID}\n`
-  );
-
-  const jobs = Array.from({ length: runs }, (_, run) => cases.map((c) => ({ c, run }))).flat();
-  const results = await mapPool(jobs, CONCURRENCY, ({ c, run }) => runCase(c, run, school.id));
-
+function report(results: CaseResult[], runs: number) {
   for (const r of results) {
     const failed = Object.entries(r.checks)
       .filter(([, ok]) => !ok)
@@ -274,11 +260,90 @@ Retrieval        ${rate(results, (r) => r.checks.retrieval)}
 Citations valid  ${rate(results, (r) => r.checks.citationsValid)}
 Follow-ups       ${rate(results, (r) => r.checks.followUps)}
 Required facts   ${rate(results, (r) => r.checks.mustMatch && r.checks.mustNotMatch)}`);
+}
 
+function save(label: string, answerModel: string, results: CaseResult[]) {
   mkdirSync("eval-results", { recursive: true });
-  const file = `eval-results/${args.label}-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
-  writeFileSync(file, JSON.stringify({ model: CHAT_MODEL_ID, judge: JUDGE_MODEL_ID, results }, null, 2));
+  const file = `eval-results/${label}-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
+  writeFileSync(file, JSON.stringify({ model: answerModel, judge: JUDGE_MODEL_ID, results }, null, 2));
   console.log(`\nFull results: ${file}`);
+}
+
+/**
+ * Re-grade answers saved by an earlier run with the current judge and the
+ * current case definitions, without regenerating them. Lets runs graded by
+ * different judges (e.g. after a quota outage) be compared on one scale.
+ */
+async function rejudge(file: string, schoolId: string) {
+  const saved = JSON.parse(readFileSync(file, "utf8")) as {
+    model: string;
+    results: CaseResult[];
+  };
+  const prompts = new Map<string, Promise<string>>();
+  const promptFor = (c: EvalCase) => {
+    if (!prompts.has(c.id)) {
+      prompts.set(
+        c.id,
+        prepareChatTurn({
+          messages: toUIMessages(c),
+          lastMessageText: c.question,
+          schoolId,
+          children: c.children ?? [],
+          now: EVAL_NOW,
+        }).then((t) => t.systemPrompt)
+      );
+    }
+    return prompts.get(c.id)!;
+  };
+
+  const results = await mapPool(saved.results, CONCURRENCY, async (r): Promise<CaseResult> => {
+    const c = CASES.find((x) => x.id === r.id);
+    if (!c || !r.answer) return { ...r, judge: null, pass: false, error: r.error ?? "no answer / unknown case" };
+    const checks = {
+      ...r.checks,
+      mustMatch: (c.mustMatch ?? []).every((re) => re.test(r.answer)),
+      mustNotMatch: !(c.mustNotMatch ?? []).some((re) => re.test(r.answer)),
+    };
+    try {
+      const verdict = await judge(c, await promptFor(c), r.answer);
+      const pass = Object.values(checks).every(Boolean) && verdict.correct && verdict.grounded;
+      return { ...r, checks, judge: verdict, pass, error: undefined };
+    } catch (err) {
+      const error = `judge failed: ${err instanceof Error ? err.message : String(err)}`;
+      return { ...r, checks, judge: null, pass: false, error };
+    }
+  });
+
+  const runs = new Set(results.map((r) => r.run)).size;
+  console.log(`Re-judged ${file} (answer model ${saved.model}) with ${JUDGE_MODEL_ID}\n`);
+  report(results, runs);
+  save(args.label, saved.model, results);
+}
+
+async function main() {
+  const supabase = createAdminClient();
+  const { data: school, error } = await supabase
+    .from("schools")
+    .select("id, name")
+    .eq("slug", args.school)
+    .single();
+  if (error || !school) throw new Error(`School "${args.school}" not found: ${error?.message}`);
+
+  if (args.rejudge) return rejudge(args.rejudge, school.id);
+
+  const only = args.only?.split(",").map((s) => s.trim());
+  const cases = only ? CASES.filter((c) => only.includes(c.id)) : CASES;
+  if (cases.length === 0) throw new Error(`No cases match --only ${args.only}`);
+  const runs = Math.max(1, Number(args.runs) || 1);
+
+  console.log(
+    `Evaluating ${cases.length} cases × ${runs} run(s) on "${school.name}" — answer model ${ANSWER_MODEL_ID}, judge ${JUDGE_MODEL_ID}\n`
+  );
+
+  const jobs = Array.from({ length: runs }, (_, run) => cases.map((c) => ({ c, run }))).flat();
+  const results = await mapPool(jobs, CONCURRENCY, ({ c, run }) => runCase(c, run, school.id));
+  report(results, runs);
+  save(args.label, ANSWER_MODEL_ID, results);
 }
 
 main().catch((err) => {
