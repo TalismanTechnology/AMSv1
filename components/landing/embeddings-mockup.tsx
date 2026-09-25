@@ -398,20 +398,24 @@ function QueryMarker({ phase }: { phase: number }) {
       animate={hasQuery ? { opacity: 1, y: 0 } : { opacity: 0, y: -16 }}
       transition={hasQuery ? { type: "spring", stiffness: 300, damping: 18 } : { duration: 0.4 }}
     >
-      <motion.rect
-        x={QUERY_POINT.x - 2.8}
-        y={QUERY_POINT.y - 2.8}
-        width={5.6}
-        height={5.6}
-        rx={1.2}
-        fill="#f5f3ef"
-        stroke="#2d3a2e"
-        strokeWidth={0.8}
-        initial={false}
-        animate={{ rotate: hasQuery ? 45 : 0 }}
-        style={{ transformOrigin: `${QUERY_POINT.x}px ${QUERY_POINT.y}px`, transformBox: "view-box" }}
-        transition={{ duration: 0.6, ease: EASE }}
-      />
+      {/* Positioned by the plain SVG translate and centred on 0,0, so the
+          rotation pivots on the query point without a CSS transform-origin */}
+      <g transform={`translate(${QUERY_POINT.x} ${QUERY_POINT.y})`}>
+        <motion.rect
+          x={-2.8}
+          y={-2.8}
+          width={5.6}
+          height={5.6}
+          rx={1.2}
+          fill="#f5f3ef"
+          stroke="#2d3a2e"
+          strokeWidth={0.8}
+          initial={false}
+          animate={{ rotate: hasQuery ? 45 : 0 }}
+          style={{ transformBox: "fill-box", transformOrigin: "50% 50%" }}
+          transition={{ duration: 0.6, ease: EASE }}
+        />
+      </g>
       {/* Speech-bubble label, so it reads as a person's words */}
       <g transform={`translate(${QUERY_POINT.x + 6} ${QUERY_POINT.y - 5})`}>
         <rect width={88} height={10.5} rx={5.25} fill="#fff" stroke="rgba(45,58,46,0.18)" strokeWidth={0.5} />
