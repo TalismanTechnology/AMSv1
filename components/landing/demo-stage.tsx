@@ -1,54 +1,59 @@
 "use client";
 
-import { useRef, type ReactNode } from "react";
-import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
+import type { ReactNode } from "react";
+import {
+  motion,
+  useReducedMotion,
+  type HTMLMotionProps,
+  type TargetAndTransition,
+} from "framer-motion";
 
-// The stage the product demo sits on. The demo plate starts tipped back in
-// perspective and levels out as it scrolls into view, so it arrives like a
-// screen being set down on the desk. Two cream slabs sit behind it, offset
-// upward — the layering is what sells the depth. Everything degrades to a
-// static, level plate under prefers-reduced-motion.
+// The stage the product demo sits on, at the foot of the hero. It rises in
+// once the headline has landed and stops with only its top half above the
+// fold, the rest of the product left as a teaser to scroll for. The plate's
+// contents fade in a beat after the plate itself. Under
+// prefers-reduced-motion it appears in place, with no travel.
 
-const TILT_DEG = 16;
+// Starts after the headline's staggered lines (globals.css .stagger-4..7).
+const ENTER_DELAY_S = 1.0;
+const ENTER_DURATION_S = 1.2;
+const EASE_OUT_EXPO: [number, number, number, number] = [0.16, 1, 0.3, 1];
+
+const SETTLED: TargetAndTransition = { opacity: 1, y: 0, scale: 1 };
+
+function enter(
+  reduceMotion: boolean | null,
+  delay: number,
+  from: TargetAndTransition,
+  to: TargetAndTransition = SETTLED
+): HTMLMotionProps<"div"> {
+  // Server and client must render the same `initial` (the server can't know
+  // the motion preference), so reduced motion keeps the states and only
+  // drops the travel time: the plate snaps into place on hydration.
+  return {
+    initial: from,
+    animate: to,
+    transition: reduceMotion
+      ? { duration: 0 }
+      : { delay, duration: ENTER_DURATION_S, ease: EASE_OUT_EXPO },
+  };
+}
 
 export function DemoStage({ children }: { children: ReactNode }) {
-  const ref = useRef<HTMLDivElement>(null);
   const reduceMotion = useReducedMotion();
-  const { scrollYProgress } = useScroll({
-    target: ref,
-    offset: ["start 95%", "start 35%"],
-  });
-  const rotateX = useTransform(scrollYProgress, [0, 1], [reduceMotion ? 0 : TILT_DEG, 0]);
-  const scale = useTransform(scrollYProgress, [0, 1], [reduceMotion ? 1 : 0.94, 1]);
-  const y = useTransform(scrollYProgress, [0, 1], [reduceMotion ? 0 : 48, 0]);
-  const slabOpacity = useTransform(scrollYProgress, [0, 1], [0, 1]);
 
   return (
-    <div ref={ref} className="relative">
-      {/* Stacked slabs behind the plate */}
-      <motion.div
-        aria-hidden
-        style={{ opacity: slabOpacity }}
-        className="lp-slab absolute inset-x-6 -top-3 bottom-3 rounded-[32px] sm:inset-x-10 sm:-top-5 sm:bottom-5"
-      />
-      <motion.div
-        aria-hidden
-        style={{ opacity: slabOpacity }}
-        className="lp-slab absolute inset-x-12 -top-6 bottom-6 rounded-[32px] opacity-70 sm:inset-x-20 sm:-top-10 sm:bottom-10"
-      />
-
+    <div className="relative">
       {/* The plate */}
       <motion.div
-        style={{
-          rotateX,
-          scale,
-          y,
-          transformPerspective: 1800,
-          transformOrigin: "50% 100%",
-        }}
+        {...enter(reduceMotion, ENTER_DELAY_S, { opacity: 0, y: 160, scale: 0.96 })}
         className="relative rounded-[32px] border border-brand-dark/12 bg-white p-2 shadow-[var(--lp-shadow-float)] sm:p-3"
       >
-        {children}
+        <motion.div
+          {...enter(reduceMotion, ENTER_DELAY_S + 0.45, { opacity: 0 })}
+        >
+          {children}
+        </motion.div>
       </motion.div>
 
       {/* Floor shadow: a soft pool under the plate so it sits on the page */}

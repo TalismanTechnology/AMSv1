@@ -1,16 +1,30 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowRight, ChevronDown } from "lucide-react";
+import { Instrument_Serif } from "next/font/google";
+import { ChevronDown } from "lucide-react";
 import { Logo } from "@/components/logo";
 
-// Opening viewport of the landing page: a fixed nav that turns cream once
-// scrolled, then a full-bleed landscape video with the announcement pill and
-// headline laid over it, left-aligned.
+// The headline's display face: an editorial serif with a true italic, to
+// suit the old-schoolhouse scene. Everything else on the page stays in the
+// Helvetica Neue Light UI face, so this is loaded here, for the hero only.
+const heroSerif = Instrument_Serif({
+  weight: "400",
+  style: ["normal", "italic"],
+  subsets: ["latin"],
+  display: "swap",
+});
 
-const VIDEO_SRC =
-  "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260820_010308_b1636845-4c15-4ab6-b0c9-9a29bfb0c6e3.mp4";
+// Opening viewport of the landing page: a fixed nav that turns cream once
+// scrolled, then a full-bleed landscape video with the headline centred over
+// its open sky.
+
+// A still-camera loop: the clip starts and ends on the poster frame, so the
+// poster shows while it loads and the loop point is invisible. Self-hosted —
+// the generation CDN URLs are tied to one account and can disappear.
+const VIDEO_SRC = "/videos/hero-campus.mp4";
+const POSTER_SRC = "/videos/hero-campus-poster.webp";
 
 const NAV_LINKS = [
   { label: "Schools", href: "#grounded" },
@@ -196,16 +210,21 @@ function Navbar() {
   );
 }
 
-export function VideoHero() {
+export function VideoHero({ children }: { children?: ReactNode }) {
   // React omits the `muted` attribute from server-rendered markup, and an
   // unmuted video will not autoplay, so set it on the element directly.
   // The same callback pauses the video whenever the hero is scrolled out of
   // view: a looping 1080p decode is pure waste once the reader is halfway
   // down the page, and it competes with the parallax and card motion below.
+  // With reduced motion requested the poster frame stands in for the loop.
   const attachVideo = useCallback((video: HTMLVideoElement | null) => {
     if (!video) return;
     video.muted = true;
     video.defaultMuted = true;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      video.pause();
+      return;
+    }
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
@@ -224,19 +243,38 @@ export function VideoHero() {
     <>
       <Navbar />
 
+      {/* The video fills exactly one viewport; the section itself grows to
+          hold whatever follows the headline (the demo), which rises over the
+          video's faded lower edge and runs on past the fold. */}
       <section
-        className="relative w-full h-screen min-h-[700px] overflow-hidden bg-brand-cream"
+        className="relative w-full bg-brand-cream"
         aria-labelledby="landing-heading"
       >
-        <div className="absolute inset-0">
+        <div className="absolute inset-x-0 top-0 h-screen min-h-[700px] overflow-hidden">
           <video
             ref={attachVideo}
             src={VIDEO_SRC}
+            poster={POSTER_SRC}
             autoPlay
             muted
             loop
             playsInline
+            aria-hidden
+            // The schoolhouse sits dead centre, low in the frame, so a
+            // bottom-anchored crop keeps it in view at every width.
             className="w-full h-full object-cover object-bottom"
+          />
+          {/* Cream wash behind the nav and headline. The frame's upper half
+              is open sky, so this only needs to lift the text a little. On
+              phones the crop pulls the hills and trees up under the text,
+              so the wash reaches further down there. */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 top-0 h-[70%] bg-gradient-to-b from-brand-cream/90 via-brand-cream/60 to-transparent md:h-[40%] md:from-brand-cream/60 md:via-brand-cream/20"
+          />
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 hidden md:block bg-[radial-gradient(ellipse_45%_40%_at_50%_32%,var(--color-brand-cream)_0%,transparent_100%)] opacity-60"
           />
           {/* Fade the video's bottom edge into the cream page below */}
           <div
@@ -245,25 +283,40 @@ export function VideoHero() {
           />
         </div>
 
-        <div className="relative z-10 flex flex-col items-start max-w-7xl mx-auto pt-28 md:pt-36 px-6 lg:px-8">
-          <a
-            href="#grounded"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-brand-dark/15 bg-white/80 hover:bg-white transition-colors mb-5 md:mb-6 animate-fade-up stagger-3"
-          >
-            <span className="text-sm text-brand-dark">
-              Now syncing school calendars from Blackbaud.
-            </span>
-            <ArrowRight className="w-3.5 h-3.5 text-brand-dark" />
-          </a>
-
+        {/* The min-height pins the demo's top edge a fixed distance above the
+            fold on tall screens, so about half of it shows at any size; on
+            short screens the text's own height takes over. */}
+        <div className="relative z-10 flex flex-col items-center text-center max-w-7xl mx-auto pt-32 md:pt-44 px-6 lg:px-8 min-h-[calc(100svh-18rem)]">
+          {/* Two set lines, centred in the open sky above the schoolhouse;
+              each rises in turn. */}
           <h1
             id="landing-heading"
-            className="text-left text-3xl sm:text-4xl md:text-5xl lg:text-6xl text-brand-dark leading-[1.05] tracking-tight max-w-4xl animate-fade-up stagger-4"
+            className={`${heroSerif.className} text-brand-dark text-[min(clamp(2.75rem,1.2rem+4.6vw,5.75rem),10svh)] leading-[0.98] tracking-[-0.02em]`}
           >
-            Every school question,
-            <br className="hidden sm:block" /> answered from official sources
+            <span className="block animate-fade-up stagger-4">
+              Every school question,
+            </span>
+            <span className="block animate-fade-up stagger-5">
+              answered from{" "}
+              <span className="italic text-brand-green">official sources.</span>
+            </span>
           </h1>
+
+          <p className="mt-6 md:mt-8 max-w-2xl text-base md:text-lg leading-relaxed text-brand-dark animate-fade-up stagger-6">
+            Pickup times, dress codes, snow days — ask in plain words and get
+            the answer from your school&apos;s own handbooks and calendar, with
+            the page it came from.
+          </p>
         </div>
+
+        {children && (
+          <div
+            id="demo"
+            className="relative z-10 mx-auto mt-12 max-w-6xl scroll-mt-24 px-6"
+          >
+            {children}
+          </div>
+        )}
       </section>
     </>
   );

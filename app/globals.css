@@ -1669,6 +1669,7 @@ textarea:focus,
 .stagger-4 { animation-delay: 360ms; }
 .stagger-5 { animation-delay: 480ms; }
 .stagger-6 { animation-delay: 600ms; }
+.stagger-7 { animation-delay: 720ms; }
 @media (prefers-reduced-motion: reduce) {
   .animate-fade-up,
   .animate-fade-down {

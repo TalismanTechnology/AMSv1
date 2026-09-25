@@ -6,12 +6,10 @@ import { VideoHero } from "@/components/landing/video-hero";
 import { QuestionMarquee } from "@/components/landing/question-marquee";
 import { DemoStage } from "@/components/landing/demo-stage";
 import { ProductDemoMockup } from "@/components/landing/product-demo";
-import { AnswerMockup } from "@/components/landing/mockups";
+import { CitedAnswerVisual } from "@/components/landing/cited-answer-visual";
 import { AskVisual } from "@/components/landing/showcase-visuals";
 import { StackingSteps } from "@/components/landing/stacking-steps";
 import { Testimonials } from "@/components/landing/testimonials";
-import { SectionBackdrop } from "@/components/landing/section-backdrop";
-import { LANDING_IMAGES } from "@/components/landing/landing-images";
 import { Faq } from "@/components/landing/faq";
 import { ClosingCta } from "@/components/landing/closing-cta";
 import { SiteFooter } from "@/components/landing/site-footer";
@@ -24,9 +22,9 @@ import {
 
 // The marketing page, top to bottom:
 //
-//   VideoHero        full-viewport landscape video, nav, headline
+//   VideoHero        full-viewport landscape video, nav, headline, and the
+//                    looping product demo rising in half above the fold
 //   QuestionMarquee  ticker of real questions, fading at the edges
-//   Demo             the looping product demo on a tilting stage
 //   Families         two cards: ask anything / every answer cited
 //   StackingSteps    three grounding steps as a deck of sticky cards
 //   Testimonials     fanned quote cards over a faint playground
@@ -47,41 +45,16 @@ export function LandingPage() {
     <div className="landing relative z-[1]">
       <ScrollProgressBar />
 
-      <VideoHero />
+      <VideoHero>
+        <DemoStage>
+          <ProductDemoMockup />
+        </DemoStage>
+      </VideoHero>
 
       <div className="relative">
-        <div className="pt-8 sm:pt-10">
+        <div className="pt-20 sm:pt-28">
           <QuestionMarquee />
         </div>
-
-        {/* ── Live demo on the stage, over a faint campus scene ── */}
-        <section id="demo" className="relative isolate scroll-mt-24 pt-20 sm:pt-28">
-          <SectionBackdrop
-            image={LANDING_IMAGES.campusTrees}
-            opacity={0.42}
-            parallax={80}
-            position="center top"
-            fade="both"
-            className="-bottom-40 top-0"
-          />
-          <div className="mx-auto max-w-6xl px-6">
-            <SectionHeading
-              align="center"
-              eyebrow="The product"
-              title={
-                <>
-                  See it <Muted>in action</Muted>
-                </>
-              }
-              subtitle="The same loop the product runs: a question, a grounded answer, and the source opened to the cited passage."
-            />
-            <div className="mt-14 sm:mt-20">
-              <DemoStage>
-                <ProductDemoMockup />
-              </DemoStage>
-            </div>
-          </div>
-        </section>
 
         {/* ── For families ── */}
         <section id="families" className={`${SECTION} pt-28 sm:pt-36`}>
@@ -118,7 +91,7 @@ export function LandingPage() {
                   </>
                 }
                 description="Each claim links to the exact document and page it came from. If the answer isn't in the documents, it says so instead of guessing."
-                visual={<AnswerMockup />}
+                visual={<CitedAnswerVisual />}
               />
             </RevealOnScroll>
           </div>
