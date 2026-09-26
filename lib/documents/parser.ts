@@ -64,16 +64,48 @@ export async function extractSegments(
   return officeParserFallback(buffer);
 }
 
-// One segment for the whole message. The subject rides along in metadata so
-// every chunk split out of a long email still cites which email it came from,
-// not just the document title.
+// One segment for the message body, then each attachment's own segments. The
+// subject rides along in metadata so every chunk split out of a long email
+// still cites which email it came from, not just the document title.
+//
+// Attachments are parsed in place rather than dropped: school emails often say
+// "see attached" and put every date and deadline in the attached letter.
 async function extractEmlSegments(buffer: Buffer): Promise<ParsedSegment[]> {
   const { parseEml } = await import("./eml");
+  const { fileTypeFromName } = await import("./file-types");
   const email = await parseEml(buffer);
 
-  if (!email.text.trim()) return [];
+  const segments: ParsedSegment[] = email.text.trim()
+    ? [{ text: email.text, metadata: { email_subject: email.subject } }]
+    : [];
 
-  return [{ text: email.text, metadata: { email_subject: email.subject } }];
+  for (const attachment of email.attachments) {
+    try {
+      const attachmentSegments = await extractSegments(
+        attachment.buffer,
+        fileTypeFromName(attachment.filename)
+      );
+      for (const segment of attachmentSegments) {
+        if (!segment.text.trim()) continue;
+        segments.push({
+          text: segment.text,
+          metadata: {
+            ...segment.metadata,
+            attachment: attachment.filename,
+            email_subject: email.subject,
+          },
+        });
+      }
+    } catch (err) {
+      // One unreadable attachment must not cost the email its body.
+      console.warn(
+        `[parser] EML attachment "${attachment.filename}" failed to parse:`,
+        err
+      );
+    }
+  }
+
+  return segments;
 }
 
 async function officeParserFallback(
@@ -94,9 +126,43 @@ export async function extractText(
   return segments.map((s) => s.text).join("\n\n");
 }
 
+// Vision transcriptions of PDFs mark each page with this line so the page
+// numbers survive the fallback — without them every citation into a scanned
+// document opens on page 1.
+const PAGE_MARKER_RE = /^[ \t]*=== PAGE (\d+) ===[ \t]*$/gm;
+
+const PDF_VISION_PROMPT = `${VISION_PROMPT}
+
+This is a multi-page PDF. Start each page's content with a line containing only "=== PAGE n ===", where n is the page number counting from 1, and keep every page's content under its own marker.`;
+
+/**
+ * Split a page-marked Vision transcription into one segment per page. Text
+ * before the first marker, or a transcription with no markers at all, becomes
+ * an untagged segment rather than being dropped.
+ */
+export function splitVisionPages(text: string): ParsedSegment[] {
+  const markers = [...text.matchAll(PAGE_MARKER_RE)];
+  if (markers.length === 0) {
+    return text.trim() ? [{ text: text.trim(), metadata: {} }] : [];
+  }
+
+  const segments: ParsedSegment[] = [];
+  const preamble = text.slice(0, markers[0].index).trim();
+  if (preamble) segments.push({ text: preamble, metadata: {} });
+
+  markers.forEach((marker, i) => {
+    const start = marker.index! + marker[0].length;
+    const end = i + 1 < markers.length ? markers[i + 1].index : text.length;
+    const body = text.slice(start, end).trim();
+    if (body) segments.push({ text: body, metadata: { page: Number(marker[1]) } });
+  });
+  return segments;
+}
+
 async function extractPdfSegments(buffer: Buffer): Promise<ParsedSegment[]> {
   let segments: ParsedSegment[] = [];
   let totalChars = 0;
+  const failedPages: number[] = [];
 
   try {
     // pdfjs-dist 5.x ships its Node-friendly build under /legacy/build/pdf.mjs.
@@ -116,33 +182,49 @@ async function extractPdfSegments(buffer: Buffer): Promise<ParsedSegment[]> {
     });
     const pdf = await loadingTask.promise;
 
+    // One unreadable page must not cost the whole document its page numbers:
+    // a throw here used to discard every page and drop to the Vision fallback.
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-      const page = await pdf.getPage(pageNum);
-      const content = await page.getTextContent();
-      const text = reconstructPageText(content.items);
-      totalChars += text.length;
-      if (text.trim().length > 0) {
-        segments.push({ text, metadata: { page: pageNum } });
+      try {
+        const page = await pdf.getPage(pageNum);
+        const content = await page.getTextContent();
+        const text = reconstructPageText(content.items);
+        totalChars += text.length;
+        if (text.trim().length > 0) {
+          segments.push({ text, metadata: { page: pageNum } });
+        }
+        page.cleanup();
+      } catch (pageErr) {
+        failedPages.push(pageNum);
+        console.error(`[parser] pdfjs failed on page ${pageNum}:`, pageErr);
       }
-      page.cleanup();
     }
     await pdf.cleanup();
     await pdf.destroy();
   } catch (err) {
-    console.warn("[parser] pdfjs failed on PDF:", err);
+    console.error("[parser] pdfjs could not open the PDF:", err);
     segments = [];
+  }
+  if (failedPages.length > 0) {
+    console.error(
+      `[parser] ${failedPages.length} PDF page(s) unreadable by pdfjs: ${failedPages.join(", ")}`
+    );
   }
 
   // Heuristic: a real text-layer PDF yields ~1000+ chars per page. <200 total
   // = almost certainly a scanned/image PDF. Fall back to Gemini Vision on the
-  // whole document. We lose per-page location info in that case.
+  // whole document, asking it to mark pages so citations keep their location.
   if (totalChars < 200) {
-    console.log(
+    console.warn(
       `[parser] PDF text-layer extraction yielded ${totalChars} chars — falling back to Gemini Vision`
     );
     try {
-      const text = await extractWithVision(buffer, "application/pdf");
-      return [{ text, metadata: {} }];
+      const text = await extractWithVision(buffer, "application/pdf", PDF_VISION_PROMPT);
+      const pages = splitVisionPages(text);
+      if (!pages.some((s) => typeof s.metadata.page === "number")) {
+        console.error("[parser] Vision transcription had no page markers — citations will not locate a page");
+      }
+      return pages.length > 0 ? pages : [{ text, metadata: {} }];
     } catch (visionErr) {
       console.error("[parser] Vision fallback failed:", visionErr);
       // Return whatever we got, even if short — better than throwing.
@@ -416,23 +498,28 @@ async function extractDocxSegments(
 
 async function extractWithVision(
   buffer: Buffer,
-  mediaType: string
+  mediaType: string,
+  prompt = VISION_PROMPT
 ): Promise<string> {
   const base64 = buffer.toString("base64");
-  const { text } = await generateText({
+  const { text, finishReason } = await generateText({
     model: google("gemini-2.5-flash"),
     messages: [
       {
         role: "user",
         content: [
           { type: "image", image: base64, mediaType },
-          { type: "text", text: VISION_PROMPT },
+          { type: "text", text: prompt },
         ],
       },
     ],
-    // Allow long outputs for multi-page PDFs
-    maxOutputTokens: 16384,
+    // The model's ceiling. A handbook runs past 100k characters; the old 16k
+    // cap silently indexed only its first half.
+    maxOutputTokens: 65536,
     temperature: 0,
   });
+  if (finishReason === "length") {
+    console.error("[parser] Vision transcription hit the output limit — the end of the document is missing from the index");
+  }
   return text.trim();
 }

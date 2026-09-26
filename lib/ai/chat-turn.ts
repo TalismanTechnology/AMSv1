@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import {
   searchDocuments,
   keywordSearchChunks,
-  buildCitableDocuments,
+  buildCitablePassages,
   formatChunkLocation,
   type RelevantChunk,
   type KeywordHit,
@@ -33,7 +33,7 @@ const MAX_TEMPERATURE = 0.5;
 export interface ChatTurn {
   searchQuery: string;
   systemPrompt: string;
-  /** Citable document sources, in [N] order. */
+  /** Citable passages, in [N] order — sources[N-1] is what [N] opens. */
   sources: ChatSource[];
   /** Raw vector hits, for analytics. */
   relevantChunks: RelevantChunk[];
@@ -91,7 +91,7 @@ export async function prepareChatTurn({
   // sources on failure). Semantic search finds passages that mean the same
   // thing; keyword search finds the reference pages (directories, fee tables)
   // that embeddings consistently under-rank. Recall is deliberately wide —
-  // buildCitableDocuments does the narrowing.
+  // buildCitablePassages does the narrowing.
   let relevantChunks: RelevantChunk[] = [];
   let keywordHits: KeywordHit[] = [];
   const [vectorResult, keywordResult] = await Promise.allSettled([
@@ -111,11 +111,11 @@ export async function prepareChatTurn({
     announcementsResult.status === "fulfilled" ? announcementsResult.value : [];
   const settings = settingsResult.status === "fulfilled" ? settingsResult.value : null;
 
-  // Assemble one citable excerpt per relevant document: its best matching
-  // passages plus their neighbours, stitched in document order. The same
+  // Assemble citable passages: each document's best matching chunks plus their
+  // neighbours, cut into short runs that each get their own number. The same
   // ordered set is fed to the LLM as [Source 1..N] AND returned to the client
-  // as sources[N-1], so inline [N] citations always map to a real source card.
-  const citableChunks = await buildCitableDocuments(relevantChunks, keywordHits);
+  // as sources[N-1], so every inline [N] opens the passage the fact came from.
+  const passages = await buildCitablePassages(relevantChunks, keywordHits);
 
   // The calendar is prompt context, not a citable source — see
   // formatEventsContext. Multi-day events are still collapsed from their
@@ -123,7 +123,7 @@ export async function prepareChatTurn({
   // one line per event rather than ten identical ones.
   const calendar = groupEventOccurrences(events);
 
-  const systemPrompt = buildSystemPrompt(citableChunks, {
+  const systemPrompt = buildSystemPrompt(passages, {
     eventsContext: formatEventsContext(calendar),
     announcementsContext: formatAnnouncementsContext(announcements),
     childrenContext: formatChildrenContext(resolvedChildren),
@@ -132,19 +132,19 @@ export async function prepareChatTurn({
     schoolInstructions: settings?.custom_system_prompt ?? undefined,
   });
 
-  const sources: ChatSource[] = citableChunks.map((chunk, i) => ({
-    document_id: chunk.document_id,
-    title: chunk.title,
-    // The matching passage, not the full stitched excerpt the model saw —
-    // this is what the sidebar highlights inside the document.
-    chunk_content: chunk.best_chunk_content,
-    similarity: chunk.similarity,
-    file_url: chunk.file_url,
-    file_type: chunk.file_type,
-    chunk_index: chunk.chunk_index,
+  const sources: ChatSource[] = passages.map((passage, i) => ({
+    document_id: passage.document_id,
+    title: passage.title,
+    // The passage exactly as the model saw it under [N] — the sidebar locates
+    // and highlights this span inside the document.
+    chunk_content: passage.content,
+    similarity: passage.similarity,
+    file_url: passage.file_url,
+    file_type: passage.file_type,
+    chunk_index: passage.chunk_index,
     source_number: i + 1,
     source_type: "document" as const,
-    location: formatChunkLocation(chunk.metadata),
+    location: formatChunkLocation(passage.metadata),
   }));
 
   const configured =
@@ -167,17 +167,36 @@ const MODEL_PART_TYPES = new Set([
   "step-start",
 ]);
 
+// Inline citations, current ([3]) and legacy ([Source 3]) forms.
+const CITATION_MARKER_RE = /\s?\[(?:Source\s+)?\d+\]/gi;
+
+/**
+ * Remove [N] citations from a past answer. Sources are renumbered every turn,
+ * so a [2] carried over from history refers to last turn's source 2 — a model
+ * that copies it links the fact to whatever document is [2] now.
+ */
+export function stripCitationMarkers(text: string): string {
+  return text.replace(CITATION_MARKER_RE, "");
+}
+
 /**
  * Strip custom stream parts (data-sources, data-message-id) that the client
  * sends back in conversation history — these are not valid UIMessage part
- * types and cause Gemini to reject the request.
+ * types and cause Gemini to reject the request — and stale citation numbers
+ * from earlier answers.
  */
-function sanitizeMessages(messages: UIMessage[]): UIMessage[] {
+export function sanitizeMessages(messages: UIMessage[]): UIMessage[] {
   return messages
     .map((m) => ({
       ...m,
       parts: Array.isArray(m.parts)
-        ? m.parts.filter((p) => MODEL_PART_TYPES.has(p.type))
+        ? m.parts
+            .filter((p) => MODEL_PART_TYPES.has(p.type))
+            .map((p) =>
+              m.role === "assistant" && p.type === "text"
+                ? { ...p, text: stripCitationMarkers(p.text) }
+                : p
+            )
         : [],
     }))
     .filter((m) => m.parts.length > 0);

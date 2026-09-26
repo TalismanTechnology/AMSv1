@@ -4,7 +4,9 @@
  * scores the answer two ways:
  *
  *   - deterministic: retrieval surfaced the right documents, every [N] resolves
- *     to a real source, follow-ups are well formed, required facts present
+ *     to a real source, each cited clause's specifics (times, numbers, emails)
+ *     appear in the passage it cites, follow-ups are well formed, required
+ *     facts present
  *   - judged: a stronger model compares the answer against the ground truth in
  *     scripts/eval/cases.ts and against the context the assistant was given,
  *     listing any claim the context doesn't support
@@ -31,6 +33,7 @@ import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CHAT_MODEL_ID, prepareChatTurn } from "@/lib/ai/chat-turn";
 import { parseFollowUps } from "@/lib/chat-utils";
+import { findCitationMismatches, type CitationMismatch } from "@/lib/ai/citation-check";
 import { CASES, type EvalCase } from "./eval/cases";
 
 // Pinned so calendar answers ("has it passed yet?") are reproducible.
@@ -78,10 +81,13 @@ interface CaseResult {
   checks: {
     retrieval: boolean;
     citationsValid: boolean;
+    /** Every cited clause's specifics appear in the passage it cites. */
+    citationsPrecise?: boolean;
     followUps: boolean;
     mustMatch: boolean;
     mustNotMatch: boolean;
   };
+  citationMismatches?: CitationMismatch[];
   judge: Judgement | null;
   pass: boolean;
   error?: string;
@@ -161,12 +167,17 @@ async function runCase(c: EvalCase, run: number, schoolId: string): Promise<Case
     const { content: answer, followUps } = parseFollowUps(text);
     const sourceTitles = turn.sources.map((s) => s.title);
     const cited = citedNumbers(answer);
+    const citationMismatches = findCitationMismatches(
+      answer,
+      turn.sources.map((s) => s.chunk_content)
+    );
 
     const checks = {
       retrieval: (c.expectDocs ?? []).every((d) =>
         sourceTitles.some((t) => t.toLowerCase().includes(d.toLowerCase()))
       ),
       citationsValid: cited.every((n) => n >= 1 && n <= turn.sources.length),
+      citationsPrecise: citationMismatches.length === 0,
       followUps: followUps.length === 3,
       mustMatch: (c.mustMatch ?? []).every((re) => re.test(answer)),
       mustNotMatch: !(c.mustNotMatch ?? []).some((re) => re.test(answer)),
@@ -190,6 +201,7 @@ async function runCase(c: EvalCase, run: number, schoolId: string): Promise<Case
       answer,
       sourceTitles,
       checks,
+      citationMismatches,
       judge: verdict,
       pass,
       error: judgeError,
@@ -243,6 +255,9 @@ function report(results: CaseResult[], runs: number) {
     const tag = r.pass ? "PASS" : r.judge || failed.length > 0 ? "FAIL" : "????";
     console.log(`${tag}  ${r.id}${runs > 1 ? ` #${r.run + 1}` : ""}${failed.length ? `  [${failed.join(", ")}]` : ""}`);
     if (r.error) console.log(`      error: ${r.error}`);
+    for (const m of r.citationMismatches ?? []) {
+      console.log(`      citation: "${m.token}" not in [${m.cited.join("][")}] — "${m.clause.slice(0, 90)}"`);
+    }
     if (!r.pass && r.judge) {
       console.log(`      judge: ${r.judge.notes}`);
       for (const claim of r.judge.unsupported_claims) console.log(`      unsupported: ${claim}`);
@@ -258,6 +273,7 @@ Correct (judge)  ${rate(judged, (r) => !!r.judge?.correct)}
 Grounded (judge) ${rate(judged, (r) => !!r.judge?.grounded)}
 Retrieval        ${rate(results, (r) => r.checks.retrieval)}
 Citations valid  ${rate(results, (r) => r.checks.citationsValid)}
+Citations precise ${rate(results, (r) => r.checks.citationsPrecise !== false)}
 Follow-ups       ${rate(results, (r) => r.checks.followUps)}
 Required facts   ${rate(results, (r) => r.checks.mustMatch && r.checks.mustNotMatch)}`);
 }

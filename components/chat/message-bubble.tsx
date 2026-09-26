@@ -5,7 +5,7 @@ import { MarkdownRenderer } from "./markdown-renderer";
 import { TypewriterText } from "./typewriter-text";
 import { FollowUpChips } from "./follow-up-chips";
 import { MessageFeedback } from "./message-feedback";
-import { SourceCard } from "./source-card";
+import { SourceList } from "./source-list";
 import { useSourcePanel } from "./source-panel-context";
 import { parseFollowUps } from "@/lib/chat-utils";
 import type { ChatSource } from "@/lib/types";
@@ -65,21 +65,9 @@ export function MessageBubble({
     );
   }
 
-  // Documents are always shown as source cards; non-document sources (events,
-  // announcements) come from the full calendar/board and are only surfaced when
-  // the answer actually cites them, so we don't dump the whole calendar.
   const citedNumbers = new Set(
     [...displayContent.matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1]))
   );
-  const sortedSources = sources?.length
-    ? [...sources]
-        .filter((s) => {
-          const type = s.source_type ?? "document";
-          if (type === "document") return true;
-          return s.source_number != null && citedNumbers.has(s.source_number);
-        })
-        .sort((a, b) => (a.source_number ?? 0) - (b.source_number ?? 0))
-    : [];
 
   return (
     <div className="flex flex-col gap-3">
@@ -105,17 +93,8 @@ export function MessageBubble({
         )}
       </div>
 
-      {sortedSources.length > 0 && (
-        <div className="flex flex-col gap-0.5">
-          <p className="mb-1 text-xs text-muted-foreground">Sources</p>
-          {sortedSources.map((source) => (
-            <SourceCard
-              key={`${source.document_id}-${source.source_number}`}
-              source={source}
-              index={source.source_number}
-            />
-          ))}
-        </div>
+      {sources && sources.length > 0 && (
+        <SourceList sources={sources} citedNumbers={citedNumbers} />
       )}
 
       {messageId && (

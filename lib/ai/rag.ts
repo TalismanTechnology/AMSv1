@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateEmbedding } from "./embeddings";
+import { stitchChunks } from "./stitch";
 
 export interface RelevantChunk {
   id: string;
@@ -26,16 +27,40 @@ export interface ChunkMetadata {
   slide?: number;         // PPTX slide number (1-indexed)
   section?: string;       // DOCX section heading text
   email_subject?: string; // EML subject line
+  attachment?: string;    // EML attachment filename the chunk came from
   [key: string]: unknown;
 }
 
+type ChunkLocation = {
+  label: string;
+  page?: number;
+  sheet?: string;
+  slide?: number;
+  section?: string;
+};
+
 // Build the user-facing location label shown beside the source title,
 // e.g. "p. 14" or "Sheet: Q3 Sales" or "Slide 5" or "§3 Cafeteria".
+// Chunks from an email attachment lead with the attachment's name
+// ("letter.pdf · p. 2"), since the document itself is the email.
 // Returns null when there's no structural metadata.
 export function formatChunkLocation(
   metadata: ChunkMetadata | null | undefined
-): { label: string; page?: number; sheet?: string; slide?: number; section?: string } | null {
+): ChunkLocation | null {
   if (!metadata) return null;
+  const attachment =
+    typeof metadata.attachment === "string" ? metadata.attachment.trim() : "";
+  if (attachment) {
+    // The subject would just repeat the document title here.
+    const inner = formatStructuralLocation({ ...metadata, email_subject: undefined });
+    return inner
+      ? { ...inner, label: `${attachment} · ${inner.label}` }
+      : { label: attachment, section: attachment };
+  }
+  return formatStructuralLocation(metadata);
+}
+
+function formatStructuralLocation(metadata: ChunkMetadata): ChunkLocation | null {
   const { page, page_end, sheet, slide, section } = metadata;
   if (typeof page === "number") {
     const label =
@@ -220,24 +245,26 @@ export async function searchDocuments(
   });
 }
 
+
 /**
- * One document's contribution to the prompt: several stitched-together excerpts
- * presented under a single [Source N]. Grouping at the document level (rather
- * than one source per chunk) lets a long handbook contribute several passages
- * without producing a stack of identically-titled source cards.
+ * One citable passage: a short contiguous run of a document's chunks, presented
+ * to the model as its own [Source N] and returned to the client as sources[N-1].
+ *
+ * Citations are per passage, not per document. When a whole document shared
+ * one number, every fact from a long handbook cited [1] and every [1] opened
+ * the same page — rarely the one the fact came from. A passage is small enough
+ * that its number pins the fact to a page and a highlightable span.
  */
-export interface CitableDocument {
+export interface CitablePassage {
   document_id: string;
   title: string;
-  content: string; // stitched excerpts, in document order — for the prompt
-  // The single best-matching chunk, verbatim. The source sidebar locates this
-  // inside the full document to highlight it, which the stitched excerpt (gap
-  // markers, trimmed seams) would defeat — and it keeps the payload we stream
-  // and store per message small.
-  best_chunk_content: string;
-  similarity: number; // best matching chunk's score
-  chunk_index: number; // best matching chunk, for the source card
-  metadata: ChunkMetadata;
+  // The passage text, overlaps removed. Exactly what the model saw under this
+  // number, and what the source sidebar highlights inside the document.
+  content: string;
+  similarity: number; // best semantic score within the passage (else the document's)
+  chunk_index: number; // first chunk of the passage
+  chunk_indexes: number[];
+  metadata: ChunkMetadata; // page range etc. across the passage's chunks
   file_url?: string;
   file_type?: string;
   tags?: string[];
@@ -251,74 +278,75 @@ const MAX_CITED_DOCUMENTS = 5;
 const MAX_VECTOR_SEEDS_PER_DOCUMENT = 5;
 const MAX_KEYWORD_SEEDS_PER_DOCUMENT = 4;
 const MAX_CHUNKS_PER_DOCUMENT = 12;
+// A seed and its two neighbours. Longer runs are split so a citation never
+// points at more than about a page of text.
+export const MAX_CHUNKS_PER_PASSAGE = 3;
 // A document must have at least one genuinely similar chunk to be cited at all.
 // Keyword hits then decide *which* of its passages are shown, but can't promote
 // an unrelated document — that would also mask genuinely unanswered questions.
 const MIN_CITABLE_SIMILARITY = 0.5;
-// Chunks are split with overlap, so neighbours repeat text at the seam.
-const MAX_SEAM_OVERLAP = 400;
 
 /**
- * Join consecutive excerpts, removing the duplicated text where two adjacent
- * chunks overlap, and marking real gaps so the model doesn't read skipped
- * material as continuous prose.
+ * Group sorted-or-not chunk indexes into passages: contiguous runs, each cut
+ * into pieces of at most `maxPerPassage` chunks.
  */
-function stitchChunks(ordered: { content: string; chunk_index: number }[]): string {
-  let out = "";
-  let prevIndex: number | null = null;
-
-  for (const chunk of ordered) {
-    if (out === "") {
-      out = chunk.content;
-      prevIndex = chunk.chunk_index;
-      continue;
-    }
-
-    if (prevIndex != null && chunk.chunk_index > prevIndex + 1) {
-      out += "\n[...]\n" + chunk.content;
-      prevIndex = chunk.chunk_index;
-      continue;
-    }
-
-    // Adjacent: drop the longest suffix of what we have that repeats as a
-    // prefix of the next chunk.
-    const window = Math.min(MAX_SEAM_OVERLAP, out.length, chunk.content.length);
-    let overlap = 0;
-    for (let len = window; len > 20; len--) {
-      if (out.endsWith(chunk.content.slice(0, len))) {
-        overlap = len;
-        break;
-      }
-    }
-    out += chunk.content.slice(overlap);
-    prevIndex = chunk.chunk_index;
+export function splitIntoPassages(
+  indexes: Iterable<number>,
+  maxPerPassage = MAX_CHUNKS_PER_PASSAGE
+): number[][] {
+  const sorted = [...new Set(indexes)].sort((a, b) => a - b);
+  const runs: number[][] = [];
+  for (const index of sorted) {
+    const run = runs[runs.length - 1];
+    if (run && index === run[run.length - 1] + 1) run.push(index);
+    else runs.push([index]);
   }
 
-  return out;
+  return runs.flatMap((run) => {
+    // Balanced pieces: a run of 4 becomes 2+2, not 3+1.
+    const pieces = Math.ceil(run.length / maxPerPassage);
+    const size = Math.ceil(run.length / pieces);
+    return Array.from({ length: pieces }, (_, i) => run.slice(i * size, (i + 1) * size)).filter(
+      (p) => p.length > 0
+    );
+  });
+}
+
+/** Combine the chunks' metadata so the passage reports its full page range. */
+export function mergePassageMetadata(metas: (ChunkMetadata | undefined)[]): ChunkMetadata {
+  const present = metas.filter((m): m is ChunkMetadata => !!m);
+  const merged: ChunkMetadata = { ...(present[0] ?? {}) };
+  const pages = present.flatMap((m) =>
+    [m.page, m.page_end].filter((p): p is number => typeof p === "number")
+  );
+  if (pages.length > 0) {
+    const first = Math.min(...pages);
+    const last = Math.max(...pages);
+    merged.page = first;
+    if (last > first) merged.page_end = last;
+    else delete merged.page_end;
+  }
+  return merged;
+}
+
+interface KnownChunk {
+  content?: string;
+  metadata?: ChunkMetadata;
 }
 
 /**
- * Turn ranked chunk hits into per-document citable excerpts.
- *
- * Semantic ranking alone is unreliable for lookup-style facts: a phone
- * directory page matches "what's the nurse's number?" weakly because it is
- * mostly names and digits. So each document's best chunks are expanded to
- * include their immediate neighbours, which is where the specific detail
- * usually sits relative to the passage that matched.
+ * Decide which chunk indexes each document contributes: its best semantic
+ * matches, its best literal matches, and the chunk either side of each — the
+ * specific detail (a number, a deadline) often sits just past the boundary of
+ * the passage that matched.
  */
-export async function buildCitableDocuments(
+function selectDocumentChunks(
   chunks: RelevantChunk[],
-  keywordHits: KeywordHit[] = []
-): Promise<CitableDocument[]> {
-  const relevant = chunks.filter((c) => c.similarity >= MIN_CITABLE_SIMILARITY);
-  if (relevant.length === 0) return [];
-
-  // Group hits by document, strongest document first.
+  keywordHits: KeywordHit[]
+): { documentId: string; hits: RelevantChunk[]; indexes: Set<number> }[] {
   const byDocument = new Map<string, RelevantChunk[]>();
-  for (const chunk of relevant) {
-    const existing = byDocument.get(chunk.document_id);
-    if (existing) existing.push(chunk);
-    else byDocument.set(chunk.document_id, [chunk]);
+  for (const chunk of chunks) {
+    byDocument.set(chunk.document_id, [...(byDocument.get(chunk.document_id) ?? []), chunk]);
   }
 
   const documents = [...byDocument.entries()]
@@ -331,20 +359,12 @@ export async function buildCitableDocuments(
 
   const keywordsByDocument = new Map<string, KeywordHit[]>();
   for (const hit of keywordHits) {
-    const existing = keywordsByDocument.get(hit.document_id);
-    if (existing) existing.push(hit);
-    else keywordsByDocument.set(hit.document_id, [hit]);
+    keywordsByDocument.set(hit.document_id, [...(keywordsByDocument.get(hit.document_id) ?? []), hit]);
   }
 
-  // Decide which chunk indexes each document contributes: its best semantic
-  // matches, its best literal matches, and the chunk either side of each — the
-  // specific detail (a number, a deadline) often sits just past the boundary of
-  // the passage that matched.
-  const wanted = documents.map(({ documentId, hits }) => {
-    const vectorSeeds = hits
-      .slice(0, MAX_VECTOR_SEEDS_PER_DOCUMENT)
-      .map((h) => h.chunk_index);
-    const keywordSeeds = (keywordsByDocument.get(documentId) || [])
+  return documents.map(({ documentId, hits }) => {
+    const vectorSeeds = hits.slice(0, MAX_VECTOR_SEEDS_PER_DOCUMENT).map((h) => h.chunk_index);
+    const keywordSeeds = (keywordsByDocument.get(documentId) ?? [])
       .slice(0, MAX_KEYWORD_SEEDS_PER_DOCUMENT)
       .map((h) => h.chunk_index);
 
@@ -366,20 +386,91 @@ export async function buildCitableDocuments(
     }
     return { documentId, hits, indexes };
   });
+}
 
-  // Fetch the text we don't already have — one round trip for all documents;
-  // the (document, index) pairs are matched up after.
-  const known = new Map<string, string>();
+/**
+ * Pure assembly step of buildCitablePassages, once every wanted chunk's text
+ * and metadata is known (keyed `${document_id}:${chunk_index}`).
+ */
+export function assemblePassages(
+  chunks: RelevantChunk[],
+  keywordHits: KeywordHit[],
+  known: Map<string, KnownChunk>
+): CitablePassage[] {
+  const relevant = chunks.filter((c) => c.similarity >= MIN_CITABLE_SIMILARITY);
+  if (relevant.length === 0) return [];
+
+  return selectDocumentChunks(relevant, keywordHits).flatMap(({ documentId, hits, indexes }) => {
+    const best = hits[0];
+    const scoreByIndex = new Map<number, number>();
+    for (const h of hits) {
+      scoreByIndex.set(h.chunk_index, Math.max(scoreByIndex.get(h.chunk_index) ?? 0, h.similarity));
+    }
+
+    const available = [...indexes].filter((i) => known.get(`${documentId}:${i}`)?.content);
+    return splitIntoPassages(available).map((passage) => {
+      const parts = passage.map((chunk_index) => ({
+        chunk_index,
+        content: known.get(`${documentId}:${chunk_index}`)!.content!,
+      }));
+      const scores = passage.map((i) => scoreByIndex.get(i)).filter((s): s is number => s != null);
+
+      return {
+        document_id: documentId,
+        title: best.document_title || "Unknown Document",
+        content: stitchChunks(parts),
+        similarity: scores.length > 0 ? Math.max(...scores) : best.similarity,
+        chunk_index: passage[0],
+        chunk_indexes: passage,
+        metadata: mergePassageMetadata(passage.map((i) => known.get(`${documentId}:${i}`)?.metadata)),
+        file_url: best.document_file_url,
+        file_type: best.document_file_type,
+        tags: best.document_tags,
+        category: best.document_category,
+        folder: best.document_folder,
+      };
+    });
+  });
+}
+
+/**
+ * Turn ranked chunk hits into citable passages, strongest document first and
+ * each document's passages in reading order.
+ *
+ * Semantic ranking alone is unreliable for lookup-style facts: a phone
+ * directory page matches "what's the nurse's number?" weakly because it is
+ * mostly names and digits. So each document's best chunks are expanded to
+ * include their immediate neighbours, which is where the specific detail
+ * usually sits relative to the passage that matched.
+ */
+export async function buildCitablePassages(
+  chunks: RelevantChunk[],
+  keywordHits: KeywordHit[] = []
+): Promise<CitablePassage[]> {
+  const relevant = chunks.filter((c) => c.similarity >= MIN_CITABLE_SIMILARITY);
+  if (relevant.length === 0) return [];
+
+  const known = new Map<string, KnownChunk>();
   for (const chunk of relevant) {
-    known.set(`${chunk.document_id}:${chunk.chunk_index}`, chunk.content);
+    known.set(`${chunk.document_id}:${chunk.chunk_index}`, {
+      content: chunk.content,
+      metadata: chunk.metadata,
+    });
   }
+  // Keyword hits carry text but not metadata; the fetch below fills it in.
   for (const hit of keywordHits) {
-    known.set(`${hit.document_id}:${hit.chunk_index}`, hit.content);
+    const key = `${hit.document_id}:${hit.chunk_index}`;
+    if (!known.has(key)) known.set(key, { content: hit.content });
   }
+
+  // Fetch what's missing — neighbour text, and the page of keyword-only chunks
+  // — in one round trip for all documents; pairs are matched up after.
+  const wanted = selectDocumentChunks(relevant, keywordHits);
   const missingIndexes = new Set<number>();
   for (const { documentId, indexes } of wanted) {
     for (const index of indexes) {
-      if (!known.has(`${documentId}:${index}`)) missingIndexes.add(index);
+      const k = known.get(`${documentId}:${index}`);
+      if (!k?.content || !k.metadata) missingIndexes.add(index);
     }
   }
 
@@ -387,7 +478,7 @@ export async function buildCitableDocuments(
     const supabase = createAdminClient();
     const { data: neighbours, error } = await supabase
       .from("document_chunks")
-      .select("document_id, chunk_index, content")
+      .select("document_id, chunk_index, content, metadata")
       .in("document_id", wanted.map((w) => w.documentId))
       .in("chunk_index", [...missingIndexes]);
 
@@ -396,35 +487,13 @@ export async function buildCitableDocuments(
       console.error("Failed to fetch neighbouring chunks:", error);
     } else {
       for (const n of neighbours || []) {
-        known.set(`${n.document_id}:${n.chunk_index}`, n.content);
+        known.set(`${n.document_id}:${n.chunk_index}`, {
+          content: n.content,
+          metadata: (n.metadata as ChunkMetadata) ?? {},
+        });
       }
     }
   }
 
-  return wanted.map(({ documentId, hits, indexes }) => {
-    const best = hits[0];
-    const ordered = [...indexes]
-      .sort((a, b) => a - b)
-      .map((chunk_index) => ({
-        chunk_index,
-        content: known.get(`${documentId}:${chunk_index}`) || "",
-      }))
-      .filter((c) => c.content !== "");
-
-    return {
-      document_id: documentId,
-      title: best.document_title || "Unknown Document",
-      content: stitchChunks(ordered),
-      best_chunk_content: best.content,
-      similarity: best.similarity,
-      chunk_index: best.chunk_index,
-      metadata: best.metadata,
-      file_url: best.document_file_url,
-      file_type: best.document_file_type,
-      tags: best.document_tags,
-      category: best.document_category,
-      folder: best.document_folder,
-    };
-  });
+  return assemblePassages(relevant, keywordHits, known);
 }
-
