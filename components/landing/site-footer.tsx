@@ -15,7 +15,7 @@ const FOOTER_LINKS = [
     heading: "Account",
     links: [
       { label: "Sign in", href: "/login" },
-      { label: "Create an account", href: "/register" },
+      { label: "Staff sign in", href: "/login/staff" },
     ],
   },
 ];

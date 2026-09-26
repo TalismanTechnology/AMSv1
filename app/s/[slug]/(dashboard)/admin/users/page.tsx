@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
 import { requireSchoolContext } from "@/lib/school-context";
-import { loadSettings } from "@/lib/settings";
 import { UsersClient } from "./client";
 import { PageTransition } from "@/components/motion";
 
@@ -14,15 +13,12 @@ export default async function UsersPage({
 
   const supabase = await createClient();
 
-  const [{ data: rawUsers }, settings] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("*, children(*), school_memberships!inner(school_id, approved, role)")
-      .eq("school_memberships.school_id", school.id)
-      .neq("id", user.id)
-      .order("created_at", { ascending: false }),
-    loadSettings(school.id),
-  ]);
+  const { data: rawUsers } = await supabase
+    .from("profiles")
+    .select("*, children(*), school_memberships!inner(school_id, approved, role)")
+    .eq("school_memberships.school_id", school.id)
+    .neq("id", user.id)
+    .order("created_at", { ascending: false });
 
   // Map membership-level approved/role onto the profile for display
   const users = (rawUsers || []).map((u) => {
@@ -42,9 +38,6 @@ export default async function UsersPage({
         users={users}
         schoolId={school.id}
         schoolSlug={slug}
-        joinCode={school.join_code}
-        requireJoinCode={settings.require_join_code}
-        requireApproval={settings.require_approval}
       />
     </PageTransition>
   );

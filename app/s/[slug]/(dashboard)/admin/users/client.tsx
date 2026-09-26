@@ -14,9 +14,6 @@ import {
   Copy,
   Check,
   Link,
-  KeyRound,
-  ShieldAlert,
-  Settings,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -50,7 +47,6 @@ import {
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { approveUser, approveAllPending, changeUserRole, deleteUser } from "@/actions/users";
 import { toast } from "sonner";
-import NextLink from "next/link";
 import { TimeAgo } from "@/components/ui/time-ago";
 import { GRADES, formatGrade } from "@/lib/grades";
 import type { Profile } from "@/lib/types";
@@ -62,12 +58,9 @@ interface UsersClientProps {
   users: Profile[];
   schoolId: string;
   schoolSlug: string;
-  joinCode: string | null;
-  requireJoinCode: boolean;
-  requireApproval: boolean;
 }
 
-export function UsersClient({ users, schoolId, schoolSlug, joinCode, requireJoinCode, requireApproval }: UsersClientProps) {
+export function UsersClient({ users, schoolId, schoolSlug }: UsersClientProps) {
   const router = useRouter();
   const [sortKey, setSortKey] = useState<SortKey>("created_at");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -77,7 +70,6 @@ export function UsersClient({ users, schoolId, schoolSlug, joinCode, requireJoin
   const [roleChangeUser, setRoleChangeUser] = useState<Profile | null>(null);
   const [changingRole, setChangingRole] = useState(false);
   const [approvingAll, setApprovingAll] = useState(false);
-  const [codeCopied, setCodeCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [origin, setOrigin] = useState("");
 
@@ -85,14 +77,8 @@ export function UsersClient({ users, schoolId, schoolSlug, joinCode, requireJoin
     setOrigin(window.location.origin);
   }, []);
 
-  const registrationUrl = `${origin}/s/${schoolSlug}/register`;
-
-  function copyJoinCode() {
-    if (!joinCode) return;
-    navigator.clipboard.writeText(joinCode);
-    setCodeCopied(true);
-    setTimeout(() => setCodeCopied(false), 2000);
-  }
+  // Parents sign in with Blackbaud from here; there is no separate registration.
+  const registrationUrl = `${origin}/s/${schoolSlug}/login`;
 
   function copyRegistrationLink() {
     navigator.clipboard.writeText(registrationUrl);
@@ -211,7 +197,7 @@ export function UsersClient({ users, schoolId, schoolSlug, joinCode, requireJoin
             No users registered yet
           </h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Share the registration link below to invite parents.
+            Share the sign-in link below. Parents sign in with Blackbaud; only accounts your Blackbaud records mark as parents get in.
           </p>
         </div>
 
@@ -224,9 +210,9 @@ export function UsersClient({ users, schoolId, schoolSlug, joinCode, requireJoin
           <div className="flex items-start gap-3">
             <Link className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-foreground">Registration Link</p>
+              <p className="text-sm font-medium text-foreground">Parent sign-in link</p>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                Share this link with parents to let them create an account.
+                Parents open this and sign in with their Blackbaud account.
               </p>
               <div className="mt-2 flex items-center gap-2">
                 <code className="flex-1 truncate rounded bg-muted px-2.5 py-1.5 text-xs">
@@ -246,75 +232,6 @@ export function UsersClient({ users, schoolId, schoolSlug, joinCode, requireJoin
                 </Button>
               </div>
             </div>
-          </div>
-
-          {/* Join Code */}
-          <div className="flex items-start gap-3">
-            <KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-medium text-foreground">Join Code</p>
-                <Badge variant={requireJoinCode ? "default" : "outline"} className="text-[10px]">
-                  {requireJoinCode ? "Required" : "Optional"}
-                </Badge>
-              </div>
-              {joinCode ? (
-                <div className="mt-2 flex items-center gap-2">
-                  <code className="rounded bg-muted px-2.5 py-1.5 text-sm font-mono font-semibold tracking-wider">
-                    {joinCode}
-                  </code>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={copyJoinCode}
-                    className="shrink-0"
-                  >
-                    {codeCopied ? (
-                      <><Check className="mr-1.5 h-3.5 w-3.5 text-green-500" /> Copied</>
-                    ) : (
-                      <><Copy className="mr-1.5 h-3.5 w-3.5" /> Copy</>
-                    )}
-                  </Button>
-                </div>
-              ) : (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  No join code set.{" "}
-                  <NextLink
-                    href={`/s/${schoolSlug}/admin/settings`}
-                    className="text-primary underline underline-offset-2"
-                  >
-                    Configure in Settings
-                  </NextLink>
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Approval Setting */}
-          <div className="flex items-start gap-3">
-            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-medium text-foreground">Admin Approval</p>
-                <Badge variant={requireApproval ? "default" : "outline"} className="text-[10px]">
-                  {requireApproval ? "Required" : "Off"}
-                </Badge>
-              </div>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                {requireApproval
-                  ? "New parents will need your approval before they can access the dashboard."
-                  : "Parents will have immediate access after registering."}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex justify-end">
-            <Button variant="outline" size="sm" asChild>
-              <NextLink href={`/s/${schoolSlug}/admin/settings`}>
-                <Settings className="mr-1.5 h-3.5 w-3.5" />
-                Manage in Settings
-              </NextLink>
-            </Button>
           </div>
         </div>
       </div>
@@ -369,34 +286,9 @@ export function UsersClient({ users, schoolId, schoolSlug, joinCode, requireJoin
             {linkCopied ? (
               <><Check className="mr-1 h-3.5 w-3.5 text-green-500" /> Copied</>
             ) : (
-              <><Copy className="mr-1 h-3.5 w-3.5" /> Copy invite link</>
+              <><Copy className="mr-1 h-3.5 w-3.5" /> Copy sign-in link</>
             )}
           </Button>
-        </div>
-        <span className="text-muted-foreground/30">|</span>
-        {joinCode ? (
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <KeyRound className="h-4 w-4" />
-            <span className="font-mono font-semibold tracking-wider text-foreground">{joinCode}</span>
-            <Button variant="ghost" size="sm" className="h-auto px-1 py-0" onClick={copyJoinCode}>
-              {codeCopied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
-            </Button>
-            <Badge variant={requireJoinCode ? "default" : "outline"} className="text-[10px]">
-              {requireJoinCode ? "Required" : "Optional"}
-            </Badge>
-          </div>
-        ) : (
-          <span className="text-muted-foreground">
-            No join code —{" "}
-            <NextLink href={`/s/${schoolSlug}/admin/settings`} className="text-primary underline underline-offset-2">
-              set one
-            </NextLink>
-          </span>
-        )}
-        <span className="text-muted-foreground/30">|</span>
-        <div className="flex items-center gap-1.5 text-muted-foreground">
-          <ShieldAlert className="h-4 w-4" />
-          <span>Approval {requireApproval ? "on" : "off"}</span>
         </div>
       </div>
 

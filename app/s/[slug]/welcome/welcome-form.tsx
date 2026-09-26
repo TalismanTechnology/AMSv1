@@ -129,7 +129,7 @@ export function WelcomeForm({
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
           {children.map((child, index) => (
             <div key={child.key} className="flex items-end gap-2">
-              <div className="flex-1 space-y-2">
+              <div className="flex flex-1 flex-col gap-2">
                 <Label htmlFor={`child-name-${child.key}`}>
                   {index === 0 ? "Child's name" : `Child ${index + 1}`}
                 </Label>
@@ -143,7 +143,10 @@ export function WelcomeForm({
                 />
               </div>
 
-              <div className="w-40 space-y-2">
+              {/* gap, not space-y: Radix renders a hidden <select> as the last child,
+                  so space-y would give the trigger a bottom margin and lift
+                  this column out of line with the name field. */}
+              <div className="flex w-40 flex-col gap-2">
                 <Label htmlFor={`child-grade-${child.key}`}>Grade level</Label>
                 <Select
                   value={child.grade}

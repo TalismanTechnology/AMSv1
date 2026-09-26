@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { login } from "@/actions/auth";
 import { AuthShell } from "@/components/auth/auth-shell";
 
-export function LoginForm() {
+export function StaffLoginForm() {
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(searchParams.get("error"));
   const [loading, setLoading] = useState(false);
@@ -63,12 +63,12 @@ export function LoginForm() {
           <span className="mb-5 flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary elev-1">
             <Logo size={24} className="text-primary" />
           </span>
-          <p className="eyebrow">Sign in</p>
+          <p className="eyebrow">Staff sign in</p>
           <h2 className="mt-2 font-serif-display text-3xl font-medium tracking-[-0.02em] text-ink">
             Welcome back
           </h2>
           <p className="mt-2 text-sm text-ink-soft">
-            Sign in to your AskMySchool account
+            For school administrators. Parents sign in with Blackbaud.
           </p>
         </div>
 
@@ -85,7 +85,7 @@ export function LoginForm() {
               id="email"
               name="email"
               type="email"
-              placeholder="parent@example.com"
+              placeholder="you@school.org"
               required
             />
           </div>
@@ -106,9 +106,9 @@ export function LoginForm() {
         </form>
 
         <p className="mt-6 text-center text-sm text-ink-soft">
-          Don&apos;t have an account?{" "}
-          <Link href="/register" className="font-medium text-primary hover:underline">
-            Sign up
+          A parent?{" "}
+          <Link href="/login" className="font-medium text-primary hover:underline">
+            Sign in with Blackbaud
           </Link>
         </p>
       </div>

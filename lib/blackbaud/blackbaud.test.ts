@@ -93,6 +93,7 @@ test("payload tampering invalidates the signature", () => {
 test("expired state is rejected", () => {
   const stale = Buffer.from(
     JSON.stringify({
+      purpose: "connect",
       schoolId: "school-uuid",
       schoolSlug: "acme",
       issuedAt: Date.now() - 11 * 60 * 1000,

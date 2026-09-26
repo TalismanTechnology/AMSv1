@@ -7,34 +7,8 @@ import { PageTransition } from "@/components/motion";
 import type {
   BlackbaudConfig,
   BlackbaudCallbackResult,
-  SsoConfig,
 } from "./client";
 import type { BlackbaudCalendarFeed, EventCalendar } from "@/lib/types";
-
-/**
- * The SAML endpoints a school's IT department needs in order to register us as
- * a service provider. They're derived from the public project URL, not secret,
- * and are shown so the admin can hand them over without leaving the page.
- */
-function buildSsoConfig(school: {
-  sso_enabled: boolean | null;
-  sso_domain: string | null;
-  sso_provider_id: string | null;
-  sso_button_label: string | null;
-}): SsoConfig {
-  const projectUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-
-  return {
-    enabled: school.sso_enabled ?? false,
-    domain: school.sso_domain ?? "",
-    providerId: school.sso_provider_id ?? "",
-    buttonLabel: school.sso_button_label ?? "",
-    acsUrl: projectUrl ? `${projectUrl}/auth/v1/sso/saml/acs` : null,
-    metadataUrl: projectUrl
-      ? `${projectUrl}/auth/v1/sso/saml/metadata`
-      : null,
-  };
-}
 
 const CALLBACK_RESULTS: readonly string[] = ["connected", "denied", "error"];
 
@@ -156,7 +130,6 @@ export default async function SettingsPage({
         settings={settings}
         schoolId={school.id}
         schoolSlug={slug}
-        joinCode={school.join_code}
         emailIngestion={{
           enabled: school.email_ingestion_enabled ?? false,
           autoSort: school.auto_sort_enabled ?? true,
@@ -166,7 +139,6 @@ export default async function SettingsPage({
         }}
         blackbaud={blackbaudConfig}
         blackbaudCallback={parseCallbackResult(blackbaud)}
-        sso={buildSsoConfig(school)}
       />
     </PageTransition>
   );
