@@ -22,6 +22,7 @@ travel over iCal. The OAuth connection is what the SKY API calls use.
 | `BLACKBAUD_SUBSCRIPTION_KEY` | Subscription key from the SKY developer account. Global to our app. |
 | `BLACKBAUD_CLIENT_ID` / `BLACKBAUD_CLIENT_SECRET` | The SKY application's OAuth credentials. |
 | `BLACKBAUD_REDIRECT_URI` | `https://<app-host>/api/blackbaud/oauth/callback`. Must be listed verbatim as a redirect URI on the SKY application. Local dev uses `http://localhost:3000/...`. |
+| `BLACKBAUD_LOGIN_REDIRECT_URI` | Optional. Parent sign-in callback, `https://<app-host>/auth/blackbaud/callback`. Defaults to the request origin + that path. Must also be listed verbatim on the SKY application. |
 | `BLACKBAUD_TOKEN_ENC_KEY` | AES-256-GCM key used to encrypt refresh tokens at rest. |
 | `CRON_SECRET` | Shared secret the scheduled routes check. Vercel Cron sends it automatically as `Authorization: Bearer`. |
 
@@ -31,7 +32,7 @@ on the app.
 
 ### Migrations
 
-`021_blackbaud_verification.sql` through `024_blackbaud_calendar.sql`.
+`021_blackbaud_verification.sql` through `025_blackbaud_parent_login.sql`.
 
 ### Schedule
 
@@ -49,6 +50,33 @@ Any of them can be run by hand:
 curl -H "Authorization: Bearer $CRON_SECRET" https://<app-host>/api/cron/sync-blackbaud-calendar
 ```
 
+## Parent sign-in ("Sign in with Blackbaud")
+
+Parents only ever sign in through Blackbaud. Staff and super admins use
+email/password at **School staff sign-in** (`/login/staff`, or the toggle on a
+school's login page). Parents get no password path at all.
+
+1. `/login` lists every school with a Blackbaud connection ("Choose your
+   school"). `/s/<slug>/login` shows that school's button directly.
+2. `/auth/blackbaud?school=<slug>` redirects to
+   `app.blackbaud.com/oauth/authorize` using PKCE. Both the signed state and
+   the verifier are held in an httpOnly `bb_login_state` cookie.
+3. `/auth/blackbaud/callback` exchanges the code, then admits the user only if:
+   - the token's `environment_id` matches the school's connection, **and**
+   - `GET /school/v1/users/me`, called with the parent's **own** token, returns
+     `is_parent: true`. That flag comes from the school's Education Management
+     roles. No roster sync or staff-level API permission is needed; if the
+     call fails, sign-in fails.
+4. The Supabase account is found or created by the email Blackbaud returns
+   with the token, so a parent's
+   older password account keeps its history. Staff accounts (school admin or
+   super admin) are refused here and sent to staff sign-in. The parent gets an
+   approved `parent` membership and a normal Supabase session. The parent's
+   Blackbaud token is discarded.
+
+New school admins are created by a super admin (**Super admin → Assign admin**,
+with a temporary password for new accounts).
+
 ## Connecting a school (admin UI)
 
 Everything below lives under **Admin → Settings → Blackbaud**.
@@ -60,8 +88,9 @@ the school's Blackbaud environment. Blackbaud redirects back with
 `?blackbaud=connected` and the panel shows the environment id.
 
 Then click **Sync roster now**. The count of active parents appears in the
-panel. Turn on **Require roster match** only after a successful sync, or no
-parent can be approved.
+panel. The roster is not used for sign-in, and syncing it needs a Blackbaud
+account with permission to list users (a parent or student account gets
+`401 You do not have access to this route`).
 
 ### 2. Add calendar feeds (events)
 

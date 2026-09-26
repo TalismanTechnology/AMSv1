@@ -254,7 +254,7 @@ export function SuperAdminClient({
                       <DialogHeader>
                         <DialogTitle>Assign admin to {school.name}</DialogTitle>
                         <DialogDescription>
-                          Enter the email of an existing user to make them an admin of this school.
+                          Enter the admin&apos;s email. If they don&apos;t have an account yet, also set a temporary password to create one and share it with them.
                         </DialogDescription>
                       </DialogHeader>
                       <form action={handleAssignAdmin} className="space-y-4">
@@ -276,6 +276,17 @@ export function SuperAdminClient({
                             type="email"
                             placeholder="admin@school.com"
                             required
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="password">Temporary password (new accounts only)</Label>
+                          <Input
+                            id="password"
+                            name="password"
+                            type="password"
+                            autoComplete="new-password"
+                            minLength={10}
+                            placeholder="At least 10 characters"
                           />
                         </div>
                         <Button

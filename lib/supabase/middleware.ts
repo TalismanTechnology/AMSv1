@@ -39,16 +39,23 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  // School auth pages — only need getUser if user might already be logged in
+  // Self-service registration is gone — parents sign in with Blackbaud. Keep
+  // old links and bookmarks working by sending them to the matching login.
   const schoolMatch = pathname.match(/^\/s\/([^/]+)(\/.*)?$/);
-  const isSchoolAuthRoute =
-    schoolMatch &&
-    (schoolMatch[2] === "/login" || schoolMatch[2] === "/register");
+  if (pathname === "/register") {
+    return redirectTo(request, "/login");
+  }
+  if (schoolMatch && schoolMatch[2] === "/register") {
+    return redirectTo(request, `/s/${schoolMatch[1]}/login`);
+  }
+
+  // School auth pages — only need getUser if user might already be logged in
+  const isSchoolAuthRoute = schoolMatch && schoolMatch[2] === "/login";
   const isSchoolPendingRoute =
     schoolMatch && schoolMatch[2] === "/pending";
 
   // Platform auth pages — skip getUser if no session cookie exists
-  const isPlatformAuth = pathname === "/login" || pathname === "/register";
+  const isPlatformAuth = pathname === "/login" || pathname === "/login/staff";
   const hasSessionCookie = request.cookies
     .getAll()
     .some((c) => c.name.startsWith("sb-") && c.name.endsWith("-auth-token"));
@@ -63,7 +70,7 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // ─── Platform auth pages (/login, /register) ──────────────────────
+  // ─── Platform auth pages (/login, /login/staff) ───────────────────
   if (isPlatformAuth) {
     if (user) {
       const destination = await getDefaultDashboard(supabase, user.id);

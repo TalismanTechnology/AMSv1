@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { parseEml } from "./eml";
 import { fileTypeFromName } from "./file-types";
+import { extractSegments } from "./parser";
+import { formatChunkLocation } from "@/lib/ai/rag";
 
 // A realistic multipart message: text + HTML alternative, a PDF attachment, an
 // inline signature image, and a subject encoded per RFC 2047.
@@ -142,4 +144,67 @@ test("a subjectless message still produces usable text", async () => {
   const email = await parseEml(noSubject);
   assert.equal(email.subject, "(no subject)");
   assert.match(email.text, /Reminder about tomorrow/);
+});
+
+// School emails often say "see attached" and put the facts in the attachment.
+function buildEmlWithAttachment(filename: string, content: string): Buffer {
+  return Buffer.from(
+    [
+      "From: Coach <coach@collegiate.example>",
+      "Subject: Preseason Info",
+      "MIME-Version: 1.0",
+      'Content-Type: multipart/mixed; boundary="B"',
+      "",
+      "--B",
+      "Content-Type: text/plain; charset=utf-8",
+      "",
+      "Please see the attached letter.",
+      "",
+      "--B",
+      "Content-Type: application/octet-stream",
+      `Content-Disposition: attachment; filename="${filename}"`,
+      "Content-Transfer-Encoding: base64",
+      "",
+      Buffer.from(content).toString("base64"),
+      "--B--",
+    ].join("\r\n"),
+    "utf-8"
+  );
+}
+
+test("attachment content is indexed alongside the email body", async () => {
+  const eml = buildEmlWithAttachment(
+    "schedule.txt",
+    "The bus to Golden Goal leaves at 12:30 PM on August 25th."
+  );
+
+  const segments = await extractSegments(eml, "eml");
+  const text = segments.map((s) => s.text).join("\n");
+
+  assert.match(text, /see the attached letter/);
+  assert.match(text, /bus to Golden Goal leaves at 12:30 PM/);
+
+  const attachmentSegment = segments.find((s) => /Golden Goal/.test(s.text));
+  assert.equal(attachmentSegment?.metadata.attachment, "schedule.txt");
+  assert.equal(attachmentSegment?.metadata.email_subject, "Preseason Info");
+});
+
+test("an unreadable attachment does not cost the email its body", async () => {
+  const eml = buildEmlWithAttachment("letter.docx", "not really a docx");
+
+  const segments = await extractSegments(eml, "eml");
+
+  assert.ok(segments.some((s) => /see the attached letter/.test(s.text)));
+});
+
+test("attachment chunks cite the attachment by name", () => {
+  assert.equal(
+    formatChunkLocation({ attachment: "letter.pdf", page: 2 })?.label,
+    "letter.pdf · p. 2"
+  );
+  assert.equal(
+    formatChunkLocation({ attachment: "notes.txt", email_subject: "Info" })
+      ?.label,
+    "notes.txt"
+  );
 });

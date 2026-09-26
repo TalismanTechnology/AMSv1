@@ -13,9 +13,7 @@ import { TimeAgo } from "@/components/ui/time-ago";
 import { updateSettings, updateEmailIngestion } from "@/actions/settings";
 import {
   syncBlackbaudRoster,
-  updateBlackbaudVerification,
 } from "@/actions/blackbaud";
-import { updateSsoSettings } from "@/actions/sso";
 import {
   BlackbaudCalendarFeeds,
   type FeedWithMapping,
@@ -51,35 +49,22 @@ export interface BlackbaudConfig {
   eventCalendars: EventCalendar[];
 }
 
-export interface SsoConfig {
-  enabled: boolean;
-  domain: string;
-  providerId: string;
-  buttonLabel: string;
-  acsUrl: string | null;
-  metadataUrl: string | null;
-}
-
 interface SettingsClientProps {
   settings: Settings;
   schoolId: string;
   schoolSlug: string;
-  joinCode: string | null;
   emailIngestion: EmailIngestionConfig;
   blackbaud: BlackbaudConfig;
   blackbaudCallback: BlackbaudCallbackResult;
-  sso: SsoConfig;
 }
 
 export function SettingsClient({
   settings,
   schoolId,
   schoolSlug,
-  joinCode: initialJoinCode,
   emailIngestion,
   blackbaud,
   blackbaudCallback,
-  sso,
 }: SettingsClientProps) {
   const [schoolName, setSchoolName] = useState(settings.school_name);
   const [contactInfo, setContactInfo] = useState(settings.contact_info || "");
@@ -96,26 +81,9 @@ export function SettingsClient({
   const [disableAnimations, setDisableAnimations] = useState(
     settings.disable_animations
   );
-  const [joinCode, setJoinCode] = useState(initialJoinCode || "");
-  const [requireJoinCode, setRequireJoinCode] = useState(settings.require_join_code);
-  const [requireApproval, setRequireApproval] = useState(settings.require_approval);
   const [newQuestion, setNewQuestion] = useState("");
   const [saving, setSaving] = useState(false);
-  const [copied, setCopied] = useState(false);
-
   async function handleSave() {
-    // Validate join code format if provided
-    const trimmedCode = joinCode.trim().toUpperCase();
-    if (trimmedCode && !/^[A-Z0-9-]{4,20}$/.test(trimmedCode)) {
-      toast.error("Join code must be 4-20 characters, using letters, numbers, and hyphens only");
-      return;
-    }
-
-    if (requireJoinCode && !trimmedCode) {
-      toast.error("Please set a join code before enabling the requirement");
-      return;
-    }
-
     setSaving(true);
     const result = await updateSettings(schoolId, {
       school_name: schoolName.trim() || "AskMySchool",
@@ -125,9 +93,6 @@ export function SettingsClient({
       suggested_questions: questions,
       welcome_message: welcomeMessage.trim() || null,
       disable_animations: disableAnimations,
-      require_join_code: requireJoinCode,
-      require_approval: requireApproval,
-      join_code: trimmedCode || null,
     });
     if (result.error) toast.error(result.error);
     else toast.success("Settings saved");
@@ -142,14 +107,6 @@ export function SettingsClient({
 
   function removeQuestion(index: number) {
     setQuestions((prev) => prev.filter((_, i) => i !== index));
-  }
-
-  function copyCode() {
-    const code = joinCode.trim().toUpperCase();
-    if (!code) return;
-    navigator.clipboard.writeText(code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   }
 
   return (
@@ -201,80 +158,7 @@ export function SettingsClient({
         </div>
       </section>
 
-      <section className="space-y-4">
-        <div className="space-y-1">
-          <h2 className="text-base font-semibold text-ink">
-            Registration &amp; Access
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Control how parents join your school.
-          </p>
-        </div>
-        <div className="space-y-5">
-          <div className="space-y-2">
-            <Label htmlFor="join-code">School Join Code</Label>
-            <div className="flex gap-2">
-              <Input
-                id="join-code"
-                value={joinCode}
-                onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                placeholder="e.g. LINCOLN-2026"
-                className="font-mono uppercase tracking-wider"
-                maxLength={20}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={copyCode}
-                disabled={!joinCode.trim()}
-                className="shrink-0"
-              >
-                {copied ? (
-                  <Check className="h-4 w-4 text-green-500" />
-                ) : (
-                  <Copy className="h-4 w-4" />
-                )}
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Share this code with parents so they can join your school. Letters, numbers, and hyphens only (4-20 characters).
-            </p>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label htmlFor="require-join-code">Require Join Code</Label>
-              <p className="text-xs text-muted-foreground">
-                Parents must enter this code to register for your school.
-              </p>
-            </div>
-            <Switch
-              id="require-join-code"
-              checked={requireJoinCode}
-              onCheckedChange={setRequireJoinCode}
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label htmlFor="require-approval">Require Admin Approval</Label>
-              <p className="text-xs text-muted-foreground">
-                New parents need admin approval before accessing the dashboard.
-              </p>
-            </div>
-            <Switch
-              id="require-approval"
-              checked={requireApproval}
-              onCheckedChange={setRequireApproval}
-            />
-          </div>
-        </div>
-      </section>
-
       <EmailIngestionSection schoolId={schoolId} config={emailIngestion} />
-
-      <SsoSection schoolId={schoolId} config={sso} />
 
       <BlackbaudSection
         schoolId={schoolId}
@@ -425,184 +309,6 @@ export function SettingsClient({
   );
 }
 
-function SsoSection({
-  schoolId,
-  config,
-}: {
-  schoolId: string;
-  config: SsoConfig;
-}) {
-  const [enabled, setEnabled] = useState(config.enabled);
-  const [domain, setDomain] = useState(config.domain);
-  const [providerId, setProviderId] = useState(config.providerId);
-  const [buttonLabel, setButtonLabel] = useState(config.buttonLabel);
-  const [saving, setSaving] = useState(false);
-  const [copied, setCopied] = useState<string | null>(null);
-
-  const hasRoute = Boolean(domain.trim() || providerId.trim());
-
-  function copy(value: string, key: string) {
-    navigator.clipboard.writeText(value);
-    setCopied(key);
-    setTimeout(() => setCopied(null), 2000);
-  }
-
-  async function handleSave() {
-    setSaving(true);
-    const result = await updateSsoSettings(schoolId, {
-      enabled,
-      domain,
-      providerId,
-      buttonLabel,
-    });
-    setSaving(false);
-
-    if (result.error) {
-      toast.error(result.error);
-      return;
-    }
-    toast.success("Single sign-on settings saved");
-  }
-
-  return (
-    <section className="space-y-4">
-      <div className="space-y-1">
-        <h2 className="text-base font-semibold text-ink">Single Sign-On</h2>
-        <p className="text-sm text-muted-foreground">
-          Let families sign in with the same account they already use for the
-          school website, by pointing AskMySchool at your school&apos;s identity
-          provider.
-        </p>
-      </div>
-
-      <div className="space-y-5">
-        {/* The provider must exist in Supabase before this panel can route to
-            it; saying so here prevents a dead sign-in button. */}
-        <div className="rounded-lg border border-border bg-card p-4">
-          <p className="text-sm font-medium text-ink">
-            Registration is a one-time setup step
-          </p>
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-            Your identity provider has to be registered against our Supabase
-            project before this school can route to it. Send the two URLs below
-            to whoever administers your school&apos;s IdP, then record the
-            resulting domain or provider ID here.
-          </p>
-
-          <dl className="mt-4 space-y-2">
-            {[
-              { key: "acs", label: "ACS URL", value: config.acsUrl },
-              {
-                key: "metadata",
-                label: "Metadata / EntityID",
-                value: config.metadataUrl,
-              },
-            ].map((row) => (
-              <div key={row.key} className="space-y-1">
-                <dt className="text-xs text-muted-foreground">{row.label}</dt>
-                <dd className="flex gap-2">
-                  <Input
-                    readOnly
-                    value={row.value ?? "NEXT_PUBLIC_SUPABASE_URL not set"}
-                    className="font-mono text-xs"
-                    onFocus={(e) => e.target.select()}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="shrink-0"
-                    disabled={!row.value}
-                    onClick={() => row.value && copy(row.value, row.key)}
-                    aria-label={`Copy ${row.label}`}
-                  >
-                    {copied === row.key ? (
-                      <Check className="h-4 w-4 text-green-500" />
-                    ) : (
-                      <Copy className="h-4 w-4" />
-                    )}
-                  </Button>
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="sso-domain">Sign-in domain</Label>
-          <Input
-            id="sso-domain"
-            value={domain}
-            onChange={(e) => setDomain(e.target.value)}
-            placeholder="lincolnhigh.org"
-            className="font-mono"
-          />
-          <p className="text-xs text-muted-foreground">
-            The email domain registered against your identity provider. Families
-            with an address at this domain are sent to your school&apos;s login.
-          </p>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="sso-provider-id">Provider ID</Label>
-          <Input
-            id="sso-provider-id"
-            value={providerId}
-            onChange={(e) => setProviderId(e.target.value)}
-            placeholder="Optional — only if your IdP has no domain of its own"
-            className="font-mono"
-          />
-          <p className="text-xs text-muted-foreground">
-            The UUID from{" "}
-            <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">
-              supabase sso list
-            </code>
-            . Either a domain or a provider ID is required.
-          </p>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="sso-label">Button label</Label>
-          <Input
-            id="sso-label"
-            value={buttonLabel}
-            onChange={(e) => setButtonLabel(e.target.value)}
-            placeholder="Continue with your school account"
-          />
-          <p className="text-xs text-muted-foreground">
-            What families see on the sign-in button. Use the name they recognize
-            from the school website.
-          </p>
-        </div>
-
-        <div className="flex items-center justify-between">
-          <div className="space-y-0.5">
-            <Label htmlFor="sso-enabled">Enable single sign-on</Label>
-            <p className="text-xs text-muted-foreground">
-              {hasRoute
-                ? "Shows the sign-in button on your school's login page."
-                : "Add a domain or provider ID first."}
-            </p>
-          </div>
-          <Switch
-            id="sso-enabled"
-            checked={enabled}
-            disabled={!hasRoute && !enabled}
-            onCheckedChange={setEnabled}
-          />
-        </div>
-
-        <div className="flex justify-end">
-          <Button onClick={handleSave} disabled={saving}>
-            {saving && <LogoSpinner className="mr-2" />}
-            Save SSO settings
-          </Button>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 const CALLBACK_MESSAGES: Record<
   Exclude<BlackbaudCallbackResult, null>,
   { tone: "good" | "bad"; title: string; body: string }
@@ -658,9 +364,7 @@ function BlackbaudSection({
   config: BlackbaudConfig;
   callback: BlackbaudCallbackResult;
 }) {
-  const [enabled, setEnabled] = useState(config.verificationEnabled);
   const [rosterCount, setRosterCount] = useState(config.rosterCount);
-  const [savingToggle, setSavingToggle] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [notice, setNotice] = useState(callback);
 
@@ -681,22 +385,6 @@ function BlackbaudSection({
         detail: "Unrecognized connection state.",
       }
     : null;
-
-  async function handleToggle(next: boolean) {
-    setEnabled(next);
-    setSavingToggle(true);
-    const result = await updateBlackbaudVerification(schoolId, next);
-    setSavingToggle(false);
-
-    if (result.error) {
-      setEnabled(!next); // roll back — the write did not land
-      toast.error(result.error);
-      return;
-    }
-    toast.success(
-      next ? "Roster verification required" : "Roster verification turned off"
-    );
-  }
 
   async function handleSync() {
     setSyncing(true);
@@ -844,23 +532,10 @@ function BlackbaudSection({
           </div>
         </div>
 
-        <div className="flex items-center justify-between">
-          <div className="space-y-0.5">
-            <Label htmlFor="blackbaud-verification">
-              Require roster match for access
-            </Label>
-            <p className="text-xs text-muted-foreground">
-              Only people whose email appears on the synced Blackbaud roster are
-              approved as parents.
-            </p>
-          </div>
-          <Switch
-            id="blackbaud-verification"
-            checked={enabled}
-            disabled={savingToggle || (!connection && !enabled)}
-            onCheckedChange={handleToggle}
-          />
-        </div>
+        <p className="text-xs text-muted-foreground">
+          Parents sign in with Blackbaud. Only accounts your Blackbaud records
+          mark as parents can get in.
+        </p>
 
         <BlackbaudCalendarFeeds
           schoolId={schoolId}

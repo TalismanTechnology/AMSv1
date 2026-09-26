@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
+import { motion, useScroll, useTransform } from "framer-motion";
+import { usePrefersReducedMotion } from "@/components/landing/step-playback";
 import type { LandingImage } from "@/components/landing/landing-images";
 
 // A photograph behind a section, faint and slow. It sits under the content
@@ -48,7 +49,9 @@ export function SectionBackdrop({
 }: SectionBackdropProps) {
   const ref = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
-  const reduceMotion = useReducedMotion();
+  // Hydration-safe: framer's useReducedMotion reads the media query on the
+  // first client render, so the parallax offset mismatched the server HTML.
+  const reduceMotion = usePrefersReducedMotion();
   const [src, setSrc] = useState(image.src);
   const [isMissing, setIsMissing] = useState(false);
 

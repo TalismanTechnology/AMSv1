@@ -38,10 +38,10 @@ export function ClosingCta() {
                   {/* Plain link, not <Button>: the app-wide button rule
                       forces the forest fill, and this needs the inverse. */}
                   <Link
-                    href="/register"
+                    href="/login"
                     className="inline-flex items-center gap-2 rounded-full bg-white px-8 py-3.5 text-sm uppercase tracking-wide text-brand-dark shadow-[0_12px_30px_-10px_rgba(0,0,0,0.5)] transition-colors hover:bg-brand-light"
                   >
-                    Create your account
+                    Parent sign in
                     <ArrowRight className="size-4" aria-hidden="true" />
                   </Link>
                 </MagneticButton>

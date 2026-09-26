@@ -42,14 +42,6 @@ export default async function SchoolLandingPage({
             <Button asChild size="lg" className="h-12 px-6 text-base">
               <Link href={`/s/${slug}/login`}>Sign in</Link>
             </Button>
-            <Button
-              asChild
-              variant="outline"
-              size="lg"
-              className="h-12 px-6 text-base"
-            >
-              <Link href={`/s/${slug}/register`}>Create account</Link>
-            </Button>
           </div>
         </div>
         <p className="mt-6 text-center text-xs text-muted-foreground">

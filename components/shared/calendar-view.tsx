@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo } from "react";
 import {
   startOfMonth,
   endOfMonth,
@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/popover";
 import { ManageCalendarsPopover } from "@/components/admin/manage-calendars-popover";
 import { cn } from "@/lib/utils";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { calendarColorClasses, KIND_LABELS } from "@/lib/event-calendars";
 import type { SchoolEvent, EventType, EventCalendar } from "@/lib/types";
 
@@ -71,10 +72,33 @@ const TYPE_BLOCK_COLORS: Record<EventType, string> = {
   other: "bg-muted-foreground/15 border-l-muted-foreground",
 };
 
+// Phone month cells are too narrow for pills, so each event becomes a dot.
+const TYPE_DOT_COLORS: Record<EventType, string> = {
+  general: "bg-muted-foreground/60",
+  academic: "bg-chart-1",
+  sports: "bg-success",
+  arts: "bg-chart-2",
+  meeting: "bg-chart-3",
+  holiday: "bg-destructive",
+  other: "bg-muted-foreground/60",
+};
+
+// Division color matches the filter legend; fall back to the event type.
+function dotColor(event: SchoolEvent) {
+  const division = event.calendars?.find((c) => c.kind === "division");
+  if (division) return calendarColorClasses(division.color).dot;
+  return (
+    TYPE_DOT_COLORS[event.event_type as EventType] || TYPE_DOT_COLORS.general
+  );
+}
+
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const WEEKDAYS_NARROW = ["S", "M", "T", "W", "T", "F", "S"];
 const HOUR_START = 7;
 const HOUR_END = 21;
 const HOUR_HEIGHT = 60; // px per hour
+// Hour-label column width, read by the time grid's gridTemplateColumns.
+const GUTTER_VAR = "[--gutter:44px] sm:[--gutter:60px]";
 
 type ViewMode = "month" | "week" | "day";
 
@@ -157,14 +181,17 @@ function EventPopover({
   onEdit?: (event: SchoolEvent) => void;
   onDelete?: (event: SchoolEvent) => void;
 }) {
+  // Phones have no room beside a narrow column, so open below instead.
+  const isWide = useMediaQuery("(min-width: 640px)");
   return (
     <Popover>
       <PopoverTrigger asChild>{children}</PopoverTrigger>
       <PopoverContent
-        className="w-72 p-3 space-y-2"
-        side="right"
+        className="w-[min(18rem,calc(100vw-2rem))] p-3 space-y-2"
+        side={isWide ? "right" : "bottom"}
         align="start"
         sideOffset={8}
+        collisionPadding={16}
       >
         <div className="flex items-start justify-between gap-2">
           <p className="font-medium text-sm">{event.title}</p>
@@ -264,17 +291,20 @@ function MonthView({
     <div className="rounded-lg border bg-card metallic-card overflow-hidden">
       {/* Weekday headers */}
       <div className="grid grid-cols-7 border-b bg-muted/30">
-        {WEEKDAYS.map((day) => (
+        {WEEKDAYS.map((day, i) => (
           <div
             key={day}
-            className="py-2.5 text-center text-xs font-medium text-muted-foreground"
+            className="py-2 text-center text-xs font-medium text-muted-foreground sm:py-2.5"
           >
-            {day}
+            <abbr title={day} className="no-underline sm:hidden">
+              {WEEKDAYS_NARROW[i]}
+            </abbr>
+            <span className="hidden sm:inline">{day}</span>
           </div>
         ))}
       </div>
 
-      {/* Day cells — tall for event pills */}
+      {/* Day cells — dots on phones, event pills from sm up */}
       <div className="grid grid-cols-7">
         {calendarDays.map((day, i) => {
           const dateStr = format(day, "yyyy-MM-dd");
@@ -291,7 +321,7 @@ function MonthView({
               onClick={() => onSelectDate(day)}
               onDoubleClick={() => onCreateEventOnDate?.(dateStr)}
               className={cn(
-                "relative flex flex-col border-t min-h-[5rem] p-1.5 cursor-pointer transition-colors hover:bg-accent/30",
+                "relative flex flex-col items-center border-t min-h-[3.25rem] py-1.5 cursor-pointer transition-colors hover:bg-accent/30 sm:items-stretch sm:min-h-[5rem] sm:p-1.5",
                 !inMonth && "bg-muted/10 text-muted-foreground/30",
                 isSelected && "bg-primary/5 ring-1 ring-inset ring-primary/30",
                 today && !isSelected && "bg-accent/20"
@@ -299,15 +329,42 @@ function MonthView({
             >
               <span
                 className={cn(
-                  "flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium mb-1 self-end",
+                  "flex h-7 w-7 items-center justify-center rounded-full text-sm font-medium sm:mb-1 sm:h-6 sm:w-6 sm:self-end sm:text-xs",
                   isSelected && "bg-primary text-primary-foreground",
                   today && !isSelected && "bg-primary/20 text-primary font-bold"
                 )}
               >
                 {format(day, "d")}
               </span>
+              {dayEvents.length > 0 && (
+                <span className="sr-only">
+                  , {dayEvents.length} event{dayEvents.length !== 1 ? "s" : ""}
+                </span>
+              )}
 
-              <div className="flex-1 space-y-0.5 overflow-hidden">
+              {dayEvents.length > 0 && (
+                <div
+                  aria-hidden
+                  className={cn(
+                    "mt-1 flex items-center gap-[3px] sm:hidden",
+                    !inMonth && "opacity-40"
+                  )}
+                >
+                  {visible.map((event) => (
+                    <span
+                      key={event.id}
+                      className={cn("h-1.5 w-1.5 rounded-full", dotColor(event))}
+                    />
+                  ))}
+                  {overflow > 0 && (
+                    <span className="text-[9px] font-semibold leading-none text-muted-foreground">
+                      +
+                    </span>
+                  )}
+                </div>
+              )}
+
+              <div className="hidden flex-1 space-y-0.5 overflow-hidden sm:block">
                 {visible.map((event) => (
                   <EventPopover
                     key={event.id}
@@ -395,13 +452,13 @@ function TimeGrid({
   });
 
   return (
-    <div className="rounded-lg border bg-card metallic-card overflow-hidden">
+    <div className={cn("rounded-lg border bg-card metallic-card overflow-hidden", GUTTER_VAR)}>
       {/* All-day row */}
       {hasAllDay && (
         <div
           className="grid border-b"
           style={{
-            gridTemplateColumns: `60px repeat(${colCount}, 1fr)`,
+            gridTemplateColumns: `var(--gutter) repeat(${colCount}, minmax(0, 1fr))`,
           }}
         >
           <div className="text-[10px] text-muted-foreground/60 px-1 py-1.5 text-right">
@@ -444,19 +501,25 @@ function TimeGrid({
       {/* Scrollable time grid */}
       <div
         className="overflow-y-auto relative"
-        style={{ maxHeight: "calc(100vh - 320px)" }}
+        style={{ maxHeight: "max(22rem, calc(100dvh - 320px))" }}
       >
         {/* Grid lines + click targets */}
         <div
           className="grid"
           style={{
-            gridTemplateColumns: `60px repeat(${colCount}, 1fr)`,
+            gridTemplateColumns: `var(--gutter) repeat(${colCount}, minmax(0, 1fr))`,
           }}
         >
           {hours.map((hour) => (
             <div key={hour} className="contents">
-              <div className="relative h-[60px] border-t pr-2 text-right">
-                <span className="absolute -top-2 right-2 text-[10px] text-muted-foreground/60">
+              <div className="relative h-[60px] border-t text-right">
+                <span
+                  className={cn(
+                    "absolute right-1.5 whitespace-nowrap text-[10px] text-muted-foreground/60 sm:right-2",
+                    // The first label would be clipped by the scroll edge.
+                    hour === HOUR_START ? "top-0.5" : "-top-2"
+                  )}
+                >
                   {hourLabel(hour)}
                 </span>
               </div>
@@ -481,7 +544,7 @@ function TimeGrid({
         <div
           className="grid pointer-events-none"
           style={{
-            gridTemplateColumns: `60px repeat(${colCount}, 1fr)`,
+            gridTemplateColumns: `var(--gutter) repeat(${colCount}, minmax(0, 1fr))`,
             position: "absolute",
             top: 0,
             left: 0,
@@ -662,30 +725,37 @@ export function CalendarView({
   const dayColumns = useMemo(() => [selectedDate], [selectedDate]);
 
   return (
-    <div className="space-y-5 pt-2">
+    <div className="space-y-4 sm:space-y-5 sm:pt-2">
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3 pl-1">
-          <h2 className="text-2xl font-bold text-foreground">
-            {getHeaderLabel()}
-          </h2>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
+        <h2 className="pl-1 text-xl font-bold text-foreground sm:text-2xl">
+          {getHeaderLabel()}
+        </h2>
+        <div className="flex flex-wrap items-center gap-2">
           {onCreateEvent && (
-            <Button size="sm" onClick={onCreateEvent}>
+            <Button
+              size="sm"
+              onClick={onCreateEvent}
+              className="order-last w-full sm:order-none sm:w-auto"
+            >
               <Plus className="mr-1 h-4 w-4" />
               Create event
             </Button>
           )}
 
           {/* View toggle */}
-          <div className="flex rounded-lg border bg-muted/30 p-0.5">
+          <div
+            role="group"
+            aria-label="Calendar view"
+            className="flex rounded-lg border bg-muted/30 p-0.5"
+          >
             {(["month", "week", "day"] as const).map((v) => (
               <button
                 key={v}
                 onClick={() => setView(v)}
+                aria-pressed={view === v}
                 className={cn(
-                  "px-3 py-1 text-xs font-medium rounded-md transition-colors capitalize",
+                  "min-h-8 px-3 py-1 text-xs font-medium rounded-md transition-colors capitalize",
                   view === v
                     ? "bg-background text-foreground shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
@@ -696,14 +766,20 @@ export function CalendarView({
             ))}
           </div>
 
-          <Button variant="ghost" size="sm" onClick={goToToday}>
-            Today
-          </Button>
-          <div className="flex gap-0.5">
+          <div className="ml-auto flex items-center gap-0.5 sm:ml-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9"
+              onClick={goToToday}
+            >
+              Today
+            </Button>
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8"
+              className="h-9 w-9"
+              aria-label="Previous"
               onClick={navigatePrev}
             >
               <ChevronLeft className="h-4 w-4" />
@@ -711,7 +787,8 @@ export function CalendarView({
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8"
+              className="h-9 w-9"
+              aria-label="Next"
               onClick={navigateNext}
             >
               <ChevronRight className="h-4 w-4" />
@@ -723,7 +800,7 @@ export function CalendarView({
       {/* Calendar filters — divisions + categories */}
       {((eventCalendars && eventCalendars.length > 0) ||
         (manageCalendars && schoolId)) && (
-        <div className="space-y-2 rounded-lg border bg-card/60 p-3 metallic-card">
+        <div className="space-y-2.5 rounded-lg border bg-card/60 p-3 metallic-card sm:space-y-2">
           {(["division", "category"] as const).map((kind) => {
             const items = (eventCalendars ?? [])
               .filter((c) => c.kind === kind)
@@ -736,8 +813,12 @@ export function CalendarView({
               isFirst && manageCalendars && schoolId;
             if (items.length === 0 && !showManageHere) return null;
             return (
-              <div key={kind} className="flex flex-wrap items-center gap-1.5">
-                <span className="w-[68px] shrink-0 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              // One swipeable row per kind on phones; wraps from sm up.
+              <div
+                key={kind}
+                className="-mx-3 flex items-center gap-1.5 overflow-x-auto px-3 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden"
+              >
+                <span className="mr-1 shrink-0 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground sm:mr-0 sm:w-[68px]">
                   {KIND_LABELS[kind].plural}
                 </span>
                 {items.map((cal) => {
@@ -750,7 +831,7 @@ export function CalendarView({
                       onClick={() => toggleCalendar(cal.id)}
                       aria-pressed={on}
                       className={cn(
-                        "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-all",
+                        "flex min-h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-medium transition-all sm:min-h-0 sm:px-2.5",
                         on
                           ? cn(colors.chip, "border-transparent")
                           : "border-border text-muted-foreground/50"
@@ -767,7 +848,7 @@ export function CalendarView({
                   );
                 })}
                 {showManageHere && (
-                  <div className="ml-auto">
+                  <div className="ml-auto shrink-0">
                     <ManageCalendarsPopover
                       calendars={eventCalendars ?? []}
                       schoolId={schoolId!}
@@ -782,11 +863,11 @@ export function CalendarView({
 
       {/* Week view: day headers above time grid */}
       {view === "week" && (
-        <div className="rounded-lg border bg-card metallic-card overflow-hidden">
+        <div className={cn("rounded-lg border bg-card metallic-card overflow-hidden", GUTTER_VAR)}>
           <div
             className="grid bg-muted/30"
             style={{
-              gridTemplateColumns: `60px repeat(7, 1fr)`,
+              gridTemplateColumns: `var(--gutter) repeat(7, minmax(0, 1fr))`,
             }}
           >
             <div />
@@ -866,7 +947,10 @@ export function CalendarView({
       {/* Selected day event list */}
       {(
         <div>
-          <h3 className="mb-3 text-sm font-medium text-muted-foreground">
+          <h3
+            aria-live="polite"
+            className="mb-3 text-sm font-medium text-muted-foreground"
+          >
             {format(selectedDate, "EEEE, MMMM d, yyyy")}
             {selectedEvents.length > 0 && (
               <span className="ml-2 text-foreground">
@@ -892,11 +976,11 @@ export function CalendarView({
               {selectedEvents.map((event) => (
                 <div
                   key={event.id}
-                  className="flex items-start justify-between rounded-lg border bg-card p-3 metallic-card"
+                  className="flex items-start justify-between rounded-lg border bg-card p-3.5 metallic-card sm:p-3"
                 >
-                  <div className="space-y-1 min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium text-sm truncate">
+                  <div className="space-y-1.5 min-w-0 flex-1 sm:space-y-1">
+                    <div className="flex items-start gap-2 sm:items-center">
+                      <p className="font-medium text-sm sm:truncate">
                         {event.title}
                       </p>
                       <Badge
@@ -910,7 +994,7 @@ export function CalendarView({
                         {event.event_type}
                       </Badge>
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                       {event.start_time && (
                         <span className="flex items-center gap-1">
                           <Clock className="h-3 w-3" />
@@ -920,26 +1004,27 @@ export function CalendarView({
                         </span>
                       )}
                       {event.location && (
-                        <span className="flex items-center gap-1">
-                          <MapPin className="h-3 w-3" />
+                        <span className="flex min-w-0 items-center gap-1">
+                          <MapPin className="h-3 w-3 shrink-0" />
                           {event.location}
                         </span>
                       )}
                     </div>
                     {event.description && (
-                      <p className="text-xs text-muted-foreground/70 line-clamp-1">
+                      <p className="text-xs text-muted-foreground/70 line-clamp-2 sm:line-clamp-1">
                         {event.description}
                       </p>
                     )}
                     <CalendarChips event={event} />
                   </div>
                   {(onEditEvent || onDeleteEvent) && (
-                    <div className="flex items-center gap-1 ml-2 shrink-0">
+                    <div className="-my-1 -mr-1 ml-2 flex shrink-0 items-center gap-0.5 sm:m-0 sm:ml-2 sm:gap-1">
                       {onEditEvent && (
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-7 w-7"
+                          className="h-9 w-9 sm:h-7 sm:w-7"
+                          aria-label="Edit event"
                           onClick={() => onEditEvent(event)}
                         >
                           <Pencil className="h-3 w-3" />
@@ -949,7 +1034,8 @@ export function CalendarView({
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-7 w-7 text-destructive hover:text-destructive"
+                          className="h-9 w-9 text-destructive hover:text-destructive sm:h-7 sm:w-7"
+                          aria-label="Delete event"
                           onClick={() => onDeleteEvent(event)}
                         >
                           <Trash2 className="h-3 w-3" />

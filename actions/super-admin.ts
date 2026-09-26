@@ -123,6 +123,8 @@ export async function updateSchool(
   return { success: true };
 }
 
+const MIN_TEMP_PASSWORD_LENGTH = 10;
+
 export async function assignSchoolAdmin(formData: FormData) {
   const supabase = await createClient();
   const {
@@ -142,6 +144,7 @@ export async function assignSchoolAdmin(formData: FormData) {
 
   const schoolId = formData.get("school_id") as string;
   const email = (formData.get("email") as string).toLowerCase().trim();
+  const password = ((formData.get("password") as string | null) ?? "").trim();
 
   if (!schoolId || !email)
     return { error: "School ID and email are required" };
@@ -153,14 +156,37 @@ export async function assignSchoolAdmin(formData: FormData) {
     .from("profiles")
     .select("id")
     .eq("email", email)
-    .single();
+    .maybeSingle();
 
-  if (!targetProfile) return { error: "No user found with this email" };
+  let targetUserId = targetProfile?.id as string | undefined;
+
+  // Staff can't self-register (parents come in through Blackbaud), so a new
+  // school admin's account is created here with a temporary password.
+  if (!targetUserId) {
+    if (password.length < MIN_TEMP_PASSWORD_LENGTH) {
+      return {
+        error: `No account uses this email. Add a temporary password (at least ${MIN_TEMP_PASSWORD_LENGTH} characters) to create one.`,
+      };
+    }
+
+    const { data: created, error: createError } =
+      await adminSupabase.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+      });
+
+    if (createError || !created.user) {
+      return { error: createError?.message ?? "Could not create the account" };
+    }
+
+    targetUserId = created.user.id;
+  }
 
   // Create or update membership
   const { error } = await adminSupabase.from("school_memberships").upsert(
     {
-      user_id: targetProfile.id,
+      user_id: targetUserId,
       school_id: schoolId,
       role: "admin",
       approved: true,

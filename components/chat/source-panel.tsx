@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useSourcePanel } from "./source-panel-context";
-import { X, FileText, Download, Maximize2 } from "lucide-react";
+import { X, FileText, Download, Maximize2, Quote } from "lucide-react";
 import { LogoSpinner } from "@/components/logo-spinner";
 import { getDocumentSignedUrl, getDocumentUrls } from "@/lib/storage-url";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { DocumentViewer } from "@/components/shared/document-viewer";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { ease, duration } from "@/lib/motion";
 
@@ -103,6 +103,43 @@ function locateChunk(full: string, chunk: string): [number, number] | null {
 }
 
 const DOCX_TYPES = new Set(["docx", "doc"]);
+
+/**
+ * The exact passage behind the clicked [N], shown above documents rendered
+ * natively (PDF, Word, image) where the text itself can't be highlighted —
+ * the page jump gets the parent to the right page, this shows the words.
+ */
+function CitedPassage({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const clean = text.replace(/\s+/g, " ").trim();
+  if (!clean) return null;
+  const isLong = clean.length > 280;
+
+  return (
+    <figure className="border-b border-border bg-secondary/60 px-4 py-3">
+      <figcaption className="mb-1.5 flex items-center gap-1.5 text-[0.7rem] font-medium uppercase tracking-wide text-muted-foreground">
+        <Quote className="size-3" aria-hidden />
+        Cited passage
+      </figcaption>
+      <blockquote
+        className={`border-l-2 border-primary/50 pl-3 text-sm leading-relaxed text-ink ${
+          expanded || !isLong ? "" : "line-clamp-4"
+        }`}
+      >
+        {clean}
+      </blockquote>
+      {isLong && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-1.5 pl-3 text-xs font-medium text-primary hover:underline focus:outline-none focus-visible:underline"
+        >
+          {expanded ? "Show less" : "Show full passage"}
+        </button>
+      )}
+    </figure>
+  );
+}
 
 function PanelContent() {
   const { activeSource, fullContent, isLoadingContent, closePanel } =
@@ -272,9 +309,14 @@ function PanelContent() {
               {activeSource.title}
             </h3>
           </div>
-          {activeSource.location?.label && (
+          {(activeSource.source_number != null || activeSource.location?.label) && (
             <p className="pl-6 text-xs text-muted-foreground">
-              {activeSource.location.label}
+              {[
+                activeSource.source_number != null ? `Source ${activeSource.source_number}` : null,
+                activeSource.location?.label,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
             </p>
           )}
         </div>
@@ -309,12 +351,17 @@ function PanelContent() {
         initial={{ opacity: 0, x: -6 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.25, ease: ease.out, delay: 0.15 }}
-        className="border-b border-border px-4 py-2.5"
       >
-        <span className="inline-flex items-center gap-1.5 text-[0.7rem] font-medium text-muted-foreground">
-          <span className="size-1.5 rounded-full bg-muted-foreground/60" />
-          {Math.round(activeSource.similarity * 100)}% match
-        </span>
+        {canRenderInline && !loadingDoc ? (
+          <CitedPassage key={activeSource.source_number} text={activeSource.chunk_content} />
+        ) : (
+          <div className="border-b border-border px-4 py-2.5">
+            <span className="inline-flex items-center gap-1.5 text-[0.7rem] font-medium text-muted-foreground">
+              <span className="size-1.5 rounded-full bg-muted-foreground/60" />
+              {Math.round(activeSource.similarity * 100)}% match
+            </span>
+          </div>
+        )}
       </motion.div>
 
       <motion.div
@@ -329,6 +376,9 @@ function PanelContent() {
           </div>
         ) : showAsPdf ? (
           <iframe
+            // Remount per page: changing only the #page fragment of an
+            // already-loaded PDF doesn't move the browser's viewer.
+            key={pdfSrc}
             src={pdfSrc!}
             className="w-full h-full border-0"
             title={activeSource.title}
@@ -385,7 +435,7 @@ function PanelContent() {
 }
 
 export function SourcePanel() {
-  const { isOpen, closePanel } = useSourcePanel();
+  const { isOpen, closePanel, activeSource } = useSourcePanel();
   const isDesktop = useMediaQuery("(min-width: 1024px)");
 
   if (isDesktop) {
@@ -413,6 +463,12 @@ export function SourcePanel() {
         className="w-full sm:max-w-lg p-0 flex flex-col"
         showCloseButton={false}
       >
+        {/* The visible header is PanelContent's; these name the dialog for
+            screen readers, which Radix requires of every sheet. */}
+        <SheetTitle className="sr-only">{activeSource?.title ?? "Source"}</SheetTitle>
+        <SheetDescription className="sr-only">
+          The school document this answer cites, opened at the cited passage.
+        </SheetDescription>
         <PanelContent />
       </SheetContent>
     </Sheet>

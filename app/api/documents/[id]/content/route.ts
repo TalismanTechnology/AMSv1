@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { stitchChunks } from "@/lib/ai/stitch";
 
 export async function GET(
   _request: NextRequest,
@@ -34,7 +35,10 @@ export async function GET(
     .eq("document_id", id)
     .order("chunk_index", { ascending: true });
 
-  const content = (chunks || []).map((c) => c.content).join("\n\n");
+  // Stitched exactly as cited passages are, so a passage is a literal
+  // substring of this text and the sidebar highlights it precisely. A plain
+  // join would repeat every overlap and break the match at each seam.
+  const content = stitchChunks(chunks || []);
 
   return NextResponse.json({
     document: doc,

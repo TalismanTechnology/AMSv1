@@ -17,7 +17,8 @@ export const config = {
      * - / (platform landing)
      * - /s/{slug}/* (school-scoped routes)
      * - /super-admin/* (super admin routes)
-     * - /login, /register, /admin/*, /parent/* (legacy redirects)
+     * - /login, /login/staff, /auth/blackbaud/*
+     * - /register, /admin/*, /parent/* (legacy redirects)
      */
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],

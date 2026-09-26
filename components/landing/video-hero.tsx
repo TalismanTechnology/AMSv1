@@ -129,7 +129,7 @@ function Navbar() {
                 Sign in
               </Link>
               <Link
-                href="/register"
+                href="/login"
                 className="inline-flex items-center px-5 py-2.5 bg-brand-dark text-white text-sm tracking-wide uppercase rounded-full hover:bg-brand-green transition-colors"
               >
                 Get Started
@@ -198,7 +198,7 @@ function Navbar() {
             Sign in
           </Link>
           <Link
-            href="/register"
+            href="/login"
             onClick={menu.close}
             className="mt-4 inline-flex items-center px-8 py-3.5 bg-brand-dark text-white text-lg tracking-wide rounded-full"
           >
