@@ -2,7 +2,8 @@
 
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
+import { motion, useScroll, useTransform } from "framer-motion";
+import { usePrefersReducedMotion } from "@/components/landing/step-playback";
 import type { LandingImage } from "@/components/landing/landing-images";
 
 // A photograph mounted as a physical object: a rounded plate with a hairline
@@ -46,7 +47,9 @@ export function ImagePlate({
 }: ImagePlateProps) {
   const ref = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
-  const reduceMotion = useReducedMotion();
+  // Hydration-safe: framer's useReducedMotion reads the media query on the
+  // first client render, so the parallax offset mismatched the server HTML.
+  const reduceMotion = usePrefersReducedMotion();
   const [src, setSrc] = useState(image.src);
   const [isMissing, setIsMissing] = useState(false);
 

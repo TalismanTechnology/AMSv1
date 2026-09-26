@@ -17,9 +17,9 @@ export function ParentMobileHeader() {
   const { school } = useSchool();
 
   return (
-    <div className="flex items-center justify-between border-b border-border bg-background px-4 py-3 md:hidden">
-      <div className="flex items-center gap-2.5">
-        <span className="flex h-8 w-8 items-center justify-center">
+    <div className="flex items-center justify-between border-b border-border bg-background px-4 py-2 md:hidden">
+      <div className="flex min-w-0 items-center gap-2.5">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center">
           <Logo size={20} className="text-primary" />
         </span>
         <span className="truncate text-sm font-semibold tracking-[-0.01em] text-ink">
@@ -30,7 +30,8 @@ export function ParentMobileHeader() {
         variant="ghost"
         size="icon"
         onClick={() => setOpen(true)}
-        className="rounded-lg text-ink-soft hover:bg-secondary hover:text-ink"
+        aria-label="Open menu"
+        className="size-10 shrink-0 rounded-lg text-ink-soft hover:bg-secondary hover:text-ink"
       >
         <Menu className="h-5 w-5" />
       </Button>

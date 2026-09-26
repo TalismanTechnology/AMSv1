@@ -32,7 +32,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    // Browser extensions (e.g. QuillBot's data-qb-installed) stamp attributes
+    // onto <html> before hydration. This only silences attribute mismatches on
+    // this one element, not on anything inside it.
+    <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="stylesheet" href={HELVETICA_NEUE_LIGHT_HREF} />
       </head>

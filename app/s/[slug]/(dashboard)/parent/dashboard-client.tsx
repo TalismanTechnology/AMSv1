@@ -86,7 +86,7 @@ export function DashboardClient({
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="mx-auto max-w-3xl space-y-12 px-4 pb-16 pt-12 md:px-8">
+      <div className="mx-auto max-w-3xl space-y-9 px-4 pb-12 pt-6 md:space-y-12 md:px-8 md:pb-16 md:pt-12">
         {/* Greeting */}
         <header>
           <p className="text-sm text-muted-foreground">{today}</p>
@@ -108,7 +108,7 @@ export function DashboardClient({
               <Link
                 key={action.href}
                 href={action.href}
-                className="flex items-center gap-2.5 rounded-xl border border-border px-3.5 py-3 transition-colors hover:bg-secondary"
+                className="flex items-center gap-2.5 min-h-12 rounded-xl border border-border px-3.5 py-3 transition-colors hover:bg-secondary"
               >
                 <action.icon className="h-[18px] w-[18px] shrink-0 text-muted-foreground" />
                 <span className="truncate text-sm font-medium text-ink">

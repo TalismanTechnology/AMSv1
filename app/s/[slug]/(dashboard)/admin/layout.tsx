@@ -22,7 +22,7 @@ export default async function AdminLayout({
   return (
     <SidebarProvider>
       <TooltipProvider>
-        <div className="flex h-screen">
+        <div className="flex h-dvh">
           <AdminSidebar />
           <div className="flex flex-1 flex-col overflow-hidden">
             <MobileHeader />

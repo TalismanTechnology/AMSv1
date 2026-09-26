@@ -64,36 +64,39 @@ export interface SchoolContext {
 /**
  * Require school context: resolve slug, verify membership, return school + role.
  * Redirects if school not found or user not a member.
+ *
+ * Cached per request: the dashboard layout, the section layout and the page
+ * all call this, and without the cache each one repeated the auth round trip.
  */
-export async function requireSchoolContext(
+export const requireSchoolContext = cache(async function requireSchoolContext(
   slug: string
 ): Promise<SchoolContext> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const [
+    {
+      data: { user },
+    },
+    school,
+  ] = await Promise.all([supabase.auth.getUser(), getSchoolBySlug(slug)]);
 
   if (!user) {
     redirect(`/s/${slug}/login`);
   }
 
-  const school = await getSchoolBySlug(slug);
   if (!school) {
     notFound();
   }
 
   // Super admins have access to all schools as admin
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
+  const [{ data: profile }, membership] = await Promise.all([
+    supabase.from("profiles").select("role").eq("id", user.id).single(),
+    getUserSchoolMembership(user.id, school.id),
+  ]);
 
   if (profile?.role === "super_admin") {
     return { user, school, role: "admin" as const, isSuperAdmin: true };
   }
 
-  const membership = await getUserSchoolMembership(user.id, school.id);
   if (!membership) {
     redirect("/");
   }
@@ -104,4 +107,4 @@ export async function requireSchoolContext(
     role: membership.role as UserRole,
     isSuperAdmin: false,
   };
-}
+});

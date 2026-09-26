@@ -19,11 +19,32 @@ export default async function ParentLayout({
 
   const supabase = await createClient();
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name, onboarding_completed")
-    .eq("id", user.id)
-    .single();
+  // Profile, banner announcements (pinned or urgent, non-expired) and the
+  // user's dismissals are independent, so fetch them in one round trip.
+  const now = new Date().toISOString();
+  const [
+    { data: profile },
+    { data: bannerAnnouncements },
+    { data: dismissals },
+  ] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("full_name, onboarding_completed")
+      .eq("id", user.id)
+      .single(),
+    supabase
+      .from("announcements")
+      .select("id, title, content, priority")
+      .eq("school_id", school.id)
+      .or("pinned.eq.true,priority.eq.urgent")
+      .or(`expires_at.is.null,expires_at.gt.${now}`)
+      .order("created_at", { ascending: false })
+      .limit(5),
+    supabase
+      .from("announcement_dismissals")
+      .select("announcement_id")
+      .eq("user_id", user.id),
+  ]);
 
   // Onboarding is required, so it is enforced here rather than by a link the
   // parent could route around. Admins viewing the parent surface are exempt —
@@ -31,23 +52,6 @@ export default async function ParentLayout({
   if (role === "parent" && !profile?.onboarding_completed) {
     redirect(`/s/${slug}/welcome`);
   }
-
-  // Fetch banner announcements (pinned or urgent, non-expired) for this school
-  const now = new Date().toISOString();
-  const { data: bannerAnnouncements } = await supabase
-    .from("announcements")
-    .select("id, title, content, priority")
-    .eq("school_id", school.id)
-    .or("pinned.eq.true,priority.eq.urgent")
-    .or(`expires_at.is.null,expires_at.gt.${now}`)
-    .order("created_at", { ascending: false })
-    .limit(5);
-
-  // Fetch user's dismissals
-  const { data: dismissals } = await supabase
-    .from("announcement_dismissals")
-    .select("announcement_id")
-    .eq("user_id", user.id);
 
   const dismissedIds = new Set(
     (dismissals || []).map(
@@ -63,7 +67,7 @@ export default async function ParentLayout({
       userName={profile?.full_name || user.email || ""}
     >
       <TooltipProvider>
-        <div className="flex h-screen">
+        <div className="flex h-dvh">
           <ParentSidebar />
           <div className="flex flex-1 flex-col overflow-hidden">
             <ParentMobileHeader />

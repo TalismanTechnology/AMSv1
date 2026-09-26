@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { X, AlertTriangle, Megaphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { dismissAnnouncement } from "@/actions/announcements";
+import { useSchool } from "@/components/shared/school-context";
 import { cn } from "@/lib/utils";
 
 interface BannerAnnouncement {
@@ -21,6 +23,8 @@ export function AnnouncementBanner({
   announcements: initial,
 }: AnnouncementBannerProps) {
   const [announcements, setAnnouncements] = useState(initial);
+  const { slug } = useSchool();
+  const href = `/s/${slug}/parent/announcements`;
 
   async function handleDismiss(id: string) {
     setAnnouncements((prev) => prev.filter((a) => a.id !== id));
@@ -29,16 +33,26 @@ export function AnnouncementBanner({
 
   if (announcements.length === 0) return null;
 
+  // Phones show one banner so a stack of them can't push the page content
+  // (the chat composer especially) off screen; the rest are a tap away.
+  const hiddenOnMobile = announcements.length - 1;
+
   return (
     <div className="space-y-2 px-4 pt-3 md:px-6">
-      {announcements.map((a) => {
+      {announcements.map((a, i) => {
         const isUrgent = a.priority === "urgent";
         return (
           <div
             key={a.id}
-            className="flex items-center justify-between gap-4 rounded-xl border border-border px-4 py-2.5 text-sm"
+            className={cn(
+              "items-center justify-between gap-2 rounded-xl border border-border py-1 pl-4 pr-1 text-sm sm:gap-4 sm:py-1.5 sm:pr-2",
+              i > 0 ? "hidden sm:flex" : "flex"
+            )}
           >
-            <div className="flex min-w-0 items-center gap-3">
+            <Link
+              href={href}
+              className="flex min-w-0 flex-1 items-center gap-3 py-1.5 transition-opacity hover:opacity-80"
+            >
               <span
                 className={cn(
                   "shrink-0",
@@ -58,11 +72,12 @@ export function AnnouncementBanner({
                   {a.content.length > 80 ? "..." : ""}
                 </span>
               </div>
-            </div>
+            </Link>
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 w-7 shrink-0 rounded-lg p-0 text-ink-soft hover:bg-secondary hover:text-ink"
+              aria-label={`Dismiss ${a.title}`}
+              className="h-9 w-9 shrink-0 rounded-lg p-0 text-ink-soft hover:bg-secondary hover:text-ink sm:h-7 sm:w-7"
               onClick={() => handleDismiss(a.id)}
             >
               <X className="h-3.5 w-3.5" />
@@ -70,6 +85,14 @@ export function AnnouncementBanner({
           </div>
         );
       })}
+      {hiddenOnMobile > 0 && (
+        <Link
+          href={href}
+          className="block px-1 text-xs font-medium text-muted-foreground hover:text-ink sm:hidden"
+        >
+          +{hiddenOnMobile} more announcement{hiddenOnMobile !== 1 ? "s" : ""}
+        </Link>
+      )}
     </div>
   );
 }

@@ -164,8 +164,8 @@ export function ParentDocumentsClient({
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 pb-16 pt-12 md:px-8">
-      <header className="mb-8">
+    <div className="mx-auto max-w-4xl px-4 pb-12 pt-6 md:px-8 md:pb-16 md:pt-12">
+      <header className="mb-6 md:mb-8">
         <h1 className="text-2xl font-semibold tracking-[-0.01em] text-ink">
           Documents
         </h1>
@@ -174,8 +174,9 @@ export function ParentDocumentsClient({
         </p>
       </header>
 
-      <div className="mb-6 flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[200px]">
+      <div className="mb-6 flex flex-wrap items-center gap-2 sm:gap-3">
+        {/* Search takes its own row on phones; the category select sits below. */}
+        <div className="relative w-full sm:w-auto sm:min-w-[200px] sm:flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder={
@@ -185,12 +186,17 @@ export function ParentDocumentsClient({
             }
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 pr-20"
+            className="h-10 pl-9 pr-24 sm:h-9"
           />
           <Button
             variant="ghost"
             size="sm"
-            className="absolute right-1 top-1/2 -translate-y-1/2 h-7 text-xs px-2"
+            className="absolute right-1 top-1/2 -translate-y-1/2 h-8 text-xs px-2 sm:h-7"
+            aria-label={
+              searchMode === "title"
+                ? "Switch to searching document content"
+                : "Switch to searching titles"
+            }
             onClick={() =>
               setSearchMode((m) => (m === "title" ? "content" : "title"))
             }
@@ -200,7 +206,7 @@ export function ParentDocumentsClient({
           </Button>
         </div>
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-[160px]">
+          <SelectTrigger className="min-w-0 flex-1 data-[size=default]:h-10 sm:w-[180px] sm:flex-none sm:data-[size=default]:h-9">
             <SelectValue placeholder="Category" />
           </SelectTrigger>
           <SelectContent>

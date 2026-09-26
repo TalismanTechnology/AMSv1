@@ -115,7 +115,7 @@ export function ProfileClient({
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 pb-16 pt-12 md:px-8">
+    <div className="mx-auto max-w-2xl px-4 pb-12 pt-6 md:px-8 md:pb-16 md:pt-12">
       <header className="mb-10">
         <h1 className="text-2xl font-semibold tracking-[-0.01em] text-ink">
           Profile
