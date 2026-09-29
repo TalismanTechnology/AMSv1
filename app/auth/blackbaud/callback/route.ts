@@ -17,6 +17,7 @@ import {
   type SchoolCaller,
 } from "@/lib/blackbaud/parent-login";
 import { normalizeEmail } from "@/lib/blackbaud/crypto";
+import { appCallbackUrl, createAppHandoff } from "@/lib/auth/app-handoff";
 import {
   LOGIN_STATE_COOKIE,
   unpackLoginCookie,
@@ -65,9 +66,15 @@ export async function GET(request: Request) {
     return finish(`${origin}/login?error=${encodeURIComponent(MESSAGES.expired)}`);
   }
 
-  const { schoolId, schoolSlug } = verified;
+  const { schoolId, schoolSlug, appChallenge } = verified;
+  // Started from the native app: every outcome goes back to the app, which
+  // closes the sign-in sheet and shows it there.
   const fail = (message: string) =>
-    finish(`${origin}/s/${schoolSlug}/login?error=${encodeURIComponent(message)}`);
+    finish(
+      appChallenge
+        ? appCallbackUrl({ error: message, school: schoolSlug })
+        : `${origin}/s/${schoolSlug}/login?error=${encodeURIComponent(message)}`
+    );
 
   const code = searchParams.get("code");
 
@@ -104,6 +111,8 @@ export async function GET(request: Request) {
     return fail(MESSAGES.failed);
   }
 
+  let handoffCode: string | null = null;
+
   try {
     const email = normalizeEmail(token.email);
     const userId = await findOrCreateParentAccount(
@@ -120,10 +129,20 @@ export async function GET(request: Request) {
     // so the session's token is issued last, inside startParentSession.
     await revokeParentPassword(userId);
     await ensureParentMembership(userId, schoolId);
-    await startParentSession(email);
+
+    if (appChallenge) {
+      // The session starts in the app's web view instead (/auth/app-handoff).
+      handoffCode = await createAppHandoff({ email, schoolSlug, appChallenge });
+    } else {
+      await startParentSession(email);
+    }
   } catch (caught: unknown) {
     logFailure(schoolId, "session", caught);
     return fail(MESSAGES.failed);
+  }
+
+  if (handoffCode) {
+    return finish(appCallbackUrl({ code: handoffCode }));
   }
 
   // Middleware sends first-time parents on to /welcome from here.

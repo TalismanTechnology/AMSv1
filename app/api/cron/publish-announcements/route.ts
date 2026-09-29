@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isCronAuthorized } from "@/lib/blackbaud/cron-auth";
+import { notifyAnnouncementPublished } from "@/lib/push";
 
 // Publish scheduled announcements whose publish_at has passed.
 //   GET /api/cron/publish-announcements
@@ -31,6 +32,9 @@ export async function GET(request: Request) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  // Each notification catches its own failures, so one can't block the rest.
+  await Promise.all((data ?? []).map((announcement) => notifyAnnouncementPublished(announcement.id)));
 
   // Delete expired announcements (past their expires_at date)
   const { data: deleted, error: deleteError } = await supabase

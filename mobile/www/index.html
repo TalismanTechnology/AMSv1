@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>AskMySchool</title>
+    <style>
+      :root {
+        --cream: #faf8f5;
+        --forest: #2d3a2e;
+        --muted: #6b705f;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: var(--cream);
+        color: var(--forest);
+        font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+        text-align: center;
+        padding: 24px;
+        box-sizing: border-box;
+      }
+      h1 { font-weight: 300; letter-spacing: -0.02em; margin: 0 0 12px; }
+      p { color: var(--muted); margin: 0 0 24px; max-width: 320px; }
+      a {
+        display: inline-block;
+        padding: 12px 28px;
+        border-radius: 999px;
+        background: var(--forest);
+        color: #fff;
+        text-decoration: none;
+        font-size: 14px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Shown only when askmyschool.app can't be reached. -->
+    <main>
+      <h1>You're offline</h1>
+      <p>AskMySchool needs an internet connection. Check your connection and try again.</p>
+      <a href="https://askmyschool.app">Try again</a>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">AskMySchool</string>
+    <string name="title_activity_main">AskMySchool</string>
+    <string name="package_name">app.askmyschool</string>
+    <string name="custom_url_scheme">app.askmyschool</string>
+</resources>

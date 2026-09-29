@@ -1,0 +1,4 @@
+# Native app shells (Capacitor) aren't part of the web deploy.
+/ios
+/android
+/mobile

@@ -6,6 +6,7 @@ import {
   createPkcePair,
   getParentRedirectUri,
 } from "@/lib/blackbaud/parent-login";
+import { isValidAppChallenge } from "@/lib/auth/app-handoff";
 import {
   LOGIN_STATE_COOKIE,
   OAUTH_STATE_MAX_AGE_SECONDS,
@@ -15,13 +16,19 @@ import {
 
 // Starts "Sign in with Blackbaud" for a parent.
 //
-//   GET /auth/blackbaud?school=<slug>
+//   GET /auth/blackbaud?school=<slug>[&app_challenge=<S256>]
 //
 // Sends the browser to Blackbaud with a signed state (which school) and a PKCE
 // challenge. The matching verifier stays behind in an httpOnly cookie.
+// `app_challenge` comes from the native app; the callback then hands the
+// session to the app (lib/auth/app-handoff.ts).
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const slug = searchParams.get("school")?.trim().toLowerCase();
+  const rawAppChallenge = searchParams.get("app_challenge");
+  // A malformed challenge is dropped rather than rejected: sign-in still
+  // works, it just lands in this browser instead of the app.
+  const appChallenge = isValidAppChallenge(rawAppChallenge) ? rawAppChallenge : undefined;
 
   if (!slug) {
     return NextResponse.redirect(`${origin}/login`);
@@ -50,7 +57,7 @@ export async function GET(request: Request) {
   let cookieValue: string;
 
   try {
-    const state = createLoginState(school.id, school.slug);
+    const state = createLoginState(school.id, school.slug, appChallenge);
     const pkce = createPkcePair();
     authorizeUrl = buildParentAuthorizeUrl(
       state,

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { NativeBridge } from "@/components/native/native-bridge";
 import "./globals.css";
 
 // The whole UI sets in Helvetica Neue Light (the `--font-sans` stack in
@@ -50,6 +51,7 @@ export default function RootLayout({
           <TooltipProvider>
             {children}
             <Toaster />
+            <NativeBridge />
           </TooltipProvider>
         </div>
       </body>
