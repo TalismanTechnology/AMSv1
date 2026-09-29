@@ -2,6 +2,8 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import { notifyAnnouncementPublished } from "@/lib/push";
 import { logAudit } from "@/lib/audit";
 
 export async function createAnnouncement(schoolId: string, formData: FormData) {
@@ -58,6 +60,11 @@ export async function createAnnouncement(schoolId: string, formData: FormData) {
   if (error) return { error: error.message };
 
   logAudit(user.id, "create_announcement", "announcement", ann.id, { title, status }, schoolId);
+
+  // Scheduled ones are pushed by the publish cron when they go live.
+  if (status === "published") {
+    after(() => notifyAnnouncementPublished(ann.id));
+  }
 
   revalidatePath("/", "layout");
   return { success: true };

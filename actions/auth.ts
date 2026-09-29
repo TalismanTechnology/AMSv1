@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { getStaffRole } from "@/lib/auth/parent-session";
+import { forgetThisDevice } from "@/lib/push/device-cookie";
 import { redirect } from "next/navigation";
 
 const PARENT_PASSWORD_ERROR =
@@ -73,6 +74,11 @@ export async function login(formData: FormData) {
 
 export async function logout() {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (user) await forgetThisDevice(user.id);
   await supabase.auth.signOut();
   redirect("/");
 }

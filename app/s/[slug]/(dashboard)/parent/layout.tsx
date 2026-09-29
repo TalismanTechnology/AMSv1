@@ -6,6 +6,7 @@ import { AnnouncementBanner } from "@/components/parent/announcement-banner";
 import { ParentSidebarProvider } from "@/components/parent/sidebar-context";
 import { ParentSidebar } from "@/components/parent/parent-sidebar";
 import { ParentMobileHeader } from "@/components/parent/mobile-header";
+import { NativePush } from "@/components/native/native-push";
 
 export default async function ParentLayout({
   children,
@@ -77,6 +78,7 @@ export default async function ParentLayout({
             <main className="dashboard-cards flex-1 overflow-auto basis-0">{children}</main>
           </div>
         </div>
+        <NativePush />
       </TooltipProvider>
     </ParentSidebarProvider>
   );

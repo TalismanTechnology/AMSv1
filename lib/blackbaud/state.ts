@@ -47,10 +47,11 @@ function sign(payload: string): string {
 function createState(
   purpose: StatePurpose,
   schoolId: string,
-  schoolSlug: string
+  schoolSlug: string,
+  appChallenge?: string
 ): string {
   const payload = Buffer.from(
-    JSON.stringify({ purpose, schoolId, schoolSlug, issuedAt: Date.now() })
+    JSON.stringify({ purpose, schoolId, schoolSlug, appChallenge, issuedAt: Date.now() })
   ).toString("base64url");
 
   return `${payload}.${sign(payload)}`;
@@ -60,13 +61,24 @@ export function createOAuthState(schoolId: string, schoolSlug: string): string {
   return createState("connect", schoolId, schoolSlug);
 }
 
-export function createLoginState(schoolId: string, schoolSlug: string): string {
-  return createState("parent-login", schoolId, schoolSlug);
+/**
+ * `appChallenge` marks a sign-in started from the iOS / Android app: the
+ * callback then hands the session to the app instead of this browser (see
+ * lib/auth/app-handoff.ts). It's a hash, so it may travel through Blackbaud.
+ */
+export function createLoginState(
+  schoolId: string,
+  schoolSlug: string,
+  appChallenge?: string
+): string {
+  return createState("parent-login", schoolId, schoolSlug, appChallenge);
 }
 
 export interface OAuthState {
   schoolId: string;
   schoolSlug: string;
+  /** Present only for parent sign-ins started from the native app. */
+  appChallenge?: string;
 }
 
 function constantTimeEquals(a: string, b: string): boolean {
@@ -109,7 +121,15 @@ function verifyState(
       return null;
     }
 
-    return { schoolId: decoded.schoolId, schoolSlug: decoded.schoolSlug };
+    if (decoded.appChallenge !== undefined && typeof decoded.appChallenge !== "string") {
+      return null;
+    }
+
+    return {
+      schoolId: decoded.schoolId,
+      schoolSlug: decoded.schoolSlug,
+      ...(decoded.appChallenge ? { appChallenge: decoded.appChallenge } : {}),
+    };
   } catch {
     return null;
   }
