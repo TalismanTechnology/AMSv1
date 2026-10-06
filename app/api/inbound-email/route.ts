@@ -5,10 +5,12 @@ import {
   parseEmailAddress,
   senderDomainAllowed,
   extractInboundToken,
+  isStaleClaim,
 } from "@/lib/email/inbound";
 import { isBlockedFile } from "@/lib/documents/file-types";
 import {
   ingestFileAsDocument,
+  removeIngestedDocuments,
   triggerProcessingHttp,
 } from "@/lib/documents/ingest";
 
@@ -18,6 +20,7 @@ const INBOUND_DOMAIN = process.env.INBOUND_EMAIL_DOMAIN || "";
 const INBOUND_SECRET = process.env.RESEND_INBOUND_SECRET || "";
 
 type IngestStatus =
+  | "processing"
   | "accepted"
   | "rejected_disabled"
   | "rejected_domain"
@@ -54,6 +57,78 @@ async function record(
     reason,
     document_ids: documentIds,
   });
+}
+
+/**
+ * Claim a message before creating any documents by inserting its 'processing'
+ * row; 027's partial unique index lets only one processing/accepted row exist
+ * per message. Returns the claim row id, or why the message must be skipped.
+ * A claim older than STALE_CLAIM_MS belonged to an attempt that died, so it is
+ * cleared and taken over once.
+ */
+async function claimMessage(
+  schoolId: string,
+  data: ReceivedEvent["data"] & { message_id: string }
+): Promise<{ claimId: string } | { skip: "duplicate" | "in_progress" }> {
+  const supabase = createAdminClient();
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const { data: row, error } = await supabase
+      .from("email_ingestions")
+      .insert({
+        school_id: schoolId,
+        email_id: data.email_id ?? null,
+        message_id: data.message_id,
+        from_address: data.from ?? null,
+        subject: data.subject ?? null,
+        status: "processing",
+        reason: "Ingesting",
+      })
+      .select("id")
+      .single();
+
+    if (row) return { claimId: row.id };
+    if (error?.code !== "23505") {
+      throw new Error(`Could not claim message: ${error?.message}`);
+    }
+
+    const { data: holder } = await supabase
+      .from("email_ingestions")
+      .select("id, status, created_at")
+      .eq("school_id", schoolId)
+      .eq("message_id", data.message_id)
+      .in("status", ["processing", "accepted"])
+      .maybeSingle();
+
+    if (!holder) continue; // released between our insert and this read
+    if (holder.status === "accepted") return { skip: "duplicate" };
+    if (!isStaleClaim(holder.created_at)) return { skip: "in_progress" };
+
+    await supabase
+      .from("email_ingestions")
+      .update({ status: "error", reason: "Timed out; claim taken over by a retry" })
+      .eq("id", holder.id)
+      .eq("status", "processing");
+  }
+
+  return { skip: "in_progress" };
+}
+
+/** Settle a claim row as accepted or error, keeping it in the log. */
+async function settleClaim(
+  claimId: string,
+  status: "accepted" | "error",
+  reason: string,
+  documentIds: string[] = []
+) {
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from("email_ingestions")
+    .update({ status, reason, document_ids: documentIds })
+    .eq("id", claimId);
+  if (error) {
+    console.error(`[inbound-email] Failed to settle claim ${claimId}:`, error.message);
+  }
 }
 
 /** Strip HTML tags to a plain-text fallback when no text/plain part exists. */
@@ -145,19 +220,29 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: "rejected_domain" });
   }
 
-  // 4. Idempotency: skip if we already accepted this message.
+  // 4. Idempotency: claim the message so retries and concurrent deliveries
+  // of the same email can't ingest it twice. Without a message id there is
+  // nothing to key on, so the attempt is only logged when it finishes.
+  let claimId: string | null = null;
   if (data.message_id) {
-    const { data: existing } = await supabase
-      .from("email_ingestions")
-      .select("id")
-      .eq("school_id", school.id)
-      .eq("message_id", data.message_id)
-      .eq("status", "accepted")
-      .maybeSingle();
-    if (existing) {
-      return NextResponse.json({ status: "duplicate" });
+    const claim = await claimMessage(school.id, {
+      ...data,
+      message_id: data.message_id,
+    });
+    if ("skip" in claim) {
+      return NextResponse.json({ status: claim.skip });
     }
+    claimId = claim.claimId;
   }
+
+  const finish = (
+    status: "accepted" | "error",
+    reason: string,
+    ids: string[] = []
+  ) =>
+    claimId
+      ? settleClaim(claimId, status, reason, ids)
+      : record(school.id, data, status, reason, ids);
 
   // 5. Fetch content + attachments and ingest.
   const origin =
@@ -217,7 +302,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!documentIds.length) {
-      await record(school.id, data, "error", "No ingestible content found");
+      await finish("error", "No ingestible content found");
       return NextResponse.json({ status: "empty" });
     }
 
@@ -226,7 +311,7 @@ export async function POST(request: NextRequest) {
       await triggerProcessingHttp(id, origin);
     }
 
-    await record(school.id, data, "accepted", "Ingested", documentIds);
+    await finish("accepted", "Ingested", documentIds);
     return NextResponse.json({
       status: "accepted",
       documents: documentIds.length,
@@ -234,7 +319,10 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("[inbound-email] Ingestion failed:", message);
-    await record(school.id, data, "error", message, documentIds);
+    // Undo the partial ingest so Resend's retry starts clean, and release the
+    // claim (status 'error') so that retry is allowed through.
+    await removeIngestedDocuments(documentIds);
+    await finish("error", message);
     // 500 so Resend retries transient failures.
     return NextResponse.json({ error: message }, { status: 500 });
   }

@@ -79,6 +79,30 @@ export async function ingestFileAsDocument(
 }
 
 /**
+ * Delete documents created earlier in a failed ingest, storage objects first.
+ * Lets a webhook retry start clean instead of duplicating what the failed
+ * attempt already saved. Best-effort: failures are logged, not thrown.
+ */
+export async function removeIngestedDocuments(ids: string[]): Promise<void> {
+  if (!ids.length) return;
+  const supabase = createAdminClient();
+
+  try {
+    const { data: docs } = await supabase
+      .from("documents")
+      .select("file_url")
+      .in("id", ids);
+
+    const paths = (docs ?? []).map((d) => d.file_url).filter(Boolean);
+    if (paths.length) await supabase.storage.from("documents").remove(paths);
+
+    await supabase.from("documents").delete().in("id", ids);
+  } catch (err) {
+    console.error(`[ingest] Failed to clean up documents ${ids.join(", ")}:`, err);
+  }
+}
+
+/**
  * Kick off async processing for an ingested document by calling the internal
  * process-document route, which handles the dev (child process) vs prod
  * (inline) split. Fire-and-forget: failures are logged, not thrown.

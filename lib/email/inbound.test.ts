@@ -5,6 +5,7 @@ import {
   senderDomainAllowed,
   extractInboundToken,
   normalizeSenderDomain,
+  isStaleClaim,
 } from "./inbound";
 
 test("parseEmailAddress extracts bare address from display form", () => {
@@ -92,4 +93,14 @@ test("extractInboundToken ignores addresses on other domains", () => {
     extractInboundToken(["someone@gmail.com"], "inbound.askmyschool.com"),
     null
   );
+});
+
+test("isStaleClaim keeps a fresh claim and expires an old one", () => {
+  const now = new Date("2026-10-06T12:00:00Z");
+  assert.equal(isStaleClaim("2026-10-06T11:55:00Z", now), false);
+  assert.equal(isStaleClaim("2026-10-06T11:49:00Z", now), true);
+});
+
+test("isStaleClaim treats an unreadable timestamp as stale", () => {
+  assert.equal(isStaleClaim("not-a-date"), true);
 });

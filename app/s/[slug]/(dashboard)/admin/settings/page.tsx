@@ -7,6 +7,7 @@ import { PageTransition } from "@/components/motion";
 import type {
   BlackbaudConfig,
   BlackbaudCallbackResult,
+  EmailIngestionLogEntry,
 } from "./client";
 import type { BlackbaudCalendarFeed, EventCalendar } from "@/lib/types";
 
@@ -105,6 +106,30 @@ async function loadBlackbaudConfig(
   };
 }
 
+/** Latest inbound-email attempts, so admins can see what was accepted or why
+ * something was turned away. RLS limits rows to this school's admins. */
+async function loadRecentEmails(
+  schoolId: string
+): Promise<EmailIngestionLogEntry[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("email_ingestions")
+    .select("id, from_address, subject, status, reason, document_ids, created_at")
+    .eq("school_id", schoolId)
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    fromAddress: row.from_address,
+    subject: row.subject,
+    status: row.status,
+    reason: row.reason,
+    documentCount: (row.document_ids ?? []).length,
+    createdAt: row.created_at,
+  }));
+}
+
 export default async function SettingsPage({
   params,
   searchParams,
@@ -116,12 +141,13 @@ export default async function SettingsPage({
   const { blackbaud } = await searchParams;
   const { school } = await requireSchoolContext(slug);
 
-  const [settings, blackbaudConfig] = await Promise.all([
+  const [settings, blackbaudConfig, recentEmails] = await Promise.all([
     loadSettings(school.id),
     loadBlackbaudConfig(
       school.id,
       school.blackbaud_verification_enabled ?? false
     ),
+    loadRecentEmails(school.id),
   ]);
 
   return (
@@ -136,6 +162,7 @@ export default async function SettingsPage({
           allowedDomains: school.allowed_sender_domains ?? [],
           token: school.inbound_email_token ?? null,
           inboundDomain: process.env.INBOUND_EMAIL_DOMAIN ?? null,
+          recent: recentEmails,
         }}
         blackbaud={blackbaudConfig}
         blackbaudCallback={parseCallbackResult(blackbaud)}

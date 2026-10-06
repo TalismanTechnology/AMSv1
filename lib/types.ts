@@ -89,6 +89,8 @@ export interface Document {
   error_message: string | null;
   page_count: number | null;
   uploaded_by: string | null;
+  /** Where the document came from: an admin upload or an inbound email. */
+  source?: "upload" | "email";
   school_id: string;
   created_at: string;
   updated_at: string;
