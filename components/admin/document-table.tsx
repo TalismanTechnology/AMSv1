@@ -9,6 +9,7 @@ import {
   MoreHorizontal,
   CheckCircle,
   Eye,
+  Mail,
 } from "lucide-react";
 import { LogoSpinner } from "@/components/logo-spinner";
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +38,15 @@ import {
 import { toast } from "sonner";
 import type { Document } from "@/lib/types";
 import { TimeAgo } from "@/components/ui/time-ago";
+
+function EmailedBadge() {
+  return (
+    <Badge variant="outline" className="gap-1 text-xs" title="Added from an email">
+      <Mail />
+      Emailed
+    </Badge>
+  );
+}
 
 interface DocumentTableProps {
   documents: Document[];
@@ -245,6 +255,7 @@ export function DocumentTable({ documents, onEdit, onView, schoolId }: DocumentT
                       <Badge variant="secondary" className="text-xs uppercase">
                         {doc.file_type}
                       </Badge>
+                      {doc.source === "email" && <EmailedBadge />}
                       {doc.category && (
                         <Badge
                           style={{
@@ -259,9 +270,12 @@ export function DocumentTable({ documents, onEdit, onView, schoolId }: DocumentT
                   </div>
                 </TableCell>
                 <TableCell className="hidden md:table-cell">
-                  <Badge variant="secondary" className="text-xs uppercase">
-                    {doc.file_type}
-                  </Badge>
+                  <div className="flex flex-wrap gap-1">
+                    <Badge variant="secondary" className="text-xs uppercase">
+                      {doc.file_type}
+                    </Badge>
+                    {doc.source === "email" && <EmailedBadge />}
+                  </div>
                 </TableCell>
                 <TableCell className="hidden md:table-cell">
                   {doc.category ? (

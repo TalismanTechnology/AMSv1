@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Plus, X, Copy, Check, RefreshCw, ExternalLink } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { LogoSpinner } from "@/components/logo-spinner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,12 +22,23 @@ import {
 import { toast } from "sonner";
 import type { EventCalendar, Settings } from "@/lib/types";
 
+export interface EmailIngestionLogEntry {
+  id: string;
+  fromAddress: string | null;
+  subject: string | null;
+  status: string;
+  reason: string | null;
+  documentCount: number;
+  createdAt: string;
+}
+
 interface EmailIngestionConfig {
   enabled: boolean;
   autoSort: boolean;
   allowedDomains: string[];
   token: string | null;
   inboundDomain: string | null;
+  recent: EmailIngestionLogEntry[];
 }
 
 export type BlackbaudCallbackResult = "connected" | "denied" | "error" | null;
@@ -728,7 +740,76 @@ function EmailIngestionSection({
             Save email settings
           </Button>
         </div>
+
+        <RecentEmails entries={config.recent} />
       </div>
     </section>
+  );
+}
+
+const EMAIL_STATUS: Record<string, { label: string; className: string }> = {
+  accepted: { label: "Added", className: "bg-success/15 text-success" },
+  processing: { label: "Processing", className: "bg-amber-500/15 text-amber-500" },
+  rejected_domain: {
+    label: "Sender not allowed",
+    className: "bg-destructive/15 text-destructive",
+  },
+  rejected_disabled: {
+    label: "Ingestion off",
+    className: "bg-secondary text-secondary-foreground",
+  },
+  duplicate: { label: "Duplicate", className: "bg-secondary text-secondary-foreground" },
+  error: { label: "Failed", className: "bg-destructive/15 text-destructive" },
+};
+
+function RecentEmails({ entries }: { entries: EmailIngestionLogEntry[] }) {
+  return (
+    <div className="space-y-2 border-t border-border pt-5">
+      <div className="space-y-0.5">
+        <Label>Recent emails</Label>
+        <p className="text-xs text-muted-foreground">
+          The last 20 emails sent to your inbound address and what happened to
+          each.
+        </p>
+      </div>
+      {entries.length === 0 ? (
+        <p className="text-xs text-muted-foreground">No emails received yet.</p>
+      ) : (
+        <ul className="divide-y divide-border rounded-lg border border-border">
+          {entries.map((entry) => {
+            const status = EMAIL_STATUS[entry.status] ?? {
+              label: entry.status,
+              className: "bg-secondary text-secondary-foreground",
+            };
+            const detail =
+              entry.status === "accepted"
+                ? `${entry.documentCount} document${entry.documentCount === 1 ? "" : "s"} added`
+                : entry.reason;
+            return (
+              <li
+                key={entry.id}
+                className="flex flex-col gap-1 px-3.5 py-2.5 sm:flex-row sm:items-center sm:gap-3"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm text-ink">
+                    {entry.subject || "(no subject)"}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {entry.fromAddress ?? "Unknown sender"}
+                    {detail ? ` · ${detail}` : ""}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Badge className={status.className}>{status.label}</Badge>
+                  <span className="text-xs text-muted-foreground">
+                    <TimeAgo date={entry.createdAt} />
+                  </span>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
   );
 }

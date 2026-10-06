@@ -46,6 +46,19 @@ export function senderDomainAllowed(
 }
 
 /**
+ * True when a 'processing' claim is old enough that the attempt holding it
+ * must have died (the webhook's maxDuration is 300s), so a retry may take it
+ * over instead of being turned away as a duplicate forever.
+ */
+export const STALE_CLAIM_MS = 10 * 60 * 1000;
+
+export function isStaleClaim(createdAt: string, now: Date = new Date()): boolean {
+  const created = new Date(createdAt).getTime();
+  if (Number.isNaN(created)) return true;
+  return now.getTime() - created > STALE_CLAIM_MS;
+}
+
+/**
  * Find the inbound token (the local part of the address) from the recipient
  * list for messages sent to the configured inbound domain.
  * e.g. to=["ams-ab12cd@inbound.askmyschool.com"] with domain
