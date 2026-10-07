@@ -96,6 +96,9 @@ export async function uploadDocument(formData: FormData) {
     schoolId
   );
 
+  // A category picked at upload files the document under its division.
+  if (categoryId) await followCategoryDivision(supabase, schoolId, doc.id, categoryId);
+
   // Fire-and-forget: trigger async processing
   triggerProcessing(doc.id);
 
@@ -153,6 +156,10 @@ export async function createDocumentRecord(params: {
     { title: params.title, fileType: params.fileType },
     params.schoolId
   );
+
+  if (params.categoryId) {
+    await followCategoryDivision(supabase, params.schoolId, doc.id, params.categoryId);
+  }
 
   // Fire-and-forget processing
   triggerProcessing(doc.id);
@@ -296,8 +303,20 @@ export async function updateDocument(
 
   if (error) return { error: error.message };
 
-  if (division_ids) {
-    const divisionError = await setDocumentDivisions(supabase, documentId, division_ids);
+  // A school whose categories are grouped by division files a document under
+  // a division by its category, so the document's division follows it.
+  const categoryDivision = fields.category_id
+    ? await divisionOfCategory(supabase, schoolId, fields.category_id)
+    : undefined;
+  const divisionIds =
+    categoryDivision !== undefined
+      ? categoryDivision
+        ? [categoryDivision]
+        : []
+      : division_ids;
+
+  if (divisionIds) {
+    const divisionError = await setDocumentDivisions(supabase, documentId, divisionIds);
     if (divisionError) return { error: divisionError };
   }
 
@@ -313,6 +332,41 @@ export async function updateDocument(
 
   revalidatePath("/", "layout");
   return { success: true };
+}
+
+/**
+ * The division a category files documents under: its division id, or null
+ * for a whole-school category. Undefined when the school's categories aren't
+ * grouped by division (or migration 029 hasn't run), so nothing follows.
+ */
+async function divisionOfCategory(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  schoolId: string,
+  categoryId: string
+): Promise<string | null | undefined> {
+  const { data: categories, error } = await supabase
+    .from("categories")
+    .select("*")
+    .eq("school_id", schoolId);
+  if (error || !categories) return undefined;
+
+  const grouped = categories.some((c) => c.division_id);
+  const category = categories.find((c) => c.id === categoryId);
+  if (!grouped || !category) return undefined;
+  return (category.division_id as string | null) ?? null;
+}
+
+/** Point a new document's division at its category's, where that applies. */
+async function followCategoryDivision(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  schoolId: string,
+  documentId: string,
+  categoryId: string
+) {
+  const division = await divisionOfCategory(supabase, schoolId, categoryId);
+  if (division === undefined) return;
+  const error = await setDocumentDivisions(supabase, documentId, division ? [division] : []);
+  if (error) console.warn(`[documents] Couldn't set the division of ${documentId}:`, error);
 }
 
 /**

@@ -21,11 +21,15 @@ import {
   Diamond,
   EllipsisVertical,
   Folder as FolderIcon,
+  GraduationCap,
   Inbox,
   Library,
   ListFilter,
+  LoaderCircle,
   Mail,
   Pencil,
+  School,
+  Sparkles,
   Tag,
 } from "lucide-react";
 import {
@@ -74,8 +78,8 @@ export type BucketNode = Node<
   {
     bucket: Bucket<Document>;
     expanded: boolean;
-    /** Folder view: the folders listed as rows, which link to their cards. */
-    subfolders: Bucket<Document>[];
+    /** The categories or subfolders listed as rows, which link to their cards. */
+    rows: Bucket<Document>[];
   },
   "bucket"
 >;
@@ -106,6 +110,9 @@ export interface SortingMapContextValue {
   dragFrom: string | null;
   /** The bucket a dragged document is over. */
   dropTarget: string | null;
+  /** Documents being sorted by AI right now. */
+  sorting: ReadonlySet<string>;
+  sortDocuments: (docIds: string[]) => void;
   setHovered: (bucketId: string | null) => void;
   focusCard: (bucketId: string) => void;
   toggleExpanded: (bucketId: string) => void;
@@ -115,6 +122,8 @@ export interface SortingMapContextValue {
   startDrag: (fromBucketId: string) => void;
   endDrag: () => void;
   dragOver: (bucketId: string | null) => void;
+  /** Clears the drop target, unless the pointer has already entered another. */
+  dragLeave: (bucketId: string) => void;
   drop: (docId: string, bucket: Bucket<Document>) => void;
 }
 
@@ -133,25 +142,35 @@ function carriesDocument(event: DragEvent): boolean {
   return Array.from(event.dataTransfer.types).includes(DRAG_TYPE);
 }
 
-/** Lets a card or row take a document dragged from another card. */
+/**
+ * Lets a card or row take a document dragged from another card. A division
+ * isn't a place to file a document, only its categories are.
+ */
 function useDropTarget(bucket: Bucket<Document>) {
   const map = useSortingMap();
   const accepts = map.dragFrom !== bucket.id;
 
+  if (bucket.kind === "division") return { isOver: false, handlers: {} };
+
+  // Entering the next target can come before leaving the last one, so a leave
+  // only clears the target if it's still this one.
+  const over = (event: DragEvent) => {
+    if (!carriesDocument(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = accepts ? "move" : "none";
+    map.dragOver(accepts ? bucket.id : null);
+  };
+
   return {
     isOver: accepts && map.dropTarget === bucket.id,
     handlers: {
-      onDragOver(event: DragEvent) {
-        if (!carriesDocument(event)) return;
-        event.preventDefault();
-        event.stopPropagation();
-        event.dataTransfer.dropEffect = accepts ? "move" : "none";
-        map.dragOver(accepts ? bucket.id : null);
-      },
+      onDragEnter: over,
+      onDragOver: over,
       onDragLeave(event: DragEvent) {
         const next = event.relatedTarget;
         if (next instanceof Element && event.currentTarget.contains(next)) return;
-        map.dragOver(null);
+        map.dragLeave(bucket.id);
       },
       onDrop(event: DragEvent) {
         if (!carriesDocument(event)) return;
@@ -192,9 +211,12 @@ const rowButtonClass =
   "flex h-full w-full items-center gap-2.5 px-3 text-left outline-none transition-colors hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring";
 const countClass =
   "shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground";
+/** The small buttons that appear over a document row's file type on hover. */
+const rowActionClass =
+  "flex size-6 items-center justify-center rounded-md bg-[var(--card)] text-muted-foreground ring-1 ring-border outline-none transition-opacity hover:text-ink disabled:cursor-wait focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring group-hover/row:opacity-100";
 
-function plural(count: number, noun: string) {
-  return `${count} ${noun}${count === 1 ? "" : "s"}`;
+function plural(count: number, noun: string, nouns = `${noun}s`) {
+  return `${count} ${count === 1 ? noun : nouns}`;
 }
 
 function CardShell({
@@ -233,6 +255,7 @@ function CardShell({
 
 function CardHeader({
   icon,
+  prefix,
   name,
   count,
   countTitle,
@@ -240,6 +263,8 @@ function CardHeader({
   children,
 }: {
   icon: React.ReactNode;
+  /** A category's division, shown ahead of its name. */
+  prefix?: string;
   name: string;
   count: number;
   countTitle: string;
@@ -263,8 +288,11 @@ function CardHeader({
       {icon}
       <span
         className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink"
-        title={name}
+        title={prefix ? `${prefix} · ${name}` : name}
       >
+        {prefix && (
+          <span className="font-normal text-muted-foreground">{prefix} · </span>
+        )}
         {name}
       </span>
       <span className={cn(countClass, !children && "pr-1.5")} title={countTitle}>
@@ -353,6 +381,7 @@ function RowIcon({ bucket }: { bucket: Bucket<Document> }) {
   if (bucket.kind === "folder") {
     return <FolderIcon className="size-3.5 shrink-0 text-muted-foreground" />;
   }
+  if (bucket.kind === "division") return <DivisionIcon bucket={bucket} />;
   return (
     <Diamond
       aria-hidden
@@ -367,21 +396,28 @@ function RowIcon({ bucket }: { bucket: Bucket<Document> }) {
 
 // ── Category / folder cards ───────────────────────────
 
-function cardLabel(bucket: Bucket<Document>, subfolders: number): string {
+function cardLabel(bucket: Bucket<Document>, rows: number): string {
   const documents = plural(bucket.total, "document");
-  if (bucket.kind === "category") return `${bucket.name}, category, ${documents}`;
+  if (bucket.kind === "category") {
+    return `${bucket.group ? `${bucket.group}, ` : ""}${bucket.name}, category, ${documents}`;
+  }
+  if (bucket.kind === "division") {
+    return `${bucket.name}, ${plural(rows, "category", "categories")}, ${documents}`;
+  }
   if (bucket.kind === "unsorted") return `${bucket.name}, ${documents}`;
-  return subfolders
-    ? `${bucket.name}, folder, ${documents} including ${plural(subfolders, "subfolder")}`
+  return rows
+    ? `${bucket.name}, folder, ${documents} including ${plural(rows, "subfolder")}`
     : `${bucket.name}, folder, ${documents}`;
 }
 
 function BucketCard({ id, data }: NodeProps<BucketNode>) {
-  const { bucket, expanded, subfolders } = data;
+  const { bucket, expanded, rows } = data;
   const map = useSortingMap();
   const drop = useDropTarget(bucket);
   const searching = map.query !== "";
-  useRowHandleRefresh(id, subfolders);
+  // Unfiled documents in the division view can be sorted by AI on the spot.
+  const sortable = bucket.kind === "unsorted" && map.view === "category";
+  useRowHandleRefresh(id, rows);
 
   // While searching, matches come first so a folded card still shows them.
   const docs = searching
@@ -395,7 +431,7 @@ function BucketCard({ id, data }: NodeProps<BucketNode>) {
 
   return (
     <CardShell
-      label={cardLabel(bucket, subfolders.length)}
+      label={cardLabel(bucket, rows.length)}
       dashed={bucket.kind === "unsorted"}
       dimmed={searching && !map.matched.has(bucket.id)}
       {...drop.handlers}
@@ -407,24 +443,30 @@ function BucketCard({ id, data }: NodeProps<BucketNode>) {
     >
       <CardHeader
         icon={<CardIcon bucket={bucket} />}
+        prefix={bucket.group}
         name={bucket.name}
-        // Like the hub and subfolder rows: everything at or beneath here.
+        // Like the hub and parent rows: everything at or beneath here.
         count={bucket.total}
         countTitle={
-          subfolders.length
+          bucket.kind === "folder" && rows.length
             ? `${plural(bucket.total, "document")}: ${direct} here, the rest in subfolders`
             : plural(bucket.total, "document")
         }
         accent={bucket.color}
       >
-        <CardMenu bucket={bucket} expanded={expanded} />
+        <CardMenu bucket={bucket} expanded={expanded} sortable={sortable} />
       </CardHeader>
       <ul>
-        {subfolders.map((child) => (
-          <SubfolderRow key={child.id} bucket={child} parentId={bucket.id} />
+        {rows.map((child) => (
+          <ChildRow key={child.id} bucket={child} parentId={bucket.id} />
         ))}
         {shown.map((doc) => (
-          <DocumentRow key={doc.id} doc={doc} bucketId={bucket.id} />
+          <DocumentRow
+            key={doc.id}
+            doc={doc}
+            bucketId={bucket.id}
+            sortable={sortable}
+          />
         ))}
         {hasMoreRow(bucket) && (
           <li className={cn(!map.touch && "nodrag nopan")}>
@@ -447,7 +489,7 @@ function BucketCard({ id, data }: NodeProps<BucketNode>) {
             </button>
           </li>
         )}
-        {subfolders.length === 0 && direct === 0 && (
+        {rows.length === 0 && direct === 0 && (
           <PlaceholderRow>
             {bucket.kind === "folder" ? "Empty folder" : "No documents yet"}
           </PlaceholderRow>
@@ -457,7 +499,19 @@ function BucketCard({ id, data }: NodeProps<BucketNode>) {
   );
 }
 
+/** A division's mark; the whole school gets the school building. */
+function DivisionIcon({ bucket }: { bucket: Bucket<Document> }) {
+  const Icon = bucket.id === "division:whole" ? School : GraduationCap;
+  return (
+    <Icon
+      className="size-3.5 shrink-0"
+      style={bucket.color ? { color: bucket.color } : undefined}
+    />
+  );
+}
+
 function CardIcon({ bucket }: { bucket: Bucket<Document> }) {
+  if (bucket.kind === "division") return <DivisionIcon bucket={bucket} />;
   if (bucket.kind === "category") {
     return (
       <Tag
@@ -475,11 +529,18 @@ function CardIcon({ bucket }: { bucket: Bucket<Document> }) {
 function CardMenu({
   bucket,
   expanded,
+  sortable,
 }: {
   bucket: Bucket<Document>;
   expanded: boolean;
+  sortable: boolean;
 }) {
   const map = useSortingMap();
+  const toSort = sortable
+    ? bucket.docs
+        .filter((d) => d.status === "ready" && !map.sorting.has(d.id))
+        .map((d) => d.id)
+    : [];
 
   return (
     <DropdownMenu>
@@ -507,6 +568,12 @@ function CardMenu({
             {expanded ? "Show fewer" : `Show all ${bucket.docs.length}`}
           </DropdownMenuItem>
         )}
+        {toSort.length > 0 && (
+          <DropdownMenuItem onClick={() => map.sortDocuments(toSort)}>
+            <Sparkles className="mr-2 h-4 w-4" />
+            Sort {toSort.length === 1 ? "it" : `all ${toSort.length}`} with AI
+          </DropdownMenuItem>
+        )}
         {bucket.targetId && (
           <DropdownMenuItem onClick={() => map.showInList(bucket)}>
             <ListFilter className="mr-2 h-4 w-4" />
@@ -518,7 +585,11 @@ function CardMenu({
   );
 }
 
-function SubfolderRow({
+/**
+ * A category inside its division, or a subfolder inside its folder. An empty
+ * category has no card to go to, but still takes a dropped document.
+ */
+function ChildRow({
   bucket,
   parentId,
 }: {
@@ -528,6 +599,20 @@ function SubfolderRow({
   const map = useSortingMap();
   const drop = useDropTarget(bucket);
   const dimmed = map.query !== "" && !map.matched.has(bucket.id);
+  const content = (
+    <>
+      <RowIcon bucket={bucket} />
+      <span
+        className={cn(
+          "min-w-0 flex-1 truncate text-[13px]",
+          bucket.rowOnly ? "text-muted-foreground" : "text-ink"
+        )}
+      >
+        {bucket.name}
+      </span>
+      <span className={countClass}>{bucket.total}</span>
+    </>
+  );
 
   return (
     <li
@@ -540,18 +625,23 @@ function SubfolderRow({
         drop.isOver && "bg-[var(--ember-soft)]"
       )}
     >
-      <button
-        type="button"
-        onClick={() => map.focusCard(bucket.id)}
-        title={`Go to ${bucket.name}`}
-        className={rowButtonClass}
-      >
-        <FolderIcon className="size-3.5 shrink-0 text-muted-foreground" />
-        <span className="min-w-0 flex-1 truncate text-[13px] text-ink">
-          {bucket.name}
-        </span>
-        <span className={countClass}>{bucket.total}</span>
-      </button>
+      {bucket.rowOnly ? (
+        <div
+          className="flex h-full w-full items-center gap-2.5 px-3"
+          title={`Nothing in ${bucket.name} yet. Drag a document here to file it.`}
+        >
+          {content}
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => map.focusCard(bucket.id)}
+          title={`Go to ${bucket.name}`}
+          className={rowButtonClass}
+        >
+          {content}
+        </button>
+      )}
       <Handle
         type="source"
         position={Position.Right}
@@ -575,11 +665,22 @@ function statusOf(doc: Document): string {
   }
 }
 
-function DocumentRow({ doc, bucketId }: { doc: Document; bucketId: string }) {
+function DocumentRow({
+  doc,
+  bucketId,
+  sortable,
+}: {
+  doc: Document;
+  bucketId: string;
+  /** Offer "Sort with AI": an unfiled, ready document in the division view. */
+  sortable: boolean;
+}) {
   const map = useSortingMap();
   const color = map.categoryColor(doc.category_id);
   const hit = map.query ? matchesQuery(doc, map.query) : null;
-  const notReady = doc.status === "ready" ? null : doc.status;
+  const sorting = map.sorting.has(doc.id);
+  const canSort = sortable && doc.status === "ready";
+  const notReady = sorting ? "sorting…" : doc.status === "ready" ? null : doc.status;
   const facts = [
     `${doc.file_type.toUpperCase()} file`,
     statusOf(doc),
@@ -644,18 +745,33 @@ function DocumentRow({ doc, bucketId }: { doc: Document; bucketId: string }) {
           {notReady ?? doc.file_type}
         </span>
       </div>
-      <button
-        type="button"
-        onClick={() => map.editDocument(doc)}
-        aria-label={`Edit ${doc.title}`}
-        title="Edit"
-        className={cn(
-          "absolute right-1.5 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-md bg-[var(--card)] text-muted-foreground ring-1 ring-border outline-none transition-opacity hover:text-ink focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring group-hover/row:opacity-100",
-          map.touch ? "opacity-100" : "opacity-0"
+      <div className="absolute right-1.5 top-1/2 flex -translate-y-1/2 gap-1">
+        {canSort && (
+          <button
+            type="button"
+            onClick={() => map.sortDocuments([doc.id])}
+            disabled={sorting}
+            aria-label={`Sort ${doc.title} with AI`}
+            title="Sort with AI"
+            className={cn(rowActionClass, map.touch || sorting ? "opacity-100" : "opacity-0")}
+          >
+            {sorting ? (
+              <LoaderCircle className="size-3 animate-spin" />
+            ) : (
+              <Sparkles className="size-3" />
+            )}
+          </button>
         )}
-      >
-        <Pencil className="size-3" />
-      </button>
+        <button
+          type="button"
+          onClick={() => map.editDocument(doc)}
+          aria-label={`Edit ${doc.title}`}
+          title="Edit"
+          className={cn(rowActionClass, map.touch ? "opacity-100" : "opacity-0")}
+        >
+          <Pencil className="size-3" />
+        </button>
+      </div>
     </li>
   );
 }

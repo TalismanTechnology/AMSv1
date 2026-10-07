@@ -10,6 +10,7 @@ import {
   CheckCircle,
   Eye,
   Mail,
+  Sparkles,
 } from "lucide-react";
 import { LogoSpinner } from "@/components/logo-spinner";
 import { Badge } from "@/components/ui/badge";
@@ -102,10 +103,23 @@ interface DocumentTableProps {
   documents: Document[];
   onEdit?: (doc: Document) => void;
   onView?: (doc: Document) => void;
+  /** File an unfiled document with AI right away. */
+  onSort?: (doc: Document) => void;
+  sortingIds?: ReadonlySet<string>;
+  /** Category names with their division, e.g. "Upper School · Academics". */
+  categoryLabels?: Map<string, string>;
   schoolId: string;
 }
 
-export function DocumentTable({ documents, onEdit, onView, schoolId }: DocumentTableProps) {
+export function DocumentTable({
+  documents,
+  onEdit,
+  onView,
+  onSort,
+  sortingIds,
+  categoryLabels,
+  schoolId,
+}: DocumentTableProps) {
   const router = useRouter();
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -316,7 +330,7 @@ export function DocumentTable({ documents, onEdit, onView, schoolId }: DocumentT
                             color: doc.category.color,
                           }}
                         >
-                          {doc.category.name}
+                          {categoryLabels?.get(doc.category.id) ?? doc.category.name}
                         </Badge>
                       )}
                     </div>
@@ -338,7 +352,7 @@ export function DocumentTable({ documents, onEdit, onView, schoolId }: DocumentT
                         color: doc.category.color,
                       }}
                     >
-                      {doc.category.name}
+                      {categoryLabels?.get(doc.category.id) ?? doc.category.name}
                     </Badge>
                   ) : (
                     <span className="text-sm text-muted-foreground/70">
@@ -368,6 +382,15 @@ export function DocumentTable({ documents, onEdit, onView, schoolId }: DocumentT
                         <DropdownMenuItem onClick={() => handleApprove(doc.id)}>
                           <CheckCircle className="mr-2 h-4 w-4 text-green-500" />
                           Approve
+                        </DropdownMenuItem>
+                      )}
+                      {onSort && !doc.category_id && doc.status === "ready" && (
+                        <DropdownMenuItem
+                          disabled={sortingIds?.has(doc.id)}
+                          onClick={() => onSort(doc)}
+                        >
+                          <Sparkles className="mr-2 h-4 w-4" />
+                          {sortingIds?.has(doc.id) ? "Sorting…" : "Sort with AI"}
                         </DropdownMenuItem>
                       )}
                       {onEdit && (

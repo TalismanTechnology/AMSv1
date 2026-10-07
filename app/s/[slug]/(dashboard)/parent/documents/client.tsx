@@ -32,7 +32,17 @@ import {
 import { DocumentViewer } from "@/components/shared/document-viewer";
 import { searchDocumentContent } from "@/actions/documents";
 import { TimeAgo } from "@/components/ui/time-ago";
-import type { Document, Category, Folder, ContentSearchResult } from "@/lib/types";
+import {
+  CategorySelectItems,
+  useCategoryLabels,
+} from "@/components/admin/category-select-items";
+import type {
+  Document,
+  Category,
+  Folder,
+  ContentSearchResult,
+  EventCalendar,
+} from "@/lib/types";
 
 const FILE_TYPE_ICONS: Record<string, typeof FileText> = {
   pdf: FileText,
@@ -55,6 +65,7 @@ interface ParentDocumentsClientProps {
   documents: Document[];
   categories: Category[];
   folders: Folder[];
+  divisions: EventCalendar[];
   schoolId: string;
 }
 
@@ -62,8 +73,10 @@ export function ParentDocumentsClient({
   documents,
   categories,
   folders,
+  divisions,
   schoolId,
 }: ParentDocumentsClientProps) {
+  const categoryLabels = useCategoryLabels(categories, divisions);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchMode, setSearchMode] = useState<"title" | "content">("title");
   const [contentResults, setContentResults] = useState<ContentSearchResult[]>([]);
@@ -207,15 +220,13 @@ export function ParentDocumentsClient({
         </div>
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
           <SelectTrigger className="min-w-0 flex-1 data-[size=default]:h-10 sm:w-[180px] sm:flex-none sm:data-[size=default]:h-9">
-            <SelectValue placeholder="Category" />
+            <SelectValue placeholder="Category">
+              {categoryLabels.get(categoryFilter)}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Categories</SelectItem>
-            {categories.map((c) => (
-              <SelectItem key={c.id} value={c.id}>
-                {c.name}
-              </SelectItem>
-            ))}
+            <CategorySelectItems categories={categories} divisions={divisions} />
           </SelectContent>
         </Select>
         {hasActiveFilters && (
@@ -352,7 +363,8 @@ export function ParentDocumentsClient({
                                     }}
                                     className="text-[10px]"
                                   >
-                                    {doc.category.name}
+                                    {categoryLabels.get(doc.category.id) ??
+                                      doc.category.name}
                                   </Badge>
                                 )}
                                 <span className="text-[10px] text-muted-foreground">

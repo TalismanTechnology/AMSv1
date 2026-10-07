@@ -10,6 +10,7 @@ import {
   FileSearch,
   LayoutList,
   Network,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +28,11 @@ import { DocumentEditDialog } from "@/components/admin/document-edit-dialog";
 import { DocumentViewer } from "@/components/shared/document-viewer";
 import { FolderTree } from "@/components/admin/folder-tree";
 import { CategoryManager } from "@/components/admin/category-manager";
+import {
+  CategorySelectItems,
+  useCategoryLabels,
+} from "@/components/admin/category-select-items";
+import { useSortDocuments } from "@/components/admin/use-sort-documents";
 import { useSidebar } from "@/components/admin/sidebar-context";
 import { Badge } from "@/components/ui/badge";
 import { searchDocumentContent } from "@/actions/documents";
@@ -84,6 +90,16 @@ export function DocumentsClient({
   const [isSearchingContent, setIsSearchingContent] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const categoryLabels = useCategoryLabels(categories, divisions);
+  const { sorting, sort: sortDocuments } = useSortDocuments(schoolId);
+  // Ready documents with no category, which AI can sort on request.
+  const unfiled = useMemo(
+    () =>
+      documents
+        .filter((d) => !d.category_id && d.status === "ready")
+        .map((d) => d.id),
+    [documents]
+  );
   const { setFolders } = useSidebar();
 
   // Sync folders to sidebar context so the sidebar can show them
@@ -208,9 +224,20 @@ export function DocumentsClient({
               { value: "map", label: "Map", icon: <Network /> },
             ]}
           />
+          {categories.length > 0 && unfiled.length > 0 && (
+            <Button
+              variant="outline"
+              onClick={() => sortDocuments(unfiled)}
+              disabled={unfiled.every((id) => sorting.has(id))}
+              title="File every document that has no category, using AI"
+            >
+              <Sparkles className="mr-2 h-4 w-4" />
+              Sort {unfiled.length} unfiled
+            </Button>
+          )}
           <Button variant="outline" onClick={() => setCategoryOpen(true)}>
             <Tags className="mr-2 h-4 w-4" />
-            Manage Labels
+            Manage Categories
           </Button>
           <Button onClick={() => setUploadOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
@@ -261,16 +288,14 @@ export function DocumentsClient({
           </SelectContent>
         </Select>
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder="Category" />
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Category">
+              {categoryLabels.get(categoryFilter)}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Categories</SelectItem>
-            {categories.map((c) => (
-              <SelectItem key={c.id} value={c.id}>
-                {c.name}
-              </SelectItem>
-            ))}
+            <CategorySelectItems categories={categories} divisions={divisions} />
           </SelectContent>
         </Select>
         {hasActiveFilters && (
@@ -337,7 +362,7 @@ export function DocumentsClient({
       {view === "list" ? (
         <div className="relative flex gap-4">
           <div className="hidden md:block">
-            <div className="rounded-xl border border-border">
+            <div className="rounded-xl border border-border p-3">
               <FolderTree
                 folders={folders}
                 selectedFolderId={selectedFolderId}
@@ -351,6 +376,9 @@ export function DocumentsClient({
               documents={filteredDocs}
               onEdit={setEditingDoc}
               onView={setViewingDoc}
+              onSort={(doc) => sortDocuments([doc.id])}
+              sortingIds={sorting}
+              categoryLabels={categoryLabels}
               schoolId={schoolId}
             />
           </div>
@@ -360,17 +388,21 @@ export function DocumentsClient({
           documents={documents}
           categories={categories}
           folders={folders}
+          divisions={divisions}
           schoolId={schoolId}
           autoSortEnabled={autoSortEnabled}
           settingsHref={`/s/${schoolSlug}/admin/settings`}
           onOpenDocument={openFromMap}
           onEditDocument={setEditingDoc}
           onShowInList={showInList}
+          sortingIds={sorting}
+          onSortDocuments={sortDocuments}
         />
       )}
 
       <DocumentUpload
         categories={categories}
+        divisions={divisions}
         folders={folders}
         open={uploadOpen}
         onOpenChange={setUploadOpen}
@@ -380,9 +412,12 @@ export function DocumentsClient({
 
       <CategoryManager
         categories={categories}
+        divisions={divisions}
+        documentCount={documents.length}
         open={categoryOpen}
         onOpenChange={setCategoryOpen}
         schoolId={schoolId}
+        onSetUp={sortDocuments}
       />
 
       {editingDoc && (

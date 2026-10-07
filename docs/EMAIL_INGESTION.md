@@ -26,8 +26,11 @@ is about.
    to the model, which then applies the document only to that division.
    Mail to the whole-school address adds no division.
 6. During processing, the AI classifier assigns each unsorted document a
-   category and folder from that school's existing lists, preferring one
-   specific to the document's division when there is one.
+   category and folder from that school's existing lists. Once a school uses
+   division categories (Documents → Manage Categories → Set up division
+   categories), mail that reached a division's address is filed only into
+   that division's categories, landing in its "Other" when nothing else fits,
+   and a document's division always follows its category.
 
 Every attempt (accepted / rejected / error) is logged in the
 `email_ingestions` table, and the latest 20 are shown to admins under
@@ -52,8 +55,9 @@ so Resend retries it once the first has finished.
 ### 1. Run the migrations
 
 Apply `supabase/migrations/019_email_ingestion.sql`,
-`supabase/migrations/027_email_ingestion_claims.sql` and
-`supabase/migrations/028_division_email_addresses.sql` to your database.
+`supabase/migrations/027_email_ingestion_claims.sql`,
+`supabase/migrations/028_division_email_addresses.sql` and
+`supabase/migrations/029_division_categories.sql` to your database.
 028 copies each school's existing address into `email_ingestion_addresses`,
 so addresses already in use keep working. Apply it before deploying the code
 that reads that table.

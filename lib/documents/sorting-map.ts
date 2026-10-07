@@ -1,12 +1,16 @@
 /**
  * The sorting map: every document drawn inside the card for the category or
  * folder it was sorted into, the way a schema visualizer draws columns inside
- * tables. A hub card lists every card and links to it, and in the folder view
+ * tables. A hub card links to each division (or top-level folder); each
+ * division lists its categories and links to the ones holding documents, and
  * each folder links to its subfolders.
  *
  * Pure data and geometry, no React, so the grouping and layout can be tested.
  */
 
+import { groupCategories } from "./division-categories";
+
+/** "category" is the division view: divisions, then their categories. */
 export type MapView = "category" | "folder";
 
 /** The fields of a document the map reads. */
@@ -24,6 +28,17 @@ export interface MapCategory {
   id: string;
   name: string;
   color: string;
+  /** The category's division; null or missing for the whole school. */
+  division_id?: string | null;
+  sort_order?: number | null;
+}
+
+export interface MapDivision {
+  id: string;
+  name: string;
+  sort_order: number;
+  /** Hex colour for the division's card. */
+  color: string;
 }
 
 export interface MapFolder {
@@ -32,29 +47,42 @@ export interface MapFolder {
   parent_id: string | null;
 }
 
-/** One card on the map: a category or folder and the documents sorted into it. */
+/** One card on the map, and a row in the card above it. */
 export interface Bucket<D extends MapDocument = MapDocument> {
   /** Node id on the map, prefixed by view so the two maps never share one. */
   id: string;
-  /** "unsorted" is the card for documents with no category, or no folder. */
-  kind: "category" | "folder" | "unsorted";
-  /** The category or folder to file a document under; null for unsorted. */
+  /**
+   * "division" groups categories (a division, or the whole school); "unsorted"
+   * holds documents with no category, or no folder.
+   */
+  kind: "division" | "category" | "folder" | "unsorted";
+  /** The category or folder to file a document under; null otherwise. */
   targetId: string | null;
   name: string;
-  /** The category's colour; null for folders and the unsorted card. */
+  /** The division or whole school a category belongs to, for its label. */
+  group?: string;
+  /** Category or division colour; null for folders and the unsorted card. */
   color: string | null;
   /** Documents sorted directly into this bucket, in the order given. */
   docs: D[];
-  /** Folder view: ids of the buckets for the folders directly inside this one. */
+  /** Ids of the buckets listed as rows in this one: categories or subfolders. */
   children: string[];
-  /** Documents here plus in every folder beneath it. */
+  /** Documents here plus in everything beneath it. */
   total: number;
-  /** Folder view: 0 for a top-level folder. Always 0 in the category view. */
+  /** 0 for what the hub lists; 1 for a division's categories, and so on. */
   depth: number;
+  /**
+   * Shown only as a row in its parent, with no card of its own: an empty
+   * category, which would otherwise crowd the map with empty cards.
+   */
+  rowOnly?: boolean;
 }
 
 export const UNSORTED_CATEGORY_ID = "category:none";
 export const UNSORTED_FOLDER_ID = "folder:none";
+
+/** The colour the whole school's card is drawn in: the app's forest green. */
+export const WHOLE_SCHOOL_COLOR = "#3d5a3e";
 
 export function hubId(view: MapView): string {
   return `hub:${view}`;
@@ -73,37 +101,59 @@ function byName(a: { name: string }, b: { name: string }): number {
 }
 
 /**
- * One bucket per category, in the order given, then a "No category" bucket
+ * The division view: one bucket per division, then one for the whole school,
+ * each followed by its categories (empty ones row-only), then "No category"
  * for documents without one (left out when there are none). A category id
  * that matches no category counts as none.
  */
-export function groupByCategory<D extends MapDocument>(
+export function groupByDivision<D extends MapDocument>(
   docs: D[],
-  categories: MapCategory[]
+  categories: MapCategory[],
+  divisions: MapDivision[]
 ): Bucket<D>[] {
   const filed = new Map<string, D[]>(categories.map((c) => [c.id, []]));
   const unsorted: D[] = [];
-
   for (const doc of docs) {
     const bucket = doc.category_id ? filed.get(doc.category_id) : undefined;
     if (bucket) bucket.push(doc);
     else unsorted.push(doc);
   }
 
-  const buckets: Bucket<D>[] = categories.map((category) => {
-    const inCategory = filed.get(category.id) ?? [];
-    return {
-      id: `category:${category.id}`,
-      kind: "category",
-      targetId: category.id,
-      name: category.name,
-      color: category.color,
-      docs: inCategory,
-      children: [],
-      total: inCategory.length,
-      depth: 0,
-    };
-  });
+  const colorOf = new Map(divisions.map((d) => [d.id, d.color]));
+  const buckets: Bucket<D>[] = [];
+  for (const group of groupCategories(categories, divisions)) {
+    const children = group.categories.map((category) => {
+      const inCategory = filed.get(category.id) ?? [];
+      return {
+        id: `category:${category.id}`,
+        kind: "category" as const,
+        targetId: category.id,
+        name: category.name,
+        group: group.name,
+        color: category.color,
+        docs: inCategory,
+        children: [],
+        total: inCategory.length,
+        depth: 1,
+        rowOnly: inCategory.length === 0,
+      };
+    });
+    buckets.push(
+      {
+        id: `division:${group.divisionId ?? "whole"}`,
+        kind: "division",
+        targetId: null,
+        name: group.name,
+        color:
+          (group.divisionId && colorOf.get(group.divisionId)) || WHOLE_SCHOOL_COLOR,
+        docs: [],
+        children: children.map((c) => c.id),
+        total: children.reduce((sum, c) => sum + c.total, 0),
+        depth: 0,
+      },
+      ...children
+    );
+  }
 
   if (unsorted.length) {
     buckets.push({
@@ -211,10 +261,9 @@ export function groupByFolder<D extends MapDocument>(
 
 /** The buckets the hub card lists, one row and one link each. */
 export function hubBuckets<D extends MapDocument>(
-  view: MapView,
   buckets: Bucket<D>[]
 ): Bucket<D>[] {
-  return view === "category" ? buckets : buckets.filter((b) => b.depth === 0);
+  return buckets.filter((b) => b.depth === 0);
 }
 
 /** Search text as the map compares it; "" means no search. */
@@ -265,11 +314,9 @@ const CARD_BORDER = 2;
 
 /** Gap between the hub and the first column of cards; links bend inside it. */
 export const HUB_GAP = 136;
-/** Gap between columns of cards in the category view. */
-export const COLUMN_GAP = 56;
 /** Gap between a folder and the column of its subfolders. */
 export const TREE_GAP = 112;
-/** Gap between columns of top-level folders in the folder view. */
+/** Gap between columns of divisions or top-level folders. */
 export const BLOCK_GAP = 96;
 /** Vertical gap between cards stacked in one column. */
 export const STACK_GAP = 32;
@@ -448,9 +495,7 @@ export function layoutMap(
   expanded: ReadonlySet<string>,
   basis: PackingBasis = packingBasis(buckets)
 ): MapLayout {
-  return view === "category"
-    ? layoutCategories(buckets, expanded, basis)
-    : layoutFolders(buckets, expanded, basis);
+  return layoutTree(view, buckets, expanded, basis);
 }
 
 /** Something to stack in a column: a category card, or a folder's subtree. */
@@ -532,49 +577,6 @@ function stackInColumns(
   return corners;
 }
 
-/** The hub on the left and the category cards in columns to its right. */
-function layoutCategories(
-  buckets: Bucket[],
-  expanded: ReadonlySet<string>,
-  basis: PackingBasis
-): MapLayout {
-  const hub = hubId("category");
-  const hubBox: Box = { x: 0, y: 0, height: hubHeight(buckets.length) };
-  const left = CARD_WIDTH + HUB_GAP;
-  // The first card's header sits level with the hub's first row.
-  const top = levelWithRow(0, 0);
-
-  const items = buckets.map((bucket) => ({
-    basisHeight: basis.get(bucket.id),
-    height: cardHeight(bucket, expanded.has(bucket.id)),
-    width: CARD_WIDTH,
-  }));
-  const corners = stackInColumns(items, {
-    left,
-    top,
-    gap: COLUMN_GAP,
-    minHeight: hubBox.height,
-  });
-
-  const boxes = new Map<string, Box>([[hub, hubBox]]);
-  const overheadY = top - OVERHEAD_CLEARANCE;
-  const links: MapLink[] = buckets.map((bucket, i) => {
-    boxes.set(bucket.id, { ...corners[i], height: items[i].height });
-    return {
-      id: `${hub}->${bucket.id}`,
-      source: hub,
-      sourceHandle: rowHandleId(bucket.id),
-      target: bucket.id,
-      gutter: HUB_GAP,
-      // Cards past the first column have cards in front of them.
-      overhead:
-        corners[i].x > left ? { y: overheadY, approach: COLUMN_GAP } : undefined,
-    };
-  });
-
-  return { boxes, links };
-}
-
 /** One top-level folder and everything beneath it, laid out from (0, 0). */
 interface Block {
   boxes: Map<string, Box>;
@@ -609,7 +611,7 @@ function layoutSubtree(
 
     bucket.children.forEach((childId, index) => {
       const child = bucketById.get(childId);
-      if (!child) return;
+      if (!child || child.rowOnly) return;
       links.push({
         id: `${bucket.id}->${child.id}`,
         source: bucket.id,
@@ -626,20 +628,22 @@ function layoutSubtree(
 }
 
 /**
- * The hub, then each top-level folder's subtree as a block, the blocks
- * stacked in as many columns as brings the map closest to TARGET_ASPECT.
+ * The hub, then each division's (or top-level folder's) subtree as a block,
+ * the blocks stacked in as many columns as brings the map closest to
+ * TARGET_ASPECT.
  */
-function layoutFolders(
+function layoutTree(
+  view: MapView,
   buckets: Bucket[],
   expanded: ReadonlySet<string>,
   basis: PackingBasis
 ): MapLayout {
-  const hub = hubId("folder");
+  const hub = hubId(view);
   const bucketById = new Map(buckets.map((b) => [b.id, b]));
-  const roots = hubBuckets("folder", buckets);
+  const roots = hubBuckets(buckets);
   const hubBox: Box = { x: 0, y: 0, height: hubHeight(roots.length) };
   const left = CARD_WIDTH + HUB_GAP;
-  // The first folder's header sits level with the hub's first row.
+  // The first card's header sits level with the hub's first row.
   const top = levelWithRow(0, 0);
 
   const blocks = roots.map((root) =>
@@ -678,7 +682,7 @@ function layoutFolders(
       sourceHandle: rowHandleId(root.id),
       target: root.id,
       gutter: HUB_GAP,
-      // Blocks past the first column have other folders in front of them.
+      // Blocks past the first column have other cards in front of them.
       overhead:
         corner.x > left ? { y: overheadY, approach: BLOCK_GAP } : undefined,
     });

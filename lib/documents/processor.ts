@@ -4,63 +4,26 @@ import { convertToPdf } from "./convert-to-pdf";
 import { splitSegmentsIntoChunks } from "@/lib/ai/chunking";
 import { generateEmbeddings } from "@/lib/ai/embeddings";
 import { generateSummary } from "@/lib/ai/summary";
-import { classifyDocument, toFolderOptions } from "@/lib/ai/classify-document";
+import {
+  applySorting,
+  chooseSorting,
+  type SortChoice,
+  type SortableDoc,
+} from "./auto-sort";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const BATCH_SIZE = 5;
 
-/** How many recent filed documents to scan when collecting example titles. */
-const EXAMPLE_POOL = 300;
-const MAX_EXAMPLES_PER_OPTION = 3;
-
-interface SortableDoc {
-  id: string;
-  title: string;
-  school_id: string | null;
-  category_id: string | null;
-  folder_id: string | null;
-}
-
-interface FiledDoc {
-  title: string | null;
-  category_id: string | null;
-  folder_id: string | null;
-}
-
-/**
- * Group recent document titles by the bucket they were filed into. These go
- * into the prompt as worked examples — a folder name alone rarely says what
- * belongs in it, but three documents already sitting there do.
- */
-function exampleTitles(
-  rows: FiledDoc[],
-  key: "category_id" | "folder_id"
-): Map<string, { examples: string[] }> {
-  const byId = new Map<string, { examples: string[] }>();
-
-  for (const row of rows) {
-    const id = row[key];
-    const title = row.title?.trim();
-    if (!id || !title) continue;
-
-    const current = byId.get(id)?.examples ?? [];
-    if (current.length >= MAX_EXAMPLES_PER_OPTION) continue;
-    byId.set(id, { examples: [...current, title] });
-  }
-
-  return byId;
-}
-
 /**
  * When the school has auto-sort enabled and the document is missing a category
  * or folder, ask the classifier to fill in the gaps from existing options.
- * Returns a partial update ({} when nothing to do); never throws.
+ * Returns what to write ({} when nothing to do); never throws.
  */
 async function maybeAutoSort(
   supabase: SupabaseClient,
   doc: SortableDoc,
   content: string
-): Promise<{ category_id?: string; folder_id?: string }> {
+): Promise<SortChoice> {
   try {
     if (!doc.school_id) return {};
     if (doc.category_id && doc.folder_id) return {};
@@ -72,61 +35,7 @@ async function maybeAutoSort(
       .single();
 
     if (!school?.auto_sort_enabled) return {};
-
-    const [
-      { data: categories },
-      { data: folders },
-      { data: filed },
-      { data: divisions },
-    ] = await Promise.all([
-      supabase
-        .from("categories")
-        .select("id, name, description")
-        .eq("school_id", doc.school_id),
-      supabase
-        .from("folders")
-        .select("id, name, parent_id")
-        .eq("school_id", doc.school_id),
-      supabase
-        .from("documents")
-        .select("title, category_id, folder_id")
-        .eq("school_id", doc.school_id)
-        .eq("status", "ready")
-        .neq("id", doc.id)
-        .order("created_at", { ascending: false })
-        .limit(EXAMPLE_POOL),
-      // The divisions it is marked for, so the classifier can prefer that
-      // division's folder or category.
-      supabase
-        .from("document_divisions")
-        .select("division:event_calendars(name)")
-        .eq("document_id", doc.id),
-    ]);
-
-    const filedRows: FiledDoc[] = filed ?? [];
-    const categoryExamples = exampleTitles(filedRows, "category_id");
-    const folderExamples = exampleTitles(filedRows, "folder_id");
-
-    const result = await classifyDocument({
-      title: doc.title,
-      content,
-      divisions: (divisions ?? []).flatMap((row) => {
-        const division = row.division as unknown as { name: string } | null;
-        return division ? [division.name] : [];
-      }),
-      categories: (categories ?? []).map((c) => ({
-        id: c.id,
-        name: c.name,
-        description: c.description,
-        examples: categoryExamples.get(c.id)?.examples,
-      })),
-      folders: toFolderOptions(folders ?? [], folderExamples),
-    });
-
-    const update: { category_id?: string; folder_id?: string } = {};
-    if (!doc.category_id && result.categoryId) update.category_id = result.categoryId;
-    if (!doc.folder_id && result.folderId) update.folder_id = result.folderId;
-    return update;
+    return await chooseSorting(supabase, doc, content);
   } catch (err) {
     console.warn(`[processor] Auto-sort failed:`, err);
     return {};
@@ -283,22 +192,13 @@ export async function processDocument(documentId: string) {
     const autoSort = await maybeAutoSort(supabase, doc, summary ?? text);
 
     // `doc` was read before processing began, so an admin may have filed the
-    // document since. Each guess is written only if that field is still
-    // empty, so their choice wins. Done before "ready" so the list never
+    // document since: applySorting writes each guess only into a field that's
+    // still empty, so their choice wins. Done before "ready" so the list never
     // shows a ready document as unsorted.
-    if (autoSort.category_id) {
-      await supabase
-        .from("documents")
-        .update({ category_id: autoSort.category_id })
-        .eq("id", documentId)
-        .is("category_id", null);
-    }
-    if (autoSort.folder_id) {
-      await supabase
-        .from("documents")
-        .update({ folder_id: autoSort.folder_id })
-        .eq("id", documentId)
-        .is("folder_id", null);
+    try {
+      await applySorting(supabase, documentId, autoSort);
+    } catch (err) {
+      console.warn(`[processor] Saving auto-sort failed:`, err);
     }
 
     // 9. Mark document as ready

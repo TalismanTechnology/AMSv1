@@ -11,6 +11,9 @@ export async function createCategory(schoolId: string, formData: FormData) {
   const name = formData.get("name") as string;
   const description = formData.get("description") as string;
   const color = formData.get("color") as string;
+  // Empty for the whole school. Left out entirely then, so this still works
+  // before migration 029 adds the column.
+  const divisionId = (formData.get("division_id") as string | null) || null;
 
   if (!name) return { error: "Name is required" };
 
@@ -19,10 +22,11 @@ export async function createCategory(schoolId: string, formData: FormData) {
     description: description || null,
     color: color || "#6366f1",
     school_id: schoolId,
+    ...(divisionId ? { division_id: divisionId, sort_order: 10 } : {}),
   });
 
   if (error) {
-    if (error.code === "23505") return { error: "Category already exists" };
+    if (error.code === "23505") return { error: "That group already has a category with this name" };
     return { error: error.message };
   }
 

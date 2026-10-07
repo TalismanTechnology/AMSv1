@@ -33,20 +33,21 @@ import {
   Diamond,
   FileText,
   Folder as FolderIcon,
+  GraduationCap,
   LayoutGrid,
   Mail,
   Search,
   Sparkles,
-  Tag,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { ViewToggle } from "@/components/admin/view-toggle";
 import { updateDocument } from "@/actions/documents";
 import { cn } from "@/lib/utils";
+import { calendarHex } from "@/lib/event-calendars";
 import {
   bucketsWithMatches,
-  groupByCategory,
+  groupByDivision,
   groupByFolder,
   hubBuckets,
   hubId,
@@ -55,6 +56,7 @@ import {
   normalizeQuery,
   packingBasis,
   type Bucket,
+  type MapDivision,
   type MapView,
 } from "@/lib/documents/sorting-map";
 import {
@@ -69,7 +71,7 @@ import {
   type MapNode,
   type SortingMapContextValue,
 } from "./sorting-map-nodes";
-import type { Category, Document, Folder } from "@/lib/types";
+import type { Category, Document, EventCalendar, Folder } from "@/lib/types";
 
 const FIT_VIEW: FitViewOptions = { padding: 0.12, maxZoom: 1 };
 const MAP_HEIGHT = "h-[calc(100dvh-16rem)] min-h-[460px]";
@@ -117,6 +119,7 @@ interface SortingMapProps {
   documents: Document[];
   categories: Category[];
   folders: Folder[];
+  divisions: EventCalendar[];
   schoolId: string;
   autoSortEnabled: boolean;
   /** Where the auto-sort switch lives. */
@@ -125,6 +128,9 @@ interface SortingMapProps {
   onEditDocument: (doc: Document) => void;
   /** Leave the map for the list, filtered to this category or folder. */
   onShowInList: (view: MapView, targetId: string) => void;
+  /** Documents being sorted by AI right now. */
+  sortingIds: ReadonlySet<string>;
+  onSortDocuments: (docIds: string[]) => void;
 }
 
 /**
@@ -136,12 +142,15 @@ export function SortingMap({
   documents,
   categories,
   folders,
+  divisions,
   schoolId,
   autoSortEnabled,
   settingsHref,
   onOpenDocument,
   onEditDocument,
   onShowInList,
+  sortingIds,
+  onSortDocuments,
 }: SortingMapProps) {
   const router = useRouter();
   const [view, setView] = useState<MapView>("category");
@@ -205,8 +214,9 @@ export function SortingMap({
       if (previous === to.targetId) return;
 
       saveMove({ docId: doc.id, field, value: to.targetId }, () => {
+        const where = to.group ? `${to.group} · ${to.name}` : to.name;
         const message = to.targetId
-          ? `Moved “${doc.title}” to ${to.name}`
+          ? `Moved “${doc.title}” to ${where}`
           : field === "category_id"
             ? `“${doc.title}” no longer has a category`
             : `“${doc.title}” is no longer in a folder`;
@@ -250,7 +260,7 @@ export function SortingMap({
           value={view}
           onChange={setView}
           options={[
-            { value: "category", label: "By category", icon: <Tag /> },
+            { value: "category", label: "By division", icon: <GraduationCap /> },
             { value: "folder", label: "By folder", icon: <FolderIcon /> },
           ]}
         />
@@ -326,6 +336,9 @@ export function SortingMap({
             docs={docs}
             categories={categories}
             folders={folders}
+            divisions={divisions}
+            sortingIds={sortingIds}
+            onSortDocuments={onSortDocuments}
             query={query}
             fitRequest={fitRequest}
             onMove={moveDocument}
@@ -344,6 +357,9 @@ interface MapCanvasProps {
   docs: Document[];
   categories: Category[];
   folders: Folder[];
+  divisions: EventCalendar[];
+  sortingIds: ReadonlySet<string>;
+  onSortDocuments: (docIds: string[]) => void;
   query: string;
   fitRequest: number;
   onMove: (doc: Document, to: Bucket<Document>) => void;
@@ -357,6 +373,9 @@ function MapCanvas({
   docs,
   categories,
   folders,
+  divisions,
+  sortingIds,
+  onSortDocuments,
   query,
   fitRequest,
   onMove,
@@ -382,12 +401,22 @@ function MapCanvas({
   const [dragFrom, setDragFrom] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
 
+  const mapDivisions = useMemo<MapDivision[]>(
+    () =>
+      divisions.map((d) => ({
+        id: d.id,
+        name: d.name,
+        sort_order: d.sort_order,
+        color: calendarHex(d.color),
+      })),
+    [divisions]
+  );
   const buckets = useMemo(
     () =>
       view === "category"
-        ? groupByCategory(docs, categories)
+        ? groupByDivision(docs, categories, mapDivisions)
         : groupByFolder(docs, folders),
-    [view, docs, categories, folders]
+    [view, docs, categories, mapDivisions, folders]
   );
   // Cards keep the columns they opened in, so nothing changes column when a
   // card expands or a document moves. "Rearrange" packs them afresh.
@@ -422,9 +451,10 @@ function MapCanvas({
         measured: measured[hub],
         style: NODE_STYLE,
         domAttributes: PLAIN_WRAPPER,
-        data: { view, rows: hubBuckets(view, buckets), total: docs.length },
+        data: { view, rows: hubBuckets(buckets), total: docs.length },
       },
-      ...buckets.map(
+      // An empty category is only a row in its division, with no card.
+      ...buckets.filter((bucket) => !bucket.rowOnly).map(
         (bucket): BucketNode => ({
           id: bucket.id,
           type: "bucket",
@@ -436,7 +466,7 @@ function MapCanvas({
           data: {
             bucket,
             expanded: expanded.has(bucket.id),
-            subfolders: bucket.children.flatMap((id) => {
+            rows: bucket.children.flatMap((id) => {
               const child = bucketById.get(id);
               return child ? [child] : [];
             }),
@@ -575,6 +605,8 @@ function MapCanvas({
       categoryColor,
       dragFrom,
       dropTarget,
+      sorting: sortingIds,
+      sortDocuments: onSortDocuments,
       setHovered,
       focusCard,
       toggleExpanded: (id) =>
@@ -595,6 +627,8 @@ function MapCanvas({
         setDropTarget(null);
       },
       dragOver: (id) => setDropTarget(id),
+      dragLeave: (id) =>
+        setDropTarget((current) => (current === id ? null : current)),
       drop: (docId, bucket) => {
         // Look the document up fresh: the drag may have outlived the row.
         const doc = docs.find((d) => d.id === docId);
@@ -609,6 +643,8 @@ function MapCanvas({
       categoryColor,
       dragFrom,
       dropTarget,
+      sortingIds,
+      onSortDocuments,
       focusCard,
       onOpenDocument,
       onEditDocument,

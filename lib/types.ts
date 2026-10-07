@@ -59,6 +59,10 @@ export interface Category {
   description: string | null;
   color: string;
   school_id: string;
+  /** The division it belongs to; null for the whole school. Missing before
+   * migration 029. */
+  division_id?: string | null;
+  sort_order?: number;
   created_at: string;
 }
 

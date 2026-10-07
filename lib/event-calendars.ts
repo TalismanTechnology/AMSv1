@@ -36,6 +36,22 @@ export function calendarColorClasses(color: string): ColorClasses {
   return COLOR_CLASSES[color] ?? COLOR_CLASSES.slate;
 }
 
+// The same palette as hex, for drawing outside Tailwind (the sorting map).
+const COLOR_HEX: Record<string, string> = {
+  slate: "#64748b",
+  sky: "#0ea5e9",
+  emerald: "#10b981",
+  amber: "#f59e0b",
+  violet: "#8b5cf6",
+  rose: "#f43f5e",
+  teal: "#14b8a6",
+  orange: "#f97316",
+};
+
+export function calendarHex(color: string): string {
+  return COLOR_HEX[color] ?? COLOR_HEX.slate;
+}
+
 export const KIND_LABELS: Record<
   EventCalendarKind,
   { singular: string; plural: string }

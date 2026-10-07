@@ -13,8 +13,12 @@ export default async function ParentDocumentsPage({
 
   const supabase = await createClient();
 
-  const [{ data: documents }, { data: categories }, { data: folders }] =
-    await Promise.all([
+  const [
+    { data: documents },
+    { data: categories },
+    { data: folders },
+    { data: divisions },
+  ] = await Promise.all([
       supabase
         .from("documents")
         .select("*, category:categories(*), folder:folders(*)")
@@ -31,6 +35,13 @@ export default async function ParentDocumentsPage({
         .select("*")
         .eq("school_id", school.id)
         .order("name"),
+      // Categories are grouped under these once a school sorts by division.
+      supabase
+        .from("event_calendars")
+        .select("*")
+        .eq("school_id", school.id)
+        .eq("kind", "division")
+        .order("sort_order"),
     ]);
 
   return (
@@ -39,6 +50,7 @@ export default async function ParentDocumentsPage({
         documents={documents || []}
         categories={categories || []}
         folders={folders || []}
+        divisions={divisions || []}
         schoolId={school.id}
       />
     </PageTransition>

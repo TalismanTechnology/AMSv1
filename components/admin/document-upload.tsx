@@ -36,7 +36,11 @@ import {
   fileTypeFromName,
 } from "@/lib/documents/file-types";
 import { toast } from "sonner";
-import type { Category, Folder } from "@/lib/types";
+import {
+  CategorySelectItems,
+  useCategoryLabels,
+} from "@/components/admin/category-select-items";
+import type { Category, EventCalendar, Folder } from "@/lib/types";
 
 // Both lists come from lib/documents/file-types so the browser allowlist and
 // the server's type mapping stay in step. They were previously hand-copied
@@ -58,6 +62,7 @@ interface UploadItem {
 
 interface DocumentUploadProps {
   categories: Category[];
+  divisions: EventCalendar[];
   folders: Folder[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -67,6 +72,7 @@ interface DocumentUploadProps {
 
 export function DocumentUpload({
   categories,
+  divisions,
   folders,
   open,
   onOpenChange,
@@ -76,6 +82,7 @@ export function DocumentUpload({
   const router = useRouter();
   const [items, setItems] = useState<UploadItem[]>([]);
   const [categoryId, setCategoryId] = useState("");
+  const categoryLabels = useCategoryLabels(categories, divisions);
   const [folderId, setFolderId] = useState(selectedFolderId || "none");
   const [tags, setTags] = useState("");
   const pollingRef = useRef<Map<string, ReturnType<typeof setInterval>>>(
@@ -341,14 +348,15 @@ export function DocumentUpload({
                   <Label className="text-xs">Category</Label>
                   <Select value={categoryId} onValueChange={setCategoryId}>
                     <SelectTrigger className="h-8 text-xs">
-                      <SelectValue placeholder="None" />
+                      <SelectValue placeholder="None">
+                        {categoryLabels.get(categoryId)}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
-                      {categories.map((cat) => (
-                        <SelectItem key={cat.id} value={cat.id}>
-                          {cat.name}
-                        </SelectItem>
-                      ))}
+                      <CategorySelectItems
+                        categories={categories}
+                        divisions={divisions}
+                      />
                     </SelectContent>
                   </Select>
                 </div>

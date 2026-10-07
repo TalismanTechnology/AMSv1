@@ -236,7 +236,8 @@ export async function generateBulkCategories(
 
   const { data, error } = await admin
     .from("categories")
-    .upsert(insertRows, { onConflict: "name,school_id", ignoreDuplicates: true })
+    // Whole-school categories; division_scope is the key migration 029 gives them.
+    .upsert(insertRows, { onConflict: "school_id,division_scope,name", ignoreDuplicates: true })
     .select("id");
 
   if (error) return { success: false, error: error.message };

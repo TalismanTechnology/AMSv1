@@ -177,7 +177,13 @@ Rules:
 - If no option is a clear fit, answer "${NO_FIT}". Do not guess.
 - Judge from the document's actual subject matter, not just keywords.
 - When the document names a Division, the school marked it for that
-  division. If an option is specific to that division, prefer it.`,
+  division. If an option is specific to that division, prefer it.
+- Category labels like "Upper School / Academics" start with who the
+  document is for: a division, or "Whole School" for documents that apply
+  to every division. Decide who it is for first, then what it is about.
+  Choose a division only when the document is clearly about that division
+  alone; otherwise choose Whole School. Use a group's "Other" category when
+  you know who it is for but no other category in that group fits.`,
     prompt: `${optionBlock("Categories", categories)}
 
 ${optionBlock("Folders", folders)}

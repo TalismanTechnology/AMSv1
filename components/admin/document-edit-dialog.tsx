@@ -20,6 +20,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { CalendarChipSelect } from "@/components/admin/calendar-chip-select";
+import {
+  CategorySelectItems,
+  useCategoryLabels,
+} from "@/components/admin/category-select-items";
+import { hasDivisionCategories } from "@/lib/documents/division-categories";
 import { updateDocument } from "@/actions/documents";
 import { toast } from "sonner";
 import type { Document, Category, Folder, EventCalendar } from "@/lib/types";
@@ -52,6 +57,9 @@ export function DocumentEditDialog({
     (document.divisions ?? []).map((d) => d.id)
   );
   const [saving, setSaving] = useState(false);
+  const categoryLabels = useCategoryLabels(categories, divisions);
+  // Once categories are grouped by division, the category picks the division.
+  const divisionsFollowCategory = hasDivisionCategories(categories);
 
   function toggleDivision(id: string) {
     setDivisionIds((prev) =>
@@ -70,7 +78,7 @@ export function DocumentEditDialog({
         .split(",")
         .map((t) => t.trim())
         .filter(Boolean),
-      division_ids: divisionIds,
+      ...(divisionsFollowCategory ? {} : { division_ids: divisionIds }),
     });
     if (result.error) {
       toast.error(result.error);
@@ -124,17 +132,21 @@ export function DocumentEditDialog({
             <Label className="text-ink-soft">Category</Label>
             <Select value={categoryId} onValueChange={setCategoryId}>
               <SelectTrigger>
-                <SelectValue placeholder="Select a category" />
+                <SelectValue placeholder="Select a category">
+                  {categoryLabels.get(categoryId)}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">None</SelectItem>
-                {categories.map((cat) => (
-                  <SelectItem key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </SelectItem>
-                ))}
+                <CategorySelectItems categories={categories} divisions={divisions} />
               </SelectContent>
             </Select>
+            {divisionsFollowCategory && (
+              <p className="text-xs text-muted-foreground">
+                The category&apos;s division is who the assistant applies this
+                document to. Whole School applies it to everyone.
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -154,7 +166,7 @@ export function DocumentEditDialog({
             </Select>
           </div>
 
-          {divisions.length > 0 && (
+          {divisions.length > 0 && !divisionsFollowCategory && (
             <div className="space-y-2">
               <Label className="text-ink-soft">Divisions</Label>
               <CalendarChipSelect

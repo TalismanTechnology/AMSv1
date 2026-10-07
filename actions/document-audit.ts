@@ -8,6 +8,7 @@ import {
   type AuditResult,
   type DocumentInput,
 } from "@/lib/ai/document-audit";
+import { categoryLabels } from "@/lib/documents/division-categories";
 
 export interface StoredAudit {
   id: string;
@@ -35,14 +36,24 @@ export async function runDocumentAudit(schoolId: string): Promise<StoredAudit> {
     .eq("status", "ready");
 
   // Fetch categories and folders for lookup
-  const [{ data: categories }, { data: folders }, { data: school }] =
-    await Promise.all([
-      supabase.from("categories").select("id, name").eq("school_id", schoolId),
-      supabase.from("folders").select("id, name").eq("school_id", schoolId),
-      supabase.from("schools").select("name").eq("id", schoolId).single(),
-    ]);
+  const [
+    { data: categories },
+    { data: folders },
+    { data: school },
+    { data: divisions },
+  ] = await Promise.all([
+    supabase.from("categories").select("*").eq("school_id", schoolId),
+    supabase.from("folders").select("id, name").eq("school_id", schoolId),
+    supabase.from("schools").select("name").eq("id", schoolId).single(),
+    supabase
+      .from("event_calendars")
+      .select("id, name, sort_order")
+      .eq("school_id", schoolId)
+      .eq("kind", "division"),
+  ]);
 
-  const categoryMap = new Map((categories || []).map((c) => [c.id, c.name]));
+  // "Upper School · Academics" once categories are grouped by division.
+  const categoryMap = categoryLabels(categories || [], divisions || []);
   const folderMap = new Map((folders || []).map((f) => [f.id, f.name]));
 
   const docInputs: DocumentInput[] = (documents || []).map((d) => ({
