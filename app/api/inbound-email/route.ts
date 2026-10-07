@@ -4,11 +4,13 @@ import { getResendClient } from "@/lib/email/resend";
 import {
   parseEmailAddress,
   senderDomainAllowed,
-  extractInboundToken,
+  extractInboundTokens,
+  routeInboundMessage,
   isStaleClaim,
 } from "@/lib/email/inbound";
 import { isBlockedFile } from "@/lib/documents/file-types";
 import {
+  addDocumentDivisions,
   ingestFileAsDocument,
   removeIngestedDocuments,
   triggerProcessingHttp,
@@ -36,6 +38,11 @@ interface ReceivedEvent {
     subject?: string;
     from?: string;
     to?: string[];
+    cc?: string[];
+    bcc?: string[];
+    /** Addresses from the `for` clause of the Received headers, i.e. who a
+     * forwarded copy was actually delivered to. */
+    received_for?: string[];
   };
 }
 
@@ -69,7 +76,11 @@ async function record(
 async function claimMessage(
   schoolId: string,
   data: ReceivedEvent["data"] & { message_id: string }
-): Promise<{ claimId: string } | { skip: "duplicate" | "in_progress" }> {
+): Promise<
+  | { claimId: string }
+  | { skip: "duplicate"; documentIds: string[] }
+  | { skip: "in_progress" }
+> {
   const supabase = createAdminClient();
 
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -94,14 +105,16 @@ async function claimMessage(
 
     const { data: holder } = await supabase
       .from("email_ingestions")
-      .select("id, status, created_at")
+      .select("id, status, created_at, document_ids")
       .eq("school_id", schoolId)
       .eq("message_id", data.message_id)
       .in("status", ["processing", "accepted"])
       .maybeSingle();
 
     if (!holder) continue; // released between our insert and this read
-    if (holder.status === "accepted") return { skip: "duplicate" };
+    if (holder.status === "accepted") {
+      return { skip: "duplicate", documentIds: holder.document_ids ?? [] };
+    }
     if (!isStaleClaim(holder.created_at)) return { skip: "in_progress" };
 
     await supabase
@@ -185,21 +198,46 @@ export async function POST(request: NextRequest) {
   const { data } = event;
   const supabase = createAdminClient();
 
-  // 2. Resolve the school by the inbound address token.
-  const token = extractInboundToken(data.to ?? [], INBOUND_DOMAIN);
-  if (!token) {
+  // 2. Resolve the school, and the divisions the mail is for, from the
+  // inbound addresses it reached. Forwarded, CC'd and BCC'd copies can carry
+  // our address outside "to", so every recipient list is checked.
+  const tokens = extractInboundTokens(
+    [
+      ...(data.to ?? []),
+      ...(data.cc ?? []),
+      ...(data.bcc ?? []),
+      ...(data.received_for ?? []),
+    ],
+    INBOUND_DOMAIN
+  );
+  if (!tokens.length) {
     await record(null, data, "rejected_unknown", "No inbound token in recipients");
+    return NextResponse.json({ status: "rejected_unknown" });
+  }
+
+  const { data: addresses, error: addressError } = await supabase
+    .from("email_ingestion_addresses")
+    .select("token, school_id, division_id")
+    .in("token", tokens);
+  if (addressError) {
+    console.error("[inbound-email] Address lookup failed:", addressError.message);
+    return NextResponse.json({ error: "Address lookup failed" }, { status: 500 });
+  }
+
+  const route = routeInboundMessage(tokens, addresses ?? []);
+  if (!route) {
+    await record(null, data, "rejected_unknown", `Unknown token: ${tokens.join(", ")}`);
     return NextResponse.json({ status: "rejected_unknown" });
   }
 
   const { data: school } = await supabase
     .from("schools")
     .select("id, email_ingestion_enabled, allowed_sender_domains")
-    .eq("inbound_email_token", token)
+    .eq("id", route.schoolId)
     .single();
 
   if (!school) {
-    await record(null, data, "rejected_unknown", `Unknown token: ${token}`);
+    await record(null, data, "rejected_unknown", `Unknown school: ${route.schoolId}`);
     return NextResponse.json({ status: "rejected_unknown" });
   }
 
@@ -236,6 +274,21 @@ export async function POST(request: NextRequest) {
       message_id: data.message_id,
     });
     if ("skip" in claim) {
+      // One email can reach two division addresses as separate deliveries
+      // with the same message id (each mailing list forwards its own copy).
+      // The later copy adds its divisions to what the first one ingested.
+      if (route.divisionIds.length && claim.skip === "duplicate") {
+        try {
+          await addDocumentDivisions(claim.documentIds, route.divisionIds);
+        } catch (err) {
+          console.error("[inbound-email] Adding divisions to a duplicate failed:", err);
+          return NextResponse.json({ error: "Retry later" }, { status: 500 });
+        }
+      } else if (route.divisionIds.length) {
+        // The first copy is still ingesting. Fail this one so Resend retries
+        // it after that finishes, when it can add its divisions.
+        return NextResponse.json({ status: claim.skip }, { status: 409 });
+      }
       return NextResponse.json({ status: claim.skip });
     }
     claimId = claim.claimId;
@@ -312,7 +365,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: "empty" });
     }
 
-    // 6. Trigger processing for each new document.
+    // 6. Mark the documents with the divisions whose addresses the mail
+    // reached. Done before processing so auto-sort can use it.
+    await addDocumentDivisions(documentIds, route.divisionIds);
+
+    // 7. Trigger processing for each new document.
     for (const id of documentIds) {
       await triggerProcessingHttp(id, origin);
     }

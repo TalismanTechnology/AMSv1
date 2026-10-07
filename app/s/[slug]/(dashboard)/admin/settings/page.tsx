@@ -7,6 +7,7 @@ import { PageTransition } from "@/components/motion";
 import type {
   BlackbaudConfig,
   BlackbaudCallbackResult,
+  DivisionAddress,
   EmailIngestionLogEntry,
 } from "./client";
 import type { BlackbaudCalendarFeed, EventCalendar } from "@/lib/types";
@@ -130,6 +131,38 @@ async function loadRecentEmails(
   }));
 }
 
+/** The school's inbound addresses: the whole-school one and one per division
+ * that has been given its own, plus the divisions to choose from. */
+async function loadInboundAddresses(schoolId: string): Promise<{
+  wholeSchoolToken: string | null;
+  divisionAddresses: DivisionAddress[];
+  divisions: EventCalendar[];
+}> {
+  const supabase = await createClient();
+  const [{ data: addresses }, { data: divisions }] = await Promise.all([
+    supabase
+      .from("email_ingestion_addresses")
+      .select("id, token, division_id")
+      .eq("school_id", schoolId)
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("event_calendars")
+      .select("*")
+      .eq("school_id", schoolId)
+      .eq("kind", "division")
+      .order("sort_order", { ascending: true }),
+  ]);
+
+  return {
+    wholeSchoolToken:
+      (addresses ?? []).find((a) => a.division_id === null)?.token ?? null,
+    divisionAddresses: (addresses ?? [])
+      .filter((a) => a.division_id !== null)
+      .map((a) => ({ id: a.id, token: a.token, divisionId: a.division_id })),
+    divisions: (divisions ?? []) as EventCalendar[],
+  };
+}
+
 export default async function SettingsPage({
   params,
   searchParams,
@@ -141,14 +174,16 @@ export default async function SettingsPage({
   const { blackbaud } = await searchParams;
   const { school } = await requireSchoolContext(slug);
 
-  const [settings, blackbaudConfig, recentEmails] = await Promise.all([
-    loadSettings(school.id),
-    loadBlackbaudConfig(
-      school.id,
-      school.blackbaud_verification_enabled ?? false
-    ),
-    loadRecentEmails(school.id),
-  ]);
+  const [settings, blackbaudConfig, recentEmails, inboundAddresses] =
+    await Promise.all([
+      loadSettings(school.id),
+      loadBlackbaudConfig(
+        school.id,
+        school.blackbaud_verification_enabled ?? false
+      ),
+      loadRecentEmails(school.id),
+      loadInboundAddresses(school.id),
+    ]);
 
   return (
     <PageTransition>
@@ -160,7 +195,7 @@ export default async function SettingsPage({
           enabled: school.email_ingestion_enabled ?? false,
           autoSort: school.auto_sort_enabled ?? true,
           allowedDomains: school.allowed_sender_domains ?? [],
-          token: school.inbound_email_token ?? null,
+          ...inboundAddresses,
           inboundDomain: process.env.INBOUND_EMAIL_DOMAIN ?? null,
           recent: recentEmails,
         }}

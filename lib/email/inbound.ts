@@ -59,25 +59,61 @@ export function isStaleClaim(createdAt: string, now: Date = new Date()): boolean
 }
 
 /**
- * Find the inbound token (the local part of the address) from the recipient
- * list for messages sent to the configured inbound domain.
- * e.g. to=["ams-ab12cd@inbound.askmyschool.com"] with domain
- * "inbound.askmyschool.com" -> "ams-ab12cd".
+ * Find every inbound token (the local part of the address) among the
+ * recipients on the configured inbound domain, in order and without repeats.
+ * e.g. ["ams-ab12cd@inbound.askmyschool.com"] with domain
+ * "inbound.askmyschool.com" -> ["ams-ab12cd"].
  */
-export function extractInboundToken(
+export function extractInboundTokens(
   recipients: string[],
   inboundDomain: string
-): string | null {
+): string[] {
   const domain = inboundDomain.trim().toLowerCase();
-  if (!domain) return null;
+  if (!domain) return [];
 
+  const tokens: string[] = [];
   for (const recipient of recipients) {
     const addr = parseEmailAddress(recipient);
     if (!addr) continue;
     const atIndex = addr.lastIndexOf("@");
     const local = addr.slice(0, atIndex);
     const dom = addr.slice(atIndex + 1);
-    if (dom === domain && local) return local;
+    if (dom === domain && local && !tokens.includes(local)) tokens.push(local);
   }
-  return null;
+  return tokens;
+}
+
+/** A school's inbound address; division_id is null for the whole-school one. */
+export interface InboundAddress {
+  token: string;
+  school_id: string;
+  division_id: string | null;
+}
+
+/**
+ * Decide which school a message belongs to and which divisions it is for,
+ * from the inbound addresses it reached. The first known address picks the
+ * school, and the message is for every division of that school whose address
+ * it reached. The whole-school address adds no division, so mail sent to it
+ * and to the Upper School address is still marked Upper School.
+ */
+export function routeInboundMessage(
+  tokens: string[],
+  addresses: InboundAddress[]
+): { schoolId: string; divisionIds: string[] } | null {
+  const byToken = new Map(addresses.map((a) => [a.token, a]));
+  const reached = tokens
+    .map((token) => byToken.get(token))
+    .filter((a): a is InboundAddress => !!a);
+  if (!reached.length) return null;
+
+  const schoolId = reached[0].school_id;
+  const divisionIds: string[] = [];
+  for (const address of reached) {
+    if (address.school_id !== schoolId || !address.division_id) continue;
+    if (!divisionIds.includes(address.division_id)) {
+      divisionIds.push(address.division_id);
+    }
+  }
+  return { schoolId, divisionIds };
 }

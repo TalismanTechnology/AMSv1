@@ -73,25 +73,35 @@ async function maybeAutoSort(
 
     if (!school?.auto_sort_enabled) return {};
 
-    const [{ data: categories }, { data: folders }, { data: filed }] =
-      await Promise.all([
-        supabase
-          .from("categories")
-          .select("id, name, description")
-          .eq("school_id", doc.school_id),
-        supabase
-          .from("folders")
-          .select("id, name, parent_id")
-          .eq("school_id", doc.school_id),
-        supabase
-          .from("documents")
-          .select("title, category_id, folder_id")
-          .eq("school_id", doc.school_id)
-          .eq("status", "ready")
-          .neq("id", doc.id)
-          .order("created_at", { ascending: false })
-          .limit(EXAMPLE_POOL),
-      ]);
+    const [
+      { data: categories },
+      { data: folders },
+      { data: filed },
+      { data: divisions },
+    ] = await Promise.all([
+      supabase
+        .from("categories")
+        .select("id, name, description")
+        .eq("school_id", doc.school_id),
+      supabase
+        .from("folders")
+        .select("id, name, parent_id")
+        .eq("school_id", doc.school_id),
+      supabase
+        .from("documents")
+        .select("title, category_id, folder_id")
+        .eq("school_id", doc.school_id)
+        .eq("status", "ready")
+        .neq("id", doc.id)
+        .order("created_at", { ascending: false })
+        .limit(EXAMPLE_POOL),
+      // The divisions it is marked for, so the classifier can prefer that
+      // division's folder or category.
+      supabase
+        .from("document_divisions")
+        .select("division:event_calendars(name)")
+        .eq("document_id", doc.id),
+    ]);
 
     const filedRows: FiledDoc[] = filed ?? [];
     const categoryExamples = exampleTitles(filedRows, "category_id");
@@ -100,6 +110,10 @@ async function maybeAutoSort(
     const result = await classifyDocument({
       title: doc.title,
       content,
+      divisions: (divisions ?? []).flatMap((row) => {
+        const division = row.division as unknown as { name: string } | null;
+        return division ? [division.name] : [];
+      }),
       categories: (categories ?? []).map((c) => ({
         id: c.id,
         name: c.name,
@@ -268,6 +282,25 @@ export async function processDocument(documentId: string) {
     //     when the school has auto-sort enabled.
     const autoSort = await maybeAutoSort(supabase, doc, summary ?? text);
 
+    // `doc` was read before processing began, so an admin may have filed the
+    // document since. Each guess is written only if that field is still
+    // empty, so their choice wins. Done before "ready" so the list never
+    // shows a ready document as unsorted.
+    if (autoSort.category_id) {
+      await supabase
+        .from("documents")
+        .update({ category_id: autoSort.category_id })
+        .eq("id", documentId)
+        .is("category_id", null);
+    }
+    if (autoSort.folder_id) {
+      await supabase
+        .from("documents")
+        .update({ folder_id: autoSort.folder_id })
+        .eq("id", documentId)
+        .is("folder_id", null);
+    }
+
     // 9. Mark document as ready
     await supabase
       .from("documents")
@@ -277,7 +310,6 @@ export async function processDocument(documentId: string) {
         summary,
         ...(txtSaved ? { text_url: txtPath } : {}),
         ...(pdfPath ? { pdf_url: pdfPath } : {}),
-        ...autoSort,
         updated_at: new Date().toISOString(),
       })
       .eq("id", documentId);

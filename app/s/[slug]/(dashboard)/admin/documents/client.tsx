@@ -32,7 +32,13 @@ import { Badge } from "@/components/ui/badge";
 import { searchDocumentContent } from "@/actions/documents";
 import { cn } from "@/lib/utils";
 import type { MapView } from "@/lib/documents/sorting-map";
-import type { Document, Category, Folder, ContentSearchResult } from "@/lib/types";
+import type {
+  Document,
+  Category,
+  Folder,
+  ContentSearchResult,
+  EventCalendar,
+} from "@/lib/types";
 
 // React Flow is heavy, so the map loads only when someone opens it.
 const SortingMap = dynamic(
@@ -49,6 +55,7 @@ interface DocumentsClientProps {
   documents: Document[];
   categories: Category[];
   folders: Folder[];
+  divisions: EventCalendar[];
   schoolId: string;
   schoolSlug: string;
   autoSortEnabled: boolean;
@@ -58,6 +65,7 @@ export function DocumentsClient({
   documents,
   categories,
   folders,
+  divisions,
   schoolId,
   schoolSlug,
   autoSortEnabled,
@@ -382,6 +390,7 @@ export function DocumentsClient({
           document={editingDoc}
           categories={categories}
           folders={folders}
+          divisions={divisions}
           open={!!editingDoc}
           onOpenChange={(open) => {
             if (!open) setEditingDoc(null);

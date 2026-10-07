@@ -19,14 +19,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { CalendarChipSelect } from "@/components/admin/calendar-chip-select";
 import { updateDocument } from "@/actions/documents";
 import { toast } from "sonner";
-import type { Document, Category, Folder } from "@/lib/types";
+import type { Document, Category, Folder, EventCalendar } from "@/lib/types";
 
 interface DocumentEditDialogProps {
   document: Document;
   categories: Category[];
   folders: Folder[];
+  divisions: EventCalendar[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   schoolId: string;
@@ -36,6 +38,7 @@ export function DocumentEditDialog({
   document,
   categories,
   folders,
+  divisions,
   open,
   onOpenChange,
   schoolId,
@@ -45,7 +48,16 @@ export function DocumentEditDialog({
   const [categoryId, setCategoryId] = useState(document.category_id || "none");
   const [folderId, setFolderId] = useState(document.folder_id || "none");
   const [tags, setTags] = useState(document.tags.join(", "));
+  const [divisionIds, setDivisionIds] = useState<string[]>(
+    (document.divisions ?? []).map((d) => d.id)
+  );
   const [saving, setSaving] = useState(false);
+
+  function toggleDivision(id: string) {
+    setDivisionIds((prev) =>
+      prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]
+    );
+  }
 
   async function handleSave() {
     setSaving(true);
@@ -58,6 +70,7 @@ export function DocumentEditDialog({
         .split(",")
         .map((t) => t.trim())
         .filter(Boolean),
+      division_ids: divisionIds,
     });
     if (result.error) {
       toast.error(result.error);
@@ -140,6 +153,22 @@ export function DocumentEditDialog({
               </SelectContent>
             </Select>
           </div>
+
+          {divisions.length > 0 && (
+            <div className="space-y-2">
+              <Label className="text-ink-soft">Divisions</Label>
+              <CalendarChipSelect
+                items={divisions}
+                kind="division"
+                selected={divisionIds}
+                onToggle={toggleDivision}
+              />
+              <p className="text-xs text-muted-foreground">
+                The assistant only applies this document to the divisions
+                picked here. Leave all off if it&apos;s for the whole school.
+              </p>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label className="text-ink-soft">Tags (comma-separated)</Label>

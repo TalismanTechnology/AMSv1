@@ -96,6 +96,9 @@ export interface Document {
   updated_at: string;
   category?: Category | null;
   folder?: Folder | null;
+  /** Divisions the document is for; none means the whole school. Populated
+   * when fetched with the event_calendars embed. */
+  divisions?: EventCalendar[];
 }
 
 export interface DocumentChunk {

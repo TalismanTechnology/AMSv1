@@ -79,6 +79,35 @@ export async function ingestFileAsDocument(
 }
 
 /**
+ * Mark documents as being for these divisions, keeping any they already have.
+ * Documents deleted since they were ingested are skipped. Throws on a database
+ * error so the webhook can fail the delivery and let Resend retry it.
+ */
+export async function addDocumentDivisions(
+  documentIds: string[],
+  divisionIds: string[]
+): Promise<void> {
+  if (!documentIds.length || !divisionIds.length) return;
+  const supabase = createAdminClient();
+
+  const { data: docs, error: readError } = await supabase
+    .from("documents")
+    .select("id")
+    .in("id", documentIds);
+  if (readError) throw new Error(`Could not read documents: ${readError.message}`);
+
+  const rows = (docs ?? []).flatMap((doc) =>
+    divisionIds.map((division_id) => ({ document_id: doc.id, division_id }))
+  );
+  if (!rows.length) return;
+
+  const { error } = await supabase
+    .from("document_divisions")
+    .upsert(rows, { onConflict: "document_id,division_id", ignoreDuplicates: true });
+  if (error) throw new Error(`Could not tag divisions: ${error.message}`);
+}
+
+/**
  * Delete documents created earlier in a failed ingest, storage objects first.
  * Lets a webhook retry start clean instead of duplicating what the failed
  * attempt already saved. Best-effort: failures are logged, not thrown.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   FileText,
@@ -36,8 +36,9 @@ import {
   approveDocument,
 } from "@/actions/documents";
 import { toast } from "sonner";
-import type { Document } from "@/lib/types";
+import type { Document, EventCalendar } from "@/lib/types";
 import { TimeAgo } from "@/components/ui/time-ago";
+import { calendarColorClasses } from "@/lib/event-calendars";
 
 function EmailedBadge() {
   return (
@@ -45,6 +46,55 @@ function EmailedBadge() {
       <Mail />
       Emailed
     </Badge>
+  );
+}
+
+function DivisionBadge({ division }: { division: EventCalendar }) {
+  return (
+    <Badge
+      className={`text-xs ${calendarColorClasses(division.color).chip}`}
+      title={`For ${division.name}`}
+    >
+      {division.name}
+    </Badge>
+  );
+}
+
+function DocumentSummary({ summary }: { summary: string }) {
+  const ref = useRef<HTMLParagraphElement>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [truncated, setTruncated] = useState(false);
+
+  // Only offer "Show more" when the clamp is actually hiding text
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || expanded) return;
+    const check = () => setTruncated(el.scrollHeight > el.clientHeight + 1);
+    check();
+    const observer = new ResizeObserver(check);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [expanded, summary]);
+
+  return (
+    <div className="mt-0.5 max-w-sm">
+      <p
+        ref={ref}
+        className={`whitespace-normal text-xs text-muted-foreground/80 ${expanded ? "" : "line-clamp-2"}`}
+      >
+        {summary}
+      </p>
+      {(truncated || expanded) && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-ink"
+        >
+          {expanded ? "Show less" : "Show more"}
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -237,10 +287,13 @@ export function DocumentTable({ documents, onEdit, onView, schoolId }: DocumentT
                 <TableCell className="py-4">
                   <div>
                     <p className="font-medium text-ink">{doc.title}</p>
-                    {doc.summary && (
-                      <p className="mt-0.5 max-w-sm text-xs text-muted-foreground/80 line-clamp-2">
-                        {doc.summary}
-                      </p>
+                    {doc.summary && <DocumentSummary summary={doc.summary} />}
+                    {doc.divisions && doc.divisions.length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {doc.divisions.map((division) => (
+                          <DivisionBadge key={division.id} division={division} />
+                        ))}
+                      </div>
                     )}
                     {doc.tags.length > 0 && (
                       <div className="mt-1 flex gap-1">

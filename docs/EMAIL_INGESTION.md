@@ -2,22 +2,32 @@
 
 Forward school emails to a private per-school address and have their
 attachments **and** body automatically ingested as documents, then auto-sorted
-into categories and folders by AI.
+into categories and folders by AI. Each division (Lower, Middle, Upper School)
+can also have its own address, so the assistant knows which division an email
+is about.
 
 ## How it works
 
-1. Each school gets a unique inbound address: `<token>@<INBOUND_EMAIL_DOMAIN>`
-   (generated the first time an admin enables ingestion).
+1. Each school gets a unique whole-school inbound address,
+   `<token>@<INBOUND_EMAIL_DOMAIN>`, generated the first time an admin enables
+   ingestion. Admins can add one more address per division. Addresses live in
+   the `email_ingestion_addresses` table.
 2. Resend receives mail at `INBOUND_EMAIL_DOMAIN` (via an MX record) and POSTs
    an `email.received` event to `/api/inbound-email`.
-3. The webhook verifies the signature, resolves the school by the address
-   token, and — if the school has set allowed domains — accepts the mail only
-   when the sender's address ends with one of them. With no allowed domains,
-   any sender is accepted.
+3. The webhook verifies the signature and finds which of our addresses the
+   mail reached, checking `to`, `cc`, `bcc`, and `received_for`. That decides
+   the school and the divisions. If the school has set allowed domains, the
+   mail is accepted only when the sender's address ends with one of them.
+   With no allowed domains, any sender is accepted.
 4. Every attachment becomes its own document; the email body becomes one text
    document. Image attachments and inline images are skipped.
-5. During processing, the AI classifier assigns each unsorted document a
-   category and folder from that school's existing lists.
+5. Mail that reached a division's address marks its documents for that
+   division (`document_divisions`). The chat shows each document's division
+   to the model, which then applies the document only to that division.
+   Mail to the whole-school address adds no division.
+6. During processing, the AI classifier assigns each unsorted document a
+   category and folder from that school's existing lists, preferring one
+   specific to the document's division when there is one.
 
 Every attempt (accepted / rejected / error) is logged in the
 `email_ingestions` table, and the latest 20 are shown to admins under
@@ -30,12 +40,23 @@ copies arriving at once) is skipped while that claim is held or once it is
 deleted and the claim is released as `error`, so Resend's retry starts clean.
 A claim left by an attempt that crashed expires after 10 minutes.
 
+One email can reach two division addresses as separate deliveries with the
+same message id, for example when the Lower and Middle School mailing lists
+each forward their own copy. The first copy is ingested. A later copy is not
+ingested again; it only adds its division to the documents the first copy
+created. If the first copy is still being ingested, the later one gets a 409
+so Resend retries it once the first has finished.
+
 ## One-time setup (what you need to do)
 
 ### 1. Run the migrations
 
-Apply `supabase/migrations/019_email_ingestion.sql` and
-`supabase/migrations/027_email_ingestion_claims.sql` to your database.
+Apply `supabase/migrations/019_email_ingestion.sql`,
+`supabase/migrations/027_email_ingestion_claims.sql` and
+`supabase/migrations/028_division_email_addresses.sql` to your database.
+028 copies each school's existing address into `email_ingestion_addresses`,
+so addresses already in use keep working. Apply it before deploying the code
+that reads that table.
 
 ### 2. Environment variables
 
@@ -68,12 +89,18 @@ In the Resend dashboard:
 
 Each school admin, under **Admin → Settings → Email Ingestion**:
 
-1. Toggle **Enable email ingestion** (this generates the school's address).
+1. Toggle **Enable email ingestion** and save (this generates the
+   whole-school address).
 2. Optionally add **allowed sender domains** (e.g. `lincolnhigh.org`).
    Subdomains like `mail.lincolnhigh.org` are matched automatically. Leave the
    list empty to accept mail from anyone who has the address.
 3. Copy the **inbound address** and forward school emails to it.
-4. Optionally toggle **Auto-sort** (on by default).
+4. Optionally pick a division under **Your inbound addresses** to give it its
+   own address, e.g. one each for Lower, Middle and Upper School, and forward
+   that division's emails there. Divisions are the ones set up for the
+   calendar under **Events**. Removing a division's address makes mail to it
+   be turned away; documents it already added keep their division.
+5. Optionally toggle **Auto-sort** (on by default).
 
 ## Notes
 
@@ -85,4 +112,7 @@ Each school admin, under **Admin → Settings → Email Ingestion**:
 - Rejected/errored emails are recorded in `email_ingestions` but produce no
   documents.
 - Documents that arrived by email show an **Emailed** badge in the documents
-  list.
+  list, and a badge for each division they are marked for. Admins can change a
+  document's divisions in its **Edit** dialog, uploaded documents included.
+- Deleting a division under Events also deletes its inbound address and
+  removes that division from documents.

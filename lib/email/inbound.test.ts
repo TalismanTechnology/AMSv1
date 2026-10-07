@@ -3,9 +3,11 @@ import assert from "node:assert/strict";
 import {
   parseEmailAddress,
   senderDomainAllowed,
-  extractInboundToken,
+  extractInboundTokens,
+  routeInboundMessage,
   normalizeSenderDomain,
   isStaleClaim,
+  type InboundAddress,
 } from "./inbound";
 
 test("parseEmailAddress extracts bare address from display form", () => {
@@ -57,13 +59,28 @@ test("senderDomainAllowed is false for null address or empty list", () => {
   assert.equal(senderDomainAllowed("a@lincolnhigh.org", []), false);
 });
 
-test("extractInboundToken pulls the local part for the inbound domain", () => {
-  assert.equal(
-    extractInboundToken(
+test("extractInboundTokens pulls the local part for the inbound domain", () => {
+  assert.deepEqual(
+    extractInboundTokens(
       ["ams-ab12cd34@inbound.askmyschool.com"],
       "inbound.askmyschool.com"
     ),
-    "ams-ab12cd34"
+    ["ams-ab12cd34"]
+  );
+});
+
+test("extractInboundTokens keeps every inbound address once, in order", () => {
+  assert.deepEqual(
+    extractInboundTokens(
+      [
+        "Upper <ams-upper@inbound.askmyschool.com>",
+        "office@lincolnhigh.org",
+        "ams-lower@inbound.askmyschool.com",
+        "AMS-UPPER@inbound.askmyschool.com",
+      ],
+      "inbound.askmyschool.com"
+    ),
+    ["ams-upper", "ams-lower"]
   );
 });
 
@@ -81,18 +98,58 @@ test("normalizeSenderDomain rejects invalid input", () => {
   assert.equal(normalizeSenderDomain(""), null);
 });
 
-test("extractInboundToken ignores addresses on other domains", () => {
-  assert.equal(
-    extractInboundToken(
+test("extractInboundTokens ignores addresses on other domains", () => {
+  assert.deepEqual(
+    extractInboundTokens(
       ["someone@gmail.com", "ams-xyz@inbound.askmyschool.com"],
       "inbound.askmyschool.com"
     ),
-    "ams-xyz"
+    ["ams-xyz"]
   );
-  assert.equal(
-    extractInboundToken(["someone@gmail.com"], "inbound.askmyschool.com"),
-    null
+  assert.deepEqual(
+    extractInboundTokens(["someone@gmail.com"], "inbound.askmyschool.com"),
+    []
   );
+});
+
+const ADDRESSES: InboundAddress[] = [
+  { token: "ams-school", school_id: "s1", division_id: null },
+  { token: "ams-lower", school_id: "s1", division_id: "div-lower" },
+  { token: "ams-upper", school_id: "s1", division_id: "div-upper" },
+  { token: "ams-other", school_id: "s2", division_id: "div-other" },
+];
+
+test("routeInboundMessage marks mail to a division address with that division", () => {
+  assert.deepEqual(routeInboundMessage(["ams-upper"], ADDRESSES), {
+    schoolId: "s1",
+    divisionIds: ["div-upper"],
+  });
+});
+
+test("routeInboundMessage gives whole-school mail no division", () => {
+  assert.deepEqual(routeInboundMessage(["ams-school"], ADDRESSES), {
+    schoolId: "s1",
+    divisionIds: [],
+  });
+});
+
+test("routeInboundMessage collects every division address the mail reached", () => {
+  assert.deepEqual(
+    routeInboundMessage(["ams-school", "ams-lower", "ams-upper"], ADDRESSES),
+    { schoolId: "s1", divisionIds: ["div-lower", "div-upper"] }
+  );
+});
+
+test("routeInboundMessage keeps to the first school's addresses", () => {
+  assert.deepEqual(
+    routeInboundMessage(["ams-unknown", "ams-lower", "ams-other"], ADDRESSES),
+    { schoolId: "s1", divisionIds: ["div-lower"] }
+  );
+});
+
+test("routeInboundMessage is null when no address is known", () => {
+  assert.equal(routeInboundMessage(["ams-unknown"], ADDRESSES), null);
+  assert.equal(routeInboundMessage([], ADDRESSES), null);
 });
 
 test("isStaleClaim keeps a fresh claim and expires an old one", () => {

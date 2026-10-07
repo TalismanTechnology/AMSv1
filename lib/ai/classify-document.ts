@@ -31,6 +31,8 @@ export interface ClassifyInput {
   title: string;
   /** Summary or leading content of the document. */
   content: string;
+  /** Divisions the school marked the document for, e.g. ["Upper School"]. */
+  divisions?: string[];
   categories: ClassifyOption[];
   folders: ClassifyOption[];
 }
@@ -126,6 +128,11 @@ function optionBlock(heading: string, options: ClassifyOption[]): string {
   return `${heading}:\n${lines.join("\n")}`;
 }
 
+function divisionLine(divisions?: string[]): string {
+  const names = (divisions ?? []).map((d) => d.trim()).filter(Boolean);
+  return names.length ? `\nDivision: ${names.join(", ")}` : "";
+}
+
 function resolveId(label: string, options: ClassifyOption[]): string | null {
   if (!label || label === NO_FIT) return null;
   const target = label.trim().toLowerCase();
@@ -168,13 +175,15 @@ Rules:
 - Where a description or already-filed examples are given, treat them as the
   definition of what belongs there — they outrank your reading of the name.
 - If no option is a clear fit, answer "${NO_FIT}". Do not guess.
-- Judge from the document's actual subject matter, not just keywords.`,
+- Judge from the document's actual subject matter, not just keywords.
+- When the document names a Division, the school marked it for that
+  division. If an option is specific to that division, prefer it.`,
     prompt: `${optionBlock("Categories", categories)}
 
 ${optionBlock("Folders", folders)}
 
 --- DOCUMENT ---
-Title: ${input.title}
+Title: ${input.title}${divisionLine(input.divisions)}
 
 ${trimmed}
 --- END ---

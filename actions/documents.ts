@@ -277,6 +277,8 @@ export async function updateDocument(
     category_id?: string | null;
     folder_id?: string | null;
     tags?: string[];
+    /** Replaces the document's divisions; empty means the whole school. */
+    division_ids?: string[];
   }
 ) {
   const supabase = await createClient();
@@ -284,13 +286,20 @@ export async function updateDocument(
     data: { user },
   } = await supabase.auth.getUser();
 
+  const { division_ids, ...fields } = data;
+
   const { error } = await supabase
     .from("documents")
-    .update({ ...data, updated_at: new Date().toISOString() })
+    .update({ ...fields, updated_at: new Date().toISOString() })
     .eq("id", documentId)
     .eq("school_id", schoolId);
 
   if (error) return { error: error.message };
+
+  if (division_ids) {
+    const divisionError = await setDocumentDivisions(supabase, documentId, division_ids);
+    if (divisionError) return { error: divisionError };
+  }
 
   if (user)
     logAudit(
@@ -304,6 +313,31 @@ export async function updateDocument(
 
   revalidatePath("/", "layout");
   return { success: true };
+}
+
+/**
+ * Make a document's divisions exactly `divisionIds`: drop the ones no longer
+ * picked, then add the new ones. RLS only lets an admin of the document's
+ * school do this, and only with that school's divisions.
+ */
+async function setDocumentDivisions(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  documentId: string,
+  divisionIds: string[]
+): Promise<string | null> {
+  const ids = [...new Set(divisionIds)];
+
+  let stale = supabase.from("document_divisions").delete().eq("document_id", documentId);
+  if (ids.length) stale = stale.not("division_id", "in", `(${ids.join(",")})`);
+  const { error: deleteError } = await stale;
+  if (deleteError) return deleteError.message;
+
+  if (!ids.length) return null;
+  const { error } = await supabase.from("document_divisions").upsert(
+    ids.map((division_id) => ({ document_id: documentId, division_id })),
+    { onConflict: "document_id,division_id", ignoreDuplicates: true }
+  );
+  return error ? error.message : null;
 }
 
 export async function searchDocumentsByName(

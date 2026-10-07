@@ -11,7 +11,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { TimeAgo } from "@/components/ui/time-ago";
-import { updateSettings, updateEmailIngestion } from "@/actions/settings";
+import {
+  updateSettings,
+  updateEmailIngestion,
+  addDivisionAddress,
+  removeDivisionAddress,
+} from "@/actions/settings";
 import {
   syncBlackbaudRoster,
 } from "@/actions/blackbaud";
@@ -19,6 +24,16 @@ import {
   BlackbaudCalendarFeeds,
   type FeedWithMapping,
 } from "@/components/admin/blackbaud-calendar-feeds";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { calendarColorClasses } from "@/lib/event-calendars";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { EventCalendar, Settings } from "@/lib/types";
 
@@ -32,11 +47,21 @@ export interface EmailIngestionLogEntry {
   createdAt: string;
 }
 
+/** A division's own inbound address. */
+export interface DivisionAddress {
+  id: string;
+  token: string;
+  divisionId: string;
+}
+
 interface EmailIngestionConfig {
   enabled: boolean;
   autoSort: boolean;
   allowedDomains: string[];
-  token: string | null;
+  wholeSchoolToken: string | null;
+  divisionAddresses: DivisionAddress[];
+  /** The school's divisions, each of which can have its own address. */
+  divisions: EventCalendar[];
   inboundDomain: string | null;
   recent: EmailIngestionLogEntry[];
 }
@@ -170,7 +195,11 @@ export function SettingsClient({
         </div>
       </section>
 
-      <EmailIngestionSection schoolId={schoolId} config={emailIngestion} />
+      <EmailIngestionSection
+        schoolId={schoolId}
+        schoolSlug={schoolSlug}
+        config={emailIngestion}
+      />
 
       <BlackbaudSection
         schoolId={schoolId}
@@ -562,21 +591,23 @@ function BlackbaudSection({
 
 function EmailIngestionSection({
   schoolId,
+  schoolSlug,
   config,
 }: {
   schoolId: string;
+  schoolSlug: string;
   config: EmailIngestionConfig;
 }) {
   const [enabled, setEnabled] = useState(config.enabled);
   const [autoSort, setAutoSort] = useState(config.autoSort);
   const [domains, setDomains] = useState<string[]>(config.allowedDomains);
-  const [token, setToken] = useState<string | null>(config.token);
+  const [token, setToken] = useState<string | null>(config.wholeSchoolToken);
   const [newDomain, setNewDomain] = useState("");
   const [saving, setSaving] = useState(false);
-  const [copied, setCopied] = useState(false);
 
-  const inboundAddress =
-    token && config.inboundDomain ? `${token}@${config.inboundDomain}` : null;
+  const addressFor = (t: string | null) =>
+    t && config.inboundDomain ? `${t}@${config.inboundDomain}` : null;
+  const inboundAddress = addressFor(token);
 
   function addDomain() {
     const value = newDomain.trim().toLowerCase().replace(/^[@*]+\.?/, "");
@@ -591,13 +622,6 @@ function EmailIngestionSection({
 
   function removeDomain(index: number) {
     setDomains((prev) => prev.filter((_, i) => i !== index));
-  }
-
-  function copyAddress() {
-    if (!inboundAddress) return;
-    navigator.clipboard.writeText(inboundAddress);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   }
 
   async function handleSave() {
@@ -631,7 +655,7 @@ function EmailIngestionSection({
           <div className="space-y-0.5">
             <Label htmlFor="email-ingestion-enabled">Enable email ingestion</Label>
             <p className="text-xs text-muted-foreground">
-              Accept emails at your school&apos;s private inbound address.
+              Accept emails at your school&apos;s private inbound addresses.
             </p>
           </div>
           <Switch
@@ -642,34 +666,23 @@ function EmailIngestionSection({
         </div>
 
         {inboundAddress && (
-          <div className="space-y-2">
-            <Label>Your inbound address</Label>
-            <div className="flex gap-2">
-              <Input
-                readOnly
-                value={inboundAddress}
-                className="font-mono"
-                onFocus={(e) => e.target.select()}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={copyAddress}
-                className="shrink-0"
-              >
-                {copied ? (
-                  <Check className="h-4 w-4 text-green-500" />
-                ) : (
-                  <Copy className="h-4 w-4" />
-                )}
-              </Button>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Your inbound addresses</Label>
+              <AddressRow label="Whole school" address={inboundAddress} />
             </div>
+            <DivisionAddresses
+              schoolId={schoolId}
+              schoolSlug={schoolSlug}
+              divisions={config.divisions}
+              initialAddresses={config.divisionAddresses}
+              addressFor={addressFor}
+            />
             <p className="text-xs text-muted-foreground">
               Forward or send school emails here.{" "}
               {domains.length
                 ? "Only senders from the allowed domains below are accepted."
-                : "Anyone who has this address can add documents, so keep it private."}
+                : "Anyone who has these addresses can add documents, so keep them private."}
             </p>
           </div>
         )}
@@ -750,6 +763,216 @@ function EmailIngestionSection({
   );
 }
 
+/**
+ * One address per division. Mail sent to a division's address becomes
+ * documents marked for that division, so the assistant only applies them to
+ * that division. Added and removed immediately, not with the Save button.
+ */
+function DivisionAddresses({
+  schoolId,
+  schoolSlug,
+  divisions,
+  initialAddresses,
+  addressFor,
+}: {
+  schoolId: string;
+  schoolSlug: string;
+  divisions: EventCalendar[];
+  initialAddresses: DivisionAddress[];
+  addressFor: (token: string) => string | null;
+}) {
+  const [addresses, setAddresses] = useState(initialAddresses);
+  const [pick, setPick] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [removing, setRemoving] = useState<DivisionAddress | null>(null);
+  const [removeBusy, setRemoveBusy] = useState(false);
+
+  const byId = new Map(divisions.map((d) => [d.id, d]));
+  const available = divisions.filter(
+    (d) => !addresses.some((a) => a.divisionId === d.id)
+  );
+
+  async function handleAdd() {
+    if (!pick) return;
+    setAdding(true);
+    const result = await addDivisionAddress(schoolId, pick);
+    setAdding(false);
+
+    if (result.error || !result.address) {
+      toast.error(result.error ?? "Could not add the address");
+      return;
+    }
+    setAddresses((prev) => [...prev, result.address!]);
+    setPick("");
+    toast.success(`${byId.get(pick)?.name ?? "Division"} address added`);
+  }
+
+  async function handleRemove() {
+    if (!removing) return;
+    setRemoveBusy(true);
+    const result = await removeDivisionAddress(schoolId, removing.id);
+    setRemoveBusy(false);
+
+    if (result.error) {
+      toast.error(result.error);
+      return;
+    }
+    setAddresses((prev) => prev.filter((a) => a.id !== removing.id));
+    setRemoving(null);
+    toast.success("Address removed");
+  }
+
+  if (divisions.length === 0) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        To give Lower, Middle, or Upper School its own address, first add the
+        divisions under{" "}
+        <a
+          href={`/s/${schoolSlug}/admin/events`}
+          className="underline underline-offset-2 hover:text-ink"
+        >
+          Events
+        </a>
+        .
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {addresses.map((a) => {
+        const division = byId.get(a.divisionId);
+        const address = addressFor(a.token);
+        if (!division || !address) return null;
+        return (
+          <AddressRow
+            key={a.id}
+            label={division.name}
+            color={division.color}
+            address={address}
+            onRemove={() => setRemoving(a)}
+          />
+        );
+      })}
+
+      {available.length > 0 && (
+        <div className="flex gap-2">
+          <Select value={pick} onValueChange={setPick}>
+            <SelectTrigger className="flex-1">
+              <SelectValue placeholder="Add an address for a division…" />
+            </SelectTrigger>
+            <SelectContent>
+              {available.map((d) => (
+                <SelectItem key={d.id} value={d.id}>
+                  {d.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleAdd}
+            disabled={!pick || adding}
+            className="shrink-0"
+          >
+            {adding ? <LogoSpinner /> : <Plus className="h-4 w-4" />}
+          </Button>
+        </div>
+      )}
+      <p className="text-xs text-muted-foreground">
+        Emails sent to a division&apos;s address are marked for that division,
+        and the assistant only applies them to it. Use the whole-school address
+        for everything else.
+      </p>
+
+      <ConfirmDialog
+        open={!!removing}
+        onOpenChange={(open) => {
+          if (!open) setRemoving(null);
+        }}
+        title="Remove this address?"
+        description={`Emails sent to the ${
+          removing ? byId.get(removing.divisionId)?.name ?? "division" : "division"
+        } address will be turned away. Documents it already added keep their division. If you add an address for this division again, it will be a new one.`}
+        confirmLabel="Remove"
+        variant="destructive"
+        loading={removeBusy}
+        onConfirm={handleRemove}
+      />
+    </div>
+  );
+}
+
+function AddressRow({
+  label,
+  color,
+  address,
+  onRemove,
+}: {
+  label: string;
+  /** Division color; omitted for the whole-school address. */
+  color?: string;
+  address: string;
+  onRemove?: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  function copyAddress() {
+    navigator.clipboard.writeText(address);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <p className="flex items-center gap-1.5 text-xs font-medium text-ink-soft">
+        {color && (
+          <span
+            className={cn("h-2 w-2 rounded-full", calendarColorClasses(color).dot)}
+          />
+        )}
+        {label}
+      </p>
+      <div className="flex gap-2">
+        <Input
+          readOnly
+          value={address}
+          aria-label={`${label} inbound address`}
+          className="font-mono"
+          onFocus={(e) => e.target.select()}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          onClick={copyAddress}
+          className="shrink-0"
+          aria-label={`Copy ${label} address`}
+        >
+          {copied ? (
+            <Check className="h-4 w-4 text-green-500" />
+          ) : (
+            <Copy className="h-4 w-4" />
+          )}
+        </Button>
+        {onRemove && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={onRemove}
+            className="shrink-0"
+            aria-label={`Remove ${label} address`}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const EMAIL_STATUS: Record<string, { label: string; className: string }> = {
   accepted: { label: "Added", className: "bg-success/15 text-success" },
   processing: { label: "Processing", className: "bg-amber-500/15 text-amber-500" },
@@ -771,8 +994,8 @@ function RecentEmails({ entries }: { entries: EmailIngestionLogEntry[] }) {
       <div className="space-y-0.5">
         <Label>Recent emails</Label>
         <p className="text-xs text-muted-foreground">
-          The last 20 emails sent to your inbound address and what happened to
-          each.
+          The last 20 emails sent to your inbound addresses and what happened
+          to each.
         </p>
       </div>
       {entries.length === 0 ? (

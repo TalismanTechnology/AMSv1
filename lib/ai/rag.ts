@@ -15,6 +15,8 @@ export interface RelevantChunk {
   document_tags?: string[];
   document_category?: string;
   document_folder?: string;
+  /** Divisions the school marked this document for; empty for whole-school. */
+  document_divisions?: string[];
 }
 
 // Structured metadata stored on each chunk. All fields optional — populated by
@@ -213,11 +215,13 @@ export async function searchDocuments(
 
   if (!chunks || chunks.length === 0) return [];
 
-  // Fetch document metadata for the matched chunks (including tags, category, folder)
+  // Fetch document metadata for the matched chunks (tags, category, folder, divisions)
   const docIds = [...new Set(chunks.map((c: RelevantChunk) => c.document_id))];
   const { data: docs } = await supabase
     .from("documents")
-    .select("id, title, file_url, file_type, tags, category:categories(name), folder:folders(name)")
+    .select(
+      "id, title, file_url, file_type, tags, category:categories(name), folder:folders(name), divisions:event_calendars(name)"
+    )
     .in("id", docIds);
 
   const docInfoMap = new Map(
@@ -228,6 +232,7 @@ export async function searchDocuments(
       tags: (d.tags as string[]) || [],
       category: (d.category as unknown as { name: string } | null)?.name,
       folder: (d.folder as unknown as { name: string } | null)?.name,
+      divisions: ((d.divisions as unknown as { name: string }[] | null) ?? []).map((v) => v.name),
     }]) || []
   );
 
@@ -241,6 +246,7 @@ export async function searchDocuments(
       document_tags: info?.tags,
       document_category: info?.category,
       document_folder: info?.folder,
+      document_divisions: info?.divisions,
     };
   });
 }
@@ -270,6 +276,7 @@ export interface CitablePassage {
   tags?: string[];
   category?: string;
   folder?: string;
+  divisions?: string[];
 }
 
 // How much of each document reaches the model. Deliberately generous: a missed
@@ -428,6 +435,7 @@ export function assemblePassages(
         tags: best.document_tags,
         category: best.document_category,
         folder: best.document_folder,
+        divisions: best.document_divisions,
       };
     });
   });
