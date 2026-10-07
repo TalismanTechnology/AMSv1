@@ -1,9 +1,9 @@
 /**
- * The sorting map: a tree growing down from an "All documents" hub. In the
- * division view the hub branches into the whole school and each division, and
- * each of those into its own categories, every document listed inside the
- * card for the category it was sorted into. In the folder view the hub
- * branches into the top-level folders, and each folder into its subfolders.
+ * The sorting map: a tree of boxes that open on click. All documents opens
+ * into the whole school and each division, each of those into its
+ * categories, each category into the kinds of document filed there (Email,
+ * PDF, Word…), and each kind into a list of its documents. The folder view
+ * opens the folder tree the same way.
  *
  * Pure data and geometry, no React, so the grouping and layout can be tested.
  */
@@ -268,88 +268,229 @@ export function matchesQuery(doc: { title: string }, query: string): boolean {
   return query !== "" && doc.title.toLowerCase().includes(query);
 }
 
+// ── Tree ──────────────────────────────────────────────
+
 /**
- * Buckets that hold a match, counting matches anywhere beneath a folder, so
- * the links down to a matching subfolder light up as well.
+ * One box on the map. Below the divisions (or folders) sit the kinds of
+ * document filed there, and below each kind a list of its documents.
  */
-export function bucketsWithMatches<D extends MapDocument>(
-  buckets: Bucket<D>[],
-  query: string
-): Set<string> {
+export interface TreeNode<D extends MapDocument = MapDocument> {
+  /** Node id on the map; unique within a view. */
+  id: string;
+  kind: "root" | "division" | "category" | "folder" | "unsorted" | "type" | "list";
+  name: string;
+  /** Category or division colour; null where there is none. */
+  color: string | null;
+  /** Documents at or beneath this box. */
+  count: number;
+  /** The boxes that open beneath this one when it is clicked. */
+  children: TreeNode<D>[];
+  /** A "type" box's documents, which its "list" box shows. */
+  docs: D[];
+  /**
+   * Whether a document dragged onto this box is filed under `targetId`. A
+   * division is a group of categories, not a place to file a document.
+   */
+  droppable: boolean;
+  /** The category or folder a dropped document is filed under; null for none. */
+  targetId: string | null;
+  /** The division a category belongs to, to name where a document moved. */
+  group?: string;
+  /** Set under "No category" / "No folder", where documents can be sorted by AI. */
+  unsorted?: boolean;
+}
+
+/** The kinds of document a box splits into, in the order they're shown. */
+const DOC_TYPES = [
+  { key: "email", label: "Email" },
+  { key: "pdf", label: "PDF" },
+  { key: "docx", label: "Word" },
+  { key: "xlsx", label: "Spreadsheet" },
+  { key: "pptx", label: "Slides" },
+  { key: "txt", label: "Text" },
+] as const;
+
+/** The kind a document is: email by how it arrived, otherwise by file type. */
+export function docTypeOf(doc: MapDocument): { key: string; label: string } {
+  const key =
+    doc.source === "email" || doc.file_type === "eml"
+      ? "email"
+      : doc.file_type.toLowerCase();
+  return (
+    DOC_TYPES.find((t) => t.key === key) ?? { key, label: key.toUpperCase() }
+  );
+}
+
+function typeNodes<D extends MapDocument>(
+  parentId: string,
+  docs: D[],
+  file: Pick<TreeNode<D>, "color" | "targetId" | "group" | "unsorted">
+): TreeNode<D>[] {
+  const byType = new Map<string, { label: string; docs: D[] }>();
+  for (const doc of docs) {
+    const { key, label } = docTypeOf(doc);
+    const entry = byType.get(key) ?? { label, docs: [] };
+    entry.docs.push(doc);
+    byType.set(key, entry);
+  }
+  const order = (key: string) => {
+    const index = DOC_TYPES.findIndex((t) => t.key === key);
+    return index === -1 ? DOC_TYPES.length : index;
+  };
+  return [...byType.entries()]
+    .sort(([a], [b]) => order(a) - order(b) || a.localeCompare(b))
+    .map(([key, { label, docs: ofType }]) => {
+      const id = `${parentId}/type:${key}`;
+      const list: TreeNode<D> = {
+        id: `${id}/list`,
+        kind: "list",
+        name: label,
+        count: ofType.length,
+        children: [],
+        docs: ofType,
+        droppable: true,
+        ...file,
+      };
+      return {
+        id,
+        kind: "type" as const,
+        name: label,
+        count: ofType.length,
+        children: [list],
+        docs: ofType,
+        droppable: true,
+        ...file,
+      };
+    });
+}
+
+/**
+ * The map as a tree: All documents, then the whole school and each division
+ * (or the top-level folders), then their categories (or subfolders), then the
+ * kinds of document in each, then the documents themselves.
+ */
+export function buildTree<D extends MapDocument>(
+  view: MapView,
+  buckets: Bucket<D>[]
+): TreeNode<D> {
+  const bucketById = new Map(buckets.map((b) => [b.id, b]));
+
+  const toNode = (bucket: Bucket<D>): TreeNode<D> => {
+    const file = {
+      color: bucket.color,
+      targetId: bucket.targetId,
+      group: bucket.group,
+      unsorted: bucket.kind === "unsorted" || undefined,
+    };
+    const subtrees = bucket.children.flatMap((childId) => {
+      const child = bucketById.get(childId);
+      return child ? [toNode(child)] : [];
+    });
+    return {
+      id: bucket.id,
+      kind: bucket.kind,
+      name: bucket.name,
+      count: bucket.total,
+      children: [...subtrees, ...typeNodes(bucket.id, bucket.docs, file)],
+      docs: [],
+      droppable: bucket.kind !== "division",
+      ...file,
+    };
+  };
+
+  const roots = hubBuckets(buckets).map(toNode);
+  return {
+    id: hubId(view),
+    kind: "root",
+    name: "All documents",
+    color: null,
+    count: roots.reduce((sum, r) => sum + r.count, 0),
+    children: roots,
+    docs: [],
+    droppable: false,
+    targetId: null,
+  };
+}
+
+/** Every box in the tree, parents before their children. */
+export function walkTree<D extends MapDocument>(root: TreeNode<D>): TreeNode<D>[] {
+  const out: TreeNode<D>[] = [];
+  const visit = (node: TreeNode<D>) => {
+    out.push(node);
+    node.children.forEach(visit);
+  };
+  visit(root);
+  return out;
+}
+
+/** Each box's parent, by id. */
+export function parentsOf(root: TreeNode): Map<string, string> {
+  const parents = new Map<string, string>();
+  for (const node of walkTree(root)) {
+    for (const child of node.children) parents.set(child.id, node.id);
+  }
+  return parents;
+}
+
+/**
+ * The boxes to open so every document matching the search is on show: each
+ * box with a match beneath it, down to the lists the matches are in.
+ */
+export function openForMatches(root: TreeNode, query: string): Set<string> {
+  const open = new Set<string>();
+  if (!query) return open;
+  const visit = (node: TreeNode): boolean => {
+    let hit = node.kind === "list" && node.docs.some((d) => matchesQuery(d, query));
+    for (const child of node.children) if (visit(child)) hit = true;
+    if (hit && node.children.length) open.add(node.id);
+    return hit;
+  };
+  visit(root);
+  return open;
+}
+
+/** Boxes with a match at or beneath them, so the path down to it lights up. */
+export function nodesWithMatches(root: TreeNode, query: string): Set<string> {
   const hits = new Set<string>();
   if (!query) return hits;
-
-  // Buckets come parent first, so walking backwards reaches every child
-  // before its parent.
-  for (let i = buckets.length - 1; i >= 0; i--) {
-    const bucket = buckets[i];
-    if (
-      bucket.docs.some((doc) => matchesQuery(doc, query)) ||
-      bucket.children.some((childId) => hits.has(childId))
-    ) {
-      hits.add(bucket.id);
-    }
-  }
+  const visit = (node: TreeNode): boolean => {
+    let hit = node.docs.some((d) => matchesQuery(d, query));
+    for (const child of node.children) if (visit(child)) hit = true;
+    if (hit) hits.add(node.id);
+    return hit;
+  };
+  visit(root);
   return hits;
 }
 
 // ── Geometry ──────────────────────────────────────────
-// Cards are drawn to these sizes (see components/admin/sorting-map-nodes.tsx),
+// Boxes are drawn to these sizes (see components/admin/sorting-map-nodes.tsx),
 // so the layout can place them before the browser has measured anything.
 
-export const CARD_WIDTH = 248;
-export const HEADER_HEIGHT = 40;
+export const NODE_WIDTH = 232;
+export const NODE_HEIGHT = 60;
+export const LIST_WIDTH = 280;
 export const ROW_HEIGHT = 34;
-/** Documents a card lists before folding the rest behind "Show all". */
-export const PREVIEW_ROWS = 6;
-/** A card's 1px border, top and bottom. */
-const CARD_BORDER = 2;
+/** Rows a document list shows before it scrolls. */
+export const LIST_ROWS = 8;
+/** A box's 1px border, top and bottom. */
+const BORDER = 2;
 
-/** Gap between one level of the tree and the next; links branch halfway down it. */
-export const LEVEL_GAP = 72;
-/** Gap between cards that share a parent. */
+/** Gap between one level of the tree and the next. */
+export const LEVEL_GAP = 64;
+/** Gap between boxes side by side. */
 export const SIBLING_GAP = 20;
-/** Gap between the hub's branches: divisions, or top-level folders. */
-export const BRANCH_GAP = 64;
 
-/** How many of a bucket's documents its card lists. */
-export function shownDocCount(bucket: Bucket, expanded: boolean): number {
-  return expanded
-    ? bucket.docs.length
-    : Math.min(bucket.docs.length, PREVIEW_ROWS);
-}
-
-/** Whether a card has a "Show all" / "Show less" row. */
-export function hasMoreRow(bucket: Bucket): boolean {
-  return bucket.docs.length > PREVIEW_ROWS;
-}
-
-/**
- * Rows under a card's header: documents, then "Show all" when some are folded
- * away. A division is a header alone, its categories drawn as branches below
- * it; so is a folder holding only subfolders. Any other empty card shows a
- * single placeholder row.
- */
-export function cardRowCount(bucket: Bucket, expanded: boolean): number {
-  if (bucket.kind === "division") return 0;
-  const rows = shownDocCount(bucket, expanded) + (hasMoreRow(bucket) ? 1 : 0);
-  return rows || (bucket.children.length ? 0 : 1);
-}
-
-export function cardHeight(bucket: Bucket, expanded: boolean): number {
-  return (
-    CARD_BORDER + HEADER_HEIGHT + cardRowCount(bucket, expanded) * ROW_HEIGHT
-  );
-}
-
-/** The hub is a header alone, with a placeholder row while it has no branches. */
-export function hubHeight(branchCount: number): number {
-  return CARD_BORDER + HEADER_HEIGHT + (branchCount ? 0 : ROW_HEIGHT);
+export function nodeSize(node: TreeNode): { width: number; height: number } {
+  if (node.kind !== "list") return { width: NODE_WIDTH, height: NODE_HEIGHT };
+  const rows = Math.max(1, Math.min(node.docs.length, LIST_ROWS));
+  return { width: LIST_WIDTH, height: BORDER + rows * ROW_HEIGHT };
 }
 
 export interface Box {
   x: number;
   y: number;
+  width: number;
   height: number;
 }
 
@@ -357,159 +498,73 @@ export interface MapLink {
   id: string;
   source: string;
   target: string;
-  /**
-   * Where the link turns sideways: halfway down the gap above its target's
-   * level, so every link into a level branches off one shared bar.
-   */
-  busY: number;
 }
 
-export interface Point {
-  x: number;
-  y: number;
-}
-
-/**
- * The corners of a link from the bottom of a card to the top of one below:
- * down to the bar, along it, and down again. Null when the target has been
- * dragged up level with or above its source, where there is no sensible
- * corner to turn.
- */
-export function routeLink(
-  source: Point,
-  target: Point,
-  link: Pick<MapLink, "busY">
-): Point[] | null {
-  if (target.y <= source.y) return null;
-  // A dragged card can leave the bar outside the gap; turn halfway instead.
-  const y =
-    link.busY > source.y && link.busY < target.y
-      ? link.busY
-      : (source.y + target.y) / 2;
-  return [source, { x: source.x, y }, { x: target.x, y }, target];
-}
-
-/** An SVG path through right-angled corners, each rounded off by `radius`. */
-export function roundedPath(points: Point[], radius: number): string {
-  // Drop repeated points and the middle of straight runs; what's left turns.
-  const corners: Point[] = [];
-  for (const point of points) {
-    const last = corners[corners.length - 1];
-    if (last && last.x === point.x && last.y === point.y) continue;
-    const before = corners[corners.length - 2];
-    if (
-      before &&
-      last &&
-      ((before.x === last.x && last.x === point.x) ||
-        (before.y === last.y && last.y === point.y))
-    ) {
-      corners.pop();
-    }
-    corners.push(point);
-  }
-  if (!corners.length) return "";
-
-  const step = (from: Point, to: Point, by: number): Point => ({
-    x: from.x + Math.sign(to.x - from.x) * by,
-    y: from.y + Math.sign(to.y - from.y) * by,
-  });
-  const length = (a: Point, b: Point) =>
-    Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
-
-  let path = `M ${corners[0].x},${corners[0].y}`;
-  for (let i = 1; i < corners.length - 1; i++) {
-    const [prev, corner, next] = [corners[i - 1], corners[i], corners[i + 1]];
-    const r = Math.min(radius, length(prev, corner) / 2, length(corner, next) / 2);
-    const into = step(corner, prev, r);
-    const out = step(corner, next, r);
-    path += ` L ${into.x},${into.y} Q ${corner.x},${corner.y} ${out.x},${out.y}`;
-  }
-  const end = corners[corners.length - 1];
-  return corners.length > 1 ? `${path} L ${end.x},${end.y}` : path;
-}
-
-export interface MapLayout {
-  /** Where each card goes, the hub included, keyed by node id. */
+export interface MapLayout<D extends MapDocument = MapDocument> {
+  /** The boxes on show, parents before their children. */
+  nodes: TreeNode<D>[];
+  /** Where each box on show goes, keyed by id. */
   boxes: Map<string, Box>;
   links: MapLink[];
 }
 
 /**
- * Place the hub and every card as a tree growing downwards: the hub on top,
- * its branches (divisions, or top-level folders) in a row beneath it, and each
- * one's categories or subfolders in a row beneath that. Every card is centred
- * over its own children, and each level starts below the tallest card of the
- * level above. `expanded` holds the ids of cards showing all their documents.
+ * Place the boxes on show: the root, and beneath every open box its
+ * children, in a row centred under it. Each level starts below the tallest
+ * box of the level above, and no two boxes overlap.
  */
-export function layoutMap(
-  view: MapView,
-  buckets: Bucket[],
-  expanded: ReadonlySet<string>
-): MapLayout {
-  const hub = hubId(view);
-  const bucketById = new Map(buckets.map((b) => [b.id, b]));
-  const roots = hubBuckets(buckets);
+export function layoutTree<D extends MapDocument>(
+  root: TreeNode<D>,
+  open: ReadonlySet<string>
+): MapLayout<D> {
+  const shownChildren = (node: TreeNode<D>) =>
+    open.has(node.id) ? node.children : [];
 
-  const childrenOf = (id: string): Bucket[] =>
-    id === hub
-      ? roots
-      : (bucketById.get(id)?.children ?? []).flatMap((childId) => {
-          const child = bucketById.get(childId);
-          return child ? [child] : [];
-        });
-  const heightOf = (id: string): number => {
-    const bucket = bucketById.get(id);
-    return bucket ? cardHeight(bucket, expanded.has(id)) : hubHeight(roots.length);
-  };
-  const gapUnder = (id: string) => (id === hub ? BRANCH_GAP : SIBLING_GAP);
-
-  // How wide each subtree is, and how tall each level's tallest card is.
   const width = new Map<string, number>();
   const levelHeights: number[] = [];
-  const measure = (id: string, level: number): number => {
-    levelHeights[level] = Math.max(levelHeights[level] ?? 0, heightOf(id));
-    const children = childrenOf(id);
+  const measure = (node: TreeNode<D>, level: number): number => {
+    const size = nodeSize(node);
+    levelHeights[level] = Math.max(levelHeights[level] ?? 0, size.height);
+    const children = shownChildren(node);
     const span =
-      children.reduce((sum, child) => sum + measure(child.id, level + 1), 0) +
-      gapUnder(id) * Math.max(children.length - 1, 0);
-    const subtree = Math.max(CARD_WIDTH, span);
-    width.set(id, subtree);
+      children.reduce((sum, child) => sum + measure(child, level + 1), 0) +
+      SIBLING_GAP * Math.max(children.length - 1, 0);
+    const subtree = Math.max(size.width, span);
+    width.set(node.id, subtree);
     return subtree;
   };
-  measure(hub, 0);
+  measure(root, 0);
 
   const levelTops = [0];
   for (let level = 1; level < levelHeights.length; level++) {
     levelTops[level] = levelTops[level - 1] + levelHeights[level - 1] + LEVEL_GAP;
   }
 
+  const nodes: TreeNode<D>[] = [];
   const boxes = new Map<string, Box>();
   const links: MapLink[] = [];
-  const place = (id: string, left: number, level: number) => {
-    const subtree = width.get(id) ?? CARD_WIDTH;
-    boxes.set(id, {
-      x: left + (subtree - CARD_WIDTH) / 2,
+  const place = (node: TreeNode<D>, left: number, level: number) => {
+    const size = nodeSize(node);
+    const subtree = width.get(node.id) ?? size.width;
+    nodes.push(node);
+    boxes.set(node.id, {
+      x: left + (subtree - size.width) / 2,
       y: levelTops[level],
-      height: heightOf(id),
+      ...size,
     });
 
-    const children = childrenOf(id);
+    const children = shownChildren(node);
     const span =
       children.reduce((sum, child) => sum + (width.get(child.id) ?? 0), 0) +
-      gapUnder(id) * Math.max(children.length - 1, 0);
+      SIBLING_GAP * Math.max(children.length - 1, 0);
     let x = left + (subtree - span) / 2;
     for (const child of children) {
-      links.push({
-        id: `${id}->${child.id}`,
-        source: id,
-        target: child.id,
-        busY: levelTops[level + 1] - LEVEL_GAP / 2,
-      });
-      place(child.id, x, level + 1);
-      x += (width.get(child.id) ?? 0) + gapUnder(id);
+      links.push({ id: `${node.id}->${child.id}`, source: node.id, target: child.id });
+      place(child, x, level + 1);
+      x += (width.get(child.id) ?? 0) + SIBLING_GAP;
     }
   };
-  place(hub, 0, 0);
+  place(root, 0, 0);
 
-  return { boxes, links };
+  return { nodes, boxes, links };
 }

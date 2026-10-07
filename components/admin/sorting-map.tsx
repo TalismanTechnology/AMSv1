@@ -19,7 +19,6 @@ import {
   BackgroundVariant,
   ControlButton,
   Controls,
-  MiniMap,
   Panel,
   ReactFlow,
   ReactFlowProvider,
@@ -27,15 +26,12 @@ import {
   type Dimensions,
   type FitViewOptions,
   type NodeChange,
-  type XYPosition,
 } from "@xyflow/react";
 import {
-  Diamond,
+  ChevronsDownUp,
   FileText,
   Folder as FolderIcon,
   GraduationCap,
-  Mail,
-  Network,
   Search,
   Sparkles,
 } from "lucide-react";
@@ -46,27 +42,26 @@ import { updateDocument } from "@/actions/documents";
 import { cn } from "@/lib/utils";
 import { calendarHex } from "@/lib/event-calendars";
 import {
-  bucketsWithMatches,
+  buildTree,
   groupByDivision,
   groupByFolder,
-  hubBuckets,
   hubId,
-  layoutMap,
+  layoutTree,
   matchesQuery,
+  nodesWithMatches,
   normalizeQuery,
-  type Bucket,
+  openForMatches,
+  parentsOf,
   type MapDivision,
   type MapView,
+  type TreeNode,
 } from "@/lib/documents/sorting-map";
 import {
-  CARD_FOCUS_ATTRIBUTE,
-  DRAG_HANDLE_CLASS,
   SOURCE_HANDLE_ID,
   SortingMapContext,
   TARGET_HANDLE_ID,
   edgeTypes,
   nodeTypes,
-  type BucketNode,
   type LinkEdge,
   type MapNode,
   type SortingMapContextValue,
@@ -209,7 +204,7 @@ export function SortingMap({
   );
 
   const moveDocument = useCallback(
-    (doc: Document, to: Bucket<Document>) => {
+    (doc: Document, to: TreeNode<Document>) => {
       const field = view === "category" ? "category_id" : "folder_id";
       const previous = doc[field];
       if (previous === to.targetId) return;
@@ -301,18 +296,6 @@ export function SortingMap({
         </p>
 
         <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1.5">
-            <Diamond className="size-3 fill-current text-ink-soft" />
-            In a category
-          </span>
-          <span className="flex items-center gap-1.5">
-            <Diamond className="size-3" />
-            No category
-          </span>
-          <span className="flex items-center gap-1.5">
-            <Mail className="size-3" />
-            Came by email
-          </span>
           <Link
             href={settingsHref}
             title="New documents without a category or folder are sorted by AI. Change this in Settings."
@@ -363,7 +346,7 @@ interface MapCanvasProps {
   onSortDocuments: (docIds: string[]) => void;
   query: string;
   fitRequest: number;
-  onMove: (doc: Document, to: Bucket<Document>) => void;
+  onMove: (doc: Document, to: TreeNode<Document>) => void;
   onOpenDocument: (doc: Document) => void;
   onEditDocument: (doc: Document) => void;
   onShowInList: (view: MapView, targetId: string) => void;
@@ -384,23 +367,23 @@ function MapCanvas({
   onEditDocument,
   onShowInList,
 }: MapCanvasProps) {
-  const { fitView, getViewport, setViewport } = useReactFlow<
-    MapNode,
-    LinkEdge
-  >();
+  const { fitView } = useReactFlow<MapNode, LinkEdge>();
   const touch = useTouchScreen();
-  const [expanded, setExpanded] = useState<ReadonlySet<string>>(
-    () => new Set()
+  const rootId = hubId(view);
+  // The boxes the user has opened. The map starts with All documents open,
+  // showing the whole school and each division.
+  const [opened, setOpened] = useState<ReadonlySet<string>>(
+    () => new Set([rootId])
   );
-  // How far each card has been dragged from where the layout put it, so a
-  // re-layout (a card expanding, a document moving) keeps the user's edits.
-  const [offsets, setOffsets] = useState<Record<string, XYPosition>>({});
   // Sizes React Flow measured, handed back on every render so it doesn't hide
-  // the cards to measure them again.
+  // the boxes to measure them again.
   const [measured, setMeasured] = useState<Record<string, Dimensions>>({});
   const [hovered, setHovered] = useState<string | null>(null);
-  const [dragFrom, setDragFrom] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
+  // The boxes to bring into view once the next layout is on screen.
+  const [focus, setFocus] = useState<{ ids: string[]; seq: number } | null>(
+    null
+  );
 
   const mapDivisions = useMemo<MapDivision[]>(
     () =>
@@ -412,69 +395,54 @@ function MapCanvas({
       })),
     [divisions]
   );
-  const buckets = useMemo(
+  const tree = useMemo(
     () =>
-      view === "category"
-        ? groupByDivision(docs, categories, mapDivisions)
-        : groupByFolder(docs, folders),
+      buildTree(
+        view,
+        view === "category"
+          ? groupByDivision(docs, categories, mapDivisions)
+          : groupByFolder(docs, folders)
+      ),
     [view, docs, categories, mapDivisions, folders]
   );
-  const layout = useMemo(
-    () => layoutMap(view, buckets, expanded),
-    [view, buckets, expanded]
-  );
-  const matched = useMemo(
-    () => bucketsWithMatches(buckets, query),
-    [buckets, query]
-  );
+  const parents = useMemo(() => parentsOf(tree), [tree]);
+  const matched = useMemo(() => nodesWithMatches(tree, query), [tree, query]);
+  // While searching, everything on the way to a match opens as well.
+  const open = useMemo(() => {
+    const forMatches = openForMatches(tree, query);
+    return forMatches.size ? new Set([...opened, ...forMatches]) : opened;
+  }, [tree, query, opened]);
+  const layout = useMemo(() => layoutTree(tree, open), [tree, open]);
 
-  const nodes = useMemo<MapNode[]>(() => {
-    const placeOf = (id: string): XYPosition => {
-      const box = layout.boxes.get(id);
-      const offset = offsets[id];
-      return {
-        x: (box?.x ?? 0) + (offset?.x ?? 0),
-        y: (box?.y ?? 0) + (offset?.y ?? 0),
-      };
-    };
-
-    const hub = hubId(view);
-    return [
-      {
-        id: hub,
-        type: "hub",
-        position: placeOf(hub),
-        dragHandle: `.${DRAG_HANDLE_CLASS}`,
-        measured: measured[hub],
-        style: NODE_STYLE,
-        domAttributes: PLAIN_WRAPPER,
-        data: {
-          view,
-          total: docs.length,
-          branchCount: hubBuckets(buckets).length,
-        },
-      },
-      ...buckets.map(
-        (bucket): BucketNode => ({
-          id: bucket.id,
-          type: "bucket",
-          position: placeOf(bucket.id),
-          dragHandle: `.${DRAG_HANDLE_CLASS}`,
-          measured: measured[bucket.id],
+  const nodes = useMemo<MapNode[]>(
+    () =>
+      layout.nodes.map((node): MapNode => {
+        const box = layout.boxes.get(node.id);
+        const common = {
+          id: node.id,
+          position: { x: box?.x ?? 0, y: box?.y ?? 0 },
+          width: box?.width,
+          height: box?.height,
+          measured: measured[node.id],
           style: NODE_STYLE,
           domAttributes: PLAIN_WRAPPER,
-          data: { bucket, expanded: expanded.has(bucket.id) },
-        })
-      ),
-    ];
-  }, [view, buckets, layout, offsets, measured, expanded, docs.length]);
+        };
+        return node.kind === "list"
+          ? { ...common, type: "list", data: { node } }
+          : {
+              ...common,
+              type: "box",
+              data: { node, open: open.has(node.id), isRoot: node.id === rootId },
+            };
+      }),
+    [layout, measured, open, rootId]
+  );
 
   const edges = useMemo<LinkEdge[]>(() => {
-    const colorOf = new Map(buckets.map((b) => [b.id, b.color]));
+    const colorOf = new Map(layout.nodes.map((n) => [n.id, n.color]));
     return layout.links.map((link) => {
       const lit =
-        hovered !== null &&
-        (link.target === hovered || link.source === hovered);
+        hovered !== null && (link.target === hovered || link.source === hovered);
       const found = query !== "" && matched.has(link.target);
       return {
         id: link.id,
@@ -484,104 +452,86 @@ function MapCanvas({
         target: link.target,
         targetHandle: TARGET_HANDLE_ID,
         data: {
-          busY: link.busY,
           color: colorOf.get(link.target) ?? null,
           active: lit || found,
           dimmed: query !== "" && !found,
         },
       };
     });
-  }, [layout, buckets, hovered, query, matched]);
+  }, [layout, hovered, query, matched]);
 
-  const onNodesChange = useCallback(
-    (changes: NodeChange<MapNode>[]) => {
-      const sizes: Record<string, Dimensions> = {};
-      const moved: Record<string, XYPosition> = {};
-      for (const change of changes) {
-        if (change.type === "dimensions" && change.dimensions) {
-          sizes[change.id] = change.dimensions;
-        } else if (change.type === "position" && change.position) {
-          const box = layout.boxes.get(change.id);
-          if (box) {
-            moved[change.id] = {
-              x: change.position.x - box.x,
-              y: change.position.y - box.y,
-            };
-          }
-        }
+  const onNodesChange = useCallback((changes: NodeChange<MapNode>[]) => {
+    const sizes: Record<string, Dimensions> = {};
+    for (const change of changes) {
+      if (change.type === "dimensions" && change.dimensions) {
+        sizes[change.id] = change.dimensions;
       }
-      if (Object.keys(sizes).length) {
-        setMeasured((prev) => ({ ...prev, ...sizes }));
-      }
-      if (Object.keys(moved).length) {
-        setOffsets((prev) => ({ ...prev, ...moved }));
-      }
-    },
-    [layout]
-  );
+    }
+    if (Object.keys(sizes).length) {
+      setMeasured((prev) => ({ ...prev, ...sizes }));
+    }
+  }, []);
 
-  /** Bring a card into view, then move keyboard focus into it. */
-  const focusCard = useCallback(
+  /** Open or close a box, then bring it and what it opened into view. */
+  const toggle = useCallback(
     (id: string) => {
-      void fitView({
-        nodes: [{ id }],
-        padding: 0.4,
-        maxZoom: 1,
-        duration: motionMs(450),
-      }).then(() => {
-        document
-          .querySelector<HTMLElement>(
-            `.react-flow__node[data-id="${CSS.escape(id)}"] [${CARD_FOCUS_ATTRIBUTE}]`
-          )
-          ?.focus({ preventScroll: true });
+      const node = layout.nodes.find((n) => n.id === id);
+      if (!node) return;
+      const closing = open.has(id);
+      setOpened((prev) => {
+        const next = new Set(prev);
+        if (closing) {
+          // Closing a box closes everything beneath it too.
+          const below = [node];
+          while (below.length) {
+            const current = below.pop()!;
+            next.delete(current.id);
+            below.push(...current.children);
+          }
+        } else {
+          next.add(id);
+        }
+        return next;
       });
+      const parent = parents.get(id);
+      const ids = closing
+        ? [id, ...(parent ? [parent] : [])]
+        : [id, ...node.children.map((c) => c.id)];
+      setFocus((prev) => ({ ids, seq: (prev?.seq ?? 0) + 1 }));
     },
-    [fitView]
+    [layout, open, parents]
   );
 
-  // Keyboard focus can land on a row of a card that's partly off the canvas.
-  // Pan just far enough to show it.
-  const revealFocused = useCallback(
-    (event: React.FocusEvent<HTMLDivElement>) => {
-      const target = event.target;
-      if (!(target instanceof HTMLElement)) return;
-      if (!target.matches(":focus-visible") || !target.closest(".react-flow__node")) {
-        return;
-      }
-      const canvas = event.currentTarget.getBoundingClientRect();
-      const box = target.getBoundingClientRect();
-      const margin = 24;
-      const shift = (start: number, end: number, from: number, to: number) =>
-        start < from + margin
-          ? from + margin - start
-          : end > to - margin
-            ? to - margin - end
-            : 0;
-      const dx = shift(box.left, box.right, canvas.left, canvas.right);
-      const dy = shift(box.top, box.bottom, canvas.top, canvas.bottom);
-      if (!dx && !dy) return;
-      const viewport = getViewport();
-      void setViewport(
-        { x: viewport.x + dx, y: viewport.y + dy, zoom: viewport.zoom },
-        { duration: motionMs(200) }
-      );
-    },
-    [getViewport, setViewport]
-  );
+  // Once the new layout is drawn, bring the boxes just opened into view.
+  useEffect(() => {
+    if (!focus) return;
+    const frame = requestAnimationFrame(() => {
+      void fitView({
+        nodes: focus.ids.map((id) => ({ id })),
+        padding: 0.25,
+        maxZoom: 1,
+        duration: motionMs(400),
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [focus, fitView]);
 
   // Bring the search matches into view when the toolbar asks for it.
   const handledFitRequest = useRef(fitRequest);
   useEffect(() => {
     if (fitRequest === handledFitRequest.current) return;
     handledFitRequest.current = fitRequest;
-    if (!matched.size) return;
+    const lists = layout.nodes.filter(
+      (n) => n.kind === "list" && matched.has(n.id)
+    );
+    if (!lists.length) return;
     void fitView({
-      nodes: [...matched].map((id) => ({ id })),
-      padding: 0.2,
+      nodes: lists.map((n) => ({ id: n.id })),
+      padding: 0.25,
       maxZoom: 1,
       duration: motionMs(450),
     });
-  }, [fitRequest, matched, fitView]);
+  }, [fitRequest, layout, matched, fitView]);
 
   const categoryColor = useMemo(() => {
     const colors = new Map(categories.map((c) => [c.id, c.color]));
@@ -595,36 +545,24 @@ function MapCanvas({
       matched,
       touch,
       categoryColor,
-      dragFrom,
       dropTarget,
       sorting: sortingIds,
       sortDocuments: onSortDocuments,
       setHovered,
-      focusCard,
-      toggleExpanded: (id) =>
-        setExpanded((prev) => {
-          const next = new Set(prev);
-          if (next.has(id)) next.delete(id);
-          else next.add(id);
-          return next;
-        }),
+      toggle,
       openDocument: onOpenDocument,
       editDocument: onEditDocument,
-      showInList: (bucket) => {
-        if (bucket.targetId) onShowInList(view, bucket.targetId);
+      showInList: (node) => {
+        if (node.targetId) onShowInList(view, node.targetId);
       },
-      startDrag: (from) => setDragFrom(from),
-      endDrag: () => {
-        setDragFrom(null);
-        setDropTarget(null);
-      },
+      endDrag: () => setDropTarget(null),
       dragOver: (id) => setDropTarget(id),
       dragLeave: (id) =>
         setDropTarget((current) => (current === id ? null : current)),
-      drop: (docId, bucket) => {
+      drop: (docId, node) => {
         // Look the document up fresh: the drag may have outlived the row.
         const doc = docs.find((d) => d.id === docId);
-        if (doc) onMove(doc, bucket);
+        if (doc) onMove(doc, node);
       },
     }),
     [
@@ -633,11 +571,10 @@ function MapCanvas({
       matched,
       touch,
       categoryColor,
-      dragFrom,
       dropTarget,
       sortingIds,
       onSortDocuments,
-      focusCard,
+      toggle,
       onOpenDocument,
       onEditDocument,
       onShowInList,
@@ -654,12 +591,11 @@ function MapCanvas({
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
-        onFocus={revealFocused}
         fitView
         fitViewOptions={FIT_VIEW}
         minZoom={0.1}
         maxZoom={1.75}
-        nodesDraggable={!touch}
+        nodesDraggable={false}
         nodesConnectable={false}
         nodesFocusable={false}
         elementsSelectable={false}
@@ -677,34 +613,25 @@ function MapCanvas({
         <Controls position="bottom-left" showInteractive={false}>
           <ControlButton
             onClick={() => {
-              setOffsets({});
-              void fitView({ ...FIT_VIEW, duration: motionMs(450) });
+              setOpened(new Set([rootId]));
+              setFocus((prev) => ({
+                ids: [rootId, ...tree.children.map((c) => c.id)],
+                seq: (prev?.seq ?? 0) + 1,
+              }));
             }}
-            title="Put every card back in the tree"
-            aria-label="Put every card back in the tree"
+            title="Close everything below the divisions"
+            aria-label="Close everything below the divisions"
           >
             {/* React Flow fills control icons; this one is drawn in strokes. */}
-            <Network style={{ fill: "none" }} />
+            <ChevronsDownUp style={{ fill: "none" }} />
           </ControlButton>
         </Controls>
-        <MiniMap<MapNode>
-          position="bottom-right"
-          pannable
-          zoomable
-          nodeBorderRadius={4}
-          nodeColor={(node) =>
-            node.type === "bucket" && node.data.bucket.color
-              ? node.data.bucket.color
-              : "rgba(45, 58, 46, 0.22)"
-          }
-          ariaLabel="Map overview"
-          className="max-md:hidden"
-        />
         <Panel
           position="bottom-center"
           className="pointer-events-none rounded-full bg-card/90 px-3 py-1 text-[11px] text-muted-foreground shadow-[var(--elev-2)] ring-1 ring-border max-md:hidden"
         >
-          Drag a document onto another card to re-sort it
+          Click a box to open it, click again to close it · Drag a document onto
+          another box to re-sort it
         </Panel>
       </ReactFlow>
     </SortingMapContext.Provider>

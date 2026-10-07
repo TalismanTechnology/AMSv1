@@ -5,7 +5,7 @@ import {
   BaseEdge,
   Handle,
   Position,
-  getSmoothStepPath,
+  getStraightPath,
   type Edge,
   type EdgeProps,
   type EdgeTypes,
@@ -15,10 +15,11 @@ import {
 } from "@xyflow/react";
 import {
   ChevronDown,
-  ChevronUp,
-  Crosshair,
+  ChevronRight,
   Diamond,
   EllipsisVertical,
+  FileSpreadsheet,
+  FileText,
   Folder as FolderIcon,
   GraduationCap,
   Inbox,
@@ -27,6 +28,7 @@ import {
   LoaderCircle,
   Mail,
   Pencil,
+  Presentation,
   School,
   Sparkles,
   Tag,
@@ -39,51 +41,38 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import {
-  CARD_WIDTH,
-  PREVIEW_ROWS,
-  hasMoreRow,
+  LIST_ROWS,
   matchesQuery,
-  roundedPath,
-  routeLink,
-  type Bucket,
   type MapView,
+  type TreeNode,
 } from "@/lib/documents/sorting-map";
 import type { Document } from "@/lib/types";
 
-// Headers are h-[40px] and rows h-[34px] to match HEADER_HEIGHT and
-// ROW_HEIGHT in lib/documents/sorting-map.ts, which places cards before they
-// are measured. They are px, not rem, so a larger browser font can't make the
-// cards outgrow their places.
+// Boxes are drawn to NODE_WIDTH × NODE_HEIGHT (232 × 60) and list rows to ROW_HEIGHT in
+// lib/documents/sorting-map.ts, which places them before they are measured.
+// Sizes are px, not rem, so a larger browser font can't outgrow the layout.
 //
-// Cards use bg-[var(--card)], never the bg-card class: the dashboard's
-// `.neo .bg-card` rules would make them position: relative with a solid
-// border and their own shadow.
+// Boxes use bg-[var(--card)], never the bg-card class: the dashboard's
+// `.neo .bg-card` rules would give them their own border and shadow.
 
-/** Only a card's header drags the card; its rows drag documents instead. */
-export const DRAG_HANDLE_CLASS = "sorting-map-drag";
-/** The handle on top of a card that the link from its parent arrives at. */
+/** The handle on top of a box that the line from its parent arrives at. */
 export const TARGET_HANDLE_ID = "in";
-/** The handle under a card that links to its branches leave from. */
+/** The handle under a box that lines to its children leave from. */
 export const SOURCE_HANDLE_ID = "out";
-/** Marks the element "Go to" focuses once it has brought a card into view. */
+/** Marks the element focus moves to once the map has brought a box into view. */
 export const CARD_FOCUS_ATTRIBUTE = "data-map-card";
 const DRAG_TYPE = "application/x-askmyschool-document";
 
-export type HubNode = Node<
-  { view: MapView; total: number; branchCount: number },
-  "hub"
+export type TreeBoxNode = Node<
+  { node: TreeNode<Document>; open: boolean; isRoot: boolean },
+  "box"
 >;
-export type BucketNode = Node<
-  { bucket: Bucket<Document>; expanded: boolean },
-  "bucket"
->;
-export type MapNode = HubNode | BucketNode;
+export type DocListNode = Node<{ node: TreeNode<Document> }, "list">;
+export type MapNode = TreeBoxNode | DocListNode;
 
 export type LinkEdge = Edge<
   {
-    /** Where the link turns sideways; see MapLink.busY. */
-    busY: number;
-    /** The target category's colour, used while the link is lit. */
+    /** The child's colour, used while the line is lit. */
     color: string | null;
     active: boolean;
     dimmed: boolean;
@@ -95,30 +84,26 @@ export interface SortingMapContextValue {
   view: MapView;
   /** Normalized search text; "" when not searching. */
   query: string;
-  /** Buckets with a match in or beneath them, while searching. */
+  /** Boxes with a match at or beneath them, while searching. */
   matched: ReadonlySet<string>;
-  /** Touch screens pan by swiping cards and edit with a visible button. */
+  /** Touch screens pan by swiping and edit with a visible button. */
   touch: boolean;
   categoryColor: (categoryId: string | null) => string | null;
-  /** The bucket a document is being dragged out of, if any. */
-  dragFrom: string | null;
-  /** The bucket a dragged document is over. */
+  /** The box a dragged document is over. */
   dropTarget: string | null;
   /** Documents being sorted by AI right now. */
   sorting: ReadonlySet<string>;
   sortDocuments: (docIds: string[]) => void;
-  setHovered: (bucketId: string | null) => void;
-  focusCard: (bucketId: string) => void;
-  toggleExpanded: (bucketId: string) => void;
+  setHovered: (nodeId: string | null) => void;
+  toggle: (nodeId: string) => void;
   openDocument: (doc: Document) => void;
   editDocument: (doc: Document) => void;
-  showInList: (bucket: Bucket<Document>) => void;
-  startDrag: (fromBucketId: string) => void;
+  showInList: (node: TreeNode<Document>) => void;
   endDrag: () => void;
-  dragOver: (bucketId: string | null) => void;
+  dragOver: (nodeId: string | null) => void;
   /** Clears the drop target, unless the pointer has already entered another. */
-  dragLeave: (bucketId: string) => void;
-  drop: (docId: string, bucket: Bucket<Document>) => void;
+  dragLeave: (nodeId: string) => void;
+  drop: (docId: string, node: TreeNode<Document>) => void;
 }
 
 export const SortingMapContext = createContext<SortingMapContextValue | null>(
@@ -136,15 +121,10 @@ function carriesDocument(event: DragEvent): boolean {
   return Array.from(event.dataTransfer.types).includes(DRAG_TYPE);
 }
 
-/**
- * Lets a card or row take a document dragged from another card. A division
- * isn't a place to file a document, only its categories are.
- */
-function useDropTarget(bucket: Bucket<Document>) {
+/** Lets a box take a document dragged from a list. */
+function useDropTarget(node: TreeNode<Document>) {
   const map = useSortingMap();
-  const accepts = map.dragFrom !== bucket.id;
-
-  if (bucket.kind === "division") return { isOver: false, handlers: {} };
+  if (!node.droppable) return { isOver: false, handlers: {} };
 
   // Entering the next target can come before leaving the last one, so a leave
   // only clears the target if it's still this one.
@@ -152,85 +132,151 @@ function useDropTarget(bucket: Bucket<Document>) {
     if (!carriesDocument(event)) return;
     event.preventDefault();
     event.stopPropagation();
-    event.dataTransfer.dropEffect = accepts ? "move" : "none";
-    map.dragOver(accepts ? bucket.id : null);
+    event.dataTransfer.dropEffect = "move";
+    map.dragOver(node.id);
   };
 
   return {
-    isOver: accepts && map.dropTarget === bucket.id,
+    isOver: map.dropTarget === node.id,
     handlers: {
       onDragEnter: over,
       onDragOver: over,
       onDragLeave(event: DragEvent) {
         const next = event.relatedTarget;
         if (next instanceof Element && event.currentTarget.contains(next)) return;
-        map.dragLeave(bucket.id);
+        map.dragLeave(node.id);
       },
       onDrop(event: DragEvent) {
         if (!carriesDocument(event)) return;
         event.preventDefault();
         event.stopPropagation();
         const docId = event.dataTransfer.getData(DRAG_TYPE);
-        if (accepts && docId) map.drop(docId, bucket);
+        if (docId) map.drop(docId, node);
         map.endDrag();
       },
     },
   };
 }
 
-/** On touch screens rows must not block panning; there is no mouse drag. */
-function rowClass(touch: boolean) {
-  return cn(
-    "relative h-[34px] border-b border-border/60 last:border-b-0",
-    !touch && "nodrag nopan"
-  );
-}
-const rowButtonClass =
-  "flex h-full w-full items-center gap-2.5 px-3 text-left outline-none transition-colors hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring";
-const countClass =
-  "shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground";
-/** The small buttons that appear over a document row's file type on hover. */
-const rowActionClass =
-  "flex size-6 items-center justify-center rounded-md bg-[var(--card)] text-muted-foreground ring-1 ring-border outline-none transition-opacity hover:text-ink disabled:cursor-wait focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring group-hover/row:opacity-100";
-
 function plural(count: number, noun: string, nouns = `${noun}s`) {
   return `${count} ${count === 1 ? noun : nouns}`;
 }
 
-function CardShell({
-  label,
-  dashed,
-  dimmed,
-  branches,
-  className,
-  children,
-  ...rest
-}: React.ComponentProps<"div"> & {
-  /** Read out when focus enters the card. */
-  label: string;
-  dashed?: boolean;
-  dimmed?: boolean;
-  /** Whether links leave the bottom of the card for cards below it. */
-  branches?: boolean;
-}) {
+/** What a box opens into, for its subtitle and screen readers. */
+function opensInto(node: TreeNode<Document>): string {
+  const kinds = new Set(node.children.map((c) => c.kind));
+  if (node.kind === "type") return "the documents";
+  if (kinds.has("division")) return plural(node.children.length, "group");
+  if (kinds.has("category")) {
+    return plural(node.children.length, "category", "categories");
+  }
+  if (kinds.has("folder")) return plural(node.children.length, "folder");
+  return plural(node.children.length, "file type");
+}
+
+function BoxIcon({ node }: { node: TreeNode<Document> }) {
+  const style = node.color ? { color: node.color } : undefined;
+  const className = cn("size-4 shrink-0", !node.color && "text-ink-soft");
+  switch (node.kind) {
+    case "root":
+      return <Library className={className} />;
+    case "division":
+      return node.id === "division:whole" ? (
+        <School className={className} style={style} />
+      ) : (
+        <GraduationCap className={className} style={style} />
+      );
+    case "category":
+      return <Tag className={className} style={style} />;
+    case "folder":
+      return <FolderIcon className={className} />;
+    case "unsorted":
+      return <Inbox className="size-4 shrink-0 text-muted-foreground" />;
+    default:
+      return <TypeIcon name={node.name} />;
+  }
+}
+
+function TypeIcon({ name }: { name: string }) {
+  const className = "size-4 shrink-0 text-ink-soft";
+  if (name === "Email") return <Mail className={className} />;
+  if (name === "Spreadsheet") return <FileSpreadsheet className={className} />;
+  if (name === "Slides") return <Presentation className={className} />;
+  return <FileText className={className} />;
+}
+
+// ── Boxes ─────────────────────────────────────────────
+
+function TreeBox({ data }: NodeProps<TreeBoxNode>) {
+  const { node, open, isRoot } = data;
+  const map = useSortingMap();
+  const drop = useDropTarget(node);
+  const opens = node.children.length > 0;
+  const dimmed = map.query !== "" && !map.matched.has(node.id);
+  const Chevron = open ? ChevronDown : ChevronRight;
+
   return (
     <div
-      role="group"
-      aria-label={label}
-      tabIndex={-1}
-      {...{ [CARD_FOCUS_ATTRIBUTE]: "" }}
-      style={{ width: CARD_WIDTH }}
+      {...drop.handlers}
+      onMouseEnter={() => map.setHovered(node.id)}
+      onMouseLeave={() => map.setHovered(null)}
       className={cn(
-        // No outline-none here: it would also cancel the drop-target outline.
-        "overflow-hidden rounded-lg border bg-[var(--card)] shadow-[var(--elev-2)] transition-opacity duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-        dashed ? "border-dashed border-foreground/30" : "border-border",
+        "group/box relative h-[60px] w-[232px] rounded-lg border bg-[var(--card)] shadow-[var(--elev-2)] transition-[opacity,box-shadow] duration-150",
+        node.kind === "unsorted"
+          ? "border-dashed border-foreground/30"
+          : "border-border",
+        open && "border-ink/30",
         dimmed && "opacity-40",
-        className
+        drop.isOver && "outline-2 outline-offset-2 outline-ring"
       )}
-      {...rest}
+      style={
+        node.color
+          ? { boxShadow: `inset 3px 0 0 ${node.color}, var(--elev-2)` }
+          : undefined
+      }
     >
-      {children}
-      {branches && (
+      {!isRoot && (
+        <Handle
+          type="target"
+          position={Position.Top}
+          id={TARGET_HANDLE_ID}
+          isConnectable={false}
+        />
+      )}
+      <button
+        type="button"
+        {...{ [CARD_FOCUS_ATTRIBUTE]: "" }}
+        onClick={() => opens && map.toggle(node.id)}
+        aria-expanded={opens ? open : undefined}
+        aria-label={`${node.name}, ${plural(node.count, "document")}${
+          opens ? `. ${open ? "Close" : "Open"} to ${open ? "hide" : "show"} ${opensInto(node)}` : ""
+        }`}
+        title={opens ? `${open ? "Close" : "Open"} ${node.name}` : node.name}
+        className={cn(
+          "flex h-full w-full items-center gap-2.5 rounded-lg pl-3.5 pr-7 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+          opens ? "cursor-pointer hover:bg-muted/50" : "cursor-default"
+        )}
+      >
+        <BoxIcon node={node} />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[13px] font-medium leading-tight text-ink">
+            {node.name}
+          </span>
+          <span className="mt-0.5 block truncate text-[11px] leading-tight text-muted-foreground">
+            {plural(node.count, "document")}
+          </span>
+        </span>
+        {opens && (
+          <Chevron
+            aria-hidden
+            className="size-3.5 shrink-0 text-muted-foreground"
+          />
+        )}
+      </button>
+      <BoxMenu node={node} />
+      {/* Always there when the box can open: React Flow only finds handles
+          when it measures a box, not when one appears later. */}
+      {opens && (
         <Handle
           type="source"
           position={Position.Bottom}
@@ -242,278 +288,100 @@ function CardShell({
   );
 }
 
-function CardHeader({
-  icon,
-  name,
-  count,
-  countTitle,
-  accent,
-  hasParent = true,
-  children,
-}: {
-  icon: React.ReactNode;
-  name: string;
-  count: number;
-  countTitle: string;
-  accent?: string | null;
-  /** Whether a link arrives at the top of the card; all but the hub's. */
-  hasParent?: boolean;
-  children?: React.ReactNode;
-}) {
-  return (
-    <div
-      className={cn(
-        DRAG_HANDLE_CLASS,
-        "relative flex h-[40px] cursor-grab items-center gap-2 border-b border-border pl-3 pr-1.5 active:cursor-grabbing"
-      )}
-      style={accent ? { boxShadow: `inset 0 2px 0 ${accent}` } : undefined}
-    >
-      {hasParent && (
-        <Handle
-          type="target"
-          position={Position.Top}
-          id={TARGET_HANDLE_ID}
-          isConnectable={false}
-        />
-      )}
-      {icon}
-      <span
-        className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink"
-        title={name}
-      >
-        {name}
-      </span>
-      <span className={cn(countClass, !children && "pr-1.5")} title={countTitle}>
-        {count}
-      </span>
-      {children}
-    </div>
-  );
-}
-
-function PlaceholderRow({ children }: { children: React.ReactNode }) {
-  return (
-    <li className="flex h-[34px] items-center px-3 text-[12px] text-muted-foreground">
-      {children}
-    </li>
-  );
-}
-
-// ── Hub ───────────────────────────────────────────────
-
-function HubCard({ data }: NodeProps<HubNode>) {
-  return (
-    <CardShell
-      label={`All documents, ${plural(data.total, "document")}`}
-      branches={data.branchCount > 0}
-    >
-      <CardHeader
-        icon={<Library className="size-3.5 shrink-0 text-ink-soft" />}
-        name="All documents"
-        count={data.total}
-        countTitle={plural(data.total, "document")}
-        hasParent={false}
-      />
-      {data.branchCount === 0 && (
-        <ul>
-          <PlaceholderRow>
-            {data.view === "category" ? "No categories yet" : "No folders yet"}
-          </PlaceholderRow>
-        </ul>
-      )}
-    </CardShell>
-  );
-}
-
-// ── Category / folder cards ───────────────────────────
-
-function cardLabel(bucket: Bucket<Document>): string {
-  const documents = plural(bucket.total, "document");
-  const rows = bucket.children.length;
-  if (bucket.kind === "category") {
-    return `${bucket.group ? `${bucket.group}, ` : ""}${bucket.name}, category, ${documents}`;
-  }
-  if (bucket.kind === "division") {
-    return `${bucket.name}, ${plural(rows, "category", "categories")}, ${documents}`;
-  }
-  if (bucket.kind === "unsorted") return `${bucket.name}, ${documents}`;
-  return rows
-    ? `${bucket.name}, folder, ${documents} including ${plural(rows, "subfolder")}`
-    : `${bucket.name}, folder, ${documents}`;
-}
-
-function BucketCard({ data }: NodeProps<BucketNode>) {
-  const { bucket, expanded } = data;
+/** Show in list, and Sort with AI for unfiled documents. */
+function BoxMenu({ node }: { node: TreeNode<Document> }) {
   const map = useSortingMap();
-  const drop = useDropTarget(bucket);
-  const searching = map.query !== "";
-  // Unfiled documents in the division view can be sorted by AI on the spot.
-  const sortable = bucket.kind === "unsorted" && map.view === "category";
-  const branches = bucket.children.length;
-
-  // While searching, matches come first so a folded card still shows them.
-  const docs = searching
-    ? [
-        ...bucket.docs.filter((d) => matchesQuery(d, map.query)),
-        ...bucket.docs.filter((d) => !matchesQuery(d, map.query)),
-      ]
-    : bucket.docs;
-  const shown = expanded ? docs : docs.slice(0, PREVIEW_ROWS);
-  const direct = bucket.docs.length;
-
-  return (
-    <CardShell
-      label={cardLabel(bucket)}
-      dashed={bucket.kind === "unsorted"}
-      branches={branches > 0}
-      dimmed={searching && !map.matched.has(bucket.id)}
-      {...drop.handlers}
-      onMouseEnter={() => map.setHovered(bucket.id)}
-      onMouseLeave={() => map.setHovered(null)}
-      className={cn(
-        drop.isOver && "outline-2 outline-offset-2 outline-ring"
-      )}
-    >
-      <CardHeader
-        icon={<CardIcon bucket={bucket} />}
-        name={bucket.name}
-        // Like the hub: everything at or beneath here.
-        count={bucket.total}
-        countTitle={
-          bucket.kind === "folder" && branches
-            ? `${plural(bucket.total, "document")}: ${direct} here, the rest in subfolders`
-            : plural(bucket.total, "document")
-        }
-        accent={bucket.color}
-      >
-        <CardMenu bucket={bucket} expanded={expanded} sortable={sortable} />
-      </CardHeader>
-      {/* A division is a header alone; its categories branch off below. */}
-      {bucket.kind !== "division" && (
-        <ul>
-          {shown.map((doc) => (
-            <DocumentRow
-              key={doc.id}
-              doc={doc}
-              bucketId={bucket.id}
-              sortable={sortable}
-            />
-          ))}
-          {hasMoreRow(bucket) && (
-            <li className={cn(!map.touch && "nodrag nopan")}>
-              <button
-                type="button"
-                onClick={() => map.toggleExpanded(bucket.id)}
-                className="flex h-[34px] w-full items-center gap-1.5 px-3 text-[12px] text-muted-foreground outline-none transition-colors hover:bg-muted/60 hover:text-ink focus-visible:bg-muted/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-              >
-                {expanded ? (
-                  <>
-                    <ChevronUp className="size-3.5" />
-                    Show fewer
-                  </>
-                ) : (
-                  <>
-                    <ChevronDown className="size-3.5" />
-                    Show all {direct}
-                  </>
-                )}
-              </button>
-            </li>
-          )}
-          {branches === 0 && direct === 0 && (
-            <PlaceholderRow>
-              {bucket.kind === "folder" ? "Empty folder" : "No documents yet"}
-            </PlaceholderRow>
-          )}
-        </ul>
-      )}
-    </CardShell>
-  );
-}
-
-/** A division's mark; the whole school gets the school building. */
-function DivisionIcon({ bucket }: { bucket: Bucket<Document> }) {
-  const Icon = bucket.id === "division:whole" ? School : GraduationCap;
-  return (
-    <Icon
-      className="size-3.5 shrink-0"
-      style={bucket.color ? { color: bucket.color } : undefined}
-    />
-  );
-}
-
-function CardIcon({ bucket }: { bucket: Bucket<Document> }) {
-  if (bucket.kind === "division") return <DivisionIcon bucket={bucket} />;
-  if (bucket.kind === "category") {
-    return (
-      <Tag
-        className="size-3.5 shrink-0"
-        style={bucket.color ? { color: bucket.color } : undefined}
-      />
-    );
-  }
-  if (bucket.kind === "folder") {
-    return <FolderIcon className="size-3.5 shrink-0 text-ink-soft" />;
-  }
-  return <Inbox className="size-3.5 shrink-0 text-muted-foreground" />;
-}
-
-function CardMenu({
-  bucket,
-  expanded,
-  sortable,
-}: {
-  bucket: Bucket<Document>;
-  expanded: boolean;
-  sortable: boolean;
-}) {
-  const map = useSortingMap();
-  const toSort = sortable
-    ? bucket.docs
-        .filter((d) => d.status === "ready" && !map.sorting.has(d.id))
-        .map((d) => d.id)
-    : [];
+  const canList =
+    !!node.targetId && (node.kind === "category" || node.kind === "folder");
+  const toSort =
+    node.kind === "unsorted" && map.view === "category"
+      ? collectDocs(node)
+          .filter((d) => d.status === "ready" && !map.sorting.has(d.id))
+          .map((d) => d.id)
+      : [];
+  if (!canList && !toSort.length) return null;
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          aria-label={`${bucket.name} options`}
-          className="nodrag nopan flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-ink focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label={`${node.name} options`}
+          className={cn(
+            "nodrag nopan absolute right-1 top-1 flex size-6 items-center justify-center rounded-md text-muted-foreground outline-none transition-opacity hover:bg-muted hover:text-ink focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring group-hover/box:opacity-100",
+            map.touch ? "opacity-100" : "opacity-0"
+          )}
         >
           <EllipsisVertical className="size-3.5" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => map.focusCard(bucket.id)}>
-          <Crosshair className="mr-2 h-4 w-4" />
-          Zoom to card
-        </DropdownMenuItem>
-        {hasMoreRow(bucket) && (
-          <DropdownMenuItem onClick={() => map.toggleExpanded(bucket.id)}>
-            {expanded ? (
-              <ChevronUp className="mr-2 h-4 w-4" />
-            ) : (
-              <ChevronDown className="mr-2 h-4 w-4" />
-            )}
-            {expanded ? "Show fewer" : `Show all ${bucket.docs.length}`}
-          </DropdownMenuItem>
-        )}
         {toSort.length > 0 && (
           <DropdownMenuItem onClick={() => map.sortDocuments(toSort)}>
             <Sparkles className="mr-2 h-4 w-4" />
             Sort {toSort.length === 1 ? "it" : `all ${toSort.length}`} with AI
           </DropdownMenuItem>
         )}
-        {bucket.targetId && (
-          <DropdownMenuItem onClick={() => map.showInList(bucket)}>
+        {canList && (
+          <DropdownMenuItem onClick={() => map.showInList(node)}>
             <ListFilter className="mr-2 h-4 w-4" />
             Show in list
           </DropdownMenuItem>
         )}
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+function collectDocs(node: TreeNode<Document>): Document[] {
+  if (node.kind === "type") return node.docs;
+  return node.children.flatMap(collectDocs);
+}
+
+// ── Document lists ────────────────────────────────────
+
+function DocList({ data }: NodeProps<DocListNode>) {
+  const { node } = data;
+  const map = useSortingMap();
+  const drop = useDropTarget(node);
+  const searching = map.query !== "";
+  // While searching, matches come first so they're on show without scrolling.
+  const docs = searching
+    ? [
+        ...node.docs.filter((d) => matchesQuery(d, map.query)),
+        ...node.docs.filter((d) => !matchesQuery(d, map.query)),
+      ]
+    : node.docs;
+  const sortable = !!node.unsorted && map.view === "category";
+
+  return (
+    <div
+      role="group"
+      aria-label={`${node.name} documents, ${docs.length}`}
+      {...drop.handlers}
+      className={cn(
+        "w-[280px] overflow-hidden rounded-lg border border-border bg-[var(--card)] shadow-[var(--elev-2)]",
+        drop.isOver && "outline-2 outline-offset-2 outline-ring"
+      )}
+    >
+      <Handle
+        type="target"
+        position={Position.Top}
+        id={TARGET_HANDLE_ID}
+        isConnectable={false}
+      />
+      <ul
+        className={cn(
+          "overflow-y-auto",
+          docs.length > LIST_ROWS && "nowheel"
+        )}
+        style={{ maxHeight: LIST_ROWS * 34 }}
+      >
+        {docs.map((doc) => (
+          <DocumentRow key={doc.id} doc={doc} sortable={sortable} />
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -530,13 +398,15 @@ function statusOf(doc: Document): string {
   }
 }
 
+/** The small buttons that appear over a document row's file type on hover. */
+const rowActionClass =
+  "flex size-6 items-center justify-center rounded-md bg-[var(--card)] text-muted-foreground ring-1 ring-border outline-none transition-opacity hover:text-ink disabled:cursor-wait focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring group-hover/row:opacity-100";
+
 function DocumentRow({
   doc,
-  bucketId,
   sortable,
 }: {
   doc: Document;
-  bucketId: string;
   /** Offer "Sort with AI": an unfiled, ready document in the division view. */
   sortable: boolean;
 }) {
@@ -554,7 +424,11 @@ function DocumentRow({
 
   return (
     <li
-      className={cn(rowClass(map.touch), "group/row", hit === false && "opacity-40")}
+      className={cn(
+        "group/row relative h-[34px] border-b border-border/60 last:border-b-0",
+        !map.touch && "nodrag nopan",
+        hit === false && "opacity-40"
+      )}
     >
       {/* A div, not a button: Firefox won't start a drag from a button. */}
       <div
@@ -562,7 +436,7 @@ function DocumentRow({
         tabIndex={0}
         draggable={!map.touch}
         aria-label={[doc.title, ...facts].join(", ")}
-        title={`${doc.title}\n${facts.join(" · ")}`}
+        title={`${doc.title}\n${facts.join(" · ")}\nDrag onto another box to re-sort it`}
         onClick={() => map.openDocument(doc)}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
@@ -573,10 +447,9 @@ function DocumentRow({
         onDragStart={(event) => {
           event.dataTransfer.setData(DRAG_TYPE, doc.id);
           event.dataTransfer.effectAllowed = "move";
-          map.startDrag(bucketId);
         }}
         onDragEnd={map.endDrag}
-        className={cn(rowButtonClass, "cursor-pointer select-none")}
+        className="flex h-full w-full cursor-pointer select-none items-center gap-2.5 px-3 text-left outline-none transition-colors hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       >
         <Diamond
           aria-hidden
@@ -594,21 +467,16 @@ function DocumentRow({
         >
           {doc.title}
         </span>
-        {doc.source === "email" && (
-          <Mail aria-hidden className="size-3 shrink-0 text-muted-foreground" />
+        {notReady && (
+          <span
+            className={cn(
+              "shrink-0 font-mono text-[11px] lowercase",
+              notReady === "error" ? "text-destructive" : "text-amber-700"
+            )}
+          >
+            {notReady}
+          </span>
         )}
-        <span
-          className={cn(
-            "shrink-0 font-mono text-[11px] lowercase",
-            notReady === "error"
-              ? "text-destructive"
-              : notReady
-                ? "text-amber-700"
-                : "text-muted-foreground"
-          )}
-        >
-          {notReady ?? doc.file_type}
-        </span>
       </div>
       <div className="absolute right-1.5 top-1/2 flex -translate-y-1/2 gap-1">
         {canSort && (
@@ -641,37 +509,10 @@ function DocumentRow({
   );
 }
 
-// ── Links ─────────────────────────────────────────────
+// ── Lines ─────────────────────────────────────────────
 
-function LinkLine({
-  id,
-  sourceX,
-  sourceY,
-  targetX,
-  targetY,
-  sourcePosition,
-  targetPosition,
-  data,
-}: EdgeProps<LinkEdge>) {
-  // Links turn only in the gap between levels, so they never run behind a
-  // card; the links into one level share a single bar there.
-  const corners = routeLink(
-    { x: sourceX, y: sourceY },
-    { x: targetX, y: targetY },
-    { busY: data?.busY ?? (sourceY + targetY) / 2 }
-  );
-  const path = corners
-    ? roundedPath(corners, 8)
-    : getSmoothStepPath({
-        sourceX,
-        sourceY,
-        sourcePosition,
-        targetX,
-        targetY,
-        targetPosition,
-        borderRadius: 8,
-      })[0];
-
+function LinkLine({ id, sourceX, sourceY, targetX, targetY, data }: EdgeProps<LinkEdge>) {
+  const [path] = getStraightPath({ sourceX, sourceY, targetX, targetY });
   return (
     <BaseEdge
       id={id}
@@ -688,8 +529,8 @@ function LinkLine({
 }
 
 export const nodeTypes = {
-  hub: HubCard,
-  bucket: BucketCard,
+  box: TreeBox,
+  list: DocList,
 } satisfies NodeTypes;
 
 export const edgeTypes = { link: LinkLine } satisfies EdgeTypes;
