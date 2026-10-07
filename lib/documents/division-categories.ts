@@ -77,11 +77,12 @@ function byOrder<C extends GroupedCategory>(a: C, b: C): number {
 /**
  * Categories in their groups: each division in its calendar order, then the
  * whole school. A category whose division no longer exists counts as whole
- * school. Groups without categories are left out.
+ * school. Groups without categories are left out unless `keepEmpty` is set.
  */
 export function groupCategories<C extends GroupedCategory>(
   categories: C[],
-  divisions: DivisionLike[]
+  divisions: DivisionLike[],
+  { keepEmpty = false }: { keepEmpty?: boolean } = {}
 ): CategoryGroup<C>[] {
   const ordered = [...divisions].sort(
     (a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name)
@@ -101,7 +102,9 @@ export function groupCategories<C extends GroupedCategory>(
       .filter((c) => !c.division_id || !known.has(c.division_id))
       .sort(byOrder),
   });
-  return groups.filter((group) => group.categories.length > 0);
+  return keepEmpty
+    ? groups
+    : groups.filter((group) => group.categories.length > 0);
 }
 
 /**

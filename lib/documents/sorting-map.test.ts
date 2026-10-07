@@ -165,6 +165,24 @@ test("puts a school's undivided categories under Whole School", () => {
   assert.deepEqual(buckets.map((b) => b.id), ["division:whole", "category:forms"]);
 });
 
+test("shows every division, even one with no categories yet", () => {
+  const buckets = groupByDivision(
+    [doc({ category_id: "forms" })],
+    [{ id: "forms", name: "Forms", color: "#000" }],
+    divisions
+  );
+
+  assert.deepEqual(
+    buckets.filter((b) => b.kind === "division").map((b) => [b.id, b.total]),
+    [
+      ["division:whole", 1],
+      ["division:lower", 0],
+      ["division:upper", 0],
+    ]
+  );
+  assert.deepEqual(find(buckets, "division:lower").children, []);
+});
+
 const folderTree: MapFolder[] = [
   { id: "sports", name: "Sports", parent_id: null },
   { id: "admissions", name: "Admissions", parent_id: null },
@@ -418,12 +436,12 @@ test("opening the root shows the groups in a row beneath it, and no deeper", () 
 
   assert.deepEqual(
     layout.nodes.map((n) => n.id),
-    [tree.id, "division:d0", "division:d1", "division:d2", "division:d3"]
+    [tree.id, "division:whole", "division:d0", "division:d1", "division:d2", "division:d3"]
   );
-  const ys = new Set([0, 1, 2, 3].map((g) => box(layout, `division:d${g}`).y));
+  const ys = new Set(layout.nodes.slice(1).map((n) => box(layout, n.id).y));
   assert.deepEqual([...ys], [NODE_HEIGHT + LEVEL_GAP]);
   // The root sits centred over its row.
-  const first = box(layout, "division:d0");
+  const first = box(layout, "division:whole");
   const last = box(layout, "division:d3");
   assert.equal(
     box(layout, tree.id).x + NODE_WIDTH / 2,

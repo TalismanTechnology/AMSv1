@@ -91,8 +91,8 @@ function byName(a: { name: string }, b: { name: string }): number {
 }
 
 /**
- * The division view: one bucket for the whole school, then one per division,
- * each followed by its categories, then "No category" for documents without
+ * The division view: one bucket for the whole school, then one per division
+ * (each shown even with no categories yet), each followed by its categories, then "No category" for documents without
  * one (left out when there are none). Every category gets a card, empty or
  * not, so each division shows all its branches. A category id that matches no
  * category counts as none.
@@ -112,7 +112,8 @@ export function groupByDivision<D extends MapDocument>(
 
   const colorOf = new Map(divisions.map((d) => [d.id, d.color]));
   const buckets: Bucket<D>[] = [];
-  const groups = groupCategories(categories, divisions);
+  // Every division gets a box, even before it has categories of its own.
+  const groups = groupCategories(categories, divisions, { keepEmpty: true });
   // The whole school spans every division, so it leads the row.
   groups.sort((a, b) => Number(a.divisionId !== null) - Number(b.divisionId !== null));
   for (const group of groups) {
