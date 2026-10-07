@@ -11,8 +11,9 @@ into categories and folders by AI.
 2. Resend receives mail at `INBOUND_EMAIL_DOMAIN` (via an MX record) and POSTs
    an `email.received` event to `/api/inbound-email`.
 3. The webhook verifies the signature, resolves the school by the address
-   token, and accepts the mail **only if** the sender's address ends with one
-   of the school's allowed domains.
+   token, and — if the school has set allowed domains — accepts the mail only
+   when the sender's address ends with one of them. With no allowed domains,
+   any sender is accepted.
 4. Every attachment becomes its own document; the email body becomes one text
    document. Image attachments and inline images are skipped.
 5. During processing, the AI classifier assigns each unsorted document a
@@ -68,15 +69,16 @@ In the Resend dashboard:
 Each school admin, under **Admin → Settings → Email Ingestion**:
 
 1. Toggle **Enable email ingestion** (this generates the school's address).
-2. Add one or more **allowed sender domains** (e.g. `lincolnhigh.org`).
-   Subdomains like `mail.lincolnhigh.org` are matched automatically.
+2. Optionally add **allowed sender domains** (e.g. `lincolnhigh.org`).
+   Subdomains like `mail.lincolnhigh.org` are matched automatically. Leave the
+   list empty to accept mail from anyone who has the address.
 3. Copy the **inbound address** and forward school emails to it.
 4. Optionally toggle **Auto-sort** (on by default).
 
 ## Notes
 
-- Only senders whose address ends with an allowed domain are accepted — this is
-  the anti-spam gate. The random address token is a second layer.
+- The random address token is always required. Allowed domains are an optional
+  second gate; without them, anyone who learns the address can add documents.
 - Auto-sort runs for **any** unsorted document (emailed or manually uploaded)
   when the school has it enabled; it never overwrites a category/folder that was
   set manually, and never invents new categories/folders.

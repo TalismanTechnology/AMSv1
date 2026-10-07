@@ -209,8 +209,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: "rejected_disabled" });
   }
 
+  // An empty allowlist accepts any sender; the private address token is then
+  // the only gate.
   const fromAddress = parseEmailAddress(data.from ?? "");
-  if (!senderDomainAllowed(fromAddress, school.allowed_sender_domains ?? [])) {
+  const allowedDomains: string[] = school.allowed_sender_domains ?? [];
+  if (
+    allowedDomains.length > 0 &&
+    !senderDomainAllowed(fromAddress, allowedDomains)
+  ) {
     await record(
       school.id,
       data,
