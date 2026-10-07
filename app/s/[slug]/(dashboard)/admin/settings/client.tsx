@@ -666,8 +666,10 @@ function EmailIngestionSection({
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Forward or send school emails here. Only senders from the allowed
-              domains below are accepted.
+              Forward or send school emails here.{" "}
+              {domains.length
+                ? "Only senders from the allowed domains below are accepted."
+                : "Anyone who has this address can add documents, so keep it private."}
             </p>
           </div>
         )}
@@ -692,7 +694,8 @@ function EmailIngestionSection({
             ))}
             {domains.length === 0 && (
               <p className="text-xs text-muted-foreground">
-                No domains yet. Add one to accept mail (e.g. lincolnhigh.org).
+                No domains: mail from any sender is accepted. Add one (e.g.
+                lincolnhigh.org) to only accept your school&apos;s staff.
               </p>
             )}
           </div>
@@ -718,8 +721,8 @@ function EmailIngestionSection({
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Only emails whose sender address ends with one of these domains are
-            ingested. Subdomains are matched too.
+            When set, only emails whose sender address ends with one of these
+            domains are ingested. Subdomains are matched too.
           </p>
         </div>
 

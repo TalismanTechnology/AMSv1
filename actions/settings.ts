@@ -101,13 +101,6 @@ export async function updateEmailIngestion(
   }
   const allowedDomains = [...normalized];
 
-  if (data.enabled && allowedDomains.length === 0) {
-    return {
-      error:
-        "Add at least one allowed sender domain before enabling email ingestion.",
-    };
-  }
-
   // Ensure a stable inbound token exists once ingestion is turned on.
   const { data: school } = await supabase
     .from("schools")
