@@ -1027,7 +1027,7 @@ textarea:focus,
     inset 0 -1px 0 oklch(0 0 0 / 8%);
 }
 
-[data-slot="checkbox"] {
+[data-slot="checkbox"]:not([data-state="checked"]) {
   background: oklch(1 0 0 / 6%);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -1462,10 +1462,19 @@ input:not([type="checkbox"]):not([type="radio"]) {
   color: var(--foreground);
 }
 [data-slot="checkbox"] {
-  background: oklch(1 0 0 / 0.7) !important;
-  border-color: var(--border) !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
+}
+[data-slot="checkbox"]:not([data-state="checked"]) {
+  background: oklch(1 0 0 / 0.7) !important;
+  border-color: var(--border) !important;
+}
+/* Checked boxes fill solid so the white check mark is visible. */
+[data-slot="checkbox"][data-state="checked"],
+[data-slot="checkbox"][data-state="indeterminate"] {
+  background: var(--primary) !important;
+  border-color: var(--primary) !important;
+  color: var(--primary-foreground) !important;
 }
 
 /* Ember focus ring (replaces the white neon focus) */
