@@ -168,10 +168,10 @@ export default async function SettingsPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ blackbaud?: string }>;
+  searchParams: Promise<{ blackbaud?: string; tab?: string }>;
 }) {
   const { slug } = await params;
-  const { blackbaud } = await searchParams;
+  const { blackbaud, tab } = await searchParams;
   const { school } = await requireSchoolContext(slug);
 
   const [settings, blackbaudConfig, recentEmails, inboundAddresses] =
@@ -201,6 +201,7 @@ export default async function SettingsPage({
         }}
         blackbaud={blackbaudConfig}
         blackbaudCallback={parseCallbackResult(blackbaud)}
+        initialTab={tab}
       />
     </PageTransition>
   );

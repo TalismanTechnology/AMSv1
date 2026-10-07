@@ -1,7 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, X, Copy, Check, RefreshCw, ExternalLink } from "lucide-react";
+import {
+  Plus,
+  X,
+  Copy,
+  Check,
+  RefreshCw,
+  ExternalLink,
+  School,
+  Sparkles,
+  Mail,
+  Plug,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { LogoSpinner } from "@/components/logo-spinner";
 import { Button } from "@/components/ui/button";
@@ -10,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TimeAgo } from "@/components/ui/time-ago";
 import {
   updateSettings,
@@ -86,6 +98,17 @@ export interface BlackbaudConfig {
   eventCalendars: EventCalendar[];
 }
 
+const SETTINGS_TABS = ["general", "assistant", "email", "blackbaud"] as const;
+type SettingsTab = (typeof SETTINGS_TABS)[number];
+
+// Tabs whose fields are saved by the header's save button. Email has its own
+// save button and Blackbaud saves as you go.
+const SAVED_BY_HEADER: readonly SettingsTab[] = ["general", "assistant"];
+
+function isSettingsTab(value: string | null | undefined): value is SettingsTab {
+  return SETTINGS_TABS.includes(value as SettingsTab);
+}
+
 interface SettingsClientProps {
   settings: Settings;
   schoolId: string;
@@ -93,6 +116,8 @@ interface SettingsClientProps {
   emailIngestion: EmailIngestionConfig;
   blackbaud: BlackbaudConfig;
   blackbaudCallback: BlackbaudCallbackResult;
+  /** The ?tab= value from the URL, so a refresh keeps the open tab. */
+  initialTab?: string;
 }
 
 export function SettingsClient({
@@ -102,7 +127,17 @@ export function SettingsClient({
   emailIngestion,
   blackbaud,
   blackbaudCallback,
+  initialTab,
 }: SettingsClientProps) {
+  // Returning from Blackbaud's consent screen opens the Blackbaud tab so the
+  // outcome notice is visible.
+  const [tab, setTab] = useState<SettingsTab>(
+    blackbaudCallback
+      ? "blackbaud"
+      : isSettingsTab(initialTab)
+        ? initialTab
+        : "general"
+  );
   const [schoolName, setSchoolName] = useState(settings.school_name);
   const [contactInfo, setContactInfo] = useState(settings.contact_info || "");
   const [customPrompt, setCustomPrompt] = useState(
@@ -146,8 +181,17 @@ export function SettingsClient({
     setQuestions((prev) => prev.filter((_, i) => i !== index));
   }
 
+  function changeTab(value: string) {
+    if (!isSettingsTab(value)) return;
+    setTab(value);
+    const url = new URL(window.location.href);
+    if (value === "general") url.searchParams.delete("tab");
+    else url.searchParams.set("tab", value);
+    window.history.replaceState(null, "", url.toString());
+  }
+
   return (
-    <div className="mx-auto max-w-2xl space-y-12">
+    <div className="mx-auto max-w-2xl space-y-8 pb-8">
       <div className="flex items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-ink tracking-[-0.01em]">
@@ -157,195 +201,243 @@ export function SettingsClient({
             Configure your school&apos;s AskMySchool instance.
           </p>
         </div>
-        <Button onClick={handleSave} disabled={saving}>
-          {saving && <LogoSpinner className="mr-2" />}
-          Save all settings
-        </Button>
+        {SAVED_BY_HEADER.includes(tab) && (
+          <Button onClick={handleSave} disabled={saving}>
+            {saving && <LogoSpinner className="mr-2" />}
+            Save settings
+          </Button>
+        )}
       </div>
 
-      <section className="space-y-4">
-        <div className="space-y-1">
-          <h2 className="text-base font-semibold text-ink">
-            School Information
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Basic information about your school.
-          </p>
+      <Tabs value={tab} onValueChange={changeTab} className="gap-8">
+        <div className="overflow-x-auto border-b border-border">
+          <TabsList variant="line" className="h-10">
+            <TabsTrigger value="general" className="px-3">
+              <School />
+              General
+            </TabsTrigger>
+            <TabsTrigger value="assistant" className="px-3">
+              <Sparkles />
+              Assistant
+            </TabsTrigger>
+            <TabsTrigger value="email" className="px-3">
+              <Mail />
+              Email
+            </TabsTrigger>
+            <TabsTrigger value="blackbaud" className="px-3">
+              <Plug />
+              Blackbaud
+            </TabsTrigger>
+          </TabsList>
         </div>
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="school-name">School Name</Label>
-            <Input
-              id="school-name"
-              value={schoolName}
-              onChange={(e) => setSchoolName(e.target.value)}
-              placeholder="AskMySchool"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="contact-info">Contact Information</Label>
-            <Textarea
-              id="contact-info"
-              value={contactInfo}
-              onChange={(e) => setContactInfo(e.target.value)}
-              rows={2}
-              placeholder="Phone, email, or address..."
-            />
-          </div>
-        </div>
-      </section>
 
-      <EmailIngestionSection
-        schoolId={schoolId}
-        schoolSlug={schoolSlug}
-        config={emailIngestion}
-      />
-
-      <BlackbaudSection
-        schoolId={schoolId}
-        schoolSlug={schoolSlug}
-        config={blackbaud}
-        callback={blackbaudCallback}
-      />
-
-      <section className="space-y-4">
-        <div className="space-y-1">
-          <h2 className="text-base font-semibold text-ink">
-            AI Configuration
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Customize how the AI assistant responds to parents.
-          </p>
-        </div>
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="custom-prompt">
-              Custom System Prompt Additions
-            </Label>
-            <Textarea
-              id="custom-prompt"
-              value={customPrompt}
-              onChange={(e) => setCustomPrompt(e.target.value)}
-              rows={4}
-              placeholder="Add additional instructions for the AI (e.g., 'Always mention our school mascot is the Eagle')"
-            />
-            <p className="text-xs text-muted-foreground">
-              This text is appended to the AI&apos;s base system prompt.
-            </p>
-          </div>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label>Temperature</Label>
-              <span className="text-sm text-muted-foreground">
-                {temperature.toFixed(1)}
-              </span>
-            </div>
-            <Slider
-              value={[temperature]}
-              onValueChange={([v]) => setTemperature(v)}
-              min={0}
-              max={1}
-              step={0.1}
-            />
-            <p className="text-xs text-muted-foreground">
-              Lower values make responses more focused. Higher values make them
-              more creative.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <section className="space-y-4">
-        <div className="space-y-1">
-          <h2 className="text-base font-semibold text-ink">
-            Chat Settings
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Configure the chat experience for parents.
-          </p>
-        </div>
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="welcome-msg">Welcome Message</Label>
-            <Textarea
-              id="welcome-msg"
-              value={welcomeMessage}
-              onChange={(e) => setWelcomeMessage(e.target.value)}
-              rows={2}
-              placeholder="Welcome! I can help you find information about our school."
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Suggested Questions</Label>
-            <div className="space-y-2">
-              {questions.map((q, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <span className="flex-1 rounded-full border border-border px-3.5 py-1.5 text-sm text-ink">
-                    {q}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 w-7 shrink-0 p-0"
-                    onClick={() => removeQuestion(i)}
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <Input
-                value={newQuestion}
-                onChange={(e) => setNewQuestion(e.target.value)}
-                placeholder="Add a suggested question..."
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    addQuestion();
-                  }
-                }}
-              />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={addQuestion}
-                disabled={!newQuestion.trim()}
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="space-y-4">
-        <div className="space-y-1">
-          <h2 className="text-base font-semibold text-ink">
-            Appearance
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Customize the look and feel of the app.
-          </p>
-        </div>
-        <div>
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label htmlFor="disable-animations">Disable Animations</Label>
-              <p className="text-xs text-muted-foreground">
-                Turn off page transitions and decorative animations for a faster experience.
+        {/* forceMount keeps each tab's unsaved edits when switching away. */}
+        <TabsContent
+          value="general"
+          forceMount
+          className="space-y-12 data-[state=inactive]:hidden"
+        >
+          <section className="space-y-4">
+            <div className="space-y-1">
+              <h2 className="text-base font-semibold text-ink">
+                School Information
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Basic information about your school.
               </p>
             </div>
-            <Switch
-              id="disable-animations"
-              checked={disableAnimations}
-              onCheckedChange={setDisableAnimations}
-            />
-          </div>
-        </div>
-      </section>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="school-name">School Name</Label>
+                <Input
+                  id="school-name"
+                  value={schoolName}
+                  onChange={(e) => setSchoolName(e.target.value)}
+                  placeholder="AskMySchool"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="contact-info">Contact Information</Label>
+                <Textarea
+                  id="contact-info"
+                  value={contactInfo}
+                  onChange={(e) => setContactInfo(e.target.value)}
+                  rows={2}
+                  placeholder="Phone, email, or address..."
+                />
+              </div>
+            </div>
+          </section>
 
-      <div className="pb-8" />
+          <section className="space-y-4">
+            <div className="space-y-1">
+              <h2 className="text-base font-semibold text-ink">
+                Appearance
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Customize the look and feel of the app.
+              </p>
+            </div>
+            <div>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="disable-animations">Disable Animations</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Turn off page transitions and decorative animations for a faster experience.
+                  </p>
+                </div>
+                <Switch
+                  id="disable-animations"
+                  checked={disableAnimations}
+                  onCheckedChange={setDisableAnimations}
+                />
+              </div>
+            </div>
+          </section>
+        </TabsContent>
+
+        <TabsContent
+          value="assistant"
+          forceMount
+          className="space-y-12 data-[state=inactive]:hidden"
+        >
+          <section className="space-y-4">
+            <div className="space-y-1">
+              <h2 className="text-base font-semibold text-ink">
+                AI Configuration
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Customize how the AI assistant responds to parents.
+              </p>
+            </div>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="custom-prompt">
+                  Custom System Prompt Additions
+                </Label>
+                <Textarea
+                  id="custom-prompt"
+                  value={customPrompt}
+                  onChange={(e) => setCustomPrompt(e.target.value)}
+                  rows={4}
+                  placeholder="Add additional instructions for the AI (e.g., 'Always mention our school mascot is the Eagle')"
+                />
+                <p className="text-xs text-muted-foreground">
+                  This text is appended to the AI&apos;s base system prompt.
+                </p>
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label>Temperature</Label>
+                  <span className="text-sm text-muted-foreground">
+                    {temperature.toFixed(1)}
+                  </span>
+                </div>
+                <Slider
+                  value={[temperature]}
+                  onValueChange={([v]) => setTemperature(v)}
+                  min={0}
+                  max={1}
+                  step={0.1}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Lower values make responses more focused. Higher values make them
+                  more creative.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section className="space-y-4">
+            <div className="space-y-1">
+              <h2 className="text-base font-semibold text-ink">
+                Chat Settings
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Configure the chat experience for parents.
+              </p>
+            </div>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="welcome-msg">Welcome Message</Label>
+                <Textarea
+                  id="welcome-msg"
+                  value={welcomeMessage}
+                  onChange={(e) => setWelcomeMessage(e.target.value)}
+                  rows={2}
+                  placeholder="Welcome! I can help you find information about our school."
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Suggested Questions</Label>
+                <div className="space-y-2">
+                  {questions.map((q, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <span className="flex-1 rounded-full border border-border px-3.5 py-1.5 text-sm text-ink">
+                        {q}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 shrink-0 p-0"
+                        onClick={() => removeQuestion(i)}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    value={newQuestion}
+                    onChange={(e) => setNewQuestion(e.target.value)}
+                    placeholder="Add a suggested question..."
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addQuestion();
+                      }
+                    }}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={addQuestion}
+                    disabled={!newQuestion.trim()}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </section>
+        </TabsContent>
+
+        <TabsContent
+          value="email"
+          forceMount
+          className="data-[state=inactive]:hidden"
+        >
+          <EmailIngestionSection
+            schoolId={schoolId}
+            schoolSlug={schoolSlug}
+            config={emailIngestion}
+          />
+        </TabsContent>
+
+        <TabsContent
+          value="blackbaud"
+          forceMount
+          className="data-[state=inactive]:hidden"
+        >
+          <BlackbaudSection
+            schoolId={schoolId}
+            schoolSlug={schoolSlug}
+            config={blackbaud}
+            callback={blackbaudCallback}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
