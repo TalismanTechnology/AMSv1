@@ -40,6 +40,7 @@ export default async function DocumentsPage({
         folders={folders || []}
         schoolId={school.id}
         schoolSlug={slug}
+        autoSortEnabled={school.auto_sort_enabled ?? true}
       />
     </PageTransition>
   );

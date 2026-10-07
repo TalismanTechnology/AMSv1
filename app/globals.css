@@ -1829,3 +1829,58 @@ textarea:focus,
     transform: none;
   }
 }
+
+/* ===== SORTING MAP =====
+   The React Flow canvas behind Documents → Map, in the cream / forest palette:
+   dotted paper, hairline links, and a hovered or matching link drawn in its
+   category's colour (forest for folders). */
+.sorting-map {
+  --xy-background-color: var(--background);
+  --xy-background-pattern-color: rgba(45, 58, 46, 0.18);
+  --xy-edge-stroke: rgba(45, 58, 46, 0.26);
+  --xy-edge-stroke-width: 1.25;
+  --xy-controls-button-background-color: var(--card);
+  --xy-controls-button-background-color-hover: var(--muted);
+  --xy-controls-button-color: var(--ink-soft);
+  --xy-controls-button-color-hover: var(--ink);
+  --xy-controls-button-border-color: var(--border);
+  --xy-controls-box-shadow: var(--elev-1);
+  --xy-minimap-background-color: var(--card);
+  --xy-minimap-mask-background-color: rgba(245, 243, 239, 0.7);
+  --xy-attribution-background-color: transparent;
+}
+
+/* Rows carry the link handles, but there is nothing to connect by hand. */
+.sorting-map .react-flow__handle {
+  width: 1px;
+  height: 1px;
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+  background: transparent;
+  pointer-events: none;
+}
+
+.sorting-map .sorting-map-link {
+  transition: stroke 150ms ease, opacity 150ms ease;
+}
+.sorting-map .sorting-map-link.is-active {
+  stroke: var(--ember);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+  animation: sorting-map-flow 0.9s linear infinite;
+}
+.sorting-map .sorting-map-link.is-dimmed {
+  opacity: 0.35;
+}
+
+@keyframes sorting-map-flow {
+  to { stroke-dashoffset: -10; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sorting-map .sorting-map-link.is-active {
+    animation: none;
+    stroke-dasharray: none;
+  }
+}

@@ -1,9 +1,19 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Plus, Tags, Search, X, FileSearch } from "lucide-react";
+import dynamic from "next/dynamic";
+import {
+  Plus,
+  Tags,
+  Search,
+  X,
+  FileSearch,
+  LayoutList,
+  Network,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ViewToggle } from "@/components/admin/view-toggle";
 import {
   Select,
   SelectContent,
@@ -20,7 +30,20 @@ import { CategoryManager } from "@/components/admin/category-manager";
 import { useSidebar } from "@/components/admin/sidebar-context";
 import { Badge } from "@/components/ui/badge";
 import { searchDocumentContent } from "@/actions/documents";
+import { cn } from "@/lib/utils";
+import type { MapView } from "@/lib/documents/sorting-map";
 import type { Document, Category, Folder, ContentSearchResult } from "@/lib/types";
+
+// React Flow is heavy, so the map loads only when someone opens it.
+const SortingMap = dynamic(
+  () => import("@/components/admin/sorting-map").then((m) => m.SortingMap),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-[calc(100dvh-13rem)] min-h-[508px] animate-pulse rounded-xl border border-border bg-muted/40" />
+    ),
+  }
+);
 
 interface DocumentsClientProps {
   documents: Document[];
@@ -28,6 +51,7 @@ interface DocumentsClientProps {
   folders: Folder[];
   schoolId: string;
   schoolSlug: string;
+  autoSortEnabled: boolean;
 }
 
 export function DocumentsClient({
@@ -36,7 +60,11 @@ export function DocumentsClient({
   folders,
   schoolId,
   schoolSlug,
+  autoSortEnabled,
 }: DocumentsClientProps) {
+  // Map mode hides the list's filters, which keep their values, and puts the
+  // map where the folder tree and table were.
+  const [view, setView] = useState<"list" | "map">("list");
   const [uploadOpen, setUploadOpen] = useState(false);
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState<Document | null>(null);
@@ -124,6 +152,27 @@ export function DocumentsClient({
     return result;
   }, [documents, selectedFolderId, searchQuery, statusFilter, categoryFilter]);
 
+  // From a map card's menu: the list, filtered to just that card's documents.
+  const showInList = useCallback((mapView: MapView, targetId: string) => {
+    setSearchQuery("");
+    setStatusFilter("all");
+    setCategoryFilter(mapView === "category" ? targetId : "all");
+    setSelectedFolderId(mapView === "folder" ? targetId : null);
+    setView("list");
+    // The menu that was focused goes away with the map; land on "List".
+    requestAnimationFrame(() =>
+      document.getElementById("documents-view-list")?.focus()
+    );
+  }, []);
+
+  // Only ready documents can be viewed; the rest open for editing.
+  const openFromMap = useCallback((doc: Document) => {
+    if (doc.status === "ready") setViewingDoc(doc);
+    else setEditingDoc(doc);
+  }, []);
+
+  const shownCount = view === "map" ? documents.length : filteredDocs.length;
+
   return (
     <div className="relative">
       <header className="relative mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -132,12 +181,25 @@ export function DocumentsClient({
             Documents
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            <span className="text-ink">{filteredDocs.length}</span>{" "}
-            document{filteredDocs.length !== 1 ? "s" : ""}
-            {selectedFolderId ? " in this folder" : " in your library"}.
+            <span className="text-ink">{shownCount}</span>{" "}
+            document{shownCount !== 1 ? "s" : ""}
+            {view === "list" && selectedFolderId
+              ? " in this folder"
+              : " in your library"}
+            .
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <ViewToggle
+            label="Show documents as"
+            value={view}
+            onChange={setView}
+            idPrefix="documents-view"
+            options={[
+              { value: "list", label: "List", icon: <LayoutList /> },
+              { value: "map", label: "Map", icon: <Network /> },
+            ]}
+          />
           <Button variant="outline" onClick={() => setCategoryOpen(true)}>
             <Tags className="mr-2 h-4 w-4" />
             Manage Labels
@@ -149,7 +211,12 @@ export function DocumentsClient({
         </div>
       </header>
 
-      <div className="relative mb-4 flex flex-wrap items-center gap-3">
+      <div
+        className={cn(
+          "relative mb-4 flex flex-wrap items-center gap-3",
+          view === "map" && "hidden"
+        )}
+      >
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -215,7 +282,7 @@ export function DocumentsClient({
       </div>
 
       {/* Content search results */}
-      {searchMode === "content" && searchQuery.length >= 3 && (
+      {view === "list" && searchMode === "content" && searchQuery.length >= 3 && (
         <div className="relative mb-4">
           {isSearchingContent ? (
             <p className="text-sm text-ink-soft">Searching content...</p>
@@ -259,26 +326,40 @@ export function DocumentsClient({
         </div>
       )}
 
-      <div className="relative flex gap-4">
-        <div className="hidden md:block">
-          <div className="rounded-xl border border-border">
-            <FolderTree
-              folders={folders}
-              selectedFolderId={selectedFolderId}
-              onSelectFolder={setSelectedFolderId}
+      {view === "list" ? (
+        <div className="relative flex gap-4">
+          <div className="hidden md:block">
+            <div className="rounded-xl border border-border">
+              <FolderTree
+                folders={folders}
+                selectedFolderId={selectedFolderId}
+                onSelectFolder={setSelectedFolderId}
+                schoolId={schoolId}
+              />
+            </div>
+          </div>
+          <div className="min-w-0 flex-1 rounded-xl border border-border">
+            <DocumentTable
+              documents={filteredDocs}
+              onEdit={setEditingDoc}
+              onView={setViewingDoc}
               schoolId={schoolId}
             />
           </div>
         </div>
-        <div className="min-w-0 flex-1 rounded-xl border border-border">
-          <DocumentTable
-            documents={filteredDocs}
-            onEdit={setEditingDoc}
-            onView={setViewingDoc}
-            schoolId={schoolId}
-          />
-        </div>
-      </div>
+      ) : (
+        <SortingMap
+          documents={documents}
+          categories={categories}
+          folders={folders}
+          schoolId={schoolId}
+          autoSortEnabled={autoSortEnabled}
+          settingsHref={`/s/${schoolSlug}/admin/settings`}
+          onOpenDocument={openFromMap}
+          onEditDocument={setEditingDoc}
+          onShowInList={showInList}
+        />
+      )}
 
       <DocumentUpload
         categories={categories}
