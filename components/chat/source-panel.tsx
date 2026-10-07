@@ -8,7 +8,7 @@ import { getDocumentSignedUrl, getDocumentUrls } from "@/lib/storage-url";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DocumentViewer } from "@/components/shared/document-viewer";
-import { PdfPages } from "./pdf-pages";
+import { PdfPages } from "@/components/shared/pdf-pages";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -377,6 +377,7 @@ function PanelContent() {
         document={viewerDoc}
         open={viewerOpen}
         onOpenChange={setViewerOpen}
+        page={activeSource.location?.page}
       />
     </>
   );

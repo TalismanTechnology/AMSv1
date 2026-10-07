@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { getDocumentSignedUrl, getDocumentUrls } from "@/lib/storage-url";
+import { PdfPages } from "@/components/shared/pdf-pages";
 
 const FILE_TYPE_ICONS: Record<string, typeof FileText> = {
   pdf: FileText,
@@ -48,12 +49,15 @@ interface DocumentViewerProps {
   document: ViewerDocument | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** PDF page to open on, e.g. the page a chat citation points to. */
+  page?: number;
 }
 
 export function DocumentViewer({
   document,
   open,
   onOpenChange,
+  page,
 }: DocumentViewerProps) {
   const [viewUrl, setViewUrl] = useState<string | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
@@ -192,11 +196,7 @@ export function DocumentViewer({
               <LogoSpinner size={32} />
             </div>
           ) : showAsPdf ? (
-            <iframe
-              src={viewUrl!}
-              className="w-full h-full border-0"
-              title={document.title}
-            />
+            <PdfPages url={viewUrl!} page={page} title={document.title} />
           ) : showAsDocx ? (
             <ScrollArea className="h-full">
               <div
