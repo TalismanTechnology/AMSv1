@@ -74,6 +74,8 @@ interface EmailIngestionConfig {
   divisionAddresses: DivisionAddress[];
   /** The school's divisions, each of which can have its own address. */
   divisions: EventCalendar[];
+  /** Set when the addresses couldn't be loaded, saying why. */
+  addressesError: string | null;
   inboundDomain: string | null;
   recent: EmailIngestionLogEntry[];
 }
@@ -757,25 +759,52 @@ function EmailIngestionSection({
           />
         </div>
 
-        {inboundAddress && (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Your inbound addresses</Label>
-              <AddressRow label="Whole school" address={inboundAddress} />
+        {(enabled || token) && (
+          <div className="space-y-4 rounded-xl border border-border p-4">
+            <div className="space-y-1">
+              <Label>Where to send emails</Label>
+              <p className="text-xs text-muted-foreground">
+                Forward or send school emails to these addresses. Each one
+                files what it receives into its own division.{" "}
+                {domains.length
+                  ? "Only senders from the allowed domains below are accepted."
+                  : "Anyone who has an address can add documents, so keep them private."}
+              </p>
             </div>
-            <DivisionAddresses
-              schoolId={schoolId}
-              schoolSlug={schoolSlug}
-              divisions={config.divisions}
-              initialAddresses={config.divisionAddresses}
-              addressFor={addressFor}
-            />
-            <p className="text-xs text-muted-foreground">
-              Forward or send school emails here.{" "}
-              {domains.length
-                ? "Only senders from the allowed domains below are accepted."
-                : "Anyone who has these addresses can add documents, so keep them private."}
-            </p>
+            {config.addressesError ? (
+              <AddressNotice>{config.addressesError}</AddressNotice>
+            ) : !config.inboundDomain ? (
+              <AddressNotice>
+                Addresses can&apos;t be shown because INBOUND_EMAIL_DOMAIN
+                isn&apos;t set on the server. Add it under Vercel → Settings →
+                Environment Variables and redeploy.
+              </AddressNotice>
+            ) : !inboundAddress ? (
+              <AddressNotice>
+                Save email settings to create your addresses.
+              </AddressNotice>
+            ) : (
+              <>
+                {!enabled && (
+                  <AddressNotice>
+                    Email ingestion is off, so mail sent to these addresses is
+                    turned away until you switch it on and save.
+                  </AddressNotice>
+                )}
+                <AddressRow
+                  label="Whole school"
+                  hint="The AI decides which division each email belongs to."
+                  address={inboundAddress}
+                />
+                <DivisionAddresses
+                  schoolId={schoolId}
+                  schoolSlug={schoolSlug}
+                  divisions={config.divisions}
+                  initialAddresses={config.divisionAddresses}
+                  addressFor={addressFor}
+                />
+              </>
+            )}
           </div>
         )}
 
@@ -917,8 +946,15 @@ function DivisionAddresses({
   if (divisions.length === 0) {
     return (
       <p className="text-xs text-muted-foreground">
-        To give Lower, Middle, or Upper School its own address, first add the
-        divisions under{" "}
+        To give Lower, Middle, or Upper School its own address, first set up
+        division categories under{" "}
+        <a
+          href={`/s/${schoolSlug}/admin/documents`}
+          className="underline underline-offset-2 hover:text-ink"
+        >
+          Documents → Manage Categories
+        </a>
+        , or add the divisions under{" "}
         <a
           href={`/s/${schoolSlug}/admin/events`}
           className="underline underline-offset-2 hover:text-ink"
@@ -940,6 +976,7 @@ function DivisionAddresses({
           <AddressRow
             key={a.id}
             label={division.name}
+            hint={`Everything sent here is filed under ${division.name}.`}
             color={division.color}
             address={address}
             onRemove={() => setRemoving(a)}
@@ -947,36 +984,40 @@ function DivisionAddresses({
         );
       })}
 
-      {available.length > 0 && (
-        <div className="flex gap-2">
-          <Select value={pick} onValueChange={setPick}>
-            <SelectTrigger className="flex-1">
-              <SelectValue placeholder="Add an address for a division…" />
-            </SelectTrigger>
-            <SelectContent>
-              {available.map((d) => (
-                <SelectItem key={d.id} value={d.id}>
-                  {d.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleAdd}
-            disabled={!pick || adding}
-            className="shrink-0"
-          >
-            {adding ? <LogoSpinner /> : <Plus className="h-4 w-4" />}
-          </Button>
+      {available.length > 0 ? (
+        <div className="space-y-1.5 pt-1">
+          <p className="text-xs font-medium text-ink-soft">
+            Add an address for a division
+          </p>
+          <div className="flex gap-2">
+            <Select value={pick} onValueChange={setPick}>
+              <SelectTrigger className="flex-1" aria-label="Division">
+                <SelectValue placeholder="Choose a division…" />
+              </SelectTrigger>
+              <SelectContent>
+                {available.map((d) => (
+                  <SelectItem key={d.id} value={d.id}>
+                    {d.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              onClick={handleAdd}
+              disabled={!pick || adding}
+              className="shrink-0"
+            >
+              {adding ? <LogoSpinner className="mr-2" /> : <Plus className="mr-2 h-4 w-4" />}
+              Create address
+            </Button>
+          </div>
         </div>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          Every division has its own address.
+        </p>
       )}
-      <p className="text-xs text-muted-foreground">
-        Emails sent to a division&apos;s address are marked for that division,
-        and the assistant only applies them to it. Use the whole-school address
-        for everything else.
-      </p>
 
       <ConfirmDialog
         open={!!removing}
@@ -996,13 +1037,25 @@ function DivisionAddresses({
   );
 }
 
+/** A short, highlighted message in place of the addresses. */
+function AddressNotice({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="rounded-lg bg-muted/60 px-3 py-2 text-sm text-ink-soft">
+      {children}
+    </p>
+  );
+}
+
 function AddressRow({
   label,
+  hint,
   color,
   address,
   onRemove,
 }: {
   label: string;
+  /** Where mail sent to this address ends up. */
+  hint?: string;
   /** Division color; omitted for the whole-school address. */
   color?: string;
   address: string;
@@ -1025,6 +1078,7 @@ function AddressRow({
           />
         )}
         {label}
+        {hint && <span className="font-normal text-muted-foreground">· {hint}</span>}
       </p>
       <div className="flex gap-2">
         <Input

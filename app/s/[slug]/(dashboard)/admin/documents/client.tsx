@@ -33,6 +33,7 @@ import {
   useCategoryLabels,
 } from "@/components/admin/category-select-items";
 import { useSortDocuments } from "@/components/admin/use-sort-documents";
+import { SortSummaryDialog } from "@/components/admin/sort-summary-dialog";
 import { useSidebar } from "@/components/admin/sidebar-context";
 import { Badge } from "@/components/ui/badge";
 import { searchDocumentContent } from "@/actions/documents";
@@ -91,7 +92,12 @@ export function DocumentsClient({
   const [statusFilter, setStatusFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const categoryLabels = useCategoryLabels(categories, divisions);
-  const { sorting, sort: sortDocuments } = useSortDocuments(schoolId);
+  const {
+    sorting,
+    sort: sortDocuments,
+    summary: sortSummary,
+    dismissSummary,
+  } = useSortDocuments(schoolId);
   // Ready documents with no category, which AI can sort on request.
   const unfiled = useMemo(
     () =>
@@ -408,6 +414,15 @@ export function DocumentsClient({
         onOpenChange={setUploadOpen}
         selectedFolderId={selectedFolderId}
         schoolId={schoolId}
+      />
+
+      <SortSummaryDialog
+        results={sortSummary}
+        onClose={dismissSummary}
+        onRetry={(ids) => {
+          dismissSummary();
+          sortDocuments(ids);
+        }}
       />
 
       <CategoryManager

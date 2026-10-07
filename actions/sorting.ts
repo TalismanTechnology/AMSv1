@@ -79,9 +79,24 @@ async function labelsFor(admin: SupabaseClient, schoolId: string) {
 export interface SortResult {
   id: string;
   title: string;
-  /** Where it was filed, e.g. "Upper School · Athletics"; absent if nowhere. */
+  /** Where it is filed, e.g. "Upper School · Athletics"; absent if nowhere. */
   label?: string;
+  /** It already had a category, so nothing changed. */
+  alreadyFiled?: boolean;
+  /** Why it wasn't filed. */
   error?: string;
+}
+
+/** A reason an admin can act on, rather than a stack trace. */
+function reasonFor(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err);
+  if (/no object generated|could not parse|NoObjectGenerated/i.test(message)) {
+    return "The AI didn't return an answer. Try again.";
+  }
+  if (/api key|unauthori[sz]ed|permission denied|\b40[13]\b/i.test(message)) {
+    return "The AI service refused the request. Check the Google AI key on Vercel.";
+  }
+  return message.length > 160 ? `${message.slice(0, 157)}…` : message;
 }
 
 /**
@@ -113,14 +128,18 @@ export async function sortDocumentsNow(
     (docs ?? []).map(async (doc): Promise<SortResult & { categoryId?: string }> => {
       const base = { id: doc.id as string, title: doc.title as string };
       if (doc.status !== "ready") return { ...base, error: "Still processing" };
-      if (doc.category_id) return { ...base, categoryId: doc.category_id as string };
+      if (doc.category_id) {
+        return { ...base, categoryId: doc.category_id as string, alreadyFiled: true };
+      }
       try {
         const choice = await chooseSorting(admin, doc, await documentText(admin, doc));
         const { categoryId } = await applySorting(admin, doc.id, choice);
-        return { ...base, categoryId: categoryId ?? undefined };
+        return categoryId
+          ? { ...base, categoryId }
+          : { ...base, error: "No category fits it. File it by hand, or add an Other category." };
       } catch (err) {
         console.error(`[sort] Sorting ${doc.id} failed:`, err);
-        return { ...base, error: "Couldn't sort it" };
+        return { ...base, error: reasonFor(err) };
       }
     })
   );

@@ -2,6 +2,7 @@ import { requireSchoolContext } from "@/lib/school-context";
 import { loadSettings } from "@/lib/settings";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { generateInboundToken } from "@/lib/email/token";
 import { SettingsClient } from "./client";
 import { PageTransition } from "@/components/motion";
 import type {
@@ -131,15 +132,23 @@ async function loadRecentEmails(
   }));
 }
 
-/** The school's inbound addresses: the whole-school one and one per division
- * that has been given its own, plus the divisions to choose from. */
-async function loadInboundAddresses(schoolId: string): Promise<{
+/**
+ * The school's inbound addresses: the whole-school one and one per division
+ * that has been given its own, plus the divisions to choose from. A school
+ * with ingestion on always gets its whole-school address, even one switched
+ * on before addresses moved to their own table.
+ */
+async function loadInboundAddresses(
+  schoolId: string,
+  ingestionEnabled: boolean
+): Promise<{
   wholeSchoolToken: string | null;
   divisionAddresses: DivisionAddress[];
   divisions: EventCalendar[];
+  addressesError: string | null;
 }> {
   const supabase = await createClient();
-  const [{ data: addresses }, { data: divisions }] = await Promise.all([
+  const [{ data: addresses, error }, { data: divisions }] = await Promise.all([
     supabase
       .from("email_ingestion_addresses")
       .select("id, token, division_id")
@@ -153,9 +162,31 @@ async function loadInboundAddresses(schoolId: string): Promise<{
       .order("sort_order", { ascending: true }),
   ]);
 
+  if (error) {
+    console.error("[settings] Loading inbound addresses failed:", error.message);
+    return {
+      wholeSchoolToken: null,
+      divisionAddresses: [],
+      divisions: (divisions ?? []) as EventCalendar[],
+      addressesError:
+        "Your email addresses couldn't be loaded. If the database migration 028_division_email_addresses.sql hasn't been applied yet, apply it and reload.",
+    };
+  }
+
+  let wholeSchoolToken =
+    (addresses ?? []).find((a) => a.division_id === null)?.token ?? null;
+  if (ingestionEnabled && !wholeSchoolToken) {
+    const { data: created } = await supabase
+      .from("email_ingestion_addresses")
+      .insert({ school_id: schoolId, token: generateInboundToken() })
+      .select("token")
+      .single();
+    wholeSchoolToken = created?.token ?? null;
+  }
+
   return {
-    wholeSchoolToken:
-      (addresses ?? []).find((a) => a.division_id === null)?.token ?? null,
+    addressesError: null,
+    wholeSchoolToken,
     divisionAddresses: (addresses ?? [])
       .filter((a) => a.division_id !== null)
       .map((a) => ({ id: a.id, token: a.token, divisionId: a.division_id })),
@@ -182,7 +213,7 @@ export default async function SettingsPage({
         school.blackbaud_verification_enabled ?? false
       ),
       loadRecentEmails(school.id),
-      loadInboundAddresses(school.id),
+      loadInboundAddresses(school.id, school.email_ingestion_enabled ?? false),
     ]);
 
   return (

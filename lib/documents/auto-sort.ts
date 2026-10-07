@@ -203,7 +203,13 @@ export async function applySorting(
     if (data?.length) {
       categoryId = choice.category_id;
       if (choice.division_id !== undefined) {
-        await setDocumentDivision(supabase, documentId, choice.division_id);
+        // The category is what files it; a failed division update shouldn't
+        // turn a filed document into a failed sort.
+        try {
+          await setDocumentDivision(supabase, documentId, choice.division_id);
+        } catch (err) {
+          console.warn(`[auto-sort] Couldn't set the division of ${documentId}:`, err);
+        }
       }
     }
   }

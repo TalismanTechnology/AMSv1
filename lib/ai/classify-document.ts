@@ -197,6 +197,10 @@ ${trimmed}
 Return the best-fit category and folder.`,
     temperature: 0.1,
     maxOutputTokens: 300,
+    // Gemini 2.5 charges thinking tokens against maxOutputTokens. Left on,
+    // thinking over a long list of division categories used up the budget
+    // before any answer was written, and every document came back unsorted.
+    providerOptions: { google: { thinkingConfig: { thinkingBudget: 0 } } },
     maxRetries: 2,
   });
 
