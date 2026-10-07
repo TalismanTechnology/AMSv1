@@ -34,8 +34,8 @@ import {
   FileText,
   Folder as FolderIcon,
   GraduationCap,
-  LayoutGrid,
   Mail,
+  Network,
   Search,
   Sparkles,
 } from "lucide-react";
@@ -54,7 +54,6 @@ import {
   layoutMap,
   matchesQuery,
   normalizeQuery,
-  packingBasis,
   type Bucket,
   type MapDivision,
   type MapView,
@@ -62,6 +61,7 @@ import {
 import {
   CARD_FOCUS_ATTRIBUTE,
   DRAG_HANDLE_CLASS,
+  SOURCE_HANDLE_ID,
   SortingMapContext,
   TARGET_HANDLE_ID,
   edgeTypes,
@@ -134,9 +134,10 @@ interface SortingMapProps {
 }
 
 /**
- * Every document drawn inside the card for the category or folder it was
- * sorted into, with a hub card linking to each card. Dragging a document onto
- * another card re-sorts it.
+ * A tree of the library: the hub branches into the whole school and each
+ * division (or the top-level folders), and those into their categories (or
+ * subfolders), each document listed inside the card it was sorted into.
+ * Dragging a document onto another card re-sorts it.
  */
 export function SortingMap({
   documents,
@@ -418,12 +419,9 @@ function MapCanvas({
         : groupByFolder(docs, folders),
     [view, docs, categories, mapDivisions, folders]
   );
-  // Cards keep the columns they opened in, so nothing changes column when a
-  // card expands or a document moves. "Rearrange" packs them afresh.
-  const [basis, setBasis] = useState(() => packingBasis(buckets));
   const layout = useMemo(
-    () => layoutMap(view, buckets, expanded, basis),
-    [view, buckets, expanded, basis]
+    () => layoutMap(view, buckets, expanded),
+    [view, buckets, expanded]
   );
   const matched = useMemo(
     () => bucketsWithMatches(buckets, query),
@@ -431,7 +429,6 @@ function MapCanvas({
   );
 
   const nodes = useMemo<MapNode[]>(() => {
-    const bucketById = new Map(buckets.map((b) => [b.id, b]));
     const placeOf = (id: string): XYPosition => {
       const box = layout.boxes.get(id);
       const offset = offsets[id];
@@ -451,10 +448,13 @@ function MapCanvas({
         measured: measured[hub],
         style: NODE_STYLE,
         domAttributes: PLAIN_WRAPPER,
-        data: { view, rows: hubBuckets(buckets), total: docs.length },
+        data: {
+          view,
+          total: docs.length,
+          branchCount: hubBuckets(buckets).length,
+        },
       },
-      // An empty category is only a row in its division, with no card.
-      ...buckets.filter((bucket) => !bucket.rowOnly).map(
+      ...buckets.map(
         (bucket): BucketNode => ({
           id: bucket.id,
           type: "bucket",
@@ -463,14 +463,7 @@ function MapCanvas({
           measured: measured[bucket.id],
           style: NODE_STYLE,
           domAttributes: PLAIN_WRAPPER,
-          data: {
-            bucket,
-            expanded: expanded.has(bucket.id),
-            rows: bucket.children.flatMap((id) => {
-              const child = bucketById.get(id);
-              return child ? [child] : [];
-            }),
-          },
+          data: { bucket, expanded: expanded.has(bucket.id) },
         })
       ),
     ];
@@ -487,12 +480,11 @@ function MapCanvas({
         id: link.id,
         type: "link",
         source: link.source,
-        sourceHandle: link.sourceHandle,
+        sourceHandle: SOURCE_HANDLE_ID,
         target: link.target,
         targetHandle: TARGET_HANDLE_ID,
         data: {
-          gutter: link.gutter,
-          overhead: link.overhead,
+          busY: link.busY,
           color: colorOf.get(link.target) ?? null,
           active: lit || found,
           dimmed: query !== "" && !found,
@@ -686,13 +678,13 @@ function MapCanvas({
           <ControlButton
             onClick={() => {
               setOffsets({});
-              setBasis(packingBasis(buckets));
+              void fitView({ ...FIT_VIEW, duration: motionMs(450) });
             }}
-            title="Rearrange the cards"
-            aria-label="Rearrange the cards"
+            title="Put every card back in the tree"
+            aria-label="Put every card back in the tree"
           >
             {/* React Flow fills control icons; this one is drawn in strokes. */}
-            <LayoutGrid style={{ fill: "none" }} />
+            <Network style={{ fill: "none" }} />
           </ControlButton>
         </Controls>
         <MiniMap<MapNode>

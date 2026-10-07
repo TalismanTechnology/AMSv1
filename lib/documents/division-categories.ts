@@ -15,16 +15,10 @@ export const STARTER_CATEGORIES = [
       "Classes, curriculum, homework, grades and report cards, exams, course selection and academic support.",
   },
   {
-    name: "Athletics",
+    name: "Athletics & Activities",
     color: "#f97316",
     description:
-      "Sports teams, tryouts, practices and game schedules, physicals and athletic forms.",
-  },
-  {
-    name: "Arts & Activities",
-    color: "#ec4899",
-    description:
-      "Music, theater, visual arts, clubs, after-school programs and student activities.",
+      "Sports teams, tryouts, practices and game schedules, music, theater, visual arts, clubs and after-school programs.",
   },
   {
     name: "Events & Calendar",
@@ -33,16 +27,10 @@ export const STARTER_CATEGORIES = [
       "Dates and schedules: field trips, assemblies, ceremonies, conferences, holidays and school events.",
   },
   {
-    name: "Health & Safety",
+    name: "Policies, Health & Forms",
     color: "#ef4444",
     description:
-      "The nurse, medications, allergies, illness, immunizations, emergencies, safety and security.",
-  },
-  {
-    name: "Policies & Forms",
-    color: "#6366f1",
-    description:
-      "Handbooks, rules, dress code, attendance, tuition and fees, enrollment, and forms to fill in.",
+      "Handbooks, rules, dress code, attendance, tuition and fees, enrollment, the nurse, medications, allergies, immunizations, safety, and forms to fill in.",
   },
   {
     name: "Other",

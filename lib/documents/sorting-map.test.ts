@@ -10,14 +10,11 @@ import {
   hubId,
   layoutMap,
   normalizeQuery,
-  packingBasis,
   roundedPath,
   routeLink,
-  rowHandleId,
   CARD_WIDTH,
-  HEADER_HEIGHT,
+  LEVEL_GAP,
   PREVIEW_ROWS,
-  ROW_HEIGHT,
   UNSORTED_CATEGORY_ID,
   UNSORTED_FOLDER_ID,
   type Box,
@@ -26,9 +23,6 @@ import {
   type MapDocument,
   type MapFolder,
   type MapLayout,
-  type MapLink,
-  type MapView,
-  type Point,
 } from "./sorting-map";
 
 let nextId = 0;
@@ -89,19 +83,19 @@ const categories = [
   { id: "w-pol", name: "Policies", color: "#6366f1", division_id: null, sort_order: 0 },
 ];
 
-test("groups categories under their division, then the whole school", () => {
+test("groups categories under the whole school, then each division", () => {
   const buckets = groupByDivision([], categories, divisions);
 
   assert.deepEqual(
     buckets.map((b) => [b.id, b.depth]),
     [
+      ["division:whole", 0],
+      ["category:w-pol", 1],
       ["division:lower", 0],
       ["category:l-aca", 1],
       ["division:upper", 0],
       ["category:u-aca", 1],
       ["category:u-ath", 1],
-      ["division:whole", 0],
-      ["category:w-pol", 1],
     ]
   );
   assert.deepEqual(find(buckets, "division:upper").children, [
@@ -126,13 +120,13 @@ test("files each document under its category, and counts it in its division", ()
   assert.equal(find(buckets, "division:lower").total, 0);
 });
 
-test("gives empty categories a row in their division but no card", () => {
+test("gives empty categories a branch of their own", () => {
   const buckets = groupByDivision([doc({ category_id: "u-ath" })], categories, divisions);
 
-  assert.equal(find(buckets, "category:u-ath").rowOnly, false);
-  assert.equal(find(buckets, "category:u-aca").rowOnly, true);
-  // Still a row, so it can take a dropped document.
+  assert.equal(find(buckets, "category:u-aca").total, 0);
   assert.ok(find(buckets, "division:upper").children.includes("category:u-aca"));
+  const layout = layoutMap("category", buckets, new Set());
+  assert.ok(layout.boxes.has("category:u-aca"));
 });
 
 test("collects uncategorized documents, and unknown categories, under No category", () => {
@@ -261,7 +255,7 @@ test("the hub lists divisions and top-level folders, not what's inside them", ()
   const grouped = groupByDivision([doc()], categories, divisions);
   assert.deepEqual(
     hubBuckets(grouped).map((b) => b.id),
-    ["division:lower", "division:upper", "division:whole", UNSORTED_CATEGORY_ID]
+    ["division:whole", "division:lower", "division:upper", UNSORTED_CATEGORY_ID]
   );
 });
 
@@ -307,17 +301,18 @@ test("gives an empty card one placeholder row", () => {
   assert.equal(cardRowCount(bucket, false), 1);
 });
 
-test("lists a division's categories as rows, empty ones included", () => {
+test("draws a division as a header alone, its categories as branches", () => {
   const buckets = groupByDivision([doc({ category_id: "u-ath" })], categories, divisions);
 
-  assert.equal(cardRowCount(find(buckets, "division:upper"), false), 2);
+  assert.equal(cardRowCount(find(buckets, "division:upper"), false), 0);
 });
 
-test("lists subfolders as rows ahead of documents", () => {
+test("lists a folder's documents, its subfolders branching below", () => {
   const buckets = groupByFolder(docs(2, { folder_id: "sports" }), tree);
 
-  // Aquatics + Forms + two documents.
-  assert.equal(cardRowCount(find(buckets, "folder:sports"), false), 4);
+  assert.equal(cardRowCount(find(buckets, "folder:sports"), false), 2);
+  // Only subfolders: no placeholder row either.
+  assert.equal(cardRowCount(find(buckets, "folder:forms"), false), 0);
 });
 
 // ── Layout ────────────────────────────────────────────
@@ -353,287 +348,169 @@ function divisionLibrary(groups: number[][]) {
   };
 }
 
-test("links the hub to each division, and each division to its filled categories", () => {
-  const { buckets } = divisionLibrary([[3, 0, 12], [1]]);
+function box(layout: MapLayout, id: string): Box {
+  const found = layout.boxes.get(id);
+  assert.ok(found, `no box for ${id}`);
+  return found;
+}
 
+/** Four groups of five categories, unevenly filled: twenty branches. */
+const school = () =>
+  divisionLibrary([
+    [3, 0, 12, 1, 0],
+    [0, 0, 0, 0, 0],
+    [7, 2, 0, 9, 4],
+    [1, 1, 1, 1, 1],
+  ]);
+
+test("grows down from the hub: divisions below it, every category below those", () => {
+  const { buckets } = school();
   const layout = layoutMap("category", buckets, new Set());
 
+  const hub = box(layout, hubId("category"));
+  const divisionYs = new Set(
+    [0, 1, 2, 3].map((g) => box(layout, `division:d${g}`).y)
+  );
+  const categoryBoxes = buckets
+    .filter((b) => b.kind === "category")
+    .map((b) => box(layout, b.id));
+
+  assert.equal(categoryBoxes.length, 20);
+  assert.equal(divisionYs.size, 1);
+  const [divisionY] = divisionYs;
+  assert.ok(divisionY >= hub.y + hub.height + LEVEL_GAP);
+  assert.equal(new Set(categoryBoxes.map((b) => b.y)).size, 1);
+  assert.ok(categoryBoxes[0].y > divisionY);
+});
+
+test("links the hub to each division and each division to all five categories", () => {
+  const { buckets } = school();
+  const layout = layoutMap("category", buckets, new Set());
+
+  const hub = hubId("category");
   assert.deepEqual(
-    layout.links.map((l) => [l.source, l.sourceHandle, l.target]),
+    layout.links.filter((l) => l.source === hub).map((l) => l.target),
+    ["division:d0", "division:d1", "division:d2", "division:d3"]
+  );
+  for (let g = 0; g < 4; g++) {
+    assert.deepEqual(
+      layout.links.filter((l) => l.source === `division:d${g}`).map((l) => l.target),
+      [0, 1, 2, 3, 4].map((c) => `category:d${g}c${c}`)
+    );
+  }
+});
+
+test("keeps each division's categories together, in order, under it", () => {
+  const { buckets } = school();
+  const layout = layoutMap("category", buckets, new Set());
+
+  let lastRight = -Infinity;
+  for (let g = 0; g < 4; g++) {
+    const xs = [0, 1, 2, 3, 4].map((c) => box(layout, `category:d${g}c${c}`).x);
+    assert.deepEqual(xs, [...xs].sort((a, b) => a - b));
+    assert.ok(xs[0] > lastRight, `division ${g} overlaps the one before`);
+    lastRight = xs[4] + CARD_WIDTH;
+
+    // The division sits centred over its categories.
+    const division = box(layout, `division:d${g}`);
+    assert.equal(division.x + CARD_WIDTH / 2, (xs[0] + xs[4] + CARD_WIDTH) / 2);
+  }
+});
+
+test("never overlaps cards, however the categories fill up", () => {
+  for (const groups of [[[0]], [[40, 0, 2], [1]], [[3, 0, 12, 1, 0], [], [9]]]) {
+    const { buckets } = divisionLibrary(groups);
+    assertNoOverlap(layoutMap("category", buckets, new Set()).boxes);
+    const all = new Set(buckets.map((b) => b.id));
+    assertNoOverlap(layoutMap("category", buckets, all).boxes);
+  }
+});
+
+test("starts each level below the tallest card above it", () => {
+  const { buckets } = school();
+  const layout = layoutMap("category", buckets, new Set(["category:d0c2"]));
+
+  for (const link of layout.links) {
+    const source = box(layout, link.source);
+    const target = box(layout, link.target);
+    assert.ok(target.y >= source.y + source.height + LEVEL_GAP);
+    assert.ok(link.busY > source.y + source.height && link.busY < target.y);
+  }
+});
+
+test("expanding a card moves nothing sideways", () => {
+  const { buckets } = school();
+  const before = layoutMap("category", buckets, new Set());
+  const after = layoutMap("category", buckets, new Set(["category:d2c3"]));
+
+  for (const [id, { x, y }] of before.boxes) {
+    assert.equal(box(after, id).x, x, id);
+    assert.equal(box(after, id).y, y, id);
+  }
+  assert.ok(box(after, "category:d2c3").height > box(before, "category:d2c3").height);
+});
+
+test("hangs unfiled documents off the hub beside the divisions", () => {
+  const { buckets } = divisionLibrary([[1], [1]]);
+  const withLoose = groupByDivision(
+    [...buckets.flatMap((b) => b.docs), doc()],
     [
-      [hubId("category"), rowHandleId("division:d0"), "division:d0"],
-      ["division:d0", rowHandleId("category:d0c0"), "category:d0c0"],
-      ["division:d0", rowHandleId("category:d0c2"), "category:d0c2"],
-      [hubId("category"), rowHandleId("division:d1"), "division:d1"],
-      ["division:d1", rowHandleId("category:d1c0"), "category:d1c0"],
+      { id: "d0c0", name: "C", color: "#000", division_id: "d0" },
+      { id: "d1c0", name: "C", color: "#000", division_id: "d1" },
+    ],
+    [
+      { id: "d0", name: "D0", sort_order: 0, color: "#000" },
+      { id: "d1", name: "D1", sort_order: 1, color: "#000" },
     ]
   );
-  // The empty category is only a row: no card, no link.
-  assert.ok(!layout.boxes.has("category:d0c1"));
+  const layout = layoutMap("category", withLoose, new Set());
+
+  assert.equal(box(layout, UNSORTED_CATEGORY_ID).y, box(layout, "division:d0").y);
+  assert.ok(box(layout, UNSORTED_CATEGORY_ID).x > box(layout, "division:d1").x);
 });
 
-test("never overlaps cards, however the divisions fill up", () => {
-  for (const groups of [[[1]], [[3, 0, 9], [2, 2]], [[7, 1, 0, 4, 2, 12, 3], [0, 0, 1], [5, 5, 5, 5], [2]]]) {
-    const layout = layoutMap("category", divisionLibrary(groups).buckets, new Set());
-
-    assertNoOverlap(layout.boxes);
-  }
-});
-
-test("spreads divisions over several columns", () => {
-  const { buckets } = divisionLibrary([[6, 6, 6], [6, 6, 6], [6, 6, 6], [6, 6, 6]]);
-
-  const layout = layoutMap("category", buckets, new Set());
-
-  const columns = new Set(
-    buckets.filter((b) => b.kind === "division").map((b) => layout.boxes.get(b.id)!.x)
-  );
-  assert.ok(columns.size > 1, "expected more than one column");
-});
-
-test("puts the first card's header level with the hub's first row", () => {
-  const { buckets } = divisionLibrary([[2]]);
-
-  const layout = layoutMap("category", buckets, new Set());
-
-  const hub = layout.boxes.get(hubId("category"))!;
-  const card = layout.boxes.get("division:d0")!;
-  const hubRowCentre = hub.y + 1 + HEADER_HEIGHT + ROW_HEIGHT / 2;
-  const cardHeaderCentre = card.y + 1 + HEADER_HEIGHT / 2;
-  assert.equal(cardHeaderCentre, hubRowCentre);
-});
-
-test("expanding a card changes no card's column and moves nothing above it", () => {
-  const { buckets } = divisionLibrary([[20, 3, 5], [20, 2], [7, 4, 9], [1]]);
-  const target = "category:d0c0";
-  const before = layoutMap("category", buckets, new Set());
-
-  const after = layoutMap("category", buckets, new Set([target]));
-
-  assert.ok(after.boxes.get(target)!.height > before.boxes.get(target)!.height);
-  const openedTop = before.boxes.get(target)!.y;
-  for (const [id, was] of before.boxes) {
-    const now = after.boxes.get(id)!;
-    assert.equal(now.x, was.x, `${id} stayed in its column`);
-    if (now.y !== was.y) assert.ok(was.y > openedTop, `${id} was above, yet moved`);
-  }
-  assertNoOverlap(after.boxes);
-});
-
-test("moving a document between categories keeps every division in its column", () => {
-  const { buckets, library, categories: cats, divisions: divs } = divisionLibrary([
-    [1, 2, 3],
-    [4, 5],
-    [6],
-  ]);
-  const basis = packingBasis(buckets);
-
-  // Move a document from division 2 into division 0, as a drop on the map does.
-  const moved = library.map((d) =>
-    d === library[library.length - 1] ? { ...d, category_id: "d0c0" } : d
-  );
-  const after = groupByDivision(moved, cats, divs);
-
-  const was = layoutMap("category", buckets, new Set(), basis);
-  const now = layoutMap("category", after, new Set(), basis);
-  for (const division of ["division:d0", "division:d1", "division:d2"]) {
-    assert.equal(now.boxes.get(division)!.x, was.boxes.get(division)!.x);
-  }
-  assertNoOverlap(now.boxes);
-});
-
-test("fits in a division added since the map opened without moving the others", () => {
-  const before = divisionLibrary([[4, 6], [2, 8], [3]]);
-  const basis = packingBasis(before.buckets);
-  const after = divisionLibrary([[4, 6], [2, 8], [3], [5]]);
-
-  const was = layoutMap("category", before.buckets, new Set(), basis);
-  const now = layoutMap("category", after.buckets, new Set(), basis);
-
-  for (const id of was.boxes.keys()) {
-    if (id === hubId("category")) continue;
-    assert.deepEqual(now.boxes.get(id), was.boxes.get(id), id);
-  }
-  assert.ok(now.boxes.has("division:d3"));
-  assertNoOverlap(now.boxes);
-});
-
-test("draws the folder tree left to right, one column per level", () => {
+test("draws the folder tree one level per depth", () => {
   const buckets = groupByFolder(docs(3, { folder_id: "forms" }), tree);
-
   const layout = layoutMap("folder", buckets, new Set());
 
-  const x = (id: string) => layout.boxes.get(id)!.x;
-  assert.ok(x("folder:sports") > x(hubId("folder")));
-  assert.ok(x("folder:forms") > x("folder:sports"));
-  assert.ok(x("folder:fall") > x("folder:forms"));
-  assert.equal(x("folder:aquatics"), x("folder:forms"));
+  const y = (id: string) => box(layout, `folder:${id}`).y;
+  assert.equal(y("admissions"), y("sports"));
+  assert.equal(y("aquatics"), y("forms"));
+  assert.ok(y("forms") > y("sports"));
+  assert.ok(y("fall") > y("forms"));
   assertNoOverlap(layout.boxes);
-});
-
-test("links each folder to its subfolders from their rows", () => {
-  const buckets = groupByFolder([], tree);
-
-  const layout = layoutMap("folder", buckets, new Set());
-
-  const fromSports = layout.links
-    .filter((l) => l.source === "folder:sports")
-    .map((l) => [l.sourceHandle, l.target]);
-  assert.deepEqual(fromSports, [
-    [rowHandleId("folder:aquatics"), "folder:aquatics"],
-    [rowHandleId("folder:forms"), "folder:forms"],
-  ]);
-  // Hub → each top-level folder, plus one link per subfolder.
-  assert.equal(layout.links.length, 2 + 3);
-});
-
-test("keeps each top-level folder's subtree together", () => {
-  const folders: MapFolder[] = [
-    { id: "a", name: "A", parent_id: null },
-    { id: "a1", name: "A1", parent_id: "a" },
-    { id: "a2", name: "A2", parent_id: "a" },
-    { id: "b", name: "B", parent_id: null },
-  ];
-  const buckets = groupByFolder(docs(9, { folder_id: "a2" }), folders);
-
-  const layout = layoutMap("folder", buckets, new Set());
-
-  const underA = ["folder:a", "folder:a1", "folder:a2"].map(
-    (id) => layout.boxes.get(id)!
+  assert.deepEqual(
+    layout.links.map((l) => [l.source, l.target]),
+    [
+      [hubId("folder"), "folder:admissions"],
+      [hubId("folder"), "folder:sports"],
+      ["folder:sports", "folder:aquatics"],
+      ["folder:sports", "folder:forms"],
+      ["folder:forms", "folder:fall"],
+    ]
   );
-  const region: Box = {
-    x: Math.min(...underA.map((box) => box.x)),
-    y: Math.min(...underA.map((box) => box.y)),
-    height:
-      Math.max(...underA.map((box) => box.y + box.height)) -
-      Math.min(...underA.map((box) => box.y)),
-  };
-  const regionWidth =
-    Math.max(...underA.map((box) => box.x)) + CARD_WIDTH - region.x;
-  const b = layout.boxes.get("folder:b")!;
-  const insideRegion =
-    b.x < region.x + regionWidth &&
-    region.x < b.x + CARD_WIDTH &&
-    b.y < region.y + region.height &&
-    region.y < b.y + b.height;
-  assert.ok(!insideRegion, "B sits outside the block of A's subtree");
-  assertNoOverlap(layout.boxes);
 });
 
-test("spreads many top-level folders over several columns", () => {
-  const folders: MapFolder[] = Array.from({ length: 10 }, (_, i) => ({
-    id: `f${i}`,
-    name: `Folder ${String(i).padStart(2, "0")}`,
-    parent_id: null,
-  }));
-  const all = folders.flatMap((f) => docs(6, { folder_id: f.id }));
-  const buckets = groupByFolder(all, folders);
-
-  const layout = layoutMap("folder", buckets, new Set());
-
-  const columns = new Set(folders.map((f) => layout.boxes.get(`folder:${f.id}`)!.x));
-  assert.ok(columns.size > 1, "expected more than one column");
-  assertNoOverlap(layout.boxes);
-});
-
-// ── Links ─────────────────────────────────────────────
-
-/** Where React Flow will find a link's two handles, given the card sizes. */
-function handlesOf(
-  view: MapView,
-  buckets: Bucket[],
-  layout: MapLayout,
-  link: MapLink
-) {
-  const sourceBox = layout.boxes.get(link.source)!;
-  const targetBox = layout.boxes.get(link.target)!;
-  const rows =
-    link.source === hubId(view)
-      ? hubBuckets(buckets).map((b) => b.id)
-      : find(buckets, link.source).children;
-  const row = rows.indexOf(link.target);
-  assert.ok(row >= 0, `${link.target} has no row in ${link.source}`);
-  return {
-    source: {
-      x: sourceBox.x + CARD_WIDTH,
-      y: sourceBox.y + 1 + HEADER_HEIGHT + row * ROW_HEIGHT + ROW_HEIGHT / 2,
-    },
-    target: { x: targetBox.x, y: targetBox.y + 1 + HEADER_HEIGHT / 2 },
-  };
-}
-
-/** Whether an axis-aligned segment passes through a card's interior. */
-function crosses(a: Point, b: Point, box: Box): boolean {
-  return (
-    Math.min(a.x, b.x) < box.x + CARD_WIDTH &&
-    Math.max(a.x, b.x) > box.x &&
-    Math.min(a.y, b.y) < box.y + box.height &&
-    Math.max(a.y, b.y) > box.y
+test("routes a link down to its bar, across, and down again", () => {
+  assert.deepEqual(
+    routeLink({ x: 100, y: 50 }, { x: 300, y: 200 }, { busY: 160 }),
+    [
+      { x: 100, y: 50 },
+      { x: 100, y: 160 },
+      { x: 300, y: 160 },
+      { x: 300, y: 200 },
+    ]
   );
-}
-
-function assertNoLinkBehindACard(view: MapView, buckets: Bucket[]) {
-  const layout = layoutMap(view, buckets, new Set());
-  for (const link of layout.links) {
-    const { source, target } = handlesOf(view, buckets, layout, link);
-    const corners = routeLink(source, target, link);
-    assert.ok(corners, `${link.id} has a route`);
-    for (let i = 1; i < corners.length; i++) {
-      for (const [id, box] of layout.boxes) {
-        assert.ok(
-          !crosses(corners[i - 1], corners[i], box),
-          `${link.id} runs behind ${id}`
-        );
-      }
-    }
-  }
-}
-
-test("no link in the division view runs behind another card", () => {
-  for (const groups of [
-    [[3, 1, 4]],
-    [[2, 0, 7, 1, 1, 0, 3], [1, 1, 1, 1, 1, 1, 1], [0, 9, 0, 2, 4, 1, 1], [5, 0, 0, 0, 0, 0, 2]],
-    [[12, 12], [1], [6, 0, 6], [2, 2, 2, 2]],
-  ]) {
-    assertNoLinkBehindACard("category", divisionLibrary(groups).buckets);
-  }
 });
 
-test("no link in the folder tree runs behind another card", () => {
-  const folders: MapFolder[] = [...tree];
-  for (let i = 0; i < 7; i++) {
-    folders.push({ id: `r${i}`, name: `Root ${i}`, parent_id: null });
-    folders.push({ id: `r${i}-a`, name: "A", parent_id: `r${i}` });
-    folders.push({ id: `r${i}-b`, name: "B", parent_id: `r${i}` });
-  }
-  const all = [
-    ...docs(12, { folder_id: "forms" }),
-    ...docs(3, { folder_id: "r2-b" }),
-    ...docs(4),
-  ];
-
-  assertNoLinkBehindACard("folder", groupByFolder(all, folders));
+test("turns halfway when a dragged card leaves the bar outside the gap", () => {
+  const corners = routeLink({ x: 0, y: 0 }, { x: 50, y: 100 }, { busY: 400 });
+  assert.equal(corners?.[1].y, 50);
 });
 
-test("sends a link across other cards through the lane above them", () => {
-  const corners = routeLink({ x: 100, y: 300 }, { x: 700, y: 80 }, {
-    gutter: 100,
-    overhead: { y: 20, approach: 40 },
-  });
-
-  assert.deepEqual(corners, [
-    { x: 100, y: 300 },
-    { x: 150, y: 300 },
-    { x: 150, y: 20 },
-    { x: 680, y: 20 },
-    { x: 680, y: 80 },
-    { x: 700, y: 80 },
-  ]);
-});
-
-test("gives up routing when the target is dragged back over the gutter", () => {
+test("gives up routing when the target is dragged above its source", () => {
   assert.equal(
-    routeLink({ x: 100, y: 0 }, { x: 120, y: 50 }, { gutter: 100 }),
+    routeLink({ x: 0, y: 100 }, { x: 50, y: 40 }, { busY: 70 }),
     null
   );
 });

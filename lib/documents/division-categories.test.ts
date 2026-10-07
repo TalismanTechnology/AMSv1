@@ -27,7 +27,7 @@ const categories = [
 ];
 
 test("starts every group with six categories and Other", () => {
-  assert.equal(STARTER_CATEGORIES.length, 7);
+  assert.equal(STARTER_CATEGORIES.length, 5);
   assert.equal(STARTER_CATEGORIES[STARTER_CATEGORIES.length - 1].name, "Other");
 });
 

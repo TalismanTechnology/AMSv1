@@ -1,12 +1,11 @@
 "use client";
 
-import { createContext, useContext, useEffect, useRef, type DragEvent } from "react";
+import { createContext, useContext, type DragEvent } from "react";
 import {
   BaseEdge,
   Handle,
   Position,
   getSmoothStepPath,
-  useUpdateNodeInternals,
   type Edge,
   type EdgeProps,
   type EdgeTypes,
@@ -46,9 +45,7 @@ import {
   matchesQuery,
   roundedPath,
   routeLink,
-  rowHandleId,
   type Bucket,
-  type MapLink,
   type MapView,
 } from "@/lib/documents/sorting-map";
 import type { Document } from "@/lib/types";
@@ -64,31 +61,28 @@ import type { Document } from "@/lib/types";
 
 /** Only a card's header drags the card; its rows drag documents instead. */
 export const DRAG_HANDLE_CLASS = "sorting-map-drag";
-/** The handle on a card's header that links arrive at. */
+/** The handle on top of a card that the link from its parent arrives at. */
 export const TARGET_HANDLE_ID = "in";
+/** The handle under a card that links to its branches leave from. */
+export const SOURCE_HANDLE_ID = "out";
 /** Marks the element "Go to" focuses once it has brought a card into view. */
 export const CARD_FOCUS_ATTRIBUTE = "data-map-card";
 const DRAG_TYPE = "application/x-askmyschool-document";
 
 export type HubNode = Node<
-  { view: MapView; rows: Bucket<Document>[]; total: number },
+  { view: MapView; total: number; branchCount: number },
   "hub"
 >;
 export type BucketNode = Node<
-  {
-    bucket: Bucket<Document>;
-    expanded: boolean;
-    /** The categories or subfolders listed as rows, which link to their cards. */
-    rows: Bucket<Document>[];
-  },
+  { bucket: Bucket<Document>; expanded: boolean },
   "bucket"
 >;
 export type MapNode = HubNode | BucketNode;
 
 export type LinkEdge = Edge<
   {
-    gutter: number;
-    overhead?: MapLink["overhead"];
+    /** Where the link turns sideways; see MapLink.busY. */
+    busY: number;
     /** The target category's colour, used while the link is lit. */
     color: string | null;
     active: boolean;
@@ -184,22 +178,6 @@ function useDropTarget(bucket: Bucket<Document>) {
   };
 }
 
-/**
- * React Flow keeps a card's handle positions until the card resizes. When rows
- * that carry handles are added, removed or reordered at the same height (a
- * category deleted, a folder renamed), have it measure them again.
- */
-function useRowHandleRefresh(nodeId: string, rows: Bucket<Document>[]) {
-  const updateNodeInternals = useUpdateNodeInternals();
-  const handles = rows.map((row) => row.id).join("|");
-  const measured = useRef(handles);
-  useEffect(() => {
-    if (measured.current === handles) return;
-    measured.current = handles;
-    updateNodeInternals(nodeId);
-  }, [nodeId, handles, updateNodeInternals]);
-}
-
 /** On touch screens rows must not block panning; there is no mouse drag. */
 function rowClass(touch: boolean) {
   return cn(
@@ -223,6 +201,7 @@ function CardShell({
   label,
   dashed,
   dimmed,
+  branches,
   className,
   children,
   ...rest
@@ -231,6 +210,8 @@ function CardShell({
   label: string;
   dashed?: boolean;
   dimmed?: boolean;
+  /** Whether links leave the bottom of the card for cards below it. */
+  branches?: boolean;
 }) {
   return (
     <div
@@ -249,26 +230,34 @@ function CardShell({
       {...rest}
     >
       {children}
+      {branches && (
+        <Handle
+          type="source"
+          position={Position.Bottom}
+          id={SOURCE_HANDLE_ID}
+          isConnectable={false}
+        />
+      )}
     </div>
   );
 }
 
 function CardHeader({
   icon,
-  prefix,
   name,
   count,
   countTitle,
   accent,
+  hasParent = true,
   children,
 }: {
   icon: React.ReactNode;
-  /** A category's division, shown ahead of its name. */
-  prefix?: string;
   name: string;
   count: number;
   countTitle: string;
   accent?: string | null;
+  /** Whether a link arrives at the top of the card; all but the hub's. */
+  hasParent?: boolean;
   children?: React.ReactNode;
 }) {
   return (
@@ -279,20 +268,19 @@ function CardHeader({
       )}
       style={accent ? { boxShadow: `inset 0 2px 0 ${accent}` } : undefined}
     >
-      <Handle
-        type="target"
-        position={Position.Left}
-        id={TARGET_HANDLE_ID}
-        isConnectable={false}
-      />
+      {hasParent && (
+        <Handle
+          type="target"
+          position={Position.Top}
+          id={TARGET_HANDLE_ID}
+          isConnectable={false}
+        />
+      )}
       {icon}
       <span
         className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink"
-        title={prefix ? `${prefix} · ${name}` : name}
+        title={name}
       >
-        {prefix && (
-          <span className="font-normal text-muted-foreground">{prefix} · </span>
-        )}
         {name}
       </span>
       <span className={cn(countClass, !children && "pr-1.5")} title={countTitle}>
@@ -313,91 +301,35 @@ function PlaceholderRow({ children }: { children: React.ReactNode }) {
 
 // ── Hub ───────────────────────────────────────────────
 
-function HubCard({ id, data }: NodeProps<HubNode>) {
-  useRowHandleRefresh(id, data.rows);
-
+function HubCard({ data }: NodeProps<HubNode>) {
   return (
-    <CardShell label={`All documents, ${plural(data.total, "document")}`}>
+    <CardShell
+      label={`All documents, ${plural(data.total, "document")}`}
+      branches={data.branchCount > 0}
+    >
       <CardHeader
         icon={<Library className="size-3.5 shrink-0 text-ink-soft" />}
         name="All documents"
         count={data.total}
         countTitle={plural(data.total, "document")}
+        hasParent={false}
       />
-      <ul>
-        {data.rows.map((bucket) => (
-          <HubRow key={bucket.id} bucket={bucket} />
-        ))}
-        {data.rows.length === 0 && (
+      {data.branchCount === 0 && (
+        <ul>
           <PlaceholderRow>
             {data.view === "category" ? "No categories yet" : "No folders yet"}
           </PlaceholderRow>
-        )}
-      </ul>
+        </ul>
+      )}
     </CardShell>
-  );
-}
-
-function HubRow({ bucket }: { bucket: Bucket<Document> }) {
-  const map = useSortingMap();
-  const drop = useDropTarget(bucket);
-  const dimmed = map.query !== "" && !map.matched.has(bucket.id);
-
-  return (
-    <li
-      {...drop.handlers}
-      onMouseEnter={() => map.setHovered(bucket.id)}
-      onMouseLeave={() => map.setHovered(null)}
-      className={cn(
-        rowClass(map.touch),
-        dimmed && "opacity-40",
-        drop.isOver && "bg-[var(--ember-soft)]"
-      )}
-    >
-      <button
-        type="button"
-        onClick={() => map.focusCard(bucket.id)}
-        title={`Go to ${bucket.name}`}
-        className={rowButtonClass}
-      >
-        <RowIcon bucket={bucket} />
-        <span className="min-w-0 flex-1 truncate text-[13px] text-ink">
-          {bucket.name}
-        </span>
-        <span className={countClass}>{bucket.total}</span>
-      </button>
-      <Handle
-        type="source"
-        position={Position.Right}
-        id={rowHandleId(bucket.id)}
-        isConnectable={false}
-      />
-    </li>
-  );
-}
-
-/** The small mark a bucket gets where it is listed as a row. */
-function RowIcon({ bucket }: { bucket: Bucket<Document> }) {
-  if (bucket.kind === "folder") {
-    return <FolderIcon className="size-3.5 shrink-0 text-muted-foreground" />;
-  }
-  if (bucket.kind === "division") return <DivisionIcon bucket={bucket} />;
-  return (
-    <Diamond
-      aria-hidden
-      className={cn(
-        "size-3 shrink-0",
-        bucket.color ? "fill-current" : "text-muted-foreground/70"
-      )}
-      style={bucket.color ? { color: bucket.color } : undefined}
-    />
   );
 }
 
 // ── Category / folder cards ───────────────────────────
 
-function cardLabel(bucket: Bucket<Document>, rows: number): string {
+function cardLabel(bucket: Bucket<Document>): string {
   const documents = plural(bucket.total, "document");
+  const rows = bucket.children.length;
   if (bucket.kind === "category") {
     return `${bucket.group ? `${bucket.group}, ` : ""}${bucket.name}, category, ${documents}`;
   }
@@ -410,14 +342,14 @@ function cardLabel(bucket: Bucket<Document>, rows: number): string {
     : `${bucket.name}, folder, ${documents}`;
 }
 
-function BucketCard({ id, data }: NodeProps<BucketNode>) {
-  const { bucket, expanded, rows } = data;
+function BucketCard({ data }: NodeProps<BucketNode>) {
+  const { bucket, expanded } = data;
   const map = useSortingMap();
   const drop = useDropTarget(bucket);
   const searching = map.query !== "";
   // Unfiled documents in the division view can be sorted by AI on the spot.
   const sortable = bucket.kind === "unsorted" && map.view === "category";
-  useRowHandleRefresh(id, rows);
+  const branches = bucket.children.length;
 
   // While searching, matches come first so a folded card still shows them.
   const docs = searching
@@ -431,8 +363,9 @@ function BucketCard({ id, data }: NodeProps<BucketNode>) {
 
   return (
     <CardShell
-      label={cardLabel(bucket, rows.length)}
+      label={cardLabel(bucket)}
       dashed={bucket.kind === "unsorted"}
+      branches={branches > 0}
       dimmed={searching && !map.matched.has(bucket.id)}
       {...drop.handlers}
       onMouseEnter={() => map.setHovered(bucket.id)}
@@ -443,12 +376,11 @@ function BucketCard({ id, data }: NodeProps<BucketNode>) {
     >
       <CardHeader
         icon={<CardIcon bucket={bucket} />}
-        prefix={bucket.group}
         name={bucket.name}
-        // Like the hub and parent rows: everything at or beneath here.
+        // Like the hub: everything at or beneath here.
         count={bucket.total}
         countTitle={
-          bucket.kind === "folder" && rows.length
+          bucket.kind === "folder" && branches
             ? `${plural(bucket.total, "document")}: ${direct} here, the rest in subfolders`
             : plural(bucket.total, "document")
         }
@@ -456,45 +388,45 @@ function BucketCard({ id, data }: NodeProps<BucketNode>) {
       >
         <CardMenu bucket={bucket} expanded={expanded} sortable={sortable} />
       </CardHeader>
-      <ul>
-        {rows.map((child) => (
-          <ChildRow key={child.id} bucket={child} parentId={bucket.id} />
-        ))}
-        {shown.map((doc) => (
-          <DocumentRow
-            key={doc.id}
-            doc={doc}
-            bucketId={bucket.id}
-            sortable={sortable}
-          />
-        ))}
-        {hasMoreRow(bucket) && (
-          <li className={cn(!map.touch && "nodrag nopan")}>
-            <button
-              type="button"
-              onClick={() => map.toggleExpanded(bucket.id)}
-              className="flex h-[34px] w-full items-center gap-1.5 px-3 text-[12px] text-muted-foreground outline-none transition-colors hover:bg-muted/60 hover:text-ink focus-visible:bg-muted/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-            >
-              {expanded ? (
-                <>
-                  <ChevronUp className="size-3.5" />
-                  Show fewer
-                </>
-              ) : (
-                <>
-                  <ChevronDown className="size-3.5" />
-                  Show all {direct}
-                </>
-              )}
-            </button>
-          </li>
-        )}
-        {rows.length === 0 && direct === 0 && (
-          <PlaceholderRow>
-            {bucket.kind === "folder" ? "Empty folder" : "No documents yet"}
-          </PlaceholderRow>
-        )}
-      </ul>
+      {/* A division is a header alone; its categories branch off below. */}
+      {bucket.kind !== "division" && (
+        <ul>
+          {shown.map((doc) => (
+            <DocumentRow
+              key={doc.id}
+              doc={doc}
+              bucketId={bucket.id}
+              sortable={sortable}
+            />
+          ))}
+          {hasMoreRow(bucket) && (
+            <li className={cn(!map.touch && "nodrag nopan")}>
+              <button
+                type="button"
+                onClick={() => map.toggleExpanded(bucket.id)}
+                className="flex h-[34px] w-full items-center gap-1.5 px-3 text-[12px] text-muted-foreground outline-none transition-colors hover:bg-muted/60 hover:text-ink focus-visible:bg-muted/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+              >
+                {expanded ? (
+                  <>
+                    <ChevronUp className="size-3.5" />
+                    Show fewer
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="size-3.5" />
+                    Show all {direct}
+                  </>
+                )}
+              </button>
+            </li>
+          )}
+          {branches === 0 && direct === 0 && (
+            <PlaceholderRow>
+              {bucket.kind === "folder" ? "Empty folder" : "No documents yet"}
+            </PlaceholderRow>
+          )}
+        </ul>
+      )}
     </CardShell>
   );
 }
@@ -582,73 +514,6 @@ function CardMenu({
         )}
       </DropdownMenuContent>
     </DropdownMenu>
-  );
-}
-
-/**
- * A category inside its division, or a subfolder inside its folder. An empty
- * category has no card to go to, but still takes a dropped document.
- */
-function ChildRow({
-  bucket,
-  parentId,
-}: {
-  bucket: Bucket<Document>;
-  parentId: string;
-}) {
-  const map = useSortingMap();
-  const drop = useDropTarget(bucket);
-  const dimmed = map.query !== "" && !map.matched.has(bucket.id);
-  const content = (
-    <>
-      <RowIcon bucket={bucket} />
-      <span
-        className={cn(
-          "min-w-0 flex-1 truncate text-[13px]",
-          bucket.rowOnly ? "text-muted-foreground" : "text-ink"
-        )}
-      >
-        {bucket.name}
-      </span>
-      <span className={countClass}>{bucket.total}</span>
-    </>
-  );
-
-  return (
-    <li
-      {...drop.handlers}
-      onMouseEnter={() => map.setHovered(bucket.id)}
-      onMouseLeave={() => map.setHovered(parentId)}
-      className={cn(
-        rowClass(map.touch),
-        dimmed && "opacity-40",
-        drop.isOver && "bg-[var(--ember-soft)]"
-      )}
-    >
-      {bucket.rowOnly ? (
-        <div
-          className="flex h-full w-full items-center gap-2.5 px-3"
-          title={`Nothing in ${bucket.name} yet. Drag a document here to file it.`}
-        >
-          {content}
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => map.focusCard(bucket.id)}
-          title={`Go to ${bucket.name}`}
-          className={rowButtonClass}
-        >
-          {content}
-        </button>
-      )}
-      <Handle
-        type="source"
-        position={Position.Right}
-        id={rowHandleId(bucket.id)}
-        isConnectable={false}
-      />
-    </li>
   );
 }
 
@@ -788,12 +653,12 @@ function LinkLine({
   targetPosition,
   data,
 }: EdgeProps<LinkEdge>) {
-  // Links turn only in the gaps between cards, so they never run behind one;
-  // links that share a gap merge into a single trunk there.
+  // Links turn only in the gap between levels, so they never run behind a
+  // card; the links into one level share a single bar there.
   const corners = routeLink(
     { x: sourceX, y: sourceY },
     { x: targetX, y: targetY },
-    { gutter: data?.gutter ?? 0, overhead: data?.overhead }
+    { busY: data?.busY ?? (sourceY + targetY) / 2 }
   );
   const path = corners
     ? roundedPath(corners, 8)

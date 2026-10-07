@@ -1,9 +1,9 @@
 /**
- * The sorting map: every document drawn inside the card for the category or
- * folder it was sorted into, the way a schema visualizer draws columns inside
- * tables. A hub card links to each division (or top-level folder); each
- * division lists its categories and links to the ones holding documents, and
- * each folder links to its subfolders.
+ * The sorting map: a tree growing down from an "All documents" hub. In the
+ * division view the hub branches into the whole school and each division, and
+ * each of those into its own categories, every document listed inside the
+ * card for the category it was sorted into. In the folder view the hub
+ * branches into the top-level folders, and each folder into its subfolders.
  *
  * Pure data and geometry, no React, so the grouping and layout can be tested.
  */
@@ -65,17 +65,12 @@ export interface Bucket<D extends MapDocument = MapDocument> {
   color: string | null;
   /** Documents sorted directly into this bucket, in the order given. */
   docs: D[];
-  /** Ids of the buckets listed as rows in this one: categories or subfolders. */
+  /** Ids of the buckets that branch from this one: categories or subfolders. */
   children: string[];
   /** Documents here plus in everything beneath it. */
   total: number;
-  /** 0 for what the hub lists; 1 for a division's categories, and so on. */
+  /** 0 for the hub's branches; 1 for a division's categories, and so on. */
   depth: number;
-  /**
-   * Shown only as a row in its parent, with no card of its own: an empty
-   * category, which would otherwise crowd the map with empty cards.
-   */
-  rowOnly?: boolean;
 }
 
 export const UNSORTED_CATEGORY_ID = "category:none";
@@ -88,11 +83,6 @@ export function hubId(view: MapView): string {
   return `hub:${view}`;
 }
 
-/** Handle id of the row a link leaves from: the row that names its target. */
-export function rowHandleId(bucketId: string): string {
-  return `row:${bucketId}`;
-}
-
 function byName(a: { name: string }, b: { name: string }): number {
   return a.name.localeCompare(b.name, undefined, {
     sensitivity: "base",
@@ -101,10 +91,11 @@ function byName(a: { name: string }, b: { name: string }): number {
 }
 
 /**
- * The division view: one bucket per division, then one for the whole school,
- * each followed by its categories (empty ones row-only), then "No category"
- * for documents without one (left out when there are none). A category id
- * that matches no category counts as none.
+ * The division view: one bucket for the whole school, then one per division,
+ * each followed by its categories, then "No category" for documents without
+ * one (left out when there are none). Every category gets a card, empty or
+ * not, so each division shows all its branches. A category id that matches no
+ * category counts as none.
  */
 export function groupByDivision<D extends MapDocument>(
   docs: D[],
@@ -121,7 +112,10 @@ export function groupByDivision<D extends MapDocument>(
 
   const colorOf = new Map(divisions.map((d) => [d.id, d.color]));
   const buckets: Bucket<D>[] = [];
-  for (const group of groupCategories(categories, divisions)) {
+  const groups = groupCategories(categories, divisions);
+  // The whole school spans every division, so it leads the row.
+  groups.sort((a, b) => Number(a.divisionId !== null) - Number(b.divisionId !== null));
+  for (const group of groups) {
     const children = group.categories.map((category) => {
       const inCategory = filed.get(category.id) ?? [];
       return {
@@ -135,7 +129,6 @@ export function groupByDivision<D extends MapDocument>(
         children: [],
         total: inCategory.length,
         depth: 1,
-        rowOnly: inCategory.length === 0,
       };
     });
     buckets.push(
@@ -259,7 +252,7 @@ export function groupByFolder<D extends MapDocument>(
   return buckets;
 }
 
-/** The buckets the hub card lists, one row and one link each. */
+/** The buckets that branch straight from the hub. */
 export function hubBuckets<D extends MapDocument>(
   buckets: Bucket<D>[]
 ): Bucket<D>[] {
@@ -304,27 +297,20 @@ export function bucketsWithMatches<D extends MapDocument>(
 // Cards are drawn to these sizes (see components/admin/sorting-map-nodes.tsx),
 // so the layout can place them before the browser has measured anything.
 
-export const CARD_WIDTH = 288;
+export const CARD_WIDTH = 248;
 export const HEADER_HEIGHT = 40;
 export const ROW_HEIGHT = 34;
 /** Documents a card lists before folding the rest behind "Show all". */
-export const PREVIEW_ROWS = 8;
+export const PREVIEW_ROWS = 6;
 /** A card's 1px border, top and bottom. */
 const CARD_BORDER = 2;
 
-/** Gap between the hub and the first column of cards; links bend inside it. */
-export const HUB_GAP = 136;
-/** Gap between a folder and the column of its subfolders. */
-export const TREE_GAP = 112;
-/** Gap between columns of divisions or top-level folders. */
-export const BLOCK_GAP = 96;
-/** Vertical gap between cards stacked in one column. */
-export const STACK_GAP = 32;
-/** How far above the top row of cards the overhead lane runs. */
-const OVERHEAD_CLEARANCE = 18;
-/** The width-to-height ratio each view picks its column count for. */
-const TARGET_ASPECT = 1.6;
-const MAX_COLUMNS = 4;
+/** Gap between one level of the tree and the next; links branch halfway down it. */
+export const LEVEL_GAP = 72;
+/** Gap between cards that share a parent. */
+export const SIBLING_GAP = 20;
+/** Gap between the hub's branches: divisions, or top-level folders. */
+export const BRANCH_GAP = 64;
 
 /** How many of a bucket's documents its card lists. */
 export function shownDocCount(bucket: Bucket, expanded: boolean): number {
@@ -339,15 +325,15 @@ export function hasMoreRow(bucket: Bucket): boolean {
 }
 
 /**
- * Rows under a card's header: subfolders, then documents, then "Show all" when
- * some are folded away. An empty card shows a single placeholder row.
+ * Rows under a card's header: documents, then "Show all" when some are folded
+ * away. A division is a header alone, its categories drawn as branches below
+ * it; so is a folder holding only subfolders. Any other empty card shows a
+ * single placeholder row.
  */
 export function cardRowCount(bucket: Bucket, expanded: boolean): number {
-  const rows =
-    bucket.children.length +
-    shownDocCount(bucket, expanded) +
-    (hasMoreRow(bucket) ? 1 : 0);
-  return Math.max(rows, 1);
+  if (bucket.kind === "division") return 0;
+  const rows = shownDocCount(bucket, expanded) + (hasMoreRow(bucket) ? 1 : 0);
+  return rows || (bucket.children.length ? 0 : 1);
 }
 
 export function cardHeight(bucket: Bucket, expanded: boolean): number {
@@ -356,17 +342,9 @@ export function cardHeight(bucket: Bucket, expanded: boolean): number {
   );
 }
 
-/** The hub lists one row per bucket, or a single placeholder row. */
-export function hubHeight(rowCount: number): number {
-  return CARD_BORDER + HEADER_HEIGHT + Math.max(rowCount, 1) * ROW_HEIGHT;
-}
-
-/**
- * Top for a card whose header should sit level with row `index` of the card
- * whose top is `top`, so the link between them runs straight across.
- */
-function levelWithRow(top: number, index: number): number {
-  return top + HEADER_HEIGHT / 2 + index * ROW_HEIGHT + ROW_HEIGHT / 2;
+/** The hub is a header alone, with a placeholder row while it has no branches. */
+export function hubHeight(branchCount: number): number {
+  return CARD_BORDER + HEADER_HEIGHT + (branchCount ? 0 : ROW_HEIGHT);
 }
 
 export interface Box {
@@ -378,17 +356,12 @@ export interface Box {
 export interface MapLink {
   id: string;
   source: string;
-  sourceHandle: string;
   target: string;
-  /** The gap the link crosses first; it bends halfway across. */
-  gutter: number;
   /**
-   * Set when other cards stand between the link's ends. The link climbs to a
-   * lane at `y` above every card and drops back down in the gap left of its
-   * target, `approach` wide. Run straight across instead, it would pass
-   * behind the cards in between and seem to join them.
+   * Where the link turns sideways: halfway down the gap above its target's
+   * level, so every link into a level branches off one shared bar.
    */
-  overhead?: { y: number; approach: number };
+  busY: number;
 }
 
 export interface Point {
@@ -397,35 +370,23 @@ export interface Point {
 }
 
 /**
- * The corners of a link from a row's right edge to a card's left edge: out
- * into the source's gutter, along it, then across to the target, by way of
- * the overhead lane when the link has one. Null when the target has been
- * dragged back over the gutter, where there is no sensible corner to turn.
+ * The corners of a link from the bottom of a card to the top of one below:
+ * down to the bar, along it, and down again. Null when the target has been
+ * dragged up level with or above its source, where there is no sensible
+ * corner to turn.
  */
 export function routeLink(
   source: Point,
   target: Point,
-  link: Pick<MapLink, "gutter" | "overhead">
+  link: Pick<MapLink, "busY">
 ): Point[] | null {
-  const bendX = source.x + link.gutter / 2;
-  if (target.x <= bendX) return null;
-
-  if (link.overhead) {
-    const dropX = target.x - link.overhead.approach / 2;
-    const laneY = link.overhead.y;
-    if (dropX > bendX) {
-      return [
-        source,
-        { x: bendX, y: source.y },
-        { x: bendX, y: laneY },
-        { x: dropX, y: laneY },
-        { x: dropX, y: target.y },
-        target,
-      ];
-    }
-  }
-
-  return [source, { x: bendX, y: source.y }, { x: bendX, y: target.y }, target];
+  if (target.y <= source.y) return null;
+  // A dragged card can leave the bar outside the gap; turn halfway instead.
+  const y =
+    link.busY > source.y && link.busY < target.y
+      ? link.busY
+      : (source.y + target.y) / 2;
+  return [source, { x: source.x, y }, { x: target.x, y }, target];
 }
 
 /** An SVG path through right-angled corners, each rounded off by `radius`. */
@@ -474,220 +435,81 @@ export interface MapLayout {
 }
 
 /**
- * The heights cards are packed into columns by: each card folded, as the map
- * first draws it. Holding these fixed while the map is open keeps every card
- * in its column when a card expands or a document moves to another card.
- */
-export type PackingBasis = ReadonlyMap<string, number>;
-
-export function packingBasis(buckets: Bucket[]): PackingBasis {
-  return new Map(buckets.map((b) => [b.id, cardHeight(b, false)]));
-}
-
-/**
- * Place the hub and every card. `expanded` holds the ids of cards showing all
- * their documents. Columns are assigned from `basis`, so a card that grows or
- * shrinks only moves the cards below it in its own column.
+ * Place the hub and every card as a tree growing downwards: the hub on top,
+ * its branches (divisions, or top-level folders) in a row beneath it, and each
+ * one's categories or subfolders in a row beneath that. Every card is centred
+ * over its own children, and each level starts below the tallest card of the
+ * level above. `expanded` holds the ids of cards showing all their documents.
  */
 export function layoutMap(
   view: MapView,
   buckets: Bucket[],
-  expanded: ReadonlySet<string>,
-  basis: PackingBasis = packingBasis(buckets)
-): MapLayout {
-  return layoutTree(view, buckets, expanded, basis);
-}
-
-/** Something to stack in a column: a category card, or a folder's subtree. */
-interface Stackable {
-  /** Height the basis gives it, or undefined if the basis predates it. */
-  basisHeight: number | undefined;
-  /** Height it is drawn at now. */
-  height: number;
-  width: number;
-}
-
-/**
- * Masonry columns: each item goes under whichever column is shortest so far.
- * The column count is the one that brings the map closest to TARGET_ASPECT,
- * judged on the items the basis knows. Items it doesn't know, like a
- * category added since the map opened, are placed after those, so they can't
- * push known items into other columns. Returns each item's top-left corner.
- */
-function stackInColumns(
-  items: Stackable[],
-  { left, top, gap, minHeight }: { left: number; top: number; gap: number; minHeight: number }
-): Point[] {
-  const indices = items.map((_, i) => i);
-  const known = indices.filter((i) => items[i].basisHeight !== undefined);
-  const order = [...known, ...indices.filter((i) => items[i].basisHeight === undefined)];
-  const packHeight = (i: number) => items[i].basisHeight ?? items[i].height;
-
-  const assign = (subset: number[], columns: number) => {
-    const bottoms: number[] = new Array(columns).fill(top);
-    const widths: number[] = new Array(columns).fill(0);
-    const columnOf = new Map<number, number>();
-    for (const i of subset) {
-      let column = 0;
-      for (let c = 1; c < columns; c++) {
-        if (bottoms[c] < bottoms[column]) column = c;
-      }
-      columnOf.set(i, column);
-      bottoms[column] += packHeight(i) + STACK_GAP;
-      widths[column] = Math.max(widths[column], items[i].width);
-    }
-    const right = left + widths.reduce((sum, w) => sum + w, 0) + gap * (columns - 1);
-    const bottom = Math.max(...bottoms) - STACK_GAP;
-    return { columnOf, right, bottom };
-  };
-
-  const judged = known.length ? known : order;
-  let columns = 1;
-  let bestScore = Infinity;
-  for (let count = 1; count <= Math.min(MAX_COLUMNS, Math.max(judged.length, 1)); count++) {
-    const packed = assign(judged, count);
-    const height = Math.max(minHeight, packed.bottom);
-    const score = Math.abs(Math.log(packed.right / height / TARGET_ASPECT));
-    if (score < bestScore) {
-      bestScore = score;
-      columns = count;
-    }
-  }
-  const { columnOf } = assign(order, columns);
-
-  // Stack each column in packing order at the heights drawn now.
-  const widths: number[] = new Array(columns).fill(0);
-  for (const i of order) {
-    const column = columnOf.get(i) ?? 0;
-    widths[column] = Math.max(widths[column], items[i].width);
-  }
-  const lefts: number[] = [];
-  let x = left;
-  for (const width of widths) {
-    lefts.push(x);
-    x += width + gap;
-  }
-  const nextTop: number[] = new Array(columns).fill(top);
-  const corners: Point[] = new Array(items.length);
-  for (const i of order) {
-    const column = columnOf.get(i) ?? 0;
-    corners[i] = { x: lefts[column], y: nextTop[column] };
-    nextTop[column] += items[i].height + STACK_GAP;
-  }
-  return corners;
-}
-
-/** One top-level folder and everything beneath it, laid out from (0, 0). */
-interface Block {
-  boxes: Map<string, Box>;
-  links: MapLink[];
-  width: number;
-  height: number;
-}
-
-/**
- * A subtree read left to right, one column per level. A card sits level with
- * the row that links to it when there is room, and lower otherwise.
- */
-function layoutSubtree(
-  root: Bucket,
-  bucketById: Map<string, Bucket>,
-  heightOf: (bucket: Bucket) => number
-): Block {
-  const boxes = new Map<string, Box>();
-  const links: MapLink[] = [];
-  /** First free y in each level's column. */
-  const nextTop: number[] = [];
-  let width = CARD_WIDTH;
-
-  const place = (bucket: Bucket, ideal: number) => {
-    const level = bucket.depth - root.depth;
-    const x = level * (CARD_WIDTH + TREE_GAP);
-    const top = Math.max(nextTop[level] ?? 0, ideal);
-    const height = heightOf(bucket);
-    boxes.set(bucket.id, { x, y: top, height });
-    nextTop[level] = top + height + STACK_GAP;
-    width = Math.max(width, x + CARD_WIDTH);
-
-    bucket.children.forEach((childId, index) => {
-      const child = bucketById.get(childId);
-      if (!child || child.rowOnly) return;
-      links.push({
-        id: `${bucket.id}->${child.id}`,
-        source: bucket.id,
-        sourceHandle: rowHandleId(child.id),
-        target: child.id,
-        gutter: TREE_GAP,
-      });
-      place(child, levelWithRow(top, index));
-    });
-  };
-
-  place(root, 0);
-  return { boxes, links, width, height: Math.max(...nextTop) - STACK_GAP };
-}
-
-/**
- * The hub, then each division's (or top-level folder's) subtree as a block,
- * the blocks stacked in as many columns as brings the map closest to
- * TARGET_ASPECT.
- */
-function layoutTree(
-  view: MapView,
-  buckets: Bucket[],
-  expanded: ReadonlySet<string>,
-  basis: PackingBasis
+  expanded: ReadonlySet<string>
 ): MapLayout {
   const hub = hubId(view);
   const bucketById = new Map(buckets.map((b) => [b.id, b]));
   const roots = hubBuckets(buckets);
-  const hubBox: Box = { x: 0, y: 0, height: hubHeight(roots.length) };
-  const left = CARD_WIDTH + HUB_GAP;
-  // The first card's header sits level with the hub's first row.
-  const top = levelWithRow(0, 0);
 
-  const blocks = roots.map((root) =>
-    layoutSubtree(root, bucketById, (b) => cardHeight(b, expanded.has(b.id)))
-  );
-  const items = roots.map((root, i) => ({
-    basisHeight: basis.has(root.id)
-      ? layoutSubtree(
-          root,
-          bucketById,
-          (b) => basis.get(b.id) ?? cardHeight(b, false)
-        ).height
-      : undefined,
-    height: blocks[i].height,
-    width: blocks[i].width,
-  }));
-  const corners = stackInColumns(items, {
-    left,
-    top,
-    gap: BLOCK_GAP,
-    minHeight: hubBox.height,
-  });
+  const childrenOf = (id: string): Bucket[] =>
+    id === hub
+      ? roots
+      : (bucketById.get(id)?.children ?? []).flatMap((childId) => {
+          const child = bucketById.get(childId);
+          return child ? [child] : [];
+        });
+  const heightOf = (id: string): number => {
+    const bucket = bucketById.get(id);
+    return bucket ? cardHeight(bucket, expanded.has(id)) : hubHeight(roots.length);
+  };
+  const gapUnder = (id: string) => (id === hub ? BRANCH_GAP : SIBLING_GAP);
 
-  const boxes = new Map<string, Box>([[hub, hubBox]]);
+  // How wide each subtree is, and how tall each level's tallest card is.
+  const width = new Map<string, number>();
+  const levelHeights: number[] = [];
+  const measure = (id: string, level: number): number => {
+    levelHeights[level] = Math.max(levelHeights[level] ?? 0, heightOf(id));
+    const children = childrenOf(id);
+    const span =
+      children.reduce((sum, child) => sum + measure(child.id, level + 1), 0) +
+      gapUnder(id) * Math.max(children.length - 1, 0);
+    const subtree = Math.max(CARD_WIDTH, span);
+    width.set(id, subtree);
+    return subtree;
+  };
+  measure(hub, 0);
+
+  const levelTops = [0];
+  for (let level = 1; level < levelHeights.length; level++) {
+    levelTops[level] = levelTops[level - 1] + levelHeights[level - 1] + LEVEL_GAP;
+  }
+
+  const boxes = new Map<string, Box>();
   const links: MapLink[] = [];
-  const overheadY = top - OVERHEAD_CLEARANCE;
-
-  roots.forEach((root, i) => {
-    const corner = corners[i];
-    for (const [id, box] of blocks[i].boxes) {
-      boxes.set(id, { x: box.x + corner.x, y: box.y + corner.y, height: box.height });
-    }
-    links.push({
-      id: `${hub}->${root.id}`,
-      source: hub,
-      sourceHandle: rowHandleId(root.id),
-      target: root.id,
-      gutter: HUB_GAP,
-      // Blocks past the first column have other cards in front of them.
-      overhead:
-        corner.x > left ? { y: overheadY, approach: BLOCK_GAP } : undefined,
+  const place = (id: string, left: number, level: number) => {
+    const subtree = width.get(id) ?? CARD_WIDTH;
+    boxes.set(id, {
+      x: left + (subtree - CARD_WIDTH) / 2,
+      y: levelTops[level],
+      height: heightOf(id),
     });
-    links.push(...blocks[i].links);
-  });
+
+    const children = childrenOf(id);
+    const span =
+      children.reduce((sum, child) => sum + (width.get(child.id) ?? 0), 0) +
+      gapUnder(id) * Math.max(children.length - 1, 0);
+    let x = left + (subtree - span) / 2;
+    for (const child of children) {
+      links.push({
+        id: `${id}->${child.id}`,
+        source: id,
+        target: child.id,
+        busY: levelTops[level + 1] - LEVEL_GAP / 2,
+      });
+      place(child.id, x, level + 1);
+      x += (width.get(child.id) ?? 0) + gapUnder(id);
+    }
+  };
+  place(hub, 0, 0);
 
   return { boxes, links };
 }
