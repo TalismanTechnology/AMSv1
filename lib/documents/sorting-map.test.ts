@@ -11,6 +11,7 @@ import {
   nodesWithMatches,
   normalizeQuery,
   openForMatches,
+  stepPath,
   walkTree,
   LEVEL_GAP,
   LIST_ROWS,
@@ -498,6 +499,29 @@ test("starts each level below the tallest box above it", () => {
     const target = box(layout, link.target);
     assert.ok(target.y >= source.y + source.height + LEVEL_GAP);
   }
+});
+
+test("runs each line down to a bar halfway between the levels", () => {
+  const tree = school();
+  const layout = layoutTree(tree, new Set([tree.id, "division:d0"]));
+
+  for (const link of layout.links) {
+    const source = box(layout, link.source);
+    const target = box(layout, link.target);
+    assert.equal(link.busY, target.y - LEVEL_GAP / 2);
+    assert.ok(link.busY > source.y + source.height);
+  }
+});
+
+test("draws right-angled lines with rounded corners", () => {
+  assert.equal(
+    stepPath({ x: 100, y: 0 }, { x: 40, y: 60 }, 30, 6),
+    "M 100,0 L 100,24 Q 100,30 94,30 L 46,30 Q 40,30 40,36 L 40,60"
+  );
+  // Straight down when the boxes line up.
+  assert.equal(stepPath({ x: 50, y: 0 }, { x: 50, y: 60 }, 30, 6), "M 50,0 L 50,60");
+  // A bar outside the gap is ignored for the halfway point.
+  assert.ok(stepPath({ x: 0, y: 0 }, { x: 40, y: 100 }, 500, 6).includes("L 0,44"));
 });
 
 test("lays out an empty library as a lone root", () => {

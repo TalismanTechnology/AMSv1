@@ -468,19 +468,19 @@ export function nodesWithMatches(root: TreeNode, query: string): Set<string> {
 // Boxes are drawn to these sizes (see components/admin/sorting-map-nodes.tsx),
 // so the layout can place them before the browser has measured anything.
 
-export const NODE_WIDTH = 232;
-export const NODE_HEIGHT = 60;
-export const LIST_WIDTH = 280;
-export const ROW_HEIGHT = 34;
+export const NODE_WIDTH = 200;
+export const NODE_HEIGHT = 36;
+export const LIST_WIDTH = 248;
+export const ROW_HEIGHT = 30;
 /** Rows a document list shows before it scrolls. */
 export const LIST_ROWS = 8;
 /** A box's 1px border, top and bottom. */
 const BORDER = 2;
 
 /** Gap between one level of the tree and the next. */
-export const LEVEL_GAP = 64;
+export const LEVEL_GAP = 48;
 /** Gap between boxes side by side. */
-export const SIBLING_GAP = 20;
+export const SIBLING_GAP = 16;
 
 export function nodeSize(node: TreeNode): { width: number; height: number } {
   if (node.kind !== "list") return { width: NODE_WIDTH, height: NODE_HEIGHT };
@@ -499,6 +499,46 @@ export interface MapLink {
   id: string;
   source: string;
   target: string;
+  /**
+   * Where the link turns sideways: halfway down the gap above its target's
+   * level, so the links from one box branch off a single bar.
+   */
+  busY: number;
+}
+
+export interface Point {
+  x: number;
+  y: number;
+}
+
+/**
+ * An SVG path from the bottom of a box to the top of one below it: down to
+ * the bar, along it, and down again, each corner rounded off by `radius`.
+ * When a box has been moved off its level the bar falls outside the gap, and
+ * the path turns halfway instead.
+ */
+export function stepPath(
+  source: Point,
+  target: Point,
+  busY: number,
+  radius: number
+): string {
+  const y =
+    busY > source.y && busY < target.y ? busY : (source.y + target.y) / 2;
+  const dx = target.x - source.x;
+  if (Math.abs(dx) < 0.5) {
+    return `M ${source.x},${source.y} L ${target.x},${target.y}`;
+  }
+  const r = Math.min(radius, Math.abs(dx) / 2, Math.abs(y - source.y), Math.abs(target.y - y));
+  const sx = Math.sign(dx);
+  return [
+    `M ${source.x},${source.y}`,
+    `L ${source.x},${y - r}`,
+    `Q ${source.x},${y} ${source.x + sx * r},${y}`,
+    `L ${target.x - sx * r},${y}`,
+    `Q ${target.x},${y} ${target.x},${y + r}`,
+    `L ${target.x},${target.y}`,
+  ].join(" ");
 }
 
 export interface MapLayout<D extends MapDocument = MapDocument> {
@@ -560,7 +600,12 @@ export function layoutTree<D extends MapDocument>(
       SIBLING_GAP * Math.max(children.length - 1, 0);
     let x = left + (subtree - span) / 2;
     for (const child of children) {
-      links.push({ id: `${node.id}->${child.id}`, source: node.id, target: child.id });
+      links.push({
+        id: `${node.id}->${child.id}`,
+        source: node.id,
+        target: child.id,
+        busY: levelTops[level + 1] - LEVEL_GAP / 2,
+      });
       place(child, x, level + 1);
       x += (width.get(child.id) ?? 0) + SIBLING_GAP;
     }

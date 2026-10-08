@@ -5,7 +5,6 @@ import {
   BaseEdge,
   Handle,
   Position,
-  getStraightPath,
   type Edge,
   type EdgeProps,
   type EdgeTypes,
@@ -42,13 +41,15 @@ import {
 import { cn } from "@/lib/utils";
 import {
   LIST_ROWS,
+  ROW_HEIGHT,
   matchesQuery,
+  stepPath,
   type MapView,
   type TreeNode,
 } from "@/lib/documents/sorting-map";
 import type { Document } from "@/lib/types";
 
-// Boxes are drawn to NODE_WIDTH × NODE_HEIGHT (232 × 60) and list rows to ROW_HEIGHT in
+// Boxes are drawn to NODE_WIDTH × NODE_HEIGHT (200 × 36) and list rows to ROW_HEIGHT (30) in
 // lib/documents/sorting-map.ts, which places them before they are measured.
 // Sizes are px, not rem, so a larger browser font can't outgrow the layout.
 //
@@ -72,6 +73,8 @@ export type MapNode = TreeBoxNode | DocListNode;
 
 export type LinkEdge = Edge<
   {
+    /** Where the line turns sideways; see MapLink.busY. */
+    busY: number;
     /** The child's colour, used while the line is lit. */
     color: string | null;
     active: boolean;
@@ -176,7 +179,7 @@ function opensInto(node: TreeNode<Document>): string {
 
 function BoxIcon({ node }: { node: TreeNode<Document> }) {
   const style = node.color ? { color: node.color } : undefined;
-  const className = cn("size-4 shrink-0", !node.color && "text-ink-soft");
+  const className = cn("size-3.5 shrink-0", !node.color && "text-muted-foreground");
   switch (node.kind) {
     case "root":
       return <Library className={className} />;
@@ -191,14 +194,14 @@ function BoxIcon({ node }: { node: TreeNode<Document> }) {
     case "folder":
       return <FolderIcon className={className} />;
     case "unsorted":
-      return <Inbox className="size-4 shrink-0 text-muted-foreground" />;
+      return <Inbox className="size-3.5 shrink-0 text-muted-foreground" />;
     default:
       return <TypeIcon name={node.name} />;
   }
 }
 
 function TypeIcon({ name }: { name: string }) {
-  const className = "size-4 shrink-0 text-ink-soft";
+  const className = "size-3.5 shrink-0 text-muted-foreground";
   if (name === "Email") return <Mail className={className} />;
   if (name === "Spreadsheet") return <FileSpreadsheet className={className} />;
   if (name === "Slides") return <Presentation className={className} />;
@@ -221,19 +224,15 @@ function TreeBox({ data }: NodeProps<TreeBoxNode>) {
       onMouseEnter={() => map.setHovered(node.id)}
       onMouseLeave={() => map.setHovered(null)}
       className={cn(
-        "group/box relative h-[60px] w-[232px] rounded-lg border bg-[var(--card)] shadow-[var(--elev-2)] transition-[opacity,box-shadow] duration-150",
+        "group/box relative h-[36px] w-[200px] rounded-md border bg-[var(--card)] shadow-[0_1px_2px_rgba(45,58,46,0.06)] transition-opacity duration-150",
         node.kind === "unsorted"
           ? "border-dashed border-foreground/30"
-          : "border-border",
-        open && "border-ink/30",
+          : open
+            ? "border-ink/35"
+            : "border-border",
         dimmed && "opacity-40",
         drop.isOver && "outline-2 outline-offset-2 outline-ring"
       )}
-      style={
-        node.color
-          ? { boxShadow: `inset 3px 0 0 ${node.color}, var(--elev-2)` }
-          : undefined
-      }
     >
       {!isRoot && (
         <Handle
@@ -253,23 +252,24 @@ function TreeBox({ data }: NodeProps<TreeBoxNode>) {
         }`}
         title={opens ? `${open ? "Close" : "Open"} ${node.name}` : node.name}
         className={cn(
-          "flex h-full w-full items-center gap-2.5 rounded-lg pl-3.5 pr-7 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+          "flex h-full w-full items-center gap-2 rounded-md px-2.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
           opens ? "cursor-pointer hover:bg-muted/50" : "cursor-default"
         )}
       >
         <BoxIcon node={node} />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[13px] font-medium leading-tight text-ink">
-            {node.name}
-          </span>
-          <span className="mt-0.5 block truncate text-[11px] leading-tight text-muted-foreground">
-            {plural(node.count, "document")}
-          </span>
+        <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-ink">
+          {node.name}
+        </span>
+        <span
+          className="shrink-0 font-mono text-[10.5px] tabular-nums text-muted-foreground"
+          title={plural(node.count, "document")}
+        >
+          {node.count}
         </span>
         {opens && (
           <Chevron
             aria-hidden
-            className="size-3.5 shrink-0 text-muted-foreground"
+            className="size-3 shrink-0 text-muted-foreground"
           />
         )}
       </button>
@@ -308,7 +308,7 @@ function BoxMenu({ node }: { node: TreeNode<Document> }) {
           type="button"
           aria-label={`${node.name} options`}
           className={cn(
-            "nodrag nopan absolute right-1 top-1 flex size-6 items-center justify-center rounded-md text-muted-foreground outline-none transition-opacity hover:bg-muted hover:text-ink focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring group-hover/box:opacity-100",
+            "nodrag nopan absolute right-1 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded bg-[var(--card)] text-muted-foreground outline-none transition-opacity hover:bg-muted hover:text-ink focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring group-hover/box:opacity-100",
             map.touch ? "opacity-100" : "opacity-0"
           )}
         >
@@ -360,7 +360,7 @@ function DocList({ data }: NodeProps<DocListNode>) {
       aria-label={`${node.name} documents, ${docs.length}`}
       {...drop.handlers}
       className={cn(
-        "w-[280px] overflow-hidden rounded-lg border border-border bg-[var(--card)] shadow-[var(--elev-2)]",
+        "w-[248px] overflow-hidden rounded-md border border-border bg-[var(--card)] shadow-[0_1px_2px_rgba(45,58,46,0.06)]",
         drop.isOver && "outline-2 outline-offset-2 outline-ring"
       )}
     >
@@ -375,7 +375,7 @@ function DocList({ data }: NodeProps<DocListNode>) {
           "overflow-y-auto",
           docs.length > LIST_ROWS && "nowheel"
         )}
-        style={{ maxHeight: LIST_ROWS * 34 }}
+        style={{ maxHeight: LIST_ROWS * ROW_HEIGHT }}
       >
         {docs.map((doc) => (
           <DocumentRow key={doc.id} doc={doc} sortable={sortable} />
@@ -400,7 +400,7 @@ function statusOf(doc: Document): string {
 
 /** The small buttons that appear over a document row's file type on hover. */
 const rowActionClass =
-  "flex size-6 items-center justify-center rounded-md bg-[var(--card)] text-muted-foreground ring-1 ring-border outline-none transition-opacity hover:text-ink disabled:cursor-wait focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring group-hover/row:opacity-100";
+  "flex size-5 items-center justify-center rounded bg-[var(--card)] text-muted-foreground ring-1 ring-border outline-none transition-opacity hover:text-ink disabled:cursor-wait focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring group-hover/row:opacity-100";
 
 function DocumentRow({
   doc,
@@ -425,7 +425,7 @@ function DocumentRow({
   return (
     <li
       className={cn(
-        "group/row relative h-[34px] border-b border-border/60 last:border-b-0",
+        "group/row relative h-[30px] border-b border-border/60 last:border-b-0",
         !map.touch && "nodrag nopan",
         hit === false && "opacity-40"
       )}
@@ -449,7 +449,7 @@ function DocumentRow({
           event.dataTransfer.effectAllowed = "move";
         }}
         onDragEnd={map.endDrag}
-        className="flex h-full w-full cursor-pointer select-none items-center gap-2.5 px-3 text-left outline-none transition-colors hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+        className="flex h-full w-full cursor-pointer select-none items-center gap-2 px-2.5 text-left outline-none transition-colors hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       >
         <Diamond
           aria-hidden
@@ -461,22 +461,24 @@ function DocumentRow({
         />
         <span
           className={cn(
-            "min-w-0 flex-1 truncate text-[13px]",
+            "min-w-0 flex-1 truncate text-[12px]",
             hit ? "font-medium text-ink" : "text-ink-soft"
           )}
         >
           {doc.title}
         </span>
-        {notReady && (
-          <span
-            className={cn(
-              "shrink-0 font-mono text-[11px] lowercase",
-              notReady === "error" ? "text-destructive" : "text-amber-700"
-            )}
-          >
-            {notReady}
-          </span>
-        )}
+        <span
+          className={cn(
+            "shrink-0 font-mono text-[10.5px] lowercase",
+            notReady === "error"
+              ? "text-destructive"
+              : notReady
+                ? "text-amber-700"
+                : "text-muted-foreground"
+          )}
+        >
+          {notReady ?? doc.file_type}
+        </span>
       </div>
       <div className="absolute right-1.5 top-1/2 flex -translate-y-1/2 gap-1">
         {canSort && (
@@ -512,7 +514,13 @@ function DocumentRow({
 // ── Lines ─────────────────────────────────────────────
 
 function LinkLine({ id, sourceX, sourceY, targetX, targetY, data }: EdgeProps<LinkEdge>) {
-  const [path] = getStraightPath({ sourceX, sourceY, targetX, targetY });
+  // Right angles, like a schema diagram: down, along the bar, and down.
+  const path = stepPath(
+    { x: sourceX, y: sourceY },
+    { x: targetX, y: targetY },
+    data?.busY ?? (sourceY + targetY) / 2,
+    6
+  );
   return (
     <BaseEdge
       id={id}

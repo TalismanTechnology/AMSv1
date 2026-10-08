@@ -452,6 +452,7 @@ function MapCanvas({
         target: link.target,
         targetHandle: TARGET_HANDLE_ID,
         data: {
+          busY: link.busY,
           color: colorOf.get(link.target) ?? null,
           active: lit || found,
           dimmed: query !== "" && !found,
