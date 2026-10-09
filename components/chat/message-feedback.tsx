@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ThumbsUp, ThumbsDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { submitFeedback } from "@/actions/feedback";
+import { clearFeedback, submitFeedback } from "@/actions/feedback";
 import { cn } from "@/lib/utils";
 
 interface MessageFeedbackProps {
@@ -23,10 +23,10 @@ export function MessageFeedback({ messageId, schoolId }: MessageFeedbackProps) {
     // Optimistic update
     setRating(newRating);
 
-    if (newRating) {
-      const result = await submitFeedback(messageId, newRating, schoolId);
-      if (result.error) setRating(rating); // revert on error
-    }
+    const result = newRating
+      ? await submitFeedback(messageId, newRating, schoolId)
+      : await clearFeedback(messageId);
+    if (result.error) setRating(rating); // revert on error
     setSubmitting(false);
   }
 
@@ -43,6 +43,7 @@ export function MessageFeedback({ messageId, schoolId }: MessageFeedbackProps) {
         )}
         onClick={() => handleRate("up")}
         disabled={submitting}
+        aria-label="Helpful"
       >
         <ThumbsUp className="h-3.5 w-3.5" />
       </Button>
@@ -57,6 +58,8 @@ export function MessageFeedback({ messageId, schoolId }: MessageFeedbackProps) {
         )}
         onClick={() => handleRate("down")}
         disabled={submitting}
+        aria-label="Not helpful"
+        title="Not helpful — lets your school see this question and answer so they can improve"
       >
         <ThumbsDown className="h-3.5 w-3.5" />
       </Button>

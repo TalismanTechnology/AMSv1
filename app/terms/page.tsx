@@ -1,0 +1,213 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import {
+  ContactEmailLink,
+  LEGAL_OPERATOR,
+  LegalList,
+  LegalPage,
+  LegalSection,
+} from "@/components/legal/legal-page";
+
+// DRAFT — not yet reviewed by counsel. See the PR description.
+
+export const metadata: Metadata = {
+  title: "Terms of Service — AskMySchool",
+  description: "The terms that apply when you use AskMySchool.",
+};
+
+export default function TermsPage() {
+  return (
+    <LegalPage
+      eyebrow="Legal"
+      title="Terms of Service"
+      intro={
+        <p>
+          These Terms of Service (&ldquo;Terms&rdquo;) govern your use of
+          AskMySchool at askmyschool.app and in our iOS and Android apps (the
+          &ldquo;Service&rdquo;). By signing in or using the Service, you agree
+          to these Terms and to our <Link href="/privacy" className="font-medium text-ink underline underline-offset-4">Privacy Policy</Link>.
+          If you do not agree, do not use the Service. The Service is
+          operated by {LEGAL_OPERATOR} (&ldquo;we,&rdquo; &ldquo;us&rdquo;).
+        </p>
+      }
+    >
+      <LegalSection id="service" title="1. The Service">
+        <p>
+          AskMySchool lets parents and guardians ask questions about their
+          school and get answers, with citations, generated from documents,
+          calendars, and announcements the school has provided. School staff use
+          it to manage that content and see how families use it. Features may
+          change over time.
+        </p>
+      </LegalSection>
+
+      <LegalSection id="accounts" title="2. Accounts and eligibility">
+        <LegalList>
+          <li>
+            Access is provided through your school. Parents and guardians sign
+            in with their school&apos;s Blackbaud parent portal account; school
+            staff receive accounts from AskMySchool at the school&apos;s
+            request.
+          </li>
+          <li>
+            You must be an adult parent or guardian of a student at a
+            participating school, or authorized school staff. The Service is
+            not for children, and children under 13 may not use it.
+          </li>
+          <li>
+            Keep your sign-in credentials secure and do not share your account.
+            You are responsible for activity under your account. Tell us
+            promptly at <ContactEmailLink /> if you suspect unauthorized use.
+          </li>
+          <li>
+            Your access depends on your school&apos;s relationship with
+            AskMySchool and on your school continuing to list you as a parent,
+            guardian, or staff member.
+          </li>
+        </LegalList>
+      </LegalSection>
+
+      <LegalSection id="acceptable-use" title="3. Acceptable use">
+        <p>You agree not to:</p>
+        <LegalList>
+          <li>
+            Use the Service for anything unlawful, harmful, harassing, or
+            unrelated to your school community.
+          </li>
+          <li>
+            Enter other people&apos;s sensitive personal information (such as
+            medical, disciplinary, or financial details about a child other
+            than your own) into questions.
+          </li>
+          <li>
+            Try to access accounts, schools, or data you are not authorized to
+            access, or bypass security or access controls.
+          </li>
+          <li>
+            Scrape, overload, reverse engineer, or interfere with the Service,
+            or use automated means to access it except as we permit.
+          </li>
+          <li>
+            Use the Service to build a competing product, or attempt to extract
+            the underlying AI models or prompts.
+          </li>
+          <li>
+            Upload or send content (school staff) that you do not have the
+            right to share, or that contains malware.
+          </li>
+        </LegalList>
+      </LegalSection>
+
+      <LegalSection id="content" title="4. School content and your content">
+        <p>
+          Schools own the documents, calendars, announcements, and other
+          content they provide. Each school grants AskMySchool a limited
+          license to store, process, and display that content only to provide
+          the Service to that school and its families. Schools are responsible
+          for making sure they have the right to share that content and that
+          it is appropriate to share with their families.
+        </p>
+        <p>
+          You keep any rights you have in the questions you ask. You grant us
+          permission to store and process them to provide the Service to you
+          and your school, as described in our Privacy Policy.
+        </p>
+        <p>
+          AskMySchool owns the Service itself, including its software, design,
+          and branding. These Terms do not give you any rights in them other
+          than the right to use the Service as allowed here.
+        </p>
+      </LegalSection>
+
+      <LegalSection id="ai" title="5. AI-generated answers">
+        <p>
+          Answers are generated by artificial intelligence from your
+          school&apos;s content. <strong>They can be incomplete, out of date,
+          or wrong</strong>, even when citations are shown, and the underlying
+          school documents may themselves be outdated. Answers are for general
+          information only and are not official statements of your school,
+          and they are not medical, legal, or financial advice.
+        </p>
+        <p>
+          Always check important information &mdash; deadlines, health and
+          safety, emergencies, money, and anything about a specific child
+          &mdash; against the cited document or directly with your school. In
+          an emergency, contact your school or emergency services, not the
+          Service.
+        </p>
+      </LegalSection>
+
+      <LegalSection id="third-parties" title="6. Third-party services">
+        <p>
+          The Service relies on third parties such as Blackbaud (sign-in and
+          school data), Google (AI processing), and Apple and Google (app
+          stores and push notifications). Your use of those services is subject
+          to their own terms, and we are not responsible for them.
+        </p>
+      </LegalSection>
+
+      <LegalSection id="warranty" title="7. No warranty">
+        <p>
+          THE SERVICE IS PROVIDED &ldquo;AS IS&rdquo; AND &ldquo;AS
+          AVAILABLE,&rdquo; WITHOUT WARRANTIES OF ANY KIND, WHETHER EXPRESS OR
+          IMPLIED, INCLUDING WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+          PARTICULAR PURPOSE, ACCURACY, AND NON-INFRINGEMENT. WE DO NOT
+          WARRANT THAT THE SERVICE WILL BE UNINTERRUPTED, ERROR-FREE, OR
+          SECURE, OR THAT ANSWERS WILL BE ACCURATE OR COMPLETE.
+        </p>
+      </LegalSection>
+
+      <LegalSection id="liability" title="8. Limitation of liability">
+        <p>
+          TO THE FULLEST EXTENT PERMITTED BY LAW, ASKMYSCHOOL AND ITS
+          OPERATORS WILL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL,
+          CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR FOR ANY LOSS ARISING FROM
+          RELIANCE ON AI-GENERATED ANSWERS, ARISING OUT OF OR RELATED TO THE
+          SERVICE. OUR TOTAL LIABILITY FOR ANY CLAIM RELATED TO THE SERVICE IS
+          LIMITED TO THE GREATER OF THE AMOUNT YOU PAID US TO USE THE SERVICE
+          IN THE 12 MONTHS BEFORE THE CLAIM OR US$50. Some jurisdictions do
+          not allow certain limitations, so some of these may not apply to
+          you.
+        </p>
+      </LegalSection>
+
+      <LegalSection id="termination" title="9. Suspension and termination">
+        <p>
+          You may stop using the Service at any time and may ask us to delete
+          your account. We or your school may suspend or end your access if you
+          violate these Terms, if you are no longer associated with the school,
+          if the school stops using the Service, or if needed to protect the
+          Service or others. Sections that by their nature should survive
+          (including content ownership, disclaimers, limitation of liability,
+          and governing law) survive termination.
+        </p>
+      </LegalSection>
+
+      <LegalSection id="law" title="10. Governing law">
+        <p>
+          These Terms are governed by the laws of the State of New York,
+          without regard to its conflict-of-laws rules. Any dispute will be
+          brought in the state or federal courts located in New York, and you
+          and we consent to their jurisdiction. If your school has a separate
+          written agreement with AskMySchool, that agreement controls where it
+          conflicts with these Terms.
+        </p>
+      </LegalSection>
+
+      <LegalSection id="changes" title="11. Changes to these Terms">
+        <p>
+          We may update these Terms. We will post the new version here with a
+          new &ldquo;Last updated&rdquo; date and, for material changes, give
+          notice before they take effect. Continuing to use the Service after
+          the changes take effect means you accept them.
+        </p>
+      </LegalSection>
+
+      <LegalSection id="contact" title="12. Contact">
+        <p>
+          Questions about these Terms: <ContactEmailLink />.
+        </p>
+      </LegalSection>
+    </LegalPage>
+  );
+}

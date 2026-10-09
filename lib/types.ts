@@ -130,6 +130,8 @@ export interface ChatMessage {
   content: string;
   sources: ChatSource[];
   school_id: string;
+  /** No school sources were found for this exchange; flags it for staff review. */
+  unanswered?: boolean;
   created_at: string;
 }
 

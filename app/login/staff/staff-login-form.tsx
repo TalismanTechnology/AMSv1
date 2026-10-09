@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { login } from "@/actions/auth";
 import { AuthShell } from "@/components/auth/auth-shell";
+import { LegalNotice } from "@/components/legal/legal-notice";
 
 export function StaffLoginForm() {
   const searchParams = useSearchParams();
@@ -111,6 +112,7 @@ export function StaffLoginForm() {
             Sign in with Blackbaud
           </Link>
         </p>
+        <LegalNotice className="mt-4" />
       </div>
     </AuthShell>
   );

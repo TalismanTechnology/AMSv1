@@ -8,13 +8,17 @@ const adminClient = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+// Public pages that must load for anyone, signed in or not (legal pages are
+// linked from the app stores and sign-in screens).
+const PUBLIC_PAGES = new Set(["/privacy", "/terms"]);
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
   const pathname = request.nextUrl.pathname;
 
   // ─── Fast path: public routes that never need auth ─────────────────
-  if (pathname === "/") {
+  if (pathname === "/" || PUBLIC_PAGES.has(pathname)) {
     return supabaseResponse;
   }
 

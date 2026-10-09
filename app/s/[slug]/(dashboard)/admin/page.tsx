@@ -1,9 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requireSchoolContext } from "@/lib/school-context";
 import { StatsCards } from "@/components/admin/stats-cards";
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import { PageTransition } from "@/components/motion";
@@ -14,9 +16,14 @@ export default async function AdminDashboard({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const { school } = await requireSchoolContext(slug);
+  const { school, role, isSuperAdmin } = await requireSchoolContext(slug);
+  if (role !== "admin" && !isSuperAdmin) redirect(`/s/${slug}/parent`);
 
   const supabase = await createClient();
+  // analytics_events holds parents' question text, so school admins can't read
+  // it through RLS (migration 031). Counts only, via the service role, after
+  // the admin check above.
+  const service = createAdminClient();
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -51,15 +58,15 @@ export default async function AdminDashboard({
       .eq("school_memberships.school_id", school.id)
       .eq("role", "parent")
       .eq("approved", false),
-    supabase
+    service
       .from("analytics_events")
-      .select("*", { count: "exact", head: true })
+      .select("id", { count: "exact", head: true })
       .eq("school_id", school.id)
       .eq("event_type", "question")
       .gte("created_at", today.toISOString()),
-    supabase
+    service
       .from("analytics_events")
-      .select("*", { count: "exact", head: true })
+      .select("id", { count: "exact", head: true })
       .eq("school_id", school.id)
       .eq("event_type", "question"),
     supabase
