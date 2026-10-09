@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { login } from "@/actions/auth";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { BlackbaudSignInButton } from "@/components/auth/blackbaud-sign-in-button";
+import { LegalNotice } from "@/components/legal/legal-notice";
 
 interface LoginFormProps {
   schoolSlug: string;
@@ -144,6 +145,7 @@ export function LoginForm({
         >
           {showStaffSignIn ? "Back to parent sign-in" : "School staff sign-in"}
         </button>
+        <LegalNotice className="mt-4" />
       </div>
     </AuthShell>
   );

@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { LegalNotice } from "@/components/legal/legal-notice";
 
 // askmyschool.app/collegiate (app/collegiate/page.tsx), the link Collegiate
 // parents are sent while they are onboarded. Parents already know what the
@@ -123,6 +124,7 @@ export function CollegiateOnboarding({ schoolSlug }: { schoolSlug: string | null
         <p className="mt-3 text-center text-xs text-muted-foreground">
           Powered by AskMySchool
         </p>
+        <LegalNotice className="mt-2" />
       </div>
     </div>
   );

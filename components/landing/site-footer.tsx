@@ -18,6 +18,13 @@ const FOOTER_LINKS = [
       { label: "Staff sign in", href: "/login/staff" },
     ],
   },
+  {
+    heading: "Legal",
+    links: [
+      { label: "Privacy Policy", href: "/privacy" },
+      { label: "Terms of Service", href: "/terms" },
+    ],
+  },
 ];
 
 const LINK_CLASS = "text-sm text-muted-foreground transition-colors hover:text-ink";
@@ -25,7 +32,7 @@ const LINK_CLASS = "text-sm text-muted-foreground transition-colors hover:text-i
 export function SiteFooter() {
   return (
     <footer className="border-t border-border py-12 sm:py-14">
-      <div className="mx-auto grid max-w-6xl gap-10 px-6 sm:grid-cols-[1fr_auto_auto] sm:gap-16">
+      <div className="mx-auto grid max-w-6xl gap-10 px-6 sm:grid-cols-[1fr_auto_auto_auto] sm:gap-16">
         <div>
           <div className="flex items-center gap-2">
             <Logo size={20} className="text-brand-dark" />
