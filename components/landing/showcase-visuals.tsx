@@ -27,7 +27,7 @@ type Ask = {
   cite: string;
 };
 
-const SUGGESTIONS = ["When is spring break?", "Nut-free lunch rules?", "Snow day policy?"];
+const SUGGESTIONS = ["When is spring break?", "Nut-free lunch rules?", "Soccer game schedule?"];
 
 const ASKS: Ask[] = [
   {

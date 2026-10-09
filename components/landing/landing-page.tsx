@@ -79,7 +79,7 @@ export function LandingPage() {
                     Ask <Chip icon={MessageSquare}>anything</Chip> about your school
                   </>
                 }
-                description="Pickup times, dress code, bus routes, snow days. If the school wrote it down, you can ask about it, any time of day."
+                description="Pickup times, dress code, bus routes, sports schedules. If the school wrote it down, you can ask about it, any time of day."
                 visual={<AskVisual />}
               />
             </RevealOnScroll>

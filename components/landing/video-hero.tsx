@@ -105,6 +105,18 @@ function Navbar() {
               ))}
             </div>
 
+            {/* Mobile: sign-in one tap away, on the side the logo leaves
+                free. Hidden while the menu is open, which has its own. */}
+            <Link
+              href="/login"
+              className={`md:hidden inline-flex items-center px-3.5 py-1.5 bg-brand-dark text-white text-xs tracking-wide uppercase rounded-full transition-opacity duration-300 ${
+                menu.isOpen ? "opacity-0 pointer-events-none" : "opacity-100"
+              }`}
+              tabIndex={menu.isOpen ? -1 : undefined}
+            >
+              Sign in
+            </Link>
+
             {/* Center logo. The centering translate and the entrance
                 animation live on different elements on purpose: fade-down's
                 keyframes set `transform`, and with `both` fill that would
@@ -303,7 +315,7 @@ export function VideoHero({ children }: { children?: ReactNode }) {
           </h1>
 
           <p className="mt-6 md:mt-8 max-w-2xl text-base md:text-lg leading-relaxed text-brand-dark animate-fade-up stagger-6">
-            Pickup times, dress codes, snow days — ask in plain words and get
+            Pickup times, dress codes, sports schedules — ask in plain words and get
             the answer from your school&apos;s own handbooks and calendar, with
             the page it came from.
           </p>
