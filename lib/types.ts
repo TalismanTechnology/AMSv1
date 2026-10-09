@@ -40,6 +40,10 @@ export interface Profile {
   approved: boolean;
   child_grade: string | null;
   created_at: string;
+  /** When the user agreed to AI processing (migration 035); null if not / withdrawn. */
+  ai_consent_at?: string | null;
+  /** Notice version agreed to — see lib/ai/consent.ts. */
+  ai_consent_version?: string | null;
   children?: Child[];
   memberships?: SchoolMembership[];
 }
@@ -130,6 +134,8 @@ export interface ChatMessage {
   content: string;
   sources: ChatSource[];
   school_id: string;
+  /** No school sources were found for this exchange; flags it for staff review. */
+  unanswered?: boolean;
   created_at: string;
 }
 

@@ -1,7 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isApnsConfigured, sendApns, type SendResult } from "./apns";
 import { isFcmConfigured, sendFcm } from "./fcm";
-import { truncateBody, type PushMessage } from "./messages";
+import { announcementPath, truncateBody, type PushMessage } from "./messages";
 
 // Push notifications to the iOS / Android apps. Everything here is
 // best-effort: a failed push is logged, never surfaced to whoever triggered it.
@@ -79,7 +79,7 @@ export async function notifyAnnouncementPublished(announcementId: string): Promi
       {
         title: announcement.title,
         body: truncateBody(announcement.content ?? ""),
-        url: `/s/${school.slug}/parent/announcements`,
+        url: announcementPath(school.slug, announcementId),
       }
     );
   } catch (caught: unknown) {

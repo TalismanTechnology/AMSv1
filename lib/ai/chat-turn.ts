@@ -19,6 +19,7 @@ import {
   type ChildContext,
 } from "@/lib/ai/context";
 import { rewriteQueryWithContext } from "@/lib/ai/rewrite-query";
+import { redactChildNames, redactChildNamesInMessages } from "@/lib/ai/child-privacy";
 import { buildSystemPrompt } from "@/lib/ai/system-prompt";
 import type { ChatSource } from "@/lib/types";
 
@@ -39,6 +40,12 @@ export interface ChatTurn {
   relevantChunks: RelevantChunk[];
   modelMessages: ModelMessage[];
   temperature: number;
+  /**
+   * The parent's question as sent to the AI provider — children's names
+   * replaced by grade labels. Use this, not the raw text, for any other
+   * provider call (e.g. embedding an unanswered question).
+   */
+  providerQuestion: string;
 }
 
 /**
@@ -78,12 +85,18 @@ export async function prepareChatTurn({
   ]);
   const resolvedChildren = await children;
 
+  // Children's names never leave for the AI provider: every name in the
+  // conversation becomes that child's grade label before anything below
+  // (rewrite, embedding, answer model) sees it. See lib/ai/child-privacy.ts.
+  const providerMessages = redactChildNamesInMessages(messages, resolvedChildren);
+  const providerQuestion = redactChildNames(lastMessageText, resolvedChildren);
+
   // Rewrite follow-up questions into standalone queries for better RAG
   // search. Children are passed so "and my other kid?" resolves to a grade
   // level the documents are actually organised by.
   const searchQuery = await rewriteQueryWithContext(
-    messages,
-    lastMessageText,
+    providerMessages,
+    providerQuestion,
     resolvedChildren
   );
 
@@ -153,9 +166,17 @@ export async function prepareChatTurn({
     ? Math.min(Math.max(configured, 0), MAX_TEMPERATURE)
     : DEFAULT_TEMPERATURE;
 
-  const modelMessages = await convertToModelMessages(sanitizeMessages(messages));
+  const modelMessages = await convertToModelMessages(sanitizeMessages(providerMessages));
 
-  return { searchQuery, systemPrompt, sources, relevantChunks, modelMessages, temperature };
+  return {
+    searchQuery,
+    systemPrompt,
+    sources,
+    relevantChunks,
+    modelMessages,
+    temperature,
+    providerQuestion,
+  };
 }
 
 const MODEL_PART_TYPES = new Set([

@@ -14,6 +14,7 @@ import { assignToCluster } from "@/lib/ai/cluster-assignment";
 import { sendClusterAlert } from "@/lib/alerts/cluster-alerts";
 import { fetchChildrenForContext } from "@/lib/ai/context";
 import { CHAT_MODEL_ID, prepareChatTurn } from "@/lib/ai/chat-turn";
+import { aiConsentGate } from "@/lib/ai/consent";
 import { parseFollowUps } from "@/lib/chat-utils";
 import type { ChatSource } from "@/lib/types";
 
@@ -43,9 +44,16 @@ export async function POST(request: NextRequest) {
     // Verify access: super admins, or approved members of this school
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role")
+      .select("role, ai_consent_at, ai_consent_version")
       .eq("id", user.id)
       .single();
+
+    // Nothing reaches the AI provider until this user has agreed to the
+    // current AI-processing notice (App Store 5.1.2(i)). Enforced here, not
+    // only in the chat UI, so the dialog can't be bypassed. Applies to every
+    // role: staff previewing the chat send the same data to the same place.
+    const consentDenied = aiConsentGate(profile);
+    if (consentDenied) return consentDenied;
 
     if (profile?.role !== "super_admin") {
       const { data: membership } = await supabase
@@ -81,6 +89,7 @@ export async function POST(request: NextRequest) {
       relevantChunks,
       modelMessages,
       temperature,
+      providerQuestion,
     } = await prepareChatTurn({
       messages,
       lastMessageText,
@@ -111,6 +120,9 @@ export async function POST(request: NextRequest) {
           content: lastMessageText,
           sources: [],
           school_id: schoolId,
+          // Flags this exchange for school staff (no school sources found) —
+          // the same condition that logs an unanswered question below.
+          unanswered: sources.length === 0,
         })
         .then(({ error }) => { if (error) console.error("Failed to save user message:", error); });
 
@@ -161,7 +173,8 @@ export async function POST(request: NextRequest) {
         debugLog(`Recording unanswered question: "${lastMessageText.slice(0, 80)}"`);
         (async () => {
           try {
-            const embedding = await generateEmbedding(lastMessageText);
+            // Embedded via the provider, so the name-redacted text is used.
+            const embedding = await generateEmbedding(providerQuestion);
             debugLog(`Embedding generated (${embedding.length} dims), inserting...`);
             const { data: inserted, error: uqError } = await adminSupabase
               .from("unanswered_questions")
@@ -230,6 +243,7 @@ export async function POST(request: NextRequest) {
               content: cleanText,
               sources: savedSources,
               school_id: schoolId,
+              unanswered: sources.length === 0,
             })
             .then(({ error }) => { if (error) console.error("Failed to save assistant message:", error); });
         }

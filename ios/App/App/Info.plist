@@ -49,7 +49,7 @@
 	<string>Main</string>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
-		<string>armv7</string>
+		<string>arm64</string>
 	</array>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
@@ -66,5 +66,34 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<!-- app.askmyschool:// - the Blackbaud sign-in callback
+	     (lib/native/blackbaud-sign-in.ts) and app.askmyschool://open?path=...
+	     deep links (lib/native/links.ts). -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>app.askmyschool</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>app.askmyschool</string>
+			</array>
+		</dict>
+	</array>
+	<!-- Only HTTPS / the system's own encryption: exempt from export
+	     compliance, so App Store Connect doesn't ask on every build. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<!-- The site's file pickers (staff document upload) are system pickers
+	     in the web view, which can offer the camera and photo library. iOS
+	     requires these strings for that; the app never reads either on its
+	     own. Notifications need no Info.plist string; the prompt is shown by
+	     iOS. -->
+	<key>NSCameraUsageDescription</key>
+	<string>AskMySchool uses the camera only when you choose to photograph a document to upload.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>AskMySchool opens your photo library only when you choose a picture to upload.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>AskMySchool saves an image to your photo library only when you ask it to.</string>
 </dict>
 </plist>

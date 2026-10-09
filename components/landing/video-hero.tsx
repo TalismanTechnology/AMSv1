@@ -8,7 +8,7 @@ import { Logo } from "@/components/logo";
 
 // The headline's display face: an editorial serif with a true italic, to
 // suit the old-schoolhouse scene. Everything else on the page stays in the
-// Helvetica Neue Light UI face, so this is loaded here, for the hero only.
+// light Inter UI face, so this is loaded here, for the hero only.
 const heroSerif = Instrument_Serif({
   weight: "400",
   style: ["normal", "italic"],
@@ -90,16 +90,19 @@ function Navbar() {
             </Link>
           </div>
 
-          {/* Desktop: sign-in text link, then the CTA pill */}
+          {/* Desktop: the schools link, then the parent sign-in pill. There
+              is no self-serve sign-up: parents sign in through their
+              school's Blackbaud login (/login is the school picker) and
+              schools get in touch via the closing section. */}
           <div className="hidden md:flex items-center gap-6 ml-auto animate-fade-down stagger-3">
-            <Link href="/login" className={NAV_LINK_CLASS}>
-              Sign in
-            </Link>
+            <a href="#get-started" className={NAV_LINK_CLASS}>
+              For schools
+            </a>
             <Link
               href="/login"
               className="inline-flex items-center px-5 py-2.5 bg-brand-dark text-white text-sm tracking-wide uppercase rounded-full hover:bg-brand-green transition-colors"
             >
-              Get Started
+              Parent sign in
             </Link>
           </div>
 

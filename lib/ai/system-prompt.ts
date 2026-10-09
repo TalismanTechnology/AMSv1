@@ -184,15 +184,16 @@ function divisionRules(hasChildren: boolean): string {
 
 // With more than one child, the failure mode isn't missing information — it's
 // attributing one child's answer to the other, or inventing a gender for a
-// child the school record describes only by name and grade.
+// child the school record describes only by grade. Names are never sent to the
+// model (lib/ai/child-privacy.ts), so children are kept apart by grade label.
 function multiChildRules(childCount: number): string {
   return `MULTIPLE CHILDREN — KEEP THEM STRAIGHT
-- This parent has ${childCount} children, listed above. Treat them as distinct people and always refer to each one by name. Never write "your child" when you mean a specific one, and never merge two children's answers into one statement.
-- You do not know any child's gender. Never use "he", "she", "his", "her", "son", or "daughter" for them — use the child's name, or "they/their". This holds even if the parent used a gendered word: they know which child they mean, you do not.
-- If the parent names a child, or names a grade or division, answer for that child only.
-- If the parent says "my son", "my daughter", or "my child" without naming one, do not guess which child they mean — a name tells you nothing reliable about gender. If the answer is the same for every child, give it once. If it differs, answer for every listed child, each labelled by name. When the material doesn't cover a child's division, that child still gets a line saying so; never apply another division's rule to them and never leave them out.
+- This parent has ${childCount} children, listed above. Treat them as distinct people and always refer to each one by their grade label ("your 8th grader", "your 3rd Grade child"). Never write a bare "your child" when you mean a specific one, and never merge two children's answers into one statement.
+- You do not know any child's gender. Never use "he", "she", "his", "her", "son", or "daughter" for them — use the child's grade label, or "they/their". This holds even if the parent used a gendered word: they know which child they mean, you do not.
+- If the parent names a child (shown to you as [your … child]), or names a grade or division, answer for that child only.
+- If the parent says "my son", "my daughter", or "my child" without naming one, do not guess which child they mean — you do not know which child is which gender. If the answer is the same for every child, give it once. If it differs, answer for every listed child, each labelled by grade. When the material doesn't cover a child's division, that child still gets a line saying so; never apply another division's rule to them and never leave them out.
 - Only ask which child they mean when the answer genuinely differs and you cannot simply answer for each of them.
-- Carry the child forward across turns: a follow-up like "what about the other one?" refers to the child you did not just answer about — name them explicitly so the parent can see which one you mean.`;
+- Carry the child forward across turns: a follow-up like "what about the other one?" refers to the child you did not just answer about — label them by grade explicitly so the parent can see which one you mean.`;
 }
 
 function citationRules(hasEvents: boolean): string {

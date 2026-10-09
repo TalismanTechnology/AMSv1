@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Logo } from "@/components/logo";
+import { SCHOOL_CONTACT_HREF } from "@/components/landing/contact";
 
 const FOOTER_LINKS = [
   {
@@ -16,6 +17,18 @@ const FOOTER_LINKS = [
     links: [
       { label: "Sign in", href: "/login" },
       { label: "Staff sign in", href: "/login/staff" },
+      { label: "Support", href: "/support" },
+    ],
+  },
+  {
+    heading: "Schools",
+    links: [{ label: "Bring it to your school", href: SCHOOL_CONTACT_HREF }],
+  },
+  {
+    heading: "Legal",
+    links: [
+      { label: "Privacy Policy", href: "/privacy" },
+      { label: "Terms of Service", href: "/terms" },
     ],
   },
 ];
@@ -25,7 +38,7 @@ const LINK_CLASS = "text-sm text-muted-foreground transition-colors hover:text-i
 export function SiteFooter() {
   return (
     <footer className="border-t border-border py-12 sm:py-14">
-      <div className="mx-auto grid max-w-6xl gap-10 px-6 sm:grid-cols-[1fr_auto_auto] sm:gap-16">
+      <div className="mx-auto grid max-w-6xl gap-10 px-6 md:grid-cols-[1fr_auto_auto_auto_auto] md:gap-12 lg:gap-16">
         <div>
           <div className="flex items-center gap-2">
             <Logo size={20} className="text-brand-dark" />
@@ -42,7 +55,7 @@ export function SiteFooter() {
             <ul className="mt-3 space-y-2">
               {group.links.map((link) => (
                 <li key={link.href}>
-                  {link.href.startsWith("#") ? (
+                  {link.href.startsWith("#") || link.href.startsWith("mailto:") ? (
                     <a href={link.href} className={LINK_CLASS}>
                       {link.label}
                     </a>

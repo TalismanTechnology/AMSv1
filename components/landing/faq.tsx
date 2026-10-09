@@ -5,8 +5,8 @@ import { ChevronDown } from "lucide-react";
 
 // Answers are grounded in what the product does today: retrieval over
 // approved documents, the "say so if it isn't there" rule in the answer
-// prompt, per-school row-level security, and the join-code / approval /
-// Blackbaud-roster options in school settings.
+// prompt, per-school row-level security, and Blackbaud parent sign-in.
+// Schools are set up by request; there is no self-serve sign-up.
 const FAQS = [
   {
     q: "How does it know the answer?",
@@ -18,7 +18,7 @@ const FAQS = [
   },
   {
     q: "Who can use it?",
-    a: "Parents and guardians at a participating school. Each school decides how families get in: an open join code, admin approval, or automatic verification against the school's Blackbaud parent roster.",
+    a: "Parents and guardians at a participating school. You sign in with the same Blackbaud login you use for your school's parent portal, so there's no separate account to create.",
   },
   {
     q: "Is my school's information private?",
@@ -30,7 +30,7 @@ const FAQS = [
   },
   {
     q: "How does a school get set up?",
-    a: "An admin uploads documents or forwards emails, adds calendar feeds, and invites families. Documents are ready to answer from as soon as they finish processing, usually within minutes.",
+    a: "Schools are set up on request: get in touch using \"Bring it to your school\" below. Once the school's Blackbaud parent portal is connected, an admin uploads documents or forwards emails and adds calendar feeds, and parents sign in with their Blackbaud login. Documents are ready to answer from as soon as they finish processing, usually within minutes.",
   },
 ];
 

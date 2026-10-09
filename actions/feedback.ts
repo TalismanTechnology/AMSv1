@@ -24,6 +24,29 @@ export async function submitFeedback(messageId: string, rating: "up" | "down", s
   return { success: true };
 }
 
+/**
+ * Remove the parent's rating from a message. A thumbs-down flags the exchange
+ * for school staff (migration 031); clearing it un-flags it again unless the
+ * assistant also couldn't answer.
+ */
+export async function clearFeedback(messageId: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { error: "Unauthorized" };
+
+  const { error } = await supabase
+    .from("chat_feedback")
+    .delete()
+    .eq("message_id", messageId)
+    .eq("user_id", user.id);
+
+  if (error) return { error: error.message };
+  return { success: true };
+}
+
 export async function getFeedback(messageId: string, schoolId?: string) {
   const supabase = await createClient();
   const {

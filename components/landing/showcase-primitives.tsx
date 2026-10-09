@@ -8,7 +8,7 @@ import { BlurReveal } from "@/components/motion";
 // section headings, rounded tiles (white, or the forest "accent"), inline
 // heading chips, captions that sit under a tile, and the number/title/body
 // rows of the stats column. Everything sits on the app's cream / forest
-// tokens; headings are the light Helvetica Neue face with tight tracking.
+// tokens; headings are the light Inter face with tight tracking.
 
 /** A muted word inside a heading — the second tone of the two-tone title. */
 export function Muted({ children }: { children: ReactNode }) {

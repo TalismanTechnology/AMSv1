@@ -117,3 +117,24 @@ export function routeInboundMessage(
   }
   return { schoolId, divisionIds };
 }
+
+/**
+ * What to do with a message from this sender, given the school's allowed
+ * sender domains:
+ *   - "allow":  the sender matches the allowlist; ingest it.
+ *   - "reject": an allowlist is set and the sender isn't on it.
+ *   - "review": no allowlist is set. The private address is then the only
+ *               thing standing between a stranger and documents parents see,
+ *               so the message is held for an admin to approve or reject.
+ * Secure by default: an empty allowlist never ingests on its own.
+ */
+export type SenderGateDecision = "allow" | "reject" | "review";
+
+export function senderGate(
+  fromAddress: string | null,
+  allowedDomains: string[] | null | undefined
+): SenderGateDecision {
+  const domains = (allowedDomains ?? []).filter((d) => d.trim() !== "");
+  if (domains.length === 0) return "review";
+  return senderDomainAllowed(fromAddress, domains) ? "allow" : "reject";
+}

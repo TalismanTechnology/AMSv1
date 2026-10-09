@@ -17,6 +17,7 @@ import { LogoSpinner } from "@/components/logo-spinner";
 import { Logo } from "@/components/logo";
 import { GRADES } from "@/lib/grades";
 import { completeOnboarding } from "@/actions/onboarding";
+import { schoolPossessive } from "@/lib/school-display-name";
 
 interface WelcomeFormProps {
   schoolId: string;
@@ -107,14 +108,14 @@ export function WelcomeForm({
 
         <p className="eyebrow">Welcome</p>
         <h1 className="mt-2 font-serif-display text-3xl font-medium tracking-[-0.02em] text-ink">
-          You&apos;re in at {schoolName}
+          {schoolName.trim() ? `You're in at ${schoolName.trim()}` : "You're in"}
         </h1>
 
         {matchedName && (
           <p className="mt-4 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/[0.04] p-3 text-sm text-ink-soft">
             <ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" />
             <span>
-              We matched you to {schoolName}&apos;s records as{" "}
+              {`We matched you to ${schoolPossessive(schoolName)} records as `}
               <span className="font-medium text-ink">{matchedName}</span>. If
               that isn&apos;t you, contact the school office before continuing.
             </span>

@@ -1,0 +1,91 @@
+# Builds the AskMySchool iOS app and uploads it to TestFlight, with no Mac
+# signing setup: Xcode's automatic signing fetches (or creates) the App Store
+# certificate and provisioning profile through the App Store Connect API key.
+#
+#   cd ios/App && bundle exec fastlane beta
+#
+# Needs, as environment variables (GitHub Actions secrets in CI):
+#   APPLE_TEAM_ID      10-character Team ID (developer.apple.com > Membership)
+#   ASC_KEY_ID         App Store Connect API key id
+#   ASC_ISSUER_ID      App Store Connect API issuer id
+#   ASC_KEY_P8_BASE64  the downloaded AuthKey_XXXX.p8, base64-encoded
+# The API key needs the Admin role: cloud-managed signing certificates
+# aren't available to lower roles.
+#
+# Run `npx cap sync ios` first so the web assets and plugin list are current.
+
+require "base64"
+require "tmpdir"
+
+default_platform(:ios)
+
+APP_IDENTIFIER = "app.askmyschool"
+
+platform :ios do
+  desc "Build a signed App Store build and upload it to TestFlight"
+  lane :beta do |options|
+    team_id = ENV.fetch("APPLE_TEAM_ID")
+    key_id = ENV.fetch("ASC_KEY_ID")
+    issuer_id = ENV.fetch("ASC_ISSUER_ID")
+    key_base64 = ENV.fetch("ASC_KEY_P8_BASE64")
+
+    api_key = app_store_connect_api_key(
+      key_id: key_id,
+      issuer_id: issuer_id,
+      key_content: key_base64,
+      is_key_content_base64: true,
+      in_house: false
+    )
+
+    # xcodebuild wants the key as a file for -allowProvisioningUpdates.
+    key_path = File.join(Dir.tmpdir, "AuthKey_#{key_id}.p8")
+    File.write(key_path, Base64.decode64(key_base64))
+
+    # Every upload needs a new build number; the marketing version
+    # (MARKETING_VERSION in the Xcode project) only changes per release.
+    build_number = latest_testflight_build_number(
+      api_key: api_key,
+      app_identifier: APP_IDENTIFIER,
+      initial_build_number: 0
+    ) + 1
+    UI.message("Building AskMySchool build #{build_number}")
+
+    auth_args = [
+      "-allowProvisioningUpdates",
+      "-authenticationKeyPath #{key_path}",
+      "-authenticationKeyID #{key_id}",
+      "-authenticationKeyIssuerID #{issuer_id}",
+    ].join(" ")
+
+    build_app(
+      project: "App.xcodeproj",
+      scheme: "App",
+      configuration: "Release",
+      export_method: "app-store",
+      clean: true,
+      output_directory: "build",
+      output_name: "AskMySchool.ipa",
+      xcargs: "#{auth_args} DEVELOPMENT_TEAM=#{team_id} CODE_SIGN_STYLE=Automatic " \
+              "CURRENT_PROJECT_VERSION=#{build_number}",
+      export_xcargs: auth_args,
+      export_options: {
+        teamID: team_id,
+        signingStyle: "automatic",
+        destination: "export",
+        manageAppVersionAndBuildNumber: false,
+      }
+    )
+
+    if options[:skip_upload].to_s == "true"
+      UI.important("skip_upload: the .ipa is in ios/App/build, not uploaded")
+    else
+      upload_to_testflight(
+        api_key: api_key,
+        app_identifier: APP_IDENTIFIER,
+        skip_waiting_for_build_processing: true
+      )
+    end
+  ensure
+    File.delete(key_path) if key_path && File.exist?(key_path)
+  end
+end

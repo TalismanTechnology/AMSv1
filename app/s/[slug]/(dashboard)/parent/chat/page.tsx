@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { requireSchoolContext } from "@/lib/school-context";
 import { ChatPageClient } from "./chat-page-client";
+import { hasAiConsent } from "@/lib/ai/consent";
 
 export default async function ChatPage({
   params,
@@ -20,6 +21,14 @@ export default async function ChatPage({
     .eq("school_id", school.id)
     .order("updated_at", { ascending: false })
     .limit(1);
+
+  // Whether to show the one-time AI-processing notice before the first
+  // question (the chat API enforces it too).
+  const { data: consent } = await supabase
+    .from("profiles")
+    .select("ai_consent_at, ai_consent_version")
+    .eq("id", user.id)
+    .single();
 
   // Load suggested questions from settings (fallback to empty)
   const { data: settings } = await supabase
@@ -45,6 +54,7 @@ export default async function ChatPage({
         welcomeMessage={settings?.welcome_message}
         schoolId={school.id}
         schoolSlug={slug}
+        aiConsentGiven={hasAiConsent(consent)}
       />
     </Suspense>
   );

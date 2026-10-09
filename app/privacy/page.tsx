@@ -1,0 +1,369 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import {
+  ContactEmailLink,
+  LEGAL_OPERATOR,
+  LegalList,
+  LegalPage,
+  LegalSection,
+} from "@/components/legal/legal-page";
+
+// DRAFT — not yet reviewed by counsel. Every statement about what the product
+// does is grounded in the code (see the PR description for file references);
+// statements about what we will or won't do are policy commitments.
+
+export const metadata: Metadata = {
+  title: "Privacy Policy — AskMySchool",
+  description:
+    "How AskMySchool collects, uses, and protects information for parents and school staff.",
+};
+
+export default function PrivacyPage() {
+  return (
+    <LegalPage
+      eyebrow="Legal"
+      title="Privacy Policy"
+      intro={
+        <>
+          <p>
+            AskMySchool (&ldquo;AskMySchool,&rdquo; &ldquo;we,&rdquo;
+            &ldquo;us&rdquo;) is an assistant that answers parents&apos;
+            questions using documents, calendars, and announcements their
+            school has approved. This policy explains what information we
+            handle at askmyschool.app and in our iOS and Android apps (the
+            &ldquo;Service&rdquo;), why, who we share it with, and the choices
+            you have.
+          </p>
+          <p className="mt-4">
+            AskMySchool is operated by {LEGAL_OPERATOR}. If anything here is
+            unclear, email <ContactEmailLink />.
+          </p>
+        </>
+      }
+    >
+      <LegalSection id="schools" title="1. Your school and AskMySchool">
+        <p>
+          We provide the Service to schools, and parents get access through
+          their school. The school decides which documents, calendars, and
+          announcements go into the Service and which families may use it. For
+          information that comes from a school&apos;s records (for example, its
+          parent roster), the school is in control of that information and we
+          process it on the school&apos;s behalf and under its direction.
+        </p>
+        <p>
+          Where a school is subject to the U.S. Family Educational Rights and
+          Privacy Act (FERPA), we intend to act as a &ldquo;school
+          official&rdquo; with a legitimate educational interest: we use
+          school-provided information only to provide the Service to that
+          school, we stay under the school&apos;s direct control with respect
+          to that information, and we do not re-disclose it except as described
+          here or as the school directs. Questions about your school&apos;s own
+          records should go to your school.
+        </p>
+      </LegalSection>
+
+      <LegalSection id="children" title="2. Children's privacy">
+        <p>
+          The Service is for parents, guardians, and school staff. It is not
+          directed to children, and we do not knowingly allow children under 13
+          to create accounts or use it. Parent sign-in is limited to people
+          their school&apos;s Blackbaud system identifies as a parent or
+          guardian. If you believe a child has given us personal information,
+          contact us and we will delete it.
+        </p>
+        <p>
+          We keep information about students to the minimum the Service needs:
+          the first names (or names) and grade levels a parent chooses to enter
+          so answers can be tailored to the right grade. Children&apos;s names
+          stay in our own database and are never sent to our AI provider (see
+          section 5). We do not import student records, grades, attendance, or
+          other education records from the school&apos;s systems.
+        </p>
+      </LegalSection>
+
+      <LegalSection id="collect" title="3. Information we collect">
+        <p>
+          <strong>Account information.</strong> When a parent signs in with
+          their school&apos;s Blackbaud parent portal, Blackbaud tells us their
+          email address, name, Blackbaud user ID, and whether the school&apos;s
+          records list them as a parent. We use this to create or find their
+          AskMySchool account and confirm they belong to that school. We do not
+          receive or store your Blackbaud password, and we do not keep the
+          sign-in token Blackbaud issues to you after sign-in completes. School
+          staff accounts use an email address and password managed by our
+          authentication provider (Supabase).
+        </p>
+        <p>
+          <strong>Profile and children.</strong> Your name, email, school
+          membership and role, whether you have finished onboarding, and the
+          children you add (name and grade level). You can edit or remove
+          children in your profile at any time.
+        </p>
+        <p>
+          <strong>Questions and conversations.</strong> The questions you ask,
+          the answers we generate, the documents cited, conversation titles,
+          and any thumbs-up/down feedback you give. We also record whether,
+          and when, you agreed to AI processing (see section 5). Conversations
+          are saved so
+          you can return to them and search them. Your conversations are
+          private to you; school staff can see an exchange only if it is
+          flagged, as described in section 6.
+        </p>
+        <p>
+          <strong>Usage information.</strong> We record a usage event each time
+          a question is asked (the question text, which school documents were
+          used, and the time). When we can&apos;t find an answer in the
+          school&apos;s documents, we log the question so the school can see
+          what information is missing. We also keep notifications we send you
+          in the app and which announcements you have dismissed.
+        </p>
+        <p>
+          <strong>Device information (mobile apps).</strong> If you allow
+          notifications in our iOS or Android app, we store your device&apos;s
+          push notification token and platform (iOS or Android), linked to your
+          account. Signing out removes that device&apos;s token.
+        </p>
+        <p>
+          <strong>School roster.</strong> For schools that connect Blackbaud,
+          we sync the school&apos;s parent/guardian roster once a day: Blackbaud
+          user ID, email address, first (or preferred) name, last name, and
+          role. We use it only to recognize parents of that school. Students
+          are not included in this sync.
+        </p>
+        <p>
+          <strong>School content.</strong> Documents, calendars, events, and
+          announcements that school staff upload, sync from Blackbaud, or send
+          to the school&apos;s private AskMySchool email address. For emailed
+          content we also keep a log of each message received (sender address,
+          subject, and whether it was accepted, held for a school administrator
+          to review, or rejected). School staff are responsible
+          for not sending us content that contains private information about
+          individual students or families.
+        </p>
+        <p>
+          <strong>Staff activity.</strong> Certain administrative actions by
+          school staff (for example, approving users or changing documents) are
+          recorded in an audit log visible to that school&apos;s
+          administrators.
+        </p>
+        <p>
+          We do not use third-party advertising or third-party analytics
+          trackers on the Service, and we do not collect precise location.
+        </p>
+      </LegalSection>
+
+      <LegalSection id="use" title="4. How we use information">
+        <LegalList>
+          <li>To sign you in and confirm you belong to your school.</li>
+          <li>
+            To answer your questions from your school&apos;s approved content,
+            tailored to your children&apos;s grade levels, with citations.
+          </li>
+          <li>
+            To send announcements and notifications your school publishes,
+            including push notifications if you turn them on.
+          </li>
+          <li>
+            To help your school improve its information, for example by showing
+            school administrators aggregate statistics and the flagged
+            questions the Service couldn&apos;t answer or that parents marked
+            unhelpful.
+          </li>
+          <li>To keep the Service secure, debug problems, and prevent abuse.</li>
+        </LegalList>
+        <p>
+          We do not sell personal information, we do not use it for targeted
+          advertising, and we do not build profiles of students or families for
+          any purpose unrelated to providing the Service.
+        </p>
+      </LegalSection>
+
+      <LegalSection id="ai" title="5. AI processing">
+        <p>
+          To answer a question, we send the question, the recent conversation,
+          relevant excerpts of your school&apos;s documents and calendar, and
+          your children&apos;s grade levels to Google&apos;s Gemini API, which
+          generates the answer. We do <strong>not</strong> send your
+          children&apos;s names: the AI sees them only as, for example,
+          &ldquo;your 8th Grade child,&rdquo; and if you type a child&apos;s
+          name in a question, it is replaced with that label before the
+          question leaves our servers. We also use Google&apos;s Gemini models
+          to process school documents (for example, to extract text,
+          summarize, classify, and index them).
+        </p>
+        <p>
+          <strong>Your consent.</strong> Before your first question, the app
+          shows a short notice explaining what is sent to Google&apos;s Gemini
+          AI and asks you to agree. Nothing is sent to the AI until you do. You
+          can withdraw your consent at any time from your Profile; the app will
+          then ask again before you can ask another question.
+        </p>
+        <p>
+          We do not use your data to train our own AI models, and it is not
+          used to train Google&apos;s models either: we use a paid,
+          billing-enabled Gemini API account, and under Google&apos;s paid-tier
+          Gemini API terms Google does not use prompts or responses to improve
+          its products. This commitment relies on those Google terms. Google
+          processes this data as our service provider; please see{" "}
+          <a href="https://ai.google.dev/gemini-api/terms" target="_blank" rel="noopener noreferrer">
+            Google&apos;s Gemini API Additional Terms
+          </a>{" "}
+          for how Google handles API data.
+        </p>
+        <p>
+          <strong>AI answers can be wrong.</strong> Always check important
+          information (deadlines, health and safety, money) against the cited
+          document or with your school directly.
+        </p>
+      </LegalSection>
+
+      <LegalSection id="who-sees" title="6. Who can see your information">
+        <p>
+          <strong>Your school&apos;s administrators</strong> can see the
+          members of their school and the children they have added. They
+          <strong> cannot</strong> read your conversations, with one
+          exception: school staff can see only conversations that were
+          flagged, because the assistant couldn&apos;t answer your question or
+          because you marked the answer unhelpful (thumbs-down). For a flagged
+          conversation, staff see just that question and the assistant&apos;s
+          reply, not the rest of the conversation. Removing your thumbs-down
+          removes that flag. Otherwise, staff see only aggregate statistics,
+          such as how many questions were asked and when, ratings totals, and
+          questions that several different parents have asked, without names
+          attached. They cannot see information from other schools.
+        </p>
+        <p>
+          <strong>AskMySchool</strong> personnel can access data when needed to
+          operate, support, and secure the Service.
+        </p>
+        <p>
+          <strong>Service providers</strong> process data for us only to run
+          the Service:
+        </p>
+        <LegalList>
+          <li>
+            <strong>Supabase</strong> &mdash; database, file storage, and
+            authentication.
+          </li>
+          <li>
+            <strong>Vercel</strong> &mdash; website hosting and scheduled jobs.
+          </li>
+          <li>
+            <strong>Google (Gemini API)</strong> &mdash; generating answers and
+            processing school documents, as described above.
+          </li>
+          <li>
+            <strong>Blackbaud</strong> &mdash; parent sign-in and, where the
+            school connects it, roster and calendar sync. Your use of Blackbaud
+            is governed by Blackbaud&apos;s and your school&apos;s terms.
+          </li>
+          <li>
+            <strong>Resend</strong> &mdash; receiving email that schools forward
+            to their private AskMySchool address.
+          </li>
+          <li>
+            <strong>Apple Push Notification service and Google Firebase Cloud
+            Messaging</strong> &mdash; delivering push notifications (the
+            notification title and text, and your device token).
+          </li>
+        </LegalList>
+        <p>
+          We may also disclose information if required by law, to protect the
+          safety of any person, or as part of a merger or transfer of the
+          Service (in which case this policy&apos;s commitments will continue
+          to apply to the transferred data).
+        </p>
+      </LegalSection>
+
+      <LegalSection id="cookies" title="7. Cookies and local storage">
+        <p>We use only cookies needed for the Service to work:</p>
+        <LegalList>
+          <li>Authentication cookies that keep you signed in (Supabase).</li>
+          <li>
+            Short-lived security cookies used during Blackbaud sign-in and when
+            a school connects its Blackbaud account.
+          </li>
+          <li>
+            In the mobile apps, a cookie that remembers this device&apos;s push
+            token so signing out can turn off notifications for it.
+          </li>
+        </LegalList>
+        <p>
+          The website also uses your browser&apos;s session storage for small
+          display preferences (for example, whether an intro animation has
+          already played). We do not use advertising or cross-site tracking
+          cookies.
+        </p>
+      </LegalSection>
+
+      <LegalSection id="retention" title="8. Retention and deletion">
+        <p>
+          We keep account and conversation data while your account is active
+          so you can use the Service. You can delete individual conversations,
+          or all of your conversations, at any time in the app, and you can
+          remove children from your profile. Usage records and unanswered
+          questions your school can see may be kept after a conversation is
+          deleted, so that the school&apos;s statistics stay accurate.
+        </p>
+        <p>
+          You can delete your account at any time from your Profile
+          (&ldquo;Delete account&rdquo;). This permanently deletes your
+          account, conversations, feedback, the questions you asked (including
+          usage records and unanswered questions), children, notifications,
+          and registered devices. School administrators can also remove a
+          family&apos;s account, which deletes the same data. You can also ask
+          us to delete your account and associated personal information by
+          emailing <ContactEmailLink />; we will do so unless we need to keep
+          something to comply with law or resolve a dispute.
+          Parent roster records are refreshed daily from the school&apos;s
+          Blackbaud system and marked inactive when a parent leaves the
+          school&apos;s roster. When a school stops using the Service, we will
+          delete or return its data at the school&apos;s request.
+        </p>
+      </LegalSection>
+
+      <LegalSection id="security" title="9. Security">
+        <p>
+          Data is encrypted in transit (HTTPS). Database access rules limit
+          each user to their own data, limit each school&apos;s administrators
+          to their own school, and only let administrators read conversations
+          that were flagged as described in section 6. Blackbaud connection credentials are encrypted
+          before they are stored, sign-in codes for the mobile apps are stored
+          only as hashes and expire quickly, and the parent roster is only
+          accessible to our servers. No system is perfectly secure; if we learn
+          of a breach affecting your information, we will notify affected
+          schools and users as required by law.
+        </p>
+      </LegalSection>
+
+      <LegalSection id="rights" title="10. Your choices and rights">
+        <p>
+          You can view and update your profile and children, delete your
+          conversations, withdraw your consent to AI processing, delete your
+          account, and turn notifications off in your device settings.
+          To access, correct, or delete other information, or to ask a question
+          about this policy, contact us. Requests about education records held
+          by your school should go to your school, and we will help the school
+          respond. Depending on where you live, you may have additional rights
+          under local law; we will honor those requests as the law requires.
+        </p>
+      </LegalSection>
+
+      <LegalSection id="changes" title="11. Changes to this policy">
+        <p>
+          We may update this policy as the Service changes. We will post the
+          new version here with a new &ldquo;Last updated&rdquo; date, and for
+          material changes we will notify schools and, where appropriate,
+          users before the change takes effect.
+        </p>
+      </LegalSection>
+
+      <LegalSection id="contact" title="12. Contact">
+        <p>
+          Questions or requests: <ContactEmailLink />. See also our{" "}
+          <Link href="/terms">Terms of Service</Link>.
+        </p>
+      </LegalSection>
+    </LegalPage>
+  );
+}

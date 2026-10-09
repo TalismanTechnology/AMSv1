@@ -1,0 +1,83 @@
+# Builds the iOS app on a GitHub-hosted Mac and uploads it to TestFlight,
+# so a release doesn't need a Mac. Manual only: Actions > "iOS: build for
+# TestFlight" > Run workflow. Never runs on push or pull requests.
+#
+# Repository secrets (Settings > Secrets and variables > Actions):
+#   APPLE_TEAM_ID       10-character Team ID
+#   ASC_KEY_ID          App Store Connect API key id (Admin role)
+#   ASC_ISSUER_ID       App Store Connect API issuer id
+#   ASC_KEY_P8_BASE64   `base64 -i AuthKey_XXXX.p8` output
+# See docs/APP_STORE.md, "Release without a Mac".
+
+name: "iOS: build for TestFlight"
+
+on:
+  workflow_dispatch:
+    inputs:
+      upload:
+        description: "Upload to TestFlight (untick to only build the .ipa)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-testflight
+  cancel-in-progress: false
+
+jobs:
+  testflight:
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install JavaScript dependencies
+        run: npm ci
+
+      - name: Sync Capacitor (web assets, plugins, config)
+        run: npx cap sync ios
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+          working-directory: ios/App
+
+      - name: Check secrets are set
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+        run: |
+          missing=0
+          for name in APPLE_TEAM_ID ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8_BASE64; do
+            if [ -z "${!name}" ]; then echo "::error::Secret $name is not set"; missing=1; fi
+          done
+          exit $missing
+
+      - name: Build and upload
+        working-directory: ios/App
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+          SKIP_UPLOAD: ${{ inputs.upload && 'false' || 'true' }}
+        run: bundle exec fastlane beta skip_upload:$SKIP_UPLOAD
+
+      - name: Keep the .ipa
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AskMySchool-ipa
+          path: ios/App/build/*.ipa
+          if-no-files-found: ignore
+          retention-days: 14

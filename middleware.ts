@@ -12,6 +12,7 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico and static assets (svg, png, jpg, etc.)
+     * - .well-known (apple-app-site-association must never redirect)
      *
      * This covers:
      * - / (platform landing)
@@ -20,6 +21,6 @@ export const config = {
      * - /login, /login/staff, /auth/blackbaud/*
      * - /register, /admin/*, /parent/* (legacy redirects)
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|\\.well-known/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
