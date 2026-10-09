@@ -13,6 +13,16 @@ export interface PushMessage {
 
 const MAX_BODY_LENGTH = 180;
 
+/** Where an announcement notification opens: the announcement itself. */
+export function announcementPath(schoolSlug: string, announcementId: string): string {
+  return `/s/${encodeURIComponent(schoolSlug)}/parent/announcements#${announcementAnchor(announcementId)}`;
+}
+
+/** The element id each announcement carries on the announcements page. */
+export function announcementAnchor(announcementId: string): string {
+  return `announcement-${announcementId}`;
+}
+
 export function truncateBody(body: string, max = MAX_BODY_LENGTH): string {
   const flat = body.replace(/\s+/g, " ").trim();
   if (flat.length <= max) return flat;

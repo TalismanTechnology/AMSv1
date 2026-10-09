@@ -65,7 +65,13 @@ export function ParentAnnouncementsClient({
         {announcements.map((a) => {
           const isUrgent = a.priority === "urgent";
           return (
-            <article key={a.id} className="py-5 first:pt-0 sm:py-6">
+            // The id is the target of announcement notifications and links
+            // (announcementPath in lib/push/messages.ts).
+            <article
+              key={a.id}
+              id={`announcement-${a.id}`}
+              className="scroll-mt-20 py-5 first:pt-0 sm:py-6"
+            >
               <div className="flex items-start gap-3">
                 <span
                   className={

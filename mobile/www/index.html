@@ -17,32 +17,78 @@
         place-items: center;
         background: var(--cream);
         color: var(--forest);
-        font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+        font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif;
         text-align: center;
         padding: 24px;
         box-sizing: border-box;
+        -webkit-user-select: none;
+        user-select: none;
       }
+      svg { width: 56px; height: 56px; margin-bottom: 20px; }
       h1 { font-weight: 300; letter-spacing: -0.02em; margin: 0 0 12px; }
-      p { color: var(--muted); margin: 0 0 24px; max-width: 320px; }
-      a {
-        display: inline-block;
+      p { color: var(--muted); margin: 0 auto 24px; max-width: 320px; line-height: 1.45; }
+      button {
+        appearance: none;
+        border: 0;
         padding: 12px 28px;
         border-radius: 999px;
         background: var(--forest);
         color: #fff;
-        text-decoration: none;
+        font: inherit;
         font-size: 14px;
         letter-spacing: 0.04em;
         text-transform: uppercase;
       }
+      button:disabled { opacity: 0.6; }
+      .status { font-size: 13px; margin-top: 16px; min-height: 1.2em; }
     </style>
   </head>
   <body>
-    <!-- Shown only when askmyschool.app can't be reached. -->
+    <!-- Shown by the app (server.errorPath in capacitor.config.ts) whenever
+         askmyschool.app can't be reached. Retries when the phone comes back
+         online, on pull-to-refresh, or on the button. -->
     <main>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 20h.01" /><path d="M8.5 16.43a5 5 0 0 1 7 0" />
+        <path d="M5 12.86a10 10 0 0 1 5.17-2.69" /><path d="M19 12.86a10 10 0 0 0-2-1.3" />
+        <path d="M2 8.82a15 15 0 0 1 4.18-2.65" /><path d="M22 8.82a15 15 0 0 0-11.29-3.76" />
+        <path d="m2 2 20 20" />
+      </svg>
       <h1>You're offline</h1>
-      <p>AskMySchool needs an internet connection. Check your connection and try again.</p>
-      <a href="https://askmyschool.app">Try again</a>
+      <p>AskMySchool needs an internet connection. We'll reconnect as soon as you're back online.</p>
+      <button id="retry" type="button">Try again</button>
+      <p class="status" id="status" aria-live="polite"></p>
     </main>
+    <script>
+      (function () {
+        // Signed-in parents are sent on from /login to their school.
+        var APP_URL = "https://askmyschool.app/login";
+        var button = document.getElementById("retry");
+        var status = document.getElementById("status");
+
+        // The launch screen is still up if the very first load failed.
+        try {
+          var plugins = window.Capacitor && window.Capacitor.Plugins;
+          if (plugins && plugins.SplashScreen) plugins.SplashScreen.hide();
+        } catch (e) {}
+
+        function retry() {
+          if (button.disabled) return;
+          button.disabled = true;
+          status.textContent = "Reconnecting…";
+          window.location.replace(APP_URL);
+          setTimeout(function () {
+            button.disabled = false;
+            status.textContent = "";
+          }, 8000);
+        }
+
+        button.addEventListener("click", retry);
+        window.addEventListener("online", retry);
+        // Native pull-to-refresh (AppViewController.swift) calls this.
+        window.__amsRefresh = retry;
+      })();
+    </script>
   </body>
 </html>
