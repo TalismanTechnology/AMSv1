@@ -111,6 +111,9 @@ export async function POST(request: NextRequest) {
           content: lastMessageText,
           sources: [],
           school_id: schoolId,
+          // Flags this exchange for school staff (no school sources found) —
+          // the same condition that logs an unanswered question below.
+          unanswered: sources.length === 0,
         })
         .then(({ error }) => { if (error) console.error("Failed to save user message:", error); });
 
@@ -230,6 +233,7 @@ export async function POST(request: NextRequest) {
               content: cleanText,
               sources: savedSources,
               school_id: schoolId,
+              unanswered: sources.length === 0,
             })
             .then(({ error }) => { if (error) console.error("Failed to save assistant message:", error); });
         }

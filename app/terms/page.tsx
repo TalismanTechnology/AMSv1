@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import {
   ContactEmailLink,
+  LEGAL_OPERATOR,
   LegalList,
   LegalPage,
   LegalSection,
@@ -25,7 +26,8 @@ export default function TermsPage() {
           AskMySchool at askmyschool.app and in our iOS and Android apps (the
           &ldquo;Service&rdquo;). By signing in or using the Service, you agree
           to these Terms and to our <Link href="/privacy" className="font-medium text-ink underline underline-offset-4">Privacy Policy</Link>.
-          If you do not agree, do not use the Service.
+          If you do not agree, do not use the Service. The Service is
+          operated by {LEGAL_OPERATOR} (&ldquo;we,&rdquo; &ldquo;us&rdquo;).
         </p>
       }
     >

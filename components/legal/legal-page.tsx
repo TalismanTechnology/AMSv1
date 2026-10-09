@@ -7,8 +7,14 @@ import { SiteFooter } from "@/components/landing/site-footer";
 // background and type of the marketing site, a readable single column, and
 // the same footer as the landing page.
 
-// TODO(lucas): replace with the real, monitored contact address before launch.
+// TODO(lucas): this mailbox is NOT set up yet — create it (or swap in a real,
+// monitored address) before launch. Used on /privacy and /terms.
 export const LEGAL_CONTACT_EMAIL = "privacy@askmyschool.app";
+
+// Who operates the Service, as named on /privacy and /terms. There is no LLC
+// yet, so a named individual operates it on AskMySchool's behalf.
+// TODO(lucas): update this one constant if/when an entity is formed.
+export const LEGAL_OPERATOR = "Jesse Haines, on behalf of AskMySchool";
 
 export const LEGAL_LAST_UPDATED = "October 9, 2026";
 

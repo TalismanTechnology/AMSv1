@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import {
   ContactEmailLink,
+  LEGAL_OPERATOR,
   LegalList,
   LegalPage,
   LegalSection,
@@ -34,8 +35,8 @@ export default function PrivacyPage() {
             you have.
           </p>
           <p className="mt-4">
-            AskMySchool is built and operated by a small independent team. If
-            anything here is unclear, email <ContactEmailLink />.
+            AskMySchool is operated by {LEGAL_OPERATOR}. If anything here is
+            unclear, email <ContactEmailLink />.
           </p>
         </>
       }
@@ -101,7 +102,9 @@ export default function PrivacyPage() {
           <strong>Questions and conversations.</strong> The questions you ask,
           the answers we generate, the documents cited, conversation titles,
           and any thumbs-up/down feedback you give. Conversations are saved so
-          you can return to them and search them.
+          you can return to them and search them. Your conversations are
+          private to you; school staff can see an exchange only if it is
+          flagged, as described in section 6.
         </p>
         <p>
           <strong>Usage information.</strong> We record a usage event each time
@@ -158,8 +161,9 @@ export default function PrivacyPage() {
           </li>
           <li>
             To help your school improve its information, for example by showing
-            school administrators common questions and questions the Service
-            couldn&apos;t answer.
+            school administrators aggregate statistics and the flagged
+            questions the Service couldn&apos;t answer or that parents marked
+            unhelpful.
           </li>
           <li>To keep the Service secure, debug problems, and prevent abuse.</li>
         </LegalList>
@@ -180,9 +184,12 @@ export default function PrivacyPage() {
           summarize, classify, and index them).
         </p>
         <p>
-          We do not use your data to train our own AI models. Google processes
-          this data as our service provider under the Gemini API terms that
-          apply to our account; please see{" "}
+          We do not use your data to train our own AI models, and it is not
+          used to train Google&apos;s models either: we use a paid,
+          billing-enabled Gemini API account, and under Google&apos;s paid-tier
+          Gemini API terms Google does not use prompts or responses to improve
+          its products. This commitment relies on those Google terms. Google
+          processes this data as our service provider; please see{" "}
           <a href="https://ai.google.dev/gemini-api/terms" target="_blank" rel="noopener noreferrer">
             Google&apos;s Gemini API Additional Terms
           </a>{" "}
@@ -198,11 +205,17 @@ export default function PrivacyPage() {
       <LegalSection id="who-sees" title="6. Who can see your information">
         <p>
           <strong>Your school&apos;s administrators</strong> can see the
-          members of their school and the children they have added, and they
-          can view questions asked within their school (including saved
-          conversations, usage statistics, and questions the Service
-          couldn&apos;t answer) so they can support families and improve their
-          information. They cannot see information from other schools.
+          members of their school and the children they have added. They
+          <strong> cannot</strong> read your conversations, with one
+          exception: school staff can see only conversations that were
+          flagged, because the assistant couldn&apos;t answer your question or
+          because you marked the answer unhelpful (thumbs-down). For a flagged
+          conversation, staff see just that question and the assistant&apos;s
+          reply, not the rest of the conversation. Removing your thumbs-down
+          removes that flag. Otherwise, staff see only aggregate statistics,
+          such as how many questions were asked and when, ratings totals, and
+          questions that several different parents have asked, without names
+          attached. They cannot see information from other schools.
         </p>
         <p>
           <strong>AskMySchool</strong> personnel can access data when needed to
@@ -298,8 +311,9 @@ export default function PrivacyPage() {
       <LegalSection id="security" title="9. Security">
         <p>
           Data is encrypted in transit (HTTPS). Database access rules limit
-          each user to their own data and each school&apos;s administrators to
-          their own school. Blackbaud connection credentials are encrypted
+          each user to their own data, limit each school&apos;s administrators
+          to their own school, and only let administrators read conversations
+          that were flagged as described in section 6. Blackbaud connection credentials are encrypted
           before they are stored, sign-in codes for the mobile apps are stored
           only as hashes and expire quickly, and the parent roster is only
           accessible to our servers. No system is perfectly secure; if we learn

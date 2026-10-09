@@ -1,6 +1,14 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { requireSchoolAdmin } from "@/lib/auth/require-school-admin";
+
+// A question only appears in "Top questions" once this many DIFFERENT parents
+// have asked it, so the list can't be used to read one family's questions.
+// School staff otherwise see parents' words only for flagged chats (see
+// supabase/migrations/031_flagged_chat_access.sql).
+const MIN_DISTINCT_ASKERS_FOR_TOP_QUESTION = 3;
 
 export type TimeRange = "7d" | "30d" | "90d" | "all";
 
@@ -46,7 +54,23 @@ export async function getAnalyticsData(
   timeRange: TimeRange = "30d",
   schoolId?: string
 ): Promise<AnalyticsData> {
-  const supabase = await createClient();
+  // analytics_events and chat rows are no longer readable by school admins
+  // through RLS (they contain parents' question text). Authorize explicitly,
+  // then read with the service role and return aggregates only.
+  if (schoolId) {
+    const auth = await requireSchoolAdmin(schoolId);
+    if ("error" in auth) throw new Error(auth.error);
+  } else {
+    const userClient = await createClient();
+    const {
+      data: { user },
+    } = await userClient.auth.getUser();
+    const { data: profile } = user
+      ? await userClient.from("profiles").select("role").eq("id", user.id).single()
+      : { data: null };
+    if (profile?.role !== "super_admin") throw new Error("Not authorized");
+  }
+  const supabase = createAdminClient();
 
   const now = new Date();
   const days = getDaysFromRange(timeRange);
@@ -57,7 +81,7 @@ export async function getAnalyticsData(
   // Build queries with optional school_id filtering
   let analyticsEventsQuery = supabase
     .from("analytics_events")
-    .select("*")
+    .select("created_at, user_id, metadata")
     .eq("event_type", "question")
     .gte("created_at", rangeStartISO)
     .order("created_at", { ascending: true });
@@ -71,7 +95,7 @@ export async function getAnalyticsData(
 
   let activeSessionsQuery = supabase
     .from("chat_sessions")
-    .select("*", { count: "exact", head: true })
+    .select("id", { count: "exact", head: true })
     .gte("updated_at", rangeStartISO);
   if (schoolId) activeSessionsQuery = activeSessionsQuery.eq("school_id", schoolId);
 
@@ -134,16 +158,22 @@ export async function getAnalyticsData(
 
   // Top questions
   const questionCounts: Record<string, number> = {};
+  const questionAskers: Record<string, Set<string>> = {};
   events?.forEach((event) => {
     const question = (event.metadata as Record<string, unknown>)
       ?.question as string;
     if (question) {
       const normalized = question.toLowerCase().trim();
       questionCounts[normalized] = (questionCounts[normalized] || 0) + 1;
+      (questionAskers[normalized] ??= new Set()).add(event.user_id ?? "");
     }
   });
 
   const topQuestions = Object.entries(questionCounts)
+    .filter(
+      ([question]) =>
+        (questionAskers[question]?.size ?? 0) >= MIN_DISTINCT_ASKERS_FOR_TOP_QUESTION
+    )
     .sort((a, b) => b[1] - a[1])
     .slice(0, 10)
     .map(([question, count]) => ({ question, count }));
