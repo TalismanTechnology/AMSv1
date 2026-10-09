@@ -8,7 +8,7 @@ import { Logo } from "@/components/logo";
 
 // The headline's display face: an editorial serif with a true italic, to
 // suit the old-schoolhouse scene. Everything else on the page stays in the
-// Helvetica Neue Light UI face, so this is loaded here, for the hero only.
+// light Inter UI face, so this is loaded here, for the hero only.
 const heroSerif = Instrument_Serif({
   weight: "400",
   style: ["normal", "italic"],
