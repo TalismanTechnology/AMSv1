@@ -6,11 +6,12 @@ import { forgetThisDevice } from "@/lib/push/device-cookie";
 import { redirect } from "next/navigation";
 
 const PARENT_PASSWORD_ERROR =
-  "Parents sign in with Blackbaud. Choose your school and use “Sign in with Blackbaud”.";
+  "Parents sign in with their school account. Choose your school and use “Sign in with Blackbaud” or “Sign in with Veracross”.";
 
 // Email/password sign-in is for school staff and super admins only. Parents
-// come in through Blackbaud (app/auth/blackbaud), which checks the school's
-// parent roster — a password would let them skip that check.
+// come in through Blackbaud or Veracross (app/auth/blackbaud,
+// app/auth/veracross), which check the school's parent records — a password
+// would let them skip that check.
 export async function login(formData: FormData) {
   const supabase = await createClient();
 

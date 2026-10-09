@@ -1,7 +1,8 @@
 import type { PluginListenerHandle } from "@capacitor/core";
 import type { NativePlatform } from "./platform";
+import { AUTH_PROVIDERS, type AuthProvider } from "@/lib/auth/provider";
 
-// "Sign in with Blackbaud" inside the app. The server half and the reasoning
+// "Sign in with Blackbaud" (or Veracross) inside the app. The server half and the reasoning
 // are in lib/auth/app-handoff.ts; this is the part that runs in the web view.
 
 const APP_CALLBACK_URL = "app.askmyschool://auth-callback";
@@ -104,13 +105,15 @@ function showLoginError(schoolSlug: string, message: string): void {
   );
 }
 
-export async function signInWithBlackbaud(
+export async function signInWithSchoolProvider(
   platform: NativePlatform,
-  schoolSlug: string
+  schoolSlug: string,
+  provider: AuthProvider = "blackbaud"
 ): Promise<void> {
+  const { label, startPath } = AUTH_PROVIDERS[provider];
   const { verifier, challenge } = await createVerifier();
   const startUrl =
-    `${window.location.origin}/auth/blackbaud?school=${encodeURIComponent(schoolSlug)}` +
+    `${window.location.origin}${startPath}?school=${encodeURIComponent(schoolSlug)}` +
     `&app_challenge=${challenge}`;
 
   let callbackUrl: string | null;
@@ -118,8 +121,8 @@ export async function signInWithBlackbaud(
     callbackUrl =
       platform === "ios" ? await openIosSheet(startUrl) : await openAndroidTab(startUrl);
   } catch (caught: unknown) {
-    console.error("[native] Blackbaud sign-in sheet failed", caught);
-    showLoginError(schoolSlug, "We couldn't open Blackbaud sign-in. Please try again.");
+    console.error(`[native] ${label} sign-in sheet failed`, caught);
+    showLoginError(schoolSlug, `We couldn't open ${label} sign-in. Please try again.`);
     return;
   }
 
@@ -133,7 +136,7 @@ export async function signInWithBlackbaud(
   if (error || !code) {
     showLoginError(
       params.get("school") ?? schoolSlug,
-      error ?? "We couldn't sign you in with Blackbaud. Please try again."
+      error ?? `We couldn't sign you in with ${label}. Please try again.`
     );
     return;
   }

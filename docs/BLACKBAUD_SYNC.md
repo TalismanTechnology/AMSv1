@@ -3,6 +3,8 @@
 Pull a school's calendar events and parent roster out of Blackbaud so the
 assistant can answer from them and only verified parents can sign up.
 
+Schools on Veracross instead of Blackbaud: see [VERACROSS.md](VERACROSS.md).
+
 There are two independent halves. A school can use either without the other.
 
 | Half | Transport | What it feeds |

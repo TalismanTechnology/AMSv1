@@ -18,6 +18,8 @@ export interface School {
   sso_domain: string | null;
   sso_provider_id: string | null;
   sso_button_label: string | null;
+  /** Parent sign-in provider (migration 034). Absent before 034 is applied. */
+  auth_provider?: "blackbaud" | "veracross" | null;
   created_at: string;
   updated_at: string;
 }

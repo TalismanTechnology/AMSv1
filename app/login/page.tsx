@@ -23,7 +23,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             Choose your school
           </h1>
           <p className="mt-2 text-sm text-ink-soft">
-            Select your school to sign in with Blackbaud.
+            Select your school to sign in with your school account.
           </p>
         </div>
 

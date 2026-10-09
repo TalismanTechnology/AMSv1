@@ -7,6 +7,7 @@ import {
   getParentRedirectUri,
 } from "@/lib/blackbaud/parent-login";
 import { isValidAppChallenge } from "@/lib/auth/app-handoff";
+import { resolveAuthProvider } from "@/lib/auth/provider";
 import {
   LOGIN_STATE_COOKIE,
   OAUTH_STATE_MAX_AGE_SECONDS,
@@ -40,6 +41,15 @@ export async function GET(request: Request) {
     return NextResponse.redirect(
       `${origin}/login?error=${encodeURIComponent("We couldn't find that school.")}`
     );
+  }
+
+  // A Veracross school's parents sign in there instead. Older links and app
+  // builds still point here, so hand the request over with its parameters.
+  if (resolveAuthProvider(school.auth_provider) === "veracross") {
+    const veracrossUrl = new URL("/auth/veracross", origin);
+    veracrossUrl.searchParams.set("school", school.slug);
+    if (appChallenge) veracrossUrl.searchParams.set("app_challenge", appChallenge);
+    return NextResponse.redirect(veracrossUrl.toString());
   }
 
   const loginUrl = `${origin}/s/${school.slug}/login`;

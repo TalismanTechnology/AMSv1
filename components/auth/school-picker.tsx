@@ -1,5 +1,6 @@
 import { ArrowRight } from "lucide-react";
 import type { SignInSchool } from "@/lib/auth/sign-in-schools";
+import { AUTH_PROVIDERS, parentSignInHref } from "@/lib/auth/provider";
 
 interface SchoolPickerProps {
   schools: SignInSchool[];
@@ -15,14 +16,14 @@ function monogram(name: string): string {
 }
 
 /**
- * "Choose your school": one card per Blackbaud-connected school. Picking one
- * goes straight to that school's Blackbaud sign-in.
+ * "Choose your school": one card per school with parent sign-in turned on.
+ * Picking one goes straight to that school's Blackbaud or Veracross sign-in.
  */
 export function SchoolPicker({ schools }: SchoolPickerProps) {
   if (schools.length === 0) {
     return (
       <p className="rounded-xl border border-border bg-secondary/60 px-5 py-6 text-center text-sm text-ink-soft">
-        No schools have turned on Blackbaud sign-in yet.
+        No schools have turned on parent sign-in yet.
       </p>
     );
   }
@@ -32,7 +33,7 @@ export function SchoolPicker({ schools }: SchoolPickerProps) {
       {schools.map((school) => (
         <li key={school.id}>
           <a
-            href={`/auth/blackbaud?school=${encodeURIComponent(school.slug)}`}
+            href={parentSignInHref(school.provider, school.slug)}
             className="group flex items-center gap-4 rounded-2xl border border-border bg-card px-5 py-4 transition-colors hover:border-ring/50 hover:bg-secondary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             {school.logoUrl ? (
@@ -55,7 +56,7 @@ export function SchoolPicker({ schools }: SchoolPickerProps) {
             <span className="min-w-0 flex-1">
               <span className="block truncate font-medium text-ink">{school.name}</span>
               <span className="block text-sm text-ink-soft">
-                Sign in with your Blackbaud account
+                Sign in with your {AUTH_PROVIDERS[school.provider].label} account
               </span>
             </span>
             <ArrowRight className="size-4 shrink-0 text-ink-soft transition-transform group-hover:translate-x-0.5 group-hover:text-ink" />
