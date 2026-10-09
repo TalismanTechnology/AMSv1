@@ -123,16 +123,19 @@ function Navbar() {
               </Link>
             </div>
 
-            {/* Desktop: sign-in text link, then the CTA pill */}
+            {/* Desktop: the schools link, then the parent sign-in pill. There
+                is no self-serve sign-up: parents sign in through their
+                school's Blackbaud login (/login is the school picker) and
+                schools get in touch via the closing section. */}
             <div className="hidden md:flex items-center gap-6 ml-auto animate-fade-down stagger-3">
-              <Link href="/login" className={NAV_LINK_CLASS}>
-                Sign in
-              </Link>
+              <a href="#get-started" className={NAV_LINK_CLASS}>
+                For schools
+              </a>
               <Link
                 href="/login"
                 className="inline-flex items-center px-5 py-2.5 bg-brand-dark text-white text-sm tracking-wide uppercase rounded-full hover:bg-brand-green transition-colors"
               >
-                Get Started
+                Parent sign in
               </Link>
             </div>
 
@@ -190,19 +193,19 @@ function Navbar() {
               {link.label}
             </a>
           ))}
-          <Link
-            href="/login"
+          <a
+            href="#get-started"
             onClick={menu.close}
             className={`${MOBILE_LINK_CLASS} text-brand-dark/60`}
           >
-            Sign in
-          </Link>
+            For schools
+          </a>
           <Link
             href="/login"
             onClick={menu.close}
             className="mt-4 inline-flex items-center px-8 py-3.5 bg-brand-dark text-white text-lg tracking-wide rounded-full"
           >
-            Get Started
+            Parent sign in
           </Link>
         </div>
       </div>
