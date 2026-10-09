@@ -20,6 +20,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { DeleteAccountSection } from "@/components/account/delete-account-section";
 import { updateProfile } from "@/actions/profile";
 import { addChild, updateChild, removeChild } from "@/actions/children";
 import { toast } from "sonner";
@@ -237,6 +238,8 @@ export function ProfileClient({
           )}
         </div>
       </section>
+
+      <DeleteAccountSection />
 
       <Dialog open={childDialogOpen} onOpenChange={setChildDialogOpen}>
         <DialogContent className="sm:max-w-md">
