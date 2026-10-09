@@ -1,6 +1,6 @@
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
-import { formatGrade } from "@/lib/grades";
+import { labelChildren } from "./child-privacy";
 import type { ChildContext } from "./context";
 
 interface ChatMessage {
@@ -18,6 +18,10 @@ interface ChatMessage {
  * that actually appear in the documents: "and my other kid?" is useless as a
  * search query, while "8th grade Middle School dress code" retrieves the right
  * division's handbook.
+ *
+ * Children appear by grade label only — never by name. The caller has already
+ * replaced any child's name in the conversation with that label
+ * (lib/ai/child-privacy.ts).
  *
  * Returns the original query unchanged if there's no conversation history.
  */
@@ -57,14 +61,14 @@ export async function rewriteQueryWithContext(
 
   const childrenBlock =
     children.length > 0
-      ? `\nThe parent's children (grade levels, not ages):\n${children
-          .map((c) => `- ${c.name}: ${formatGrade(c.grade)}`)
+      ? `\nThe parent's children (grade levels, not ages):\n${labelChildren(children)
+          .map((c) => `- [${c.label}]: ${c.grade}`)
           .join("\n")}\n`
       : "";
 
   const childrenRule =
     children.length > 0
-      ? `\n- If the follow-up refers to a child ("Mia", "my other kid", "my 8th grader", "the younger one"), resolve it to that child's grade level in the query, since documents are organised by grade and division rather than by name.`
+      ? `\n- If the follow-up refers to a child ("[your 8th Grade child]", "my other kid", "my 8th grader", "the younger one"), resolve it to that child's grade level in the query, since documents are organised by grade and division rather than by name.`
       : "";
 
   try {

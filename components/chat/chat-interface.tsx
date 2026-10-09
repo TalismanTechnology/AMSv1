@@ -16,6 +16,8 @@ import { SuggestedQuestions } from "./suggested-questions";
 import { SourcePanel } from "./source-panel";
 import { SourcePanelProvider } from "./source-panel-context";
 import { ChatExport } from "./chat-export";
+import { AiConsentDialog } from "./ai-consent-dialog";
+import { isAiConsentError } from "@/lib/ai/consent";
 import { createChatSession } from "@/actions/chat";
 import { searchDocumentsByName } from "@/actions/documents";
 import { parseFollowUps } from "@/lib/chat-utils";
@@ -30,6 +32,12 @@ interface ChatInterfaceProps {
   welcomeMessage?: string | null;
   sessionTitle?: string;
   schoolId?: string;
+  /**
+   * Whether the user has agreed to the current AI-processing notice. When
+   * false, the first question opens the consent dialog instead of sending.
+   * The chat API enforces the same rule server-side.
+   */
+  aiConsentGiven?: boolean;
 }
 
 export function ChatInterface({
@@ -41,8 +49,16 @@ export function ChatInterface({
   welcomeMessage,
   sessionTitle,
   schoolId,
+  aiConsentGiven = false,
 }: ChatInterfaceProps) {
   const [input, setInput] = useState("");
+  const [hasAiConsent, setHasAiConsent] = useState(aiConsentGiven);
+  const [consentOpen, setConsentOpen] = useState(false);
+  // The question that was waiting on the consent dialog.
+  const consentPendingRef = useRef<string | null>(null);
+  // The consent-gate error the parent closed with "Not now" (so it doesn't
+  // re-open on every render).
+  const [dismissedConsentError, setDismissedConsentError] = useState<Error | undefined>();
   const [currentSessionId, setCurrentSessionId] = useState(sessionId);
   const [creatingSession, setCreatingSession] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
@@ -83,7 +99,7 @@ export function ChatInterface({
     [schoolId]
   );
 
-  const { messages, sendMessage, status, error, setMessages } = useChat({
+  const { messages, sendMessage, regenerate, status, error, setMessages } = useChat({
     transport,
   });
 
@@ -96,6 +112,12 @@ export function ChatInterface({
 
   const isLoading =
     status === "streaming" || status === "submitted" || creatingSession;
+
+  // The server refused for missing consent (e.g. it was withdrawn in another
+  // tab): show the notice again rather than a raw error.
+  const consentError = isAiConsentError(error?.message);
+  const consentDialogOpen =
+    consentOpen || (consentError && dismissedConsentError !== error);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -193,7 +215,7 @@ export function ChatInterface({
     );
   }
 
-  async function submitText(text: string) {
+  async function submitText(text: string, { consented = false } = {}) {
     if (!text.trim() || isLoading) return;
     setSendError(null);
 
@@ -203,6 +225,15 @@ export function ChatInterface({
       if (query) {
         await handlePreviewCommand(query);
       }
+      return;
+    }
+
+    // Nothing is sent to the AI until the parent has agreed to the notice.
+    // `consented` covers the call made right after "Agree", before the state
+    // update lands; the server has the consent row by then.
+    if (!consented && (!hasAiConsent || consentError)) {
+      consentPendingRef.current = text;
+      setConsentOpen(true);
       return;
     }
 
@@ -234,6 +265,28 @@ export function ChatInterface({
     const text = input;
     setInput("");
     await submitText(text);
+  }
+
+  function handleConsentAgree() {
+    setHasAiConsent(true);
+    setConsentOpen(false);
+    const pending = consentPendingRef.current;
+    consentPendingRef.current = null;
+    if (pending) {
+      submitText(pending, { consented: true });
+    } else if (consentError) {
+      // Re-send the question the server refused.
+      regenerate();
+    }
+  }
+
+  function handleConsentDecline() {
+    setConsentOpen(false);
+    if (consentError) setDismissedConsentError(error);
+    const pending = consentPendingRef.current;
+    consentPendingRef.current = null;
+    // Give the question back rather than dropping it.
+    if (pending && !input) setInput(pending);
   }
 
   function handleSuggestedQuestion(question: string) {
@@ -354,7 +407,13 @@ export function ChatInterface({
               {isLoading && !creatingSession && (!messages[messages.length - 1] || messages[messages.length - 1].role === "user" || !getMessageText(messages[messages.length - 1])) && (
                 <RetrievalLoadingStrip />
               )}
-              {(error || sendError) && (
+              {consentError && !consentDialogOpen && (
+                <div className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm text-ink-soft">
+                  To get answers, agree to AI processing — send your question
+                  again to see the notice.
+                </div>
+              )}
+              {((error && !consentError) || sendError) && (
                 <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
                   Something went wrong: {error?.message || sendError}
                 </div>
@@ -391,6 +450,12 @@ export function ChatInterface({
 
         {/* Artifact panel */}
         <SourcePanel />
+
+        <AiConsentDialog
+          open={consentDialogOpen}
+          onAgree={handleConsentAgree}
+          onDecline={handleConsentDecline}
+        />
       </div>
     </SourcePanelProvider>
   );

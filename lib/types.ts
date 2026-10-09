@@ -40,6 +40,10 @@ export interface Profile {
   approved: boolean;
   child_grade: string | null;
   created_at: string;
+  /** When the user agreed to AI processing (migration 035); null if not / withdrawn. */
+  ai_consent_at?: string | null;
+  /** Notice version agreed to — see lib/ai/consent.ts. */
+  ai_consent_version?: string | null;
   children?: Child[];
   memberships?: SchoolMembership[];
 }

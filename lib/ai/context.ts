@@ -1,5 +1,5 @@
+import { labelChildren } from "./child-privacy";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { formatGrade } from "@/lib/grades";
 
 // Upper bound on how many calendar events we inject into a single prompt. The
 // model scans the whole school calendar, but we cap to keep the prompt bounded;
@@ -269,7 +269,9 @@ export interface ChildContext {
 }
 
 /**
- * Fetch parent's children (name + grade) for context.
+ * Fetch parent's children (name + grade) for context. The names are used only
+ * to recognise them in the parent's own messages (lib/ai/child-privacy.ts);
+ * they are never sent to the model.
  */
 export async function fetchChildrenForContext(
   userId: string,
@@ -294,24 +296,25 @@ export async function fetchChildrenForContext(
 /**
  * Format children as a text block for the system prompt.
  *
- * Grades are spelled out ("8th Grade", never "8") and labelled as grade levels.
- * The raw stored value is a bare number, and "Lucas (8)" reads to a model as an
- * eight-year-old — which then skews every answer about divisions, deadlines,
- * and age-appropriate policies.
+ * Children appear by GRADE only — their names are never sent to the model
+ * (see lib/ai/child-privacy.ts). Grades are spelled out ("8th Grade", never
+ * "8") and labelled as grade levels: the raw stored value is a bare number, and
+ * "(8)" reads to a model as an eight-year-old — which then skews every answer
+ * about divisions, deadlines, and age-appropriate policies.
  */
 export function formatChildrenContext(children: ChildContext[]): string {
   if (children.length === 0) return "";
 
   // Numbered so the model tracks them as distinct people rather than blurring
   // two children into one when it answers.
-  const lines = children.map(
-    (c, i) => `${i + 1}. ${c.name} — enrolled in ${formatGrade(c.grade)}`
+  const lines = labelChildren(children).map(
+    (c, i) => `${i + 1}. "${c.label}" — enrolled in ${c.grade}`
   );
   const count =
     children.length === 1 ? "1 child" : `${children.length} children`;
-  // The gender warning sits here, beside the names, as well as in the rules —
-  // models otherwise guess from the name and address a child as "he"/"she".
-  return `PARENT'S CHILDREN (${count}; school grade levels, NOT ages — never state or infer a child's age from these). The school record has no gender for these children: refer to each one by name or as "they", never "he"/"she"/"son"/"daughter", even if the parent used such a word:\n${lines.join(
+  // The gender warning sits here, beside the labels, as well as in the rules —
+  // models otherwise guess and address a child as "he"/"she".
+  return `PARENT'S CHILDREN (${count}; school grade levels, NOT ages — never state or infer a child's age from these). Children's names are withheld for privacy: refer to each child by the quoted label (e.g. "your 8th Grade child" or "your 8th grader"), never invent or ask for a name. Where the parent's message says [your … child], they typed that child's name. The school record has no gender for these children: refer to each one by their label or as "they", never "he"/"she"/"son"/"daughter", even if the parent used such a word:\n${lines.join(
     "\n"
   )}`;
 }

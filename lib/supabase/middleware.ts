@@ -8,13 +8,17 @@ const adminClient = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+// Public pages that load for anyone, signed in or not — /support is the App
+// Store support URL and must never bounce to a sign-in screen.
+const PUBLIC_PAGES = new Set(["/support"]);
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
   const pathname = request.nextUrl.pathname;
 
   // ─── Fast path: public routes that never need auth ─────────────────
-  if (pathname === "/") {
+  if (pathname === "/" || PUBLIC_PAGES.has(pathname)) {
     return supabaseResponse;
   }
 
