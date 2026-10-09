@@ -24,6 +24,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TimeAgo } from "@/components/ui/time-ago";
 import { updateSettings, updateEmailIngestion } from "@/actions/settings";
+import { approveHeldEmail, rejectHeldEmail } from "@/actions/email-review";
 import {
   syncBlackbaudRoster,
 } from "@/actions/blackbaud";
@@ -742,7 +743,7 @@ function EmailIngestionSection({
                 files what it receives into its own division.{" "}
                 {domains.length
                   ? "Only senders from the allowed domains below are accepted."
-                  : "Anyone who has an address can add documents, so keep them private."}
+                  : "With no allowed domains, every email is held under Recent emails until you approve it."}
               </p>
             </div>
             {config.addressesError ? (
@@ -811,8 +812,9 @@ function EmailIngestionSection({
             ))}
             {domains.length === 0 && (
               <p className="text-xs text-muted-foreground">
-                No domains: mail from any sender is accepted. Add one (e.g.
-                lincolnhigh.org) to only accept your school&apos;s staff.
+                No domains: every email is held for your review below before
+                parents can see it. Add one (e.g. lincolnhigh.org) to accept
+                your school&apos;s staff automatically.
               </p>
             )}
           </div>
@@ -838,8 +840,9 @@ function EmailIngestionSection({
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            When set, only emails whose sender address ends with one of these
-            domains are ingested. Subdomains are matched too.
+            When set, emails whose sender address ends with one of these
+            domains are added automatically and all others are turned away.
+            Subdomains are matched too.
           </p>
         </div>
 
@@ -861,7 +864,7 @@ function EmailIngestionSection({
           </Button>
         </div>
 
-        <RecentEmails entries={config.recent} />
+        <RecentEmails schoolId={schoolId} entries={config.recent} />
       </div>
     </section>
   );
@@ -938,6 +941,14 @@ function AddressRow({
 const EMAIL_STATUS: Record<string, { label: string; className: string }> = {
   accepted: { label: "Added", className: "bg-success/15 text-success" },
   processing: { label: "Processing", className: "bg-amber-500/15 text-amber-500" },
+  pending_review: {
+    label: "Needs review",
+    className: "bg-amber-500/15 text-amber-500",
+  },
+  rejected_review: {
+    label: "Rejected",
+    className: "bg-secondary text-secondary-foreground",
+  },
   rejected_domain: {
     label: "Sender not allowed",
     className: "bg-destructive/15 text-destructive",
@@ -950,29 +961,77 @@ const EMAIL_STATUS: Record<string, { label: string; className: string }> = {
   error: { label: "Failed", className: "bg-destructive/15 text-destructive" },
 };
 
-function RecentEmails({ entries }: { entries: EmailIngestionLogEntry[] }) {
+function RecentEmails({
+  schoolId,
+  entries,
+}: {
+  schoolId: string;
+  entries: EmailIngestionLogEntry[];
+}) {
+  // Statuses changed here, shown until the page's data refreshes.
+  const [overrides, setOverrides] = useState<Record<string, string>>({});
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  async function review(id: string, decision: "approve" | "reject") {
+    setBusyId(id);
+    const result =
+      decision === "approve"
+        ? await approveHeldEmail(schoolId, id)
+        : await rejectHeldEmail(schoolId, id);
+    setBusyId(null);
+
+    if ("error" in result) {
+      toast.error(result.error);
+      return;
+    }
+    setOverrides((prev) => ({
+      ...prev,
+      [id]: decision === "approve" ? "accepted" : "rejected_review",
+    }));
+    toast.success(
+      decision === "approve"
+        ? `Email approved${result.documents ? ` · ${result.documents} document${result.documents === 1 ? "" : "s"} added` : ""}`
+        : "Email rejected"
+    );
+  }
+
+  const pendingCount = entries.filter(
+    (e) => (overrides[e.id] ?? e.status) === "pending_review"
+  ).length;
+
   return (
     <div className="space-y-2 border-t border-border pt-5">
       <div className="space-y-0.5">
         <Label>Recent emails</Label>
         <p className="text-xs text-muted-foreground">
           The last 20 emails sent to your inbound addresses and what happened
-          to each.
+          to each. Emails marked &ldquo;Needs review&rdquo; aren&apos;t visible to
+          parents until you approve them.
         </p>
+        {pendingCount > 0 && (
+          <p className="text-xs font-medium text-amber-500">
+            {pendingCount} email{pendingCount === 1 ? "" : "s"} waiting for review
+          </p>
+        )}
       </div>
       {entries.length === 0 ? (
         <p className="text-xs text-muted-foreground">No emails received yet.</p>
       ) : (
         <ul className="divide-y divide-border rounded-lg border border-border">
           {entries.map((entry) => {
-            const status = EMAIL_STATUS[entry.status] ?? {
-              label: entry.status,
+            const statusKey = overrides[entry.id] ?? entry.status;
+            const status = EMAIL_STATUS[statusKey] ?? {
+              label: statusKey,
               className: "bg-secondary text-secondary-foreground",
             };
             const detail =
-              entry.status === "accepted"
+              statusKey === "accepted" && !overrides[entry.id]
                 ? `${entry.documentCount} document${entry.documentCount === 1 ? "" : "s"} added`
-                : entry.reason;
+                : overrides[entry.id]
+                  ? null
+                  : entry.reason;
+            const pending = statusKey === "pending_review";
+            const busy = busyId === entry.id;
             return (
               <li
                 key={entry.id}
@@ -988,6 +1047,28 @@ function RecentEmails({ entries }: { entries: EmailIngestionLogEntry[] }) {
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
+                  {pending && (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7"
+                        disabled={busyId !== null}
+                        onClick={() => review(entry.id, "reject")}
+                      >
+                        Reject
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="h-7"
+                        disabled={busyId !== null}
+                        onClick={() => review(entry.id, "approve")}
+                      >
+                        {busy && <LogoSpinner className="mr-1.5" />}
+                        Approve
+                      </Button>
+                    </>
+                  )}
                   <Badge className={status.className}>{status.label}</Badge>
                   <span className="text-xs text-muted-foreground">
                     <TimeAgo date={entry.createdAt} />

@@ -7,6 +7,7 @@ import {
   routeInboundMessage,
   normalizeSenderDomain,
   isStaleClaim,
+  senderGate,
   type InboundAddress,
 } from "./inbound";
 
@@ -160,4 +161,20 @@ test("isStaleClaim keeps a fresh claim and expires an old one", () => {
 
 test("isStaleClaim treats an unreadable timestamp as stale", () => {
   assert.equal(isStaleClaim("not-a-date"), true);
+});
+
+test("senderGate holds mail for review when no allowlist is set", () => {
+  assert.equal(senderGate("a@anywhere.com", []), "review");
+  assert.equal(senderGate("a@anywhere.com", null), "review");
+  assert.equal(senderGate("a@anywhere.com", undefined), "review");
+  assert.equal(senderGate("a@anywhere.com", ["  "]), "review");
+  assert.equal(senderGate(null, []), "review");
+});
+
+test("senderGate allows allowlisted senders and rejects others", () => {
+  assert.equal(senderGate("office@lincolnhigh.org", ["lincolnhigh.org"]), "allow");
+  assert.equal(senderGate("a@mail.lincolnhigh.org", ["lincolnhigh.org"]), "allow");
+  assert.equal(senderGate("a@evil.com", ["lincolnhigh.org"]), "reject");
+  assert.equal(senderGate("a@notlincolnhigh.org", ["lincolnhigh.org"]), "reject");
+  assert.equal(senderGate(null, ["lincolnhigh.org"]), "reject");
 });
