@@ -14,7 +14,7 @@ const ROW_A = [
   "What's the dress code on spirit days?",
   "Are nut products allowed in packed lunches?",
   "When are parent–teacher conferences?",
-  "What's the snow day policy?",
+  "When's the next home game?",
 ];
 
 const ROW_B = [
