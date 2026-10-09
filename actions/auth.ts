@@ -34,7 +34,7 @@ export async function login(formData: FormData) {
   const staffRole = await getStaffRole(user.id);
 
   if (!staffRole) {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: "local" });
     return { error: PARENT_PASSWORD_ERROR };
   }
 
@@ -53,7 +53,7 @@ export async function login(formData: FormData) {
       .maybeSingle();
 
     if (membership?.role !== "admin") {
-      await supabase.auth.signOut();
+      await supabase.auth.signOut({ scope: "local" });
       return { error: "You're not a staff member at this school." };
     }
 
@@ -79,6 +79,8 @@ export async function logout() {
   } = await supabase.auth.getUser();
 
   if (user) await forgetThisDevice(user.id);
-  await supabase.auth.signOut();
+  // Only this device: signing out on a shared school computer shouldn't sign
+  // the same person out of their phone.
+  await supabase.auth.signOut({ scope: "local" });
   redirect("/");
 }

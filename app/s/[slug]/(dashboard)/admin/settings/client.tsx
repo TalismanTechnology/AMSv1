@@ -23,12 +23,7 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TimeAgo } from "@/components/ui/time-ago";
-import {
-  updateSettings,
-  updateEmailIngestion,
-  addDivisionAddress,
-  removeDivisionAddress,
-} from "@/actions/settings";
+import { updateSettings, updateEmailIngestion } from "@/actions/settings";
 import {
   syncBlackbaudRoster,
 } from "@/actions/blackbaud";
@@ -36,18 +31,11 @@ import {
   BlackbaudCalendarFeeds,
   type FeedWithMapping,
 } from "@/components/admin/blackbaud-calendar-feeds";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { calendarColorClasses } from "@/lib/event-calendars";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { EventCalendar, Settings } from "@/lib/types";
+import type { InboundAddresses } from "@/lib/email/addresses";
 
 export interface EmailIngestionLogEntry {
   id: string;
@@ -59,21 +47,10 @@ export interface EmailIngestionLogEntry {
   createdAt: string;
 }
 
-/** A division's own inbound address. */
-export interface DivisionAddress {
-  id: string;
-  token: string;
-  divisionId: string;
-}
-
-interface EmailIngestionConfig {
+interface EmailIngestionConfig extends InboundAddresses {
   enabled: boolean;
   autoSort: boolean;
   allowedDomains: string[];
-  wholeSchoolToken: string | null;
-  divisionAddresses: DivisionAddress[];
-  /** The school's divisions, each of which can have its own address. */
-  divisions: EventCalendar[];
   /** Set when the addresses couldn't be loaded, saying why. */
   addressesError: string | null;
   inboundDomain: string | null;
@@ -422,7 +399,6 @@ export function SettingsClient({
         >
           <EmailIngestionSection
             schoolId={schoolId}
-            schoolSlug={schoolSlug}
             config={emailIngestion}
           />
         </TabsContent>
@@ -685,23 +661,21 @@ function BlackbaudSection({
 
 function EmailIngestionSection({
   schoolId,
-  schoolSlug,
   config,
 }: {
   schoolId: string;
-  schoolSlug: string;
   config: EmailIngestionConfig;
 }) {
   const [enabled, setEnabled] = useState(config.enabled);
   const [autoSort, setAutoSort] = useState(config.autoSort);
   const [domains, setDomains] = useState<string[]>(config.allowedDomains);
-  const [token, setToken] = useState<string | null>(config.wholeSchoolToken);
+  const [addresses, setAddresses] = useState<InboundAddresses>(config);
   const [newDomain, setNewDomain] = useState("");
   const [saving, setSaving] = useState(false);
 
   const addressFor = (t: string | null) =>
     t && config.inboundDomain ? `${t}@${config.inboundDomain}` : null;
-  const inboundAddress = addressFor(token);
+  const inboundAddress = addressFor(addresses.wholeSchoolToken);
 
   function addDomain() {
     const value = newDomain.trim().toLowerCase().replace(/^[@*]+\.?/, "");
@@ -731,7 +705,7 @@ function EmailIngestionSection({
       toast.error(result.error);
       return;
     }
-    if (result.token) setToken(result.token);
+    if (result.addresses) setAddresses(result.addresses);
     toast.success("Email settings saved");
   }
 
@@ -759,7 +733,7 @@ function EmailIngestionSection({
           />
         </div>
 
-        {(enabled || token) && (
+        {(enabled || addresses.wholeSchoolToken) && (
           <div className="space-y-4 rounded-xl border border-border p-4">
             <div className="space-y-1">
               <Label>Where to send emails</Label>
@@ -796,13 +770,22 @@ function EmailIngestionSection({
                   hint="The AI decides which division each email belongs to."
                   address={inboundAddress}
                 />
-                <DivisionAddresses
-                  schoolId={schoolId}
-                  schoolSlug={schoolSlug}
-                  divisions={config.divisions}
-                  initialAddresses={config.divisionAddresses}
-                  addressFor={addressFor}
-                />
+                {addresses.divisions.map((division) => {
+                  const token = addresses.divisionAddresses.find(
+                    (a) => a.divisionId === division.id
+                  )?.token;
+                  const address = token ? addressFor(token) : null;
+                  if (!address) return null;
+                  return (
+                    <AddressRow
+                      key={division.id}
+                      label={division.name}
+                      hint={`Everything sent here is filed under ${division.name}.`}
+                      color={division.color}
+                      address={address}
+                    />
+                  );
+                })}
               </>
             )}
           </div>
@@ -884,159 +867,6 @@ function EmailIngestionSection({
   );
 }
 
-/**
- * One address per division. Mail sent to a division's address becomes
- * documents marked for that division, so the assistant only applies them to
- * that division. Added and removed immediately, not with the Save button.
- */
-function DivisionAddresses({
-  schoolId,
-  schoolSlug,
-  divisions,
-  initialAddresses,
-  addressFor,
-}: {
-  schoolId: string;
-  schoolSlug: string;
-  divisions: EventCalendar[];
-  initialAddresses: DivisionAddress[];
-  addressFor: (token: string) => string | null;
-}) {
-  const [addresses, setAddresses] = useState(initialAddresses);
-  const [pick, setPick] = useState("");
-  const [adding, setAdding] = useState(false);
-  const [removing, setRemoving] = useState<DivisionAddress | null>(null);
-  const [removeBusy, setRemoveBusy] = useState(false);
-
-  const byId = new Map(divisions.map((d) => [d.id, d]));
-  const available = divisions.filter(
-    (d) => !addresses.some((a) => a.divisionId === d.id)
-  );
-
-  async function handleAdd() {
-    if (!pick) return;
-    setAdding(true);
-    const result = await addDivisionAddress(schoolId, pick);
-    setAdding(false);
-
-    if (result.error || !result.address) {
-      toast.error(result.error ?? "Could not add the address");
-      return;
-    }
-    setAddresses((prev) => [...prev, result.address!]);
-    setPick("");
-    toast.success(`${byId.get(pick)?.name ?? "Division"} address added`);
-  }
-
-  async function handleRemove() {
-    if (!removing) return;
-    setRemoveBusy(true);
-    const result = await removeDivisionAddress(schoolId, removing.id);
-    setRemoveBusy(false);
-
-    if (result.error) {
-      toast.error(result.error);
-      return;
-    }
-    setAddresses((prev) => prev.filter((a) => a.id !== removing.id));
-    setRemoving(null);
-    toast.success("Address removed");
-  }
-
-  if (divisions.length === 0) {
-    return (
-      <p className="text-xs text-muted-foreground">
-        To give Lower, Middle, or Upper School its own address, first set up
-        division categories under{" "}
-        <a
-          href={`/s/${schoolSlug}/admin/documents`}
-          className="underline underline-offset-2 hover:text-ink"
-        >
-          Documents → Manage Categories
-        </a>
-        , or add the divisions under{" "}
-        <a
-          href={`/s/${schoolSlug}/admin/events`}
-          className="underline underline-offset-2 hover:text-ink"
-        >
-          Events
-        </a>
-        .
-      </p>
-    );
-  }
-
-  return (
-    <div className="space-y-2">
-      {addresses.map((a) => {
-        const division = byId.get(a.divisionId);
-        const address = addressFor(a.token);
-        if (!division || !address) return null;
-        return (
-          <AddressRow
-            key={a.id}
-            label={division.name}
-            hint={`Everything sent here is filed under ${division.name}.`}
-            color={division.color}
-            address={address}
-            onRemove={() => setRemoving(a)}
-          />
-        );
-      })}
-
-      {available.length > 0 ? (
-        <div className="space-y-1.5 pt-1">
-          <p className="text-xs font-medium text-ink-soft">
-            Add an address for a division
-          </p>
-          <div className="flex gap-2">
-            <Select value={pick} onValueChange={setPick}>
-              <SelectTrigger className="flex-1" aria-label="Division">
-                <SelectValue placeholder="Choose a division…" />
-              </SelectTrigger>
-              <SelectContent>
-                {available.map((d) => (
-                  <SelectItem key={d.id} value={d.id}>
-                    {d.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button
-              variant="outline"
-              onClick={handleAdd}
-              disabled={!pick || adding}
-              className="shrink-0"
-            >
-              {adding ? <LogoSpinner className="mr-2" /> : <Plus className="mr-2 h-4 w-4" />}
-              Create address
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <p className="text-xs text-muted-foreground">
-          Every division has its own address.
-        </p>
-      )}
-
-      <ConfirmDialog
-        open={!!removing}
-        onOpenChange={(open) => {
-          if (!open) setRemoving(null);
-        }}
-        title="Remove this address?"
-        description={`Emails sent to the ${
-          removing ? byId.get(removing.divisionId)?.name ?? "division" : "division"
-        } address will be turned away. Documents it already added keep their division. If you add an address for this division again, it will be a new one.`}
-        confirmLabel="Remove"
-        variant="destructive"
-        loading={removeBusy}
-        onConfirm={handleRemove}
-      />
-    </div>
-  );
-}
-
 /** A short, highlighted message in place of the addresses. */
 function AddressNotice({ children }: { children: React.ReactNode }) {
   return (
@@ -1051,7 +881,6 @@ function AddressRow({
   hint,
   color,
   address,
-  onRemove,
 }: {
   label: string;
   /** Where mail sent to this address ends up. */
@@ -1059,7 +888,6 @@ function AddressRow({
   /** Division color; omitted for the whole-school address. */
   color?: string;
   address: string;
-  onRemove?: () => void;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -1102,18 +930,6 @@ function AddressRow({
             <Copy className="h-4 w-4" />
           )}
         </Button>
-        {onRemove && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={onRemove}
-            className="shrink-0"
-            aria-label={`Remove ${label} address`}
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        )}
       </div>
     </div>
   );

@@ -115,7 +115,7 @@ export async function GET(request: Request) {
 
   try {
     const email = normalizeEmail(token.email);
-    const userId = await findOrCreateParentAccount(
+    const { userId, secured } = await findOrCreateParentAccount(
       email,
       caller.fullName ||
         [token.given_name, token.family_name].filter(Boolean).join(" ")
@@ -127,7 +127,7 @@ export async function GET(request: Request) {
 
     // Order matters: the password change invalidates earlier sign-in tokens,
     // so the session's token is issued last, inside startParentSession.
-    await revokeParentPassword(userId);
+    if (!secured) await revokeParentPassword(userId);
     await ensureParentMembership(userId, schoolId);
 
     if (appChallenge) {

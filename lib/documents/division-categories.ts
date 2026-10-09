@@ -6,6 +6,13 @@
 
 export const WHOLE_SCHOOL = "Whole School";
 
+/** Created when a school has no divisions yet, as migration 018 seeds them. */
+export const DEFAULT_DIVISIONS = [
+  { name: "Lower School", color: "sky" },
+  { name: "Middle School", color: "violet" },
+  { name: "Upper School", color: "emerald" },
+];
+
 /** The categories each group starts with. "Other" catches what fits nowhere. */
 export const STARTER_CATEGORIES = [
   {

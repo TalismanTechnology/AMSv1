@@ -38,7 +38,7 @@ import { CASES, type EvalCase } from "./eval/cases";
 
 // Pinned so calendar answers ("has it passed yet?") are reproducible.
 const EVAL_NOW = new Date("2026-09-23T16:00:00Z");
-const DEFAULT_SCHOOL_SLUG = "demo";
+const DEFAULT_SCHOOL_SLUG = "collegiate";
 // A stronger model than the one under test. (gemini-2.5-pro is closed to new
 // API keys.)
 const JUDGE_MODEL_ID = process.env.EVAL_JUDGE_MODEL || "gemini-3.1-pro-preview";

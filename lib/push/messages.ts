@@ -7,7 +7,7 @@ import crypto from "node:crypto";
 export interface PushMessage {
   title: string;
   body: string;
-  /** In-app path to open when the notification is tapped, e.g. /s/demo/parent. */
+  /** In-app path to open when the notification is tapped, e.g. /s/collegiate/parent. */
   url: string;
 }
 

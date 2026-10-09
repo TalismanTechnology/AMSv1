@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import type { User } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -8,6 +9,18 @@ import { createClient } from "@/lib/supabase/server";
 // existing RLS policy, middleware check and server action keeps working
 // unchanged. Accounts are keyed on email, so a parent who registered with a
 // password before Blackbaud sign-in existed lands back in the same account.
+//
+// The first Blackbaud sign-in secures the account: its password is replaced
+// and every older session is ended. Later sign-ins leave the parent's other
+// devices signed in, so the app and the website can both stay logged in.
+
+// Set in app_metadata (writable by the service role only) once an account has
+// been secured.
+const SECURED_AT = "parent_secured_at";
+
+function isSecured(user: User): boolean {
+  return Boolean(user.app_metadata?.[SECURED_AT]);
+}
 
 async function issueSignInLink(email: string) {
   const admin = createAdminClient();
@@ -24,14 +37,17 @@ async function issueSignInLink(email: string) {
     );
   }
 
-  return { userId: data.user.id, tokenHash: data.properties.hashed_token };
+  return { user: data.user, tokenHash: data.properties.hashed_token };
 }
 
-/** Finds the account for `email`, creating it when missing. Returns its id. */
+/**
+ * Finds the account for `email`, creating it when missing. `secured` is false
+ * until a Blackbaud sign-in has completed on it (see startParentSession).
+ */
 export async function findOrCreateParentAccount(
   email: string,
   fullName: string
-): Promise<string> {
+): Promise<{ userId: string; secured: boolean }> {
   const admin = createAdminClient();
 
   // No role metadata: the signup trigger defaults the profile to "parent".
@@ -46,7 +62,8 @@ export async function findOrCreateParentAccount(
   }
 
   // createUser doesn't report the existing account's id; the link lookup does.
-  return (await issueSignInLink(email)).userId;
+  const { user } = await issueSignInLink(email);
+  return { userId: user.id, secured: isSecured(user) };
 }
 
 /**
@@ -57,7 +74,7 @@ export async function findOrCreateParentAccount(
  *
  * Call only after confirming the account is not staff, and before
  * startParentSession: changing the password invalidates any sign-in token
- * issued earlier.
+ * issued earlier. Only needed while the account is not yet secured.
  */
 export async function revokeParentPassword(userId: string): Promise<void> {
   const admin = createAdminClient();
@@ -73,20 +90,23 @@ export async function revokeParentPassword(userId: string): Promise<void> {
 
 /**
  * Issues a fresh one-time token and redeems it server-side, which writes the
- * Supabase session cookies onto the current response.
+ * Supabase session cookies onto the current response. On the account's first
+ * Blackbaud sign-in, also ends every other session and marks it secured.
  */
 export async function startParentSession(email: string): Promise<void> {
   const { tokenHash } = await issueSignInLink(email);
   const supabase = await createClient();
 
-  const { error } = await supabase.auth.verifyOtp({
+  const { data, error } = await supabase.auth.verifyOtp({
     type: "magiclink",
     token_hash: tokenHash,
   });
 
-  if (error) {
-    throw new Error(`Could not start parent session: ${error.message}`);
+  if (error || !data.user) {
+    throw new Error(`Could not start parent session: ${error?.message ?? "no user"}`);
   }
+
+  if (isSecured(data.user)) return;
 
   // Drop every other session on this account, so anyone who got in before
   // Blackbaud verified it (see revokeParentPassword) is signed out.
@@ -94,6 +114,15 @@ export async function startParentSession(email: string): Promise<void> {
 
   if (signOutError) {
     throw new Error(`Could not revoke other parent sessions: ${signOutError.message}`);
+  }
+
+  const { error: markError } = await createAdminClient().auth.admin.updateUserById(
+    data.user.id,
+    { app_metadata: { [SECURED_AT]: new Date().toISOString() } }
+  );
+
+  if (markError) {
+    throw new Error(`Could not mark parent account secured: ${markError.message}`);
   }
 }
 

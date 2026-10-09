@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { logAudit } from "@/lib/audit";
-import { generateInboundToken } from "@/lib/email/token";
+import { ensureInboundAddresses, type InboundAddresses } from "@/lib/email/addresses";
 import { normalizeSenderDomain } from "@/lib/email/inbound";
 
 export async function updateSettings(
@@ -84,7 +84,7 @@ export async function updateEmailIngestion(
     autoSort: boolean;
     allowedDomains: string[];
   }
-): Promise<{ error?: string; token?: string; success?: boolean }> {
+): Promise<{ error?: string; addresses?: InboundAddresses; success?: boolean }> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -101,24 +101,15 @@ export async function updateEmailIngestion(
   }
   const allowedDomains = [...normalized];
 
-  // Once ingestion is on, the school always has its whole-school address.
-  const { data: wholeSchool, error: readError } = await supabase
-    .from("email_ingestion_addresses")
-    .select("token")
-    .eq("school_id", schoolId)
-    .is("division_id", null)
-    .maybeSingle();
-  if (readError) return { error: readError.message };
-
-  let token = wholeSchool?.token ?? null;
-  if (data.enabled && !token) {
-    const { data: created, error: createError } = await supabase
-      .from("email_ingestion_addresses")
-      .insert({ school_id: schoolId, token: generateInboundToken() })
-      .select("token")
-      .single();
-    if (createError) return { error: createError.message };
-    token = created.token;
+  // Once ingestion is on, the school has all its addresses: the whole
+  // school's and one per division.
+  let addresses: InboundAddresses | undefined;
+  if (data.enabled) {
+    try {
+      addresses = await ensureInboundAddresses(supabase, schoolId);
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : "Could not create addresses" };
+    }
   }
 
   const { error } = await supabase
@@ -143,97 +134,5 @@ export async function updateEmailIngestion(
   );
 
   revalidatePath("/", "layout");
-  return { success: true, token: token ?? undefined };
-}
-
-/**
- * Give a division its own inbound address. Mail sent to it becomes documents
- * marked for that division.
- */
-export async function addDivisionAddress(
-  schoolId: string,
-  divisionId: string
-): Promise<{ error?: string; address?: { id: string; token: string; divisionId: string } }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
-
-  const { data: division } = await supabase
-    .from("event_calendars")
-    .select("id, name")
-    .eq("id", divisionId)
-    .eq("school_id", schoolId)
-    .eq("kind", "division")
-    .maybeSingle();
-  if (!division) return { error: "Division not found" };
-
-  const { data: address, error } = await supabase
-    .from("email_ingestion_addresses")
-    .insert({
-      school_id: schoolId,
-      division_id: division.id,
-      token: generateInboundToken(),
-    })
-    .select("id, token")
-    .single();
-
-  if (error) {
-    return {
-      error:
-        error.code === "23505"
-          ? `${division.name} already has an address`
-          : error.message,
-    };
-  }
-
-  logAudit(
-    user.id,
-    "add_division_email_address",
-    "settings",
-    address.id,
-    { division: division.name },
-    schoolId
-  );
-
-  revalidatePath("/", "layout");
-  return { address: { id: address.id, token: address.token, divisionId: division.id } };
-}
-
-/**
- * Retire a division's inbound address. Mail sent to it afterwards is turned
- * away; documents it already created keep their division.
- */
-export async function removeDivisionAddress(
-  schoolId: string,
-  addressId: string
-): Promise<{ error?: string; success?: boolean }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
-
-  // The whole-school address (no division) can't be removed here.
-  const { error } = await supabase
-    .from("email_ingestion_addresses")
-    .delete()
-    .eq("id", addressId)
-    .eq("school_id", schoolId)
-    .not("division_id", "is", null);
-
-  if (error) return { error: error.message };
-
-  logAudit(
-    user.id,
-    "remove_division_email_address",
-    "settings",
-    addressId,
-    undefined,
-    schoolId
-  );
-
-  revalidatePath("/", "layout");
-  return { success: true };
+  return { success: true, addresses };
 }

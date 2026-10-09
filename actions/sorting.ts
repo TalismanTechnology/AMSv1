@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { logAudit } from "@/lib/audit";
 import { applySorting, chooseSorting } from "@/lib/documents/auto-sort";
 import {
+  DEFAULT_DIVISIONS,
   STARTER_CATEGORIES,
   categoryLabels,
 } from "@/lib/documents/division-categories";
@@ -18,13 +19,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 const MAX_PER_CALL = 4;
 /** Matches what the classifier reads of a document. */
 const CONTENT_CHARS = 6000;
-
-/** Created when a school has no divisions yet, as migration 018 seeds them. */
-const DEFAULT_DIVISIONS = [
-  { name: "Lower School", color: "sky" },
-  { name: "Middle School", color: "violet" },
-  { name: "Upper School", color: "emerald" },
-];
 
 async function requireSchoolAdmin(schoolId: string) {
   const supabase = await createClient();
