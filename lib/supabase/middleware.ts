@@ -8,9 +8,10 @@ const adminClient = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// Public pages that must load for anyone, signed in or not (legal pages are
-// linked from the app stores and sign-in screens).
-const PUBLIC_PAGES = new Set(["/privacy", "/terms"]);
+// Public pages that must load for anyone, signed in or not. The legal pages
+// are linked from the app stores and sign-in screens, and /support is the App
+// Store support URL — none of them may ever bounce to a sign-in screen.
+const PUBLIC_PAGES = new Set(["/privacy", "/terms", "/support"]);
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });

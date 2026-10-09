@@ -17,6 +17,7 @@ const FOOTER_LINKS = [
     links: [
       { label: "Sign in", href: "/login" },
       { label: "Staff sign in", href: "/login/staff" },
+      { label: "Support", href: "/support" },
     ],
   },
   {

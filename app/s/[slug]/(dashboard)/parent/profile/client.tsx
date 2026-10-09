@@ -21,6 +21,8 @@ import {
 } from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { DeleteAccountSection } from "@/components/account/delete-account-section";
+import { AiConsentSection } from "@/components/account/ai-consent-section";
+import { hasAiConsent } from "@/lib/ai/consent";
 import { updateProfile } from "@/actions/profile";
 import { addChild, updateChild, removeChild } from "@/actions/children";
 import { toast } from "sonner";
@@ -238,6 +240,11 @@ export function ProfileClient({
           )}
         </div>
       </section>
+
+      <AiConsentSection
+        consented={hasAiConsent(profile)}
+        consentedAt={profile.ai_consent_at}
+      />
 
       <DeleteAccountSection />
 
