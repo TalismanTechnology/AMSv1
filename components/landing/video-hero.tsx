@@ -315,7 +315,7 @@ export function VideoHero({ children }: { children?: ReactNode }) {
           </h1>
 
           <p className="mt-6 md:mt-8 max-w-2xl text-base md:text-lg leading-relaxed text-brand-dark animate-fade-up stagger-6">
-            Pickup times, dress codes, sports schedules — ask in plain words and get
+            Pickup times, dress codes, sports schedules, after-school activities — ask in plain words and get
             the answer from your school&apos;s own handbooks and calendar, with
             the page it came from.
           </p>
