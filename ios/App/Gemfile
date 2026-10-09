@@ -1,0 +1,5 @@
+source "https://rubygems.org"
+
+# Used by .github/workflows/ios-testflight.yml (and on a Mac:
+# `cd ios/App && bundle install && bundle exec fastlane beta`).
+gem "fastlane", "~> 2.228"

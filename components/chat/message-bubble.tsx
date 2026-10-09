@@ -5,6 +5,7 @@ import { MarkdownRenderer } from "./markdown-renderer";
 import { TypewriterText } from "./typewriter-text";
 import { FollowUpChips } from "./follow-up-chips";
 import { MessageFeedback } from "./message-feedback";
+import { MessageShare } from "./message-share";
 import { SourceList } from "./source-list";
 import { useSourcePanel } from "./source-panel-context";
 import { parseFollowUps } from "@/lib/chat-utils";
@@ -65,6 +66,9 @@ export function MessageBubble({
     );
   }
 
+  // Share once the answer has finished arriving.
+  const canShare = !showTypewriter && displayContent.trim().length > 0;
+
   const citedNumbers = new Set(
     [...displayContent.matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1]))
   );
@@ -97,8 +101,11 @@ export function MessageBubble({
         <SourceList sources={sources} citedNumbers={citedNumbers} />
       )}
 
-      {messageId && (
-        <MessageFeedback messageId={messageId} schoolId={schoolId} />
+      {(messageId || canShare) && (
+        <div className="flex items-center gap-0.5">
+          {messageId && <MessageFeedback messageId={messageId} schoolId={schoolId} />}
+          {canShare && <MessageShare content={displayContent} sources={sources} />}
+        </div>
       )}
 
       {isLastAssistant && followUps.length > 0 && onFollowUpSelect && (

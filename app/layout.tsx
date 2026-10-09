@@ -3,6 +3,7 @@ import { Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { NativeBridge } from "@/components/native/native-bridge";
+import { NativeShell } from "@/components/native/native-shell";
 import "./globals.css";
 
 // The whole UI sets in Helvetica Neue Light (the `--font-sans` stack in
@@ -52,6 +53,7 @@ export default function RootLayout({
             {children}
             <Toaster />
             <NativeBridge />
+            <NativeShell />
           </TooltipProvider>
         </div>
       </body>

@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import crypto from "node:crypto";
 
 import {
+  announcementAnchor,
+  announcementPath,
   apnsPayload,
   createApnsJwt,
   fcmMessage,
@@ -82,4 +84,13 @@ test("dead FCM tokens are recognised, other failures are not", () => {
   assert.equal(isDeadFcmToken(400, "INVALID_ARGUMENT"), false);
   assert.equal(isDeadFcmToken(429, "QUOTA_EXCEEDED"), false);
   assert.equal(isDeadFcmToken(503, "UNAVAILABLE"), false);
+});
+
+test("announcement notifications open the announcement itself", () => {
+  assert.equal(
+    announcementPath("collegiate", "8f1c"),
+    "/s/collegiate/parent/announcements#announcement-8f1c"
+  );
+  // The announcements page uses the same id on each <article>.
+  assert.equal(announcementAnchor("8f1c"), "announcement-8f1c");
 });
