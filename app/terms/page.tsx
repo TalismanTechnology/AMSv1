@@ -173,8 +173,8 @@ export default function TermsPage() {
 
       <LegalSection id="termination" title="9. Suspension and termination">
         <p>
-          You may stop using the Service at any time and may ask us to delete
-          your account. We or your school may suspend or end your access if you
+          You may stop using the Service at any time, and you can delete your
+          account from your Profile or by asking us. We or your school may suspend or end your access if you
           violate these Terms, if you are no longer associated with the school,
           if the school stops using the Service, or if needed to protect the
           Service or others. Sections that by their nature should survive

@@ -74,9 +74,10 @@ export default function PrivacyPage() {
         <p>
           We keep information about students to the minimum the Service needs:
           the first names (or names) and grade levels a parent chooses to enter
-          so answers can be tailored to the right grade. We do not import
-          student records, grades, attendance, or other education records from
-          the school&apos;s systems.
+          so answers can be tailored to the right grade. Children&apos;s names
+          stay in our own database and are never sent to our AI provider (see
+          section 5). We do not import student records, grades, attendance, or
+          other education records from the school&apos;s systems.
         </p>
       </LegalSection>
 
@@ -101,7 +102,9 @@ export default function PrivacyPage() {
         <p>
           <strong>Questions and conversations.</strong> The questions you ask,
           the answers we generate, the documents cited, conversation titles,
-          and any thumbs-up/down feedback you give. Conversations are saved so
+          and any thumbs-up/down feedback you give. We also record whether,
+          and when, you agreed to AI processing (see section 5). Conversations
+          are saved so
           you can return to them and search them. Your conversations are
           private to you; school staff can see an exchange only if it is
           flagged, as described in section 6.
@@ -132,7 +135,8 @@ export default function PrivacyPage() {
           announcements that school staff upload, sync from Blackbaud, or send
           to the school&apos;s private AskMySchool email address. For emailed
           content we also keep a log of each message received (sender address,
-          subject, and whether it was accepted). School staff are responsible
+          subject, and whether it was accepted, held for a school administrator
+          to review, or rejected). School staff are responsible
           for not sending us content that contains private information about
           individual students or families.
         </p>
@@ -178,10 +182,21 @@ export default function PrivacyPage() {
         <p>
           To answer a question, we send the question, the recent conversation,
           relevant excerpts of your school&apos;s documents and calendar, and
-          your children&apos;s names and grade levels to Google&apos;s Gemini
-          API, which generates the answer. We also use Google&apos;s Gemini
-          models to process school documents (for example, to extract text,
+          your children&apos;s grade levels to Google&apos;s Gemini API, which
+          generates the answer. We do <strong>not</strong> send your
+          children&apos;s names: the AI sees them only as, for example,
+          &ldquo;your 8th Grade child,&rdquo; and if you type a child&apos;s
+          name in a question, it is replaced with that label before the
+          question leaves our servers. We also use Google&apos;s Gemini models
+          to process school documents (for example, to extract text,
           summarize, classify, and index them).
+        </p>
+        <p>
+          <strong>Your consent.</strong> Before your first question, the app
+          shows a short notice explaining what is sent to Google&apos;s Gemini
+          AI and asks you to agree. Nothing is sent to the AI until you do. You
+          can withdraw your consent at any time from your Profile; the app will
+          then ask again before you can ask another question.
         </p>
         <p>
           We do not use your data to train our own AI models, and it is not
@@ -251,12 +266,6 @@ export default function PrivacyPage() {
             Messaging</strong> &mdash; delivering push notifications (the
             notification title and text, and your device token).
           </li>
-          <li>
-            <strong>Online Web Fonts (db.onlinewebfonts.com)</strong> &mdash;
-            serves a font file used by the website. Like any web request, this
-            shares your IP address and browser information with that provider;
-            no account information is sent.
-          </li>
         </LegalList>
         <p>
           We may also disclose information if required by law, to protect the
@@ -297,10 +306,15 @@ export default function PrivacyPage() {
           deleted, so that the school&apos;s statistics stay accurate.
         </p>
         <p>
-          School administrators can remove a family&apos;s account. You can
-          also ask us to delete your account and associated personal
-          information by emailing <ContactEmailLink />; we will do so unless
-          we need to keep something to comply with law or resolve a dispute.
+          You can delete your account at any time from your Profile
+          (&ldquo;Delete account&rdquo;). This permanently deletes your
+          account, conversations, feedback, the questions you asked (including
+          usage records and unanswered questions), children, notifications,
+          and registered devices. School administrators can also remove a
+          family&apos;s account, which deletes the same data. You can also ask
+          us to delete your account and associated personal information by
+          emailing <ContactEmailLink />; we will do so unless we need to keep
+          something to comply with law or resolve a dispute.
           Parent roster records are refreshed daily from the school&apos;s
           Blackbaud system and marked inactive when a parent leaves the
           school&apos;s roster. When a school stops using the Service, we will
@@ -325,7 +339,8 @@ export default function PrivacyPage() {
       <LegalSection id="rights" title="10. Your choices and rights">
         <p>
           You can view and update your profile and children, delete your
-          conversations, and turn notifications off in your device settings.
+          conversations, withdraw your consent to AI processing, delete your
+          account, and turn notifications off in your device settings.
           To access, correct, or delete other information, or to ask a question
           about this policy, contact us. Requests about education records held
           by your school should go to your school, and we will help the school

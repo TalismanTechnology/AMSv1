@@ -2,14 +2,15 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { SiteFooter } from "@/components/landing/site-footer";
+import { PRIVACY_EMAIL } from "@/lib/contact";
 
 // Shared shell for the public legal pages (/privacy, /terms): the paper
 // background and type of the marketing site, a readable single column, and
 // the same footer as the landing page.
 
-// TODO(lucas): this mailbox is NOT set up yet — create it (or swap in a real,
-// monitored address) before launch. Used on /privacy and /terms.
-export const LEGAL_CONTACT_EMAIL = "privacy@askmyschool.app";
+// Privacy / legal contact shown on /privacy and /terms (privacy@askmyschool.app,
+// live and monitored). Single source of truth is lib/contact.ts.
+export const LEGAL_CONTACT_EMAIL = PRIVACY_EMAIL;
 
 // Who operates the Service, as named on /privacy and /terms. There is no LLC
 // yet, so a named individual operates it on AskMySchool's behalf.

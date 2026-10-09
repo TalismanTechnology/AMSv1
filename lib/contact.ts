@@ -1,7 +1,6 @@
 // Public contact addresses. Both mailboxes are live and monitored.
-// (PR #8 adds LEGAL_CONTACT_EMAIL = privacy@askmyschool.app in
-// components/legal/legal-page.tsx; once both are merged, that constant can
-// re-export PRIVACY_EMAIL from here.)
+// components/legal/legal-page.tsx (LEGAL_CONTACT_EMAIL) and
+// components/landing/contact.ts (SCHOOL_CONTACT_EMAIL) re-use these.
 
 /** Support, sales, and general contact — shown on /support and in mailto links. */
 export const SUPPORT_EMAIL = "lucas@askmyschool.app";
