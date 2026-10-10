@@ -135,6 +135,9 @@ const FAQS: { id: string; q: string; a: React.ReactNode }[] = [
   },
 ];
 
+// Plain content with no per-request data: always prerender at build time.
+export const dynamic = "force-static";
+
 export default function SupportPage() {
   return (
     <div className="relative z-10 flex min-h-screen flex-col">

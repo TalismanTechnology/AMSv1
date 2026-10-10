@@ -36,7 +36,6 @@ import {
   pickRandom,
   pickRandomN,
   randomDateInRange,
-  randomTime,
   randomInt,
 } from "../lib/school-content";
 

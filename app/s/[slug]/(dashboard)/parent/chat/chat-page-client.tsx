@@ -28,13 +28,13 @@ export function ChatPageClient({
   const [initialMessages, setInitialMessages] = useState<ChatMessage[]>([]);
   const [chatKey, setChatKey] = useState<string>(existingSessionId || "new");
 
+  // A "new…" key needs no fetch: initialMessages starts empty and
+  // handleNewChat clears it when it mints one.
   useEffect(() => {
     if (chatKey && !chatKey.startsWith("new")) {
       getChatMessages(chatKey).then(({ messages }) => {
         setInitialMessages(messages || []);
       });
-    } else {
-      setInitialMessages([]);
     }
   }, [chatKey]);
 

@@ -143,7 +143,8 @@ export const Waves = forwardRef<WavesHandle, WavesProps>(function Waves({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
   const boundingRef = useRef({ width: 0, height: 0, left: 0, top: 0 });
-  const noiseRef = useRef(new Noise(Math.random()));
+  // Seeded lazily on the first animation frame, not on every render.
+  const noiseRef = useRef<Noise | null>(null);
   const linesRef = useRef<Point[][]>([]);
   const mouseRef = useRef<Mouse>({
     x: -10, y: 0, lx: 0, ly: 0, sx: 0, sy: 0, v: 0, vs: 0, a: 0, set: false,
@@ -227,7 +228,7 @@ export const Waves = forwardRef<WavesHandle, WavesProps>(function Waves({
     function movePoints(time: number) {
       const lines = linesRef.current;
       const mouse = mouseRef.current;
-      const noise = noiseRef.current;
+      const noise = (noiseRef.current ??= new Noise(Math.random()));
       const cfg = configRef.current;
       for (const pts of lines) {
         for (const p of pts) {

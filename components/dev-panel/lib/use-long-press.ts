@@ -15,21 +15,24 @@ export function useLongPress({ duration = 5000, onLongPress }: UseLongPressOptio
   const firedRef = useRef(false);
 
   const animate = useCallback(() => {
-    const elapsed = Date.now() - startTimeRef.current;
-    const p = Math.min(elapsed / duration, 1);
-    setProgress(p);
+    const step = () => {
+      const elapsed = Date.now() - startTimeRef.current;
+      const p = Math.min(elapsed / duration, 1);
+      setProgress(p);
 
-    if (p >= 1 && !firedRef.current) {
-      firedRef.current = true;
-      onLongPress();
-      setIsPressed(false);
-      setProgress(0);
-      return;
-    }
+      if (p >= 1 && !firedRef.current) {
+        firedRef.current = true;
+        onLongPress();
+        setIsPressed(false);
+        setProgress(0);
+        return;
+      }
 
-    if (p < 1) {
-      rafRef.current = requestAnimationFrame(animate);
-    }
+      if (p < 1) {
+        rafRef.current = requestAnimationFrame(step);
+      }
+    };
+    step();
   }, [duration, onLongPress]);
 
   const cancel = useCallback(() => {

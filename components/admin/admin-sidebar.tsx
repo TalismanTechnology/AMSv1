@@ -29,7 +29,6 @@ import { useSchool } from "@/components/shared/school-context";
 import { SchoolSwitcher } from "@/components/shared/school-switcher";
 import { motion, LayoutGroup } from "framer-motion";
 import { sidebarVariants } from "@/lib/motion";
-import { Logo } from "@/components/logo";
 import { DevPanelTrigger } from "@/components/dev-panel/dev-panel-trigger";
 import { NotificationBell } from "@/components/parent/notification-bell";
 function getNavItems(slug: string) {

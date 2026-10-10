@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import {
   HEAD_PATH,
   BODY_PATH,
@@ -16,13 +16,7 @@ interface LogoSpinnerProps {
 }
 
 export function LogoSpinner({ size = 16, className }: LogoSpinnerProps) {
-  const [prefersReduced, setPrefersReduced] = useState(false);
-
-  useEffect(() => {
-    setPrefersReduced(
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    );
-  }, []);
+  const prefersReduced = useMediaQuery("(prefers-reduced-motion: reduce)");
 
   const width = size * LOGO_ASPECT_RATIO;
   const height = size;

@@ -18,6 +18,9 @@ export const metadata: Metadata = {
     "How AskMySchool collects, uses, and protects information for parents and school staff.",
 };
 
+// Plain content with no per-request data: always prerender at build time.
+export const dynamic = "force-static";
+
 export default function PrivacyPage() {
   return (
     <LegalPage

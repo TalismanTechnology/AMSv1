@@ -30,7 +30,7 @@ export default async function ParentProfilePage({
     <PageTransition>
       <ProfileClient
         profile={profile!}
-        children={children || []}
+        initialChildren={children || []}
         email={user.email || ""}
         schoolId={school.id}
         schoolSlug={slug}

@@ -1,6 +1,6 @@
 "use client";
 
-import { Children, Fragment, useEffect, useRef, type ReactNode } from "react";
+import { Children, Fragment, useEffect, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -38,13 +38,14 @@ function CitationBadge({
 }) {
   const alreadyPlayed =
     skipAnimation || !animKey || playedCitations.has(animKey);
-  const playedRef = useRef(alreadyPlayed);
+  // Decided once on mount: a badge that starts animating keeps animating.
+  const [played] = useState(alreadyPlayed);
 
   useEffect(() => {
     if (animKey) playedCitations.add(animKey);
   }, [animKey]);
 
-  if (playedRef.current) {
+  if (played) {
     return (
       <button
         type="button"
