@@ -10,6 +10,27 @@ interface ChatMessage {
 }
 
 /**
+ * Whether a question needs the LLM rewrite at all. The rewrite only resolves
+ * references to earlier turns, so it is skipped — saving a model round trip
+ * before retrieval can start — when there are no earlier turns (the first
+ * question) or the question is already long enough to stand on its own.
+ */
+export function shouldRewriteQuery(
+  messages: ChatMessage[],
+  lastMessageText: string
+): boolean {
+  // Only 1 user message — no context needed, return as-is
+  const userMessages = messages.filter((m) => m.role === "user");
+  if (userMessages.length <= 1) return false;
+
+  // If the message is already long/specific enough, skip rewriting.
+  // 25 words catches long-but-vague follow-ups ("ok so about that thing
+  // you mentioned with the bus schedule on Wednesdays, what time again?")
+  // while still skipping rewrite for truly standalone long queries.
+  return lastMessageText.split(" ").length <= 25;
+}
+
+/**
  * Rewrites a follow-up question into a standalone query using conversation context.
  * This improves RAG search results for vague follow-ups like "What about Wednesdays?"
  * by incorporating context from previous messages.
@@ -30,17 +51,7 @@ export async function rewriteQueryWithContext(
   lastMessageText: string,
   children: ChildContext[] = []
 ): Promise<string> {
-  // Only 1 user message — no context needed, return as-is
-  const userMessages = messages.filter((m) => m.role === "user");
-  if (userMessages.length <= 1) {
-    return lastMessageText;
-  }
-
-  // If the message is already long/specific enough, skip rewriting.
-  // 25 words catches long-but-vague follow-ups ("ok so about that thing
-  // you mentioned with the bus schedule on Wednesdays, what time again?")
-  // while still skipping rewrite for truly standalone long queries.
-  if (lastMessageText.split(" ").length > 25) {
+  if (!shouldRewriteQuery(messages, lastMessageText)) {
     return lastMessageText;
   }
 

@@ -195,6 +195,22 @@ export async function searchDocuments(
   matchThreshold = 0.7,
   schoolId?: string
 ): Promise<RelevantChunk[]> {
+  return attachDocumentInfo(
+    await matchDocumentChunks(query, matchCount, matchThreshold, schoolId)
+  );
+}
+
+/**
+ * The semantic half of searchDocuments: embed the query and match chunks,
+ * without document metadata. Split out so the chat turn can fetch metadata
+ * and neighbouring passage text at the same time (both only need the hits).
+ */
+export async function matchDocumentChunks(
+  query: string,
+  matchCount = 8,
+  matchThreshold = 0.7,
+  schoolId?: string
+): Promise<RelevantChunk[]> {
   const supabase = createAdminClient();
 
   // Generate embedding for the query
@@ -213,7 +229,16 @@ export async function searchDocuments(
     return [];
   }
 
-  if (!chunks || chunks.length === 0) return [];
+  return (chunks as RelevantChunk[] | null) ?? [];
+}
+
+/** Add each matched chunk's document title, file, tags, category, folder and divisions. */
+export async function attachDocumentInfo(
+  chunks: RelevantChunk[]
+): Promise<RelevantChunk[]> {
+  if (chunks.length === 0) return [];
+
+  const supabase = createAdminClient();
 
   // Fetch document metadata for the matched chunks (tags, category, folder, divisions)
   const docIds = [...new Set(chunks.map((c: RelevantChunk) => c.document_id))];
@@ -336,7 +361,7 @@ export function mergePassageMetadata(metas: (ChunkMetadata | undefined)[]): Chun
   return merged;
 }
 
-interface KnownChunk {
+export interface KnownChunk {
   content?: string;
   metadata?: ChunkMetadata;
 }
@@ -458,7 +483,23 @@ export async function buildCitablePassages(
   const relevant = chunks.filter((c) => c.similarity >= MIN_CITABLE_SIMILARITY);
   if (relevant.length === 0) return [];
 
+  return assemblePassages(relevant, keywordHits, await fetchPassageChunks(relevant, keywordHits));
+}
+
+/**
+ * The I/O step of buildCitablePassages: the text and metadata of every chunk
+ * the passages will draw on, keyed `${document_id}:${chunk_index}`. Reads only
+ * each hit's document id, chunk index, similarity, content and metadata — not
+ * document info — so it can run alongside attachDocumentInfo.
+ */
+export async function fetchPassageChunks(
+  chunks: RelevantChunk[],
+  keywordHits: KeywordHit[] = []
+): Promise<Map<string, KnownChunk>> {
+  const relevant = chunks.filter((c) => c.similarity >= MIN_CITABLE_SIMILARITY);
   const known = new Map<string, KnownChunk>();
+  if (relevant.length === 0) return known;
+
   for (const chunk of relevant) {
     known.set(`${chunk.document_id}:${chunk.chunk_index}`, {
       content: chunk.content,
@@ -503,5 +544,5 @@ export async function buildCitablePassages(
     }
   }
 
-  return assemblePassages(relevant, keywordHits, known);
+  return known;
 }

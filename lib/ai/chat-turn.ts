@@ -1,9 +1,11 @@
 import { convertToModelMessages, type ModelMessage, type UIMessage } from "ai";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
-  searchDocuments,
+  matchDocumentChunks,
+  attachDocumentInfo,
   keywordSearchChunks,
-  buildCitablePassages,
+  fetchPassageChunks,
+  assemblePassages,
   formatChunkLocation,
   type RelevantChunk,
   type KeywordHit,
@@ -71,7 +73,9 @@ export async function prepareChatTurn({
   now?: Date;
 }): Promise<ChatTurn> {
   // Start the context fetches now; only the children are needed before the
-  // rewrite, so the rest stay in flight through retrieval.
+  // rewrite, so the rest stay in flight through retrieval. These are
+  // school-wide reads, so they must not start before the route's access
+  // checks — the route only calls this once those pass.
   const adminSupabase = createAdminClient();
   const restOfContext = Promise.allSettled([
     fetchEventsForContext(schoolId),
@@ -93,7 +97,8 @@ export async function prepareChatTurn({
 
   // Rewrite follow-up questions into standalone queries for better RAG
   // search. Children are passed so "and my other kid?" resolves to a grade
-  // level the documents are actually organised by.
+  // level the documents are actually organised by. First questions skip the
+  // model call entirely (see shouldRewriteQuery).
   const searchQuery = await rewriteQueryWithContext(
     providerMessages,
     providerQuestion,
@@ -104,17 +109,31 @@ export async function prepareChatTurn({
   // sources on failure). Semantic search finds passages that mean the same
   // thing; keyword search finds the reference pages (directories, fee tables)
   // that embeddings consistently under-rank. Recall is deliberately wide —
-  // buildCitablePassages does the narrowing.
-  let relevantChunks: RelevantChunk[] = [];
+  // assemblePassages does the narrowing.
+  let matchedChunks: RelevantChunk[] = [];
   let keywordHits: KeywordHit[] = [];
   const [vectorResult, keywordResult] = await Promise.allSettled([
-    searchDocuments(searchQuery, 40, 0.45, schoolId),
+    matchDocumentChunks(searchQuery, 40, 0.45, schoolId),
     keywordSearchChunks(searchQuery, schoolId),
   ]);
-  if (vectorResult.status === "fulfilled") relevantChunks = vectorResult.value;
+  if (vectorResult.status === "fulfilled") matchedChunks = vectorResult.value;
   else console.error("RAG search failed (continuing without sources):", vectorResult.reason);
   if (keywordResult.status === "fulfilled") keywordHits = keywordResult.value;
   else console.error("Keyword search failed (continuing without it):", keywordResult.reason);
+
+  // Document info (titles, divisions…) and the passage text around each hit
+  // both depend only on the hits, so fetch them together. Losing the document
+  // info drops the vector hits, exactly as a failed searchDocuments would.
+  const [infoResult, knownChunks] = await Promise.all([
+    attachDocumentInfo(matchedChunks).then(
+      (chunks) => ({ ok: true as const, chunks }),
+      (reason: unknown) => ({ ok: false as const, reason })
+    ),
+    fetchPassageChunks(matchedChunks, keywordHits),
+  ]);
+  let relevantChunks: RelevantChunk[] = [];
+  if (infoResult.ok) relevantChunks = infoResult.chunks;
+  else console.error("RAG search failed (continuing without sources):", infoResult.reason);
 
   // Events, announcements and settings were kicked off before the rewrite
   // (all non-fatal — an empty result just means less context)
@@ -128,7 +147,7 @@ export async function prepareChatTurn({
   // neighbours, cut into short runs that each get their own number. The same
   // ordered set is fed to the LLM as [Source 1..N] AND returned to the client
   // as sources[N-1], so every inline [N] opens the passage the fact came from.
-  const passages = await buildCitablePassages(relevantChunks, keywordHits);
+  const passages = assemblePassages(relevantChunks, keywordHits, knownChunks);
 
   // The calendar is prompt context, not a citable source — see
   // formatEventsContext. Multi-day events are still collapsed from their

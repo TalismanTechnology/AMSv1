@@ -1,8 +1,8 @@
-import { NextRequest } from "next/server";
+import { NextRequest, after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { appendFileSync } from "fs";
-const debugLog = (msg: string) => { const line = `[${new Date().toISOString()}] ${msg}\n`; console.log(line.trim()); try { appendFileSync("chat-debug.log", line); } catch {} };
+const debugLog = (msg: string) => { const line = `[${new Date().toISOString()}] ${msg}\n`; console.log(line.trim()); if (process.env.NODE_ENV !== "production") { try { appendFileSync("chat-debug.log", line); } catch {} } };
 import {
   streamText,
   createUIMessageStream,
@@ -18,9 +18,17 @@ import { aiConsentGate } from "@/lib/ai/consent";
 import { parseFollowUps } from "@/lib/chat-utils";
 import type { ChatSource } from "@/lib/types";
 
+// A write the response doesn't depend on: already running, never awaited, and
+// kept alive past the end of the response by after().
+const inBackground = (task: PromiseLike<unknown>) => after(Promise.resolve(task));
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
+    // Read the body while auth is verified; a bad body still only surfaces
+    // (as before) once the caller is known to be signed in.
+    const body = request.json();
+    body.catch(() => {});
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -29,7 +37,7 @@ export async function POST(request: NextRequest) {
       return new Response("Unauthorized", { status: 401 });
     }
 
-    const { messages, sessionId, schoolId } = await request.json();
+    const { messages, sessionId, schoolId } = await body;
     debugLog(`REQUEST: sessionId=${sessionId}, schoolId=${schoolId}, messageCount=${messages?.length}`);
 
     // Every search is scoped to one school; an unscoped request has nothing
@@ -41,12 +49,34 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Verify access: super admins, or approved members of this school
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role, ai_consent_at, ai_consent_version")
-      .eq("id", user.id)
-      .single();
+    // Only the requesting user's own children are read before access is
+    // verified, so that read overlaps the checks below. It stays on our server
+    // — nothing reaches the AI provider before the consent gate — and is
+    // dropped unread if access is refused. School-wide context (calendar,
+    // announcements, settings) is read only once access is granted, inside
+    // prepareChatTurn.
+    const children = fetchChildrenForContext(user.id, schoolId);
+    // A refused request never awaits this; don't let a failure there surface
+    // as an unhandled rejection. prepareChatTurn's await still sees the error.
+    children.catch(() => {});
+
+    // Verify access: super admins, or approved members of this school. Both
+    // rows are read in parallel; they are still checked in the original order
+    // (consent first, then membership) below.
+    const [{ data: profile }, { data: membership }] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("role, ai_consent_at, ai_consent_version")
+        .eq("id", user.id)
+        .single(),
+      supabase
+        .from("school_memberships")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("school_id", schoolId)
+        .eq("approved", true)
+        .single(),
+    ]);
 
     // Nothing reaches the AI provider until this user has agreed to the
     // current AI-processing notice (App Store 5.1.2(i)). Enforced here, not
@@ -56,14 +86,6 @@ export async function POST(request: NextRequest) {
     if (consentDenied) return consentDenied;
 
     if (profile?.role !== "super_admin") {
-      const { data: membership } = await supabase
-        .from("school_memberships")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("school_id", schoolId)
-        .eq("approved", true)
-        .single();
-
       if (!membership) {
         return new Response(JSON.stringify({ error: "Access denied" }), {
           status: 403,
@@ -94,7 +116,7 @@ export async function POST(request: NextRequest) {
       messages,
       lastMessageText,
       schoolId,
-      children: fetchChildrenForContext(user.id, schoolId),
+      children,
     });
 
     if (searchQuery !== lastMessageText) {
@@ -110,9 +132,10 @@ export async function POST(request: NextRequest) {
     // cards, so what the client receives is exactly what [N] can resolve to.
     const allSources: ChatSource[] = sources;
 
-    // Save user message in the background (fire and forget)
+    // Save user message in the background. Each write starts now and never
+    // blocks the stream; after() keeps the function alive until it lands.
     if (sessionId) {
-      adminSupabase
+      inBackground(adminSupabase
         .from("chat_messages")
         .insert({
           session_id: sessionId,
@@ -124,14 +147,14 @@ export async function POST(request: NextRequest) {
           // the same condition that logs an unanswered question below.
           unanswered: sources.length === 0,
         })
-        .then(({ error }) => { if (error) console.error("Failed to save user message:", error); });
+        .then(({ error }) => { if (error) console.error("Failed to save user message:", error); }));
 
       // Update session timestamp
-      adminSupabase
+      inBackground(adminSupabase
         .from("chat_sessions")
         .update({ updated_at: new Date().toISOString() })
         .eq("id", sessionId)
-        .then(({ error }) => { if (error) console.error("Failed to update session timestamp:", error); });
+        .then(({ error }) => { if (error) console.error("Failed to update session timestamp:", error); }));
 
       // Auto-title: if this looks like the first message, set session title
       const userMessages = messages.filter(
@@ -141,15 +164,15 @@ export async function POST(request: NextRequest) {
         const title =
           lastMessageText.slice(0, 60) +
           (lastMessageText.length > 60 ? "..." : "");
-        adminSupabase
+        inBackground(adminSupabase
           .from("chat_sessions")
           .update({ title })
           .eq("id", sessionId)
-          .then(({ error }) => { if (error) console.error("Failed to auto-title session:", error); });
+          .then(({ error }) => { if (error) console.error("Failed to auto-title session:", error); }));
       }
 
       // Analytics event
-      adminSupabase
+      inBackground(adminSupabase
         .from("analytics_events")
         .insert({
           event_type: "question",
@@ -164,14 +187,14 @@ export async function POST(request: NextRequest) {
             session_id: sessionId,
           },
         })
-        .then(({ error }) => { if (error) console.error("Failed to save analytics event:", error); });
+        .then(({ error }) => { if (error) console.error("Failed to save analytics event:", error); }));
 
       // Record unanswered question if no quality sources were found
       // (sources is empty when no chunks pass the 0.55 similarity threshold)
       debugLog(`Unanswered check: sources=${sources.length}, sessionId=${sessionId}, schoolId=${schoolId}`);
       if (sources.length === 0) {
         debugLog(`Recording unanswered question: "${lastMessageText.slice(0, 80)}"`);
-        (async () => {
+        inBackground((async () => {
           try {
             // Embedded via the provider, so the name-redacted text is used.
             const embedding = await generateEmbedding(providerQuestion);
@@ -213,7 +236,7 @@ export async function POST(request: NextRequest) {
           } catch (err) {
             debugLog(`FAILED to embed unanswered question: ${err}`);
           }
-        })();
+        })());
       }
     }
 
