@@ -3,18 +3,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getResendClient } from "@/lib/email/resend";
 import {
   parseEmailAddress,
-  senderDomainAllowed,
+  senderGate,
   extractInboundTokens,
   routeInboundMessage,
   isStaleClaim,
 } from "@/lib/email/inbound";
-import { isBlockedFile } from "@/lib/documents/file-types";
-import {
-  addDocumentDivisions,
-  ingestFileAsDocument,
-  removeIngestedDocuments,
-  triggerProcessingHttp,
-} from "@/lib/documents/ingest";
+import { addDocumentDivisions } from "@/lib/documents/ingest";
+import { ingestReceivedEmail } from "@/lib/email/ingest-message";
 
 export const maxDuration = 300;
 
@@ -24,6 +19,7 @@ const INBOUND_SECRET = process.env.RESEND_INBOUND_SECRET || "";
 type IngestStatus =
   | "processing"
   | "accepted"
+  | "pending_review"
   | "rejected_disabled"
   | "rejected_domain"
   | "rejected_unknown"
@@ -144,15 +140,79 @@ async function settleClaim(
   }
 }
 
-/** Strip HTML tags to a plain-text fallback when no text/plain part exists. */
-function htmlToText(html: string): string {
-  return html
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+/**
+ * Hold a message from an unvetted sender for admin review instead of
+ * ingesting it. Nothing is fetched or stored but the metadata; an admin's
+ * "Approve" later pulls the content from Resend by email id.
+ *
+ * A held message takes the same per-message slot as a claim (032's unique
+ * index covers 'pending_review'), so a copy of the same email reaching a
+ * second division address just adds that division to the held row, and a
+ * copy of an email that was already approved adds its division to the
+ * documents that approval created.
+ */
+async function holdForReview(
+  schoolId: string,
+  data: ReceivedEvent["data"],
+  divisionIds: string[]
+): Promise<NextResponse> {
+  const supabase = createAdminClient();
+  const row = {
+    school_id: schoolId,
+    email_id: data.email_id ?? null,
+    message_id: data.message_id ?? null,
+    from_address: data.from ?? null,
+    subject: data.subject ?? null,
+    status: "pending_review" as const,
+    reason: "Held for review: no allowed sender domains are set",
+    division_ids: divisionIds,
+  };
+
+  const { error } = await supabase.from("email_ingestions").insert(row);
+  if (!error) return NextResponse.json({ status: "pending_review" });
+  if (error.code !== "23505" || !data.message_id) {
+    console.error("[inbound-email] Could not hold message for review:", error.message);
+    return NextResponse.json({ error: "Could not hold message" }, { status: 500 });
+  }
+
+  const { data: holder } = await supabase
+    .from("email_ingestions")
+    .select("id, status, division_ids, document_ids")
+    .eq("school_id", schoolId)
+    .eq("message_id", data.message_id)
+    .in("status", ["pending_review", "processing", "accepted"])
+    .maybeSingle();
+
+  if (!holder) {
+    // Released between our insert and this read; let Resend retry.
+    return NextResponse.json({ error: "Retry later" }, { status: 409 });
+  }
+
+  if (holder.status === "pending_review") {
+    const merged = [...new Set([...(holder.division_ids ?? []), ...divisionIds])];
+    await supabase
+      .from("email_ingestions")
+      .update({ division_ids: merged })
+      .eq("id", holder.id)
+      .eq("status", "pending_review");
+    return NextResponse.json({ status: "pending_review" });
+  }
+
+  if (holder.status === "accepted") {
+    try {
+      await addDocumentDivisions(holder.document_ids ?? [], divisionIds);
+    } catch (err) {
+      console.error("[inbound-email] Adding divisions to a duplicate failed:", err);
+      return NextResponse.json({ error: "Retry later" }, { status: 500 });
+    }
+    return NextResponse.json({ status: "duplicate" });
+  }
+
+  // Being ingested right now (an admin just approved it). Retry later so
+  // this copy's divisions land on the finished documents.
+  return divisionIds.length
+    ? NextResponse.json({ status: "in_progress" }, { status: 409 })
+    : NextResponse.json({ status: "in_progress" });
 }
 
 export async function POST(request: NextRequest) {
@@ -247,14 +307,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: "rejected_disabled" });
   }
 
-  // An empty allowlist accepts any sender; the private address token is then
-  // the only gate.
+  // Secure by default: with no allowlist, the private address token would be
+  // the only gate between a stranger and documents parents read, so the
+  // message is held for an admin to approve instead of being ingested.
   const fromAddress = parseEmailAddress(data.from ?? "");
-  const allowedDomains: string[] = school.allowed_sender_domains ?? [];
-  if (
-    allowedDomains.length > 0 &&
-    !senderDomainAllowed(fromAddress, allowedDomains)
-  ) {
+  const gate = senderGate(fromAddress, school.allowed_sender_domains);
+  if (gate === "reject") {
     await record(
       school.id,
       data,
@@ -262,6 +320,9 @@ export async function POST(request: NextRequest) {
       `Sender ${fromAddress ?? "?"} not in allowlist`
     );
     return NextResponse.json({ status: "rejected_domain" });
+  }
+  if (gate === "review") {
+    return holdForReview(school.id, data, route.divisionIds);
   }
 
   // 4. Idempotency: claim the message so retries and concurrent deliveries
@@ -303,75 +364,25 @@ export async function POST(request: NextRequest) {
       ? settleClaim(claimId, status, reason, ids)
       : record(school.id, data, status, reason, ids);
 
-  // 5. Fetch content + attachments and ingest.
+  // 5. Fetch content + attachments, ingest, tag divisions and kick off
+  // processing. Partial ingests are undone inside ingestReceivedEmail.
   const origin =
     process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
-  const documentIds: string[] = [];
 
   try {
-    const subject = (data.subject ?? "").trim() || "(no subject)";
-
-    // Body as one text document.
-    const { data: email } = await resend.emails.receiving.get(data.email_id);
-    const bodyText =
-      email?.text?.trim() || (email?.html ? htmlToText(email.html) : "");
-
-    if (bodyText) {
-      const { documentId, error } = await ingestFileAsDocument({
-        schoolId: school.id,
-        buffer: Buffer.from(bodyText, "utf-8"),
-        fileName: `${subject}.txt`,
-        contentType: "text/plain",
-        title: subject,
-        description: fromAddress ? `Emailed by ${fromAddress}` : null,
-      });
-      if (documentId) documentIds.push(documentId);
-      else console.warn(`[inbound-email] Body ingest skipped: ${error}`);
-    }
-
-    // Each real attachment as its own document.
-    const { data: attachmentList } =
-      await resend.emails.receiving.attachments.list({
-        emailId: data.email_id,
-      });
-
-    for (const att of attachmentList?.data ?? []) {
-      const filename = att.filename || "attachment";
-      // Skip inline images and unsupported image types.
-      if (att.content_disposition === "inline") continue;
-      if (isBlockedFile(filename)) continue;
-
-      const dl = await fetch(att.download_url);
-      if (!dl.ok) {
-        console.warn(`[inbound-email] Download failed for ${filename}`);
-        continue;
-      }
-      const buffer = Buffer.from(await dl.arrayBuffer());
-
-      const { documentId, error } = await ingestFileAsDocument({
-        schoolId: school.id,
-        buffer,
-        fileName: filename,
-        contentType: att.content_type,
-        title: filename.replace(/\.[^.]+$/, ""),
-        description: `From email: "${subject}"${fromAddress ? ` (${fromAddress})` : ""}`,
-      });
-      if (documentId) documentIds.push(documentId);
-      else console.warn(`[inbound-email] Attachment ingest skipped: ${error}`);
-    }
+    const documentIds = await ingestReceivedEmail({
+      resend,
+      schoolId: school.id,
+      emailId: data.email_id,
+      subject: data.subject ?? null,
+      fromAddress,
+      divisionIds: route.divisionIds,
+      origin,
+    });
 
     if (!documentIds.length) {
       await finish("error", "No ingestible content found");
       return NextResponse.json({ status: "empty" });
-    }
-
-    // 6. Mark the documents with the divisions whose addresses the mail
-    // reached. Done before processing so auto-sort can use it.
-    await addDocumentDivisions(documentIds, route.divisionIds);
-
-    // 7. Trigger processing for each new document.
-    for (const id of documentIds) {
-      await triggerProcessingHttp(id, origin);
     }
 
     await finish("accepted", "Ingested", documentIds);
@@ -382,9 +393,7 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("[inbound-email] Ingestion failed:", message);
-    // Undo the partial ingest so Resend's retry starts clean, and release the
-    // claim (status 'error') so that retry is allowed through.
-    await removeIngestedDocuments(documentIds);
+    // Release the claim (status 'error') so Resend's retry is allowed through.
     await finish("error", message);
     // 500 so Resend retries transient failures.
     return NextResponse.json({ error: message }, { status: 500 });

@@ -3,6 +3,7 @@ import { Logo } from "@/components/logo";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { SchoolPicker } from "@/components/auth/school-picker";
 import { getSignInSchools } from "@/lib/auth/sign-in-schools";
+import { LegalNotice } from "@/components/legal/legal-notice";
 
 interface LoginPageProps {
   searchParams: Promise<{ error?: string }>;
@@ -44,6 +45,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             Staff sign-in
           </Link>
         </p>
+        <LegalNotice className="mt-4" />
       </div>
     </AuthShell>
   );

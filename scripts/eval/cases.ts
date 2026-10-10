@@ -211,8 +211,8 @@ export const CASES: EvalCase[] = [
     ],
     question: "can my son wear his smartwatch at school?",
     expected:
-      "Must not guess which child is the son and must not use he/she for either child. Lucas (8th grade, Middle School): devices incl. smart watches are left with the homeroom teacher / MS office 8:00 am–3:20 pm. The documents found don't cover Ava's Lower School rule; say so rather than applying the MS rule to her.",
-    mustMatch: [/Lucas/],
+      "Must not guess which child is the son and must not use he/she for either child. Children's names are never sent to the model, so it refers to them by grade. The 8th grader (Middle School): devices incl. smart watches are left with the homeroom teacher / MS office 8:00 am–3:20 pm. The documents found don't cover the 3rd grader's Lower School rule; say so rather than applying the MS rule to them.",
+    mustMatch: [/8th grade/i],
   },
 
   // --- Scope ---

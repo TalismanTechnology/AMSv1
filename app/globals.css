@@ -7,15 +7,16 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: "Helvetica Neue Light", "Helvetica Neue", Helvetica, Arial, sans-serif;
-  --font-serif: "Helvetica Neue Light", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  /* Inter, self-hosted by next/font (app/layout.tsx), then system fallbacks. */
+  --font-sans: var(--font-inter), "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-serif: var(--font-inter), "Helvetica Neue", Helvetica, Arial, sans-serif;
   /* Brand tokens (cream / forest) as utilities: bg-brand-dark, text-brand-dark/50, … */
   --color-brand-dark: #2d3a2e;
   --color-brand-green: #3d5a3e;
   --color-brand-light: #f5f3ef;
   --color-brand-cream: #faf8f5;
   /* Display faces for the landing "answers from" wordmark row */
-  --font-helvetica-neue: "Helvetica Neue Light", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-helvetica-neue: var(--font-inter), "Helvetica Neue", Helvetica, Arial, sans-serif;
   --font-playfair: "Playfair Display", serif;
   --font-oswald: "Oswald", sans-serif;
   --font-montserrat: "Montserrat", sans-serif;
@@ -80,7 +81,7 @@
   /* ===== CREAM / FOREST PALETTE =====
      Cream paper (#faf8f5), forest ink (#2d3a2e), green for hover and focus
      (#3d5a3e), one lighter cream (#f5f3ef) for secondary surfaces. Quiet,
-     editorial, light Helvetica Neue. */
+     editorial, light sans (Inter at 300). */
 
   /* Topographic background — faint warm contour on paper */
   --topo-line: #ddd8ce;
@@ -1155,6 +1156,8 @@ textarea:focus,
     background: var(--background);
     color: var(--foreground);
     font-family: var(--font-sans);
+    /* Light base weight: the UI was designed around Helvetica Neue Light. */
+    font-weight: 300;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
@@ -1535,7 +1538,7 @@ textarea:focus,
 .metallic-text,
 .metallic-text-animated {
   font-family: var(--font-sans) !important;
-  font-weight: 400 !important;
+  font-weight: 300 !important;
   letter-spacing: -0.025em !important;
   color: var(--ink);
 }
@@ -1632,10 +1635,10 @@ textarea:focus,
   text-transform: uppercase;
 }
 
-/* Headings: the light Helvetica Neue face, tight tracking — no synthetic bold */
+/* Headings: the light sans face, tight tracking — no synthetic bold */
 .font-serif-display,
 .metallic-heading {
-  font-weight: 400 !important;
+  font-weight: 300 !important;
   letter-spacing: -0.025em !important;
 }
 

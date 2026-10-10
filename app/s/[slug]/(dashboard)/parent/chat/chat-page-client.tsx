@@ -12,6 +12,7 @@ interface ChatPageClientProps {
   welcomeMessage?: string | null;
   schoolId: string;
   schoolSlug: string;
+  aiConsentGiven: boolean;
 }
 
 export function ChatPageClient({
@@ -19,6 +20,7 @@ export function ChatPageClient({
   suggestedQuestions,
   welcomeMessage,
   schoolId,
+  aiConsentGiven,
 }: ChatPageClientProps) {
   const existingSessionId = initialSessions[0]?.id ?? null;
 
@@ -59,6 +61,7 @@ export function ChatPageClient({
           suggestedQuestions={suggestedQuestions}
           welcomeMessage={welcomeMessage}
           schoolId={schoolId}
+          aiConsentGiven={aiConsentGiven}
         />
       </MagicBentoCard>
     </div>

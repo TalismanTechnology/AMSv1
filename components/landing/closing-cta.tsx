@@ -6,10 +6,14 @@ import { RevealOnScroll } from "@/components/motion";
 import { MagneticButton } from "@/components/motion/magnetic-button";
 import { ImagePlate } from "@/components/landing/image-plate";
 import { LANDING_IMAGES } from "@/components/landing/landing-images";
+import { SCHOOL_CONTACT_HREF } from "@/components/landing/contact";
 
 // The close: a forest tile with a photograph leaning out of its right edge.
 // The photo overflows the tile's corner and the section's cream shows behind
 // it, so the two surfaces sit at visibly different heights.
+//
+// There's no self-serve sign-up. Schools get in touch to be set up; parents
+// sign in through a school that is already connected.
 
 export function ClosingCta() {
   return (
@@ -23,33 +27,36 @@ export function ClosingCta() {
               className="pointer-events-none absolute -left-20 -top-20 size-80 rounded-full bg-[#7a9a7c]/25 blur-3xl"
             />
             <div className="relative max-w-xl lg:max-w-[52%]">
-              <p className="eyebrow !text-white/50">Get started</p>
+              <p className="eyebrow !text-white/50">For schools</p>
               <h2 className="mt-4 text-3xl leading-[1.12] tracking-tight sm:text-4xl lg:text-[2.9rem]">
                 <span className="text-white">Answers parents can trust.</span>
                 <br />
                 <span className="text-white/55">Bring it to your school.</span>
               </h2>
               <p className="mt-5 max-w-md text-base text-white/70 sm:text-lg">
-                Create an account, add your school&apos;s documents, and start
-                answering the questions families ask every week.
+                AskMySchool is set up school by school. If you&apos;d like it
+                for your families, get in touch and we&apos;ll help connect
+                your Blackbaud parent portal and load your documents. Parents
+                at schools already on AskMySchool sign in with their
+                school&apos;s Blackbaud login.
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-4">
                 <MagneticButton strength={0.4} radius={100}>
                   {/* Plain link, not <Button>: the app-wide button rule
                       forces the forest fill, and this needs the inverse. */}
-                  <Link
-                    href="/login"
+                  <a
+                    href={SCHOOL_CONTACT_HREF}
                     className="inline-flex items-center gap-2 rounded-full bg-white px-8 py-3.5 text-sm uppercase tracking-wide text-brand-dark shadow-[0_12px_30px_-10px_rgba(0,0,0,0.5)] transition-colors hover:bg-brand-light"
                   >
-                    Parent sign in
+                    Bring it to your school
                     <ArrowRight className="size-4" aria-hidden="true" />
-                  </Link>
+                  </a>
                 </MagneticButton>
                 <Link
                   href="/login"
                   className="text-sm text-white/70 underline-offset-4 transition-colors hover:text-white hover:underline"
                 >
-                  Already set up? Sign in
+                  Parent? Sign in with your school
                 </Link>
               </div>
             </div>

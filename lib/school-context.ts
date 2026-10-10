@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isTransientAuthError } from "@/lib/supabase/response-cookies";
 import { redirect, notFound } from "next/navigation";
 import { cache } from "react";
 import type { School, SchoolMembership, UserRole } from "@/lib/types";
@@ -75,9 +76,16 @@ export const requireSchoolContext = cache(async function requireSchoolContext(
   const [
     {
       data: { user },
+      error: authError,
     },
     school,
   ] = await Promise.all([supabase.auth.getUser(), getSchoolBySlug(slug)]);
+
+  // Supabase Auth was unreachable, not "signed out": show the error page
+  // (which offers a retry) rather than sending a signed-in user to log in.
+  if (!user && isTransientAuthError(authError)) {
+    throw new Error("Couldn't verify your session. Please try again.");
+  }
 
   if (!user) {
     redirect(`/s/${slug}/login`);

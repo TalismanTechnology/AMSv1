@@ -9,7 +9,7 @@ import { ProductDemoMockup } from "@/components/landing/product-demo";
 import { CitedAnswerVisual } from "@/components/landing/cited-answer-visual";
 import { AskVisual } from "@/components/landing/showcase-visuals";
 import { StackingSteps } from "@/components/landing/stacking-steps";
-import { Testimonials } from "@/components/landing/testimonials";
+import { ParentSteps } from "@/components/landing/parent-steps";
 import { Faq } from "@/components/landing/faq";
 import { ClosingCta } from "@/components/landing/closing-cta";
 import { SiteFooter } from "@/components/landing/site-footer";
@@ -27,13 +27,15 @@ import {
 //   QuestionMarquee  ticker of real questions, fading at the edges
 //   Families         two cards: ask anything / every answer cited
 //   StackingSteps    three grounding steps as a deck of sticky cards
-//   Testimonials     fanned quote cards over a faint playground
+//   ParentSteps      how parents get in and use it, as fanned cards
 //   FAQ              sticky heading beside the accordion
 //   ClosingCta       forest tile with a photo leaning out of it
 //   SiteFooter
 //
 // One beat per job: show it, say what it does for parents, say why schools
-// can trust it, prove it, answer the objections, ask for the signup.
+// can trust it, show how parents get in, answer the objections, and invite
+// schools to get in touch. There is no self-serve sign-up: parents sign in
+// through their school's Blackbaud login, and schools ask to be set up.
 //
 // `.landing` scopes the depth tokens (globals.css, "LANDING PAGE — DEPTH
 // LAYER"): the app shell stays flat; only this page gets real lift.
@@ -79,7 +81,7 @@ export function LandingPage() {
                     Ask <Chip icon={MessageSquare}>anything</Chip> about your school
                   </>
                 }
-                description="Pickup times, dress code, bus routes, snow days. If the school wrote it down, you can ask about it, any time of day."
+                description="Pickup times, dress code, bus routes, sports schedules. If the school wrote it down, you can ask about it, any time of day."
                 visual={<AskVisual />}
               />
             </RevealOnScroll>
@@ -98,7 +100,7 @@ export function LandingPage() {
         </section>
 
         <StackingSteps />
-        <Testimonials />
+        <ParentSteps />
 
         {/* ── FAQ: heading stays put while the accordion scrolls ── */}
         <section

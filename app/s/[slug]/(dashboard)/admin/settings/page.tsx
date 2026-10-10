@@ -108,27 +108,44 @@ async function loadBlackbaudConfig(
 }
 
 /** Latest inbound-email attempts, so admins can see what was accepted or why
- * something was turned away. RLS limits rows to this school's admins. */
+ * something was turned away, plus every email still waiting for review (so a
+ * held email can't scroll out of reach). RLS limits rows to this school's
+ * admins. */
 async function loadRecentEmails(
   schoolId: string
 ): Promise<EmailIngestionLogEntry[]> {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("email_ingestions")
-    .select("id, from_address, subject, status, reason, document_ids, created_at")
-    .eq("school_id", schoolId)
-    .order("created_at", { ascending: false })
-    .limit(20);
+  const columns = "id, from_address, subject, status, reason, document_ids, created_at";
+  const [{ data: recent }, { data: pending }] = await Promise.all([
+    supabase
+      .from("email_ingestions")
+      .select(columns)
+      .eq("school_id", schoolId)
+      .order("created_at", { ascending: false })
+      .limit(20),
+    supabase
+      .from("email_ingestions")
+      .select(columns)
+      .eq("school_id", schoolId)
+      .eq("status", "pending_review")
+      .order("created_at", { ascending: false })
+      .limit(50),
+  ]);
 
-  return (data ?? []).map((row) => ({
-    id: row.id,
-    fromAddress: row.from_address,
-    subject: row.subject,
-    status: row.status,
-    reason: row.reason,
-    documentCount: (row.document_ids ?? []).length,
-    createdAt: row.created_at,
-  }));
+  const byId = new Map<string, NonNullable<typeof recent>[number]>();
+  for (const row of [...(pending ?? []), ...(recent ?? [])]) byId.set(row.id, row);
+
+  return [...byId.values()]
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    .map((row) => ({
+      id: row.id,
+      fromAddress: row.from_address,
+      subject: row.subject,
+      status: row.status,
+      reason: row.reason,
+      documentCount: (row.document_ids ?? []).length,
+      createdAt: row.created_at,
+    }));
 }
 
 /**

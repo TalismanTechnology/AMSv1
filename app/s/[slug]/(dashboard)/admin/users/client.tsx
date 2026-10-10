@@ -120,7 +120,9 @@ export function UsersClient({ users, schoolId, schoolSlug }: UsersClientProps) {
     if (!deleteId) return;
     setDeleting(true);
     const result = await deleteUser(deleteId, schoolId);
-    if (result.error) toast.error(result.error);
+    if ("error" in result) toast.error(result.error);
+    else if (result.removedFromSchoolOnly)
+      toast.success("Removed from your school (they belong to another school too)");
     else toast.success("User deleted");
     setDeleting(false);
     setDeleteId(null);
@@ -456,7 +458,7 @@ export function UsersClient({ users, schoolId, schoolSlug }: UsersClientProps) {
           if (!open) setDeleteId(null);
         }}
         title="Delete user"
-        description="Are you sure you want to delete this user? Their profile will be removed. This action cannot be undone."
+        description="This permanently deletes their account, chats, children and sign-in. If they also belong to another school, they're only removed from yours. This can't be undone."
         confirmLabel="Delete"
         variant="destructive"
         loading={deleting}

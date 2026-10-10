@@ -12,12 +12,15 @@ import { Label } from "@/components/ui/label";
 import { login } from "@/actions/auth";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { ParentSignInButton } from "@/components/auth/parent-sign-in-button";
+import { LegalNotice } from "@/components/legal/legal-notice";
 import { AUTH_PROVIDERS, type AuthProvider } from "@/lib/auth/provider";
+import { schoolPossessive } from "@/lib/school-display-name";
 
 interface LoginFormProps {
   schoolSlug: string;
   schoolId: string;
-  schoolName: string;
+  /** Null when the school has no usable name; copy falls back to "your school". */
+  schoolName: string | null;
   provider: AuthProvider;
   signInEnabled: boolean;
 }
@@ -49,6 +52,16 @@ export function LoginForm({
 
   const showTransition = loading && !error;
 
+  // Built as whole strings so each sentence renders as one text node, and a
+  // missing name reads "your school's" rather than "'s".
+  const possessive = schoolPossessive(schoolName);
+  const heading = schoolName ?? "Sign in";
+  const subheading = schoolName
+    ? `Sign in with your ${schoolName} ${providerLabel} account.`
+    : `Sign in with your school's ${providerLabel} account.`;
+  const portalHint = `Use the same login you use for ${possessive} ${portalName}. Only parents and guardians can sign in.`;
+  const notEnabled = `${schoolName ?? "Your school"} hasn't turned on ${providerLabel} sign-in yet. Please check back soon.`;
+
   return (
     <AuthShell>
       <AnimatePresence>
@@ -71,12 +84,12 @@ export function LoginForm({
           </span>
           <p className="eyebrow">{showStaffSignIn ? "Staff sign in" : "Parent sign in"}</p>
           <h1 className="mt-2 font-serif-display text-3xl font-medium tracking-[-0.02em] text-ink">
-            {schoolName}
+            {heading}
           </h1>
           <p className="mt-2 text-sm text-ink-soft">
             {showStaffSignIn
               ? "For school administrators."
-              : `Sign in with your ${schoolName} ${providerLabel} account.`}
+              : subheading}
           </p>
         </div>
 
@@ -94,14 +107,12 @@ export function LoginForm({
             <>
               <ParentSignInButton schoolSlug={schoolSlug} provider={provider} />
               <p className="mt-5 text-center text-sm text-ink-soft">
-                Use the same login you use for {schoolName}&apos;s {portalName}.
-                Only parents and guardians can sign in.
+                {portalHint}
               </p>
             </>
           ) : (
             <p className="rounded-xl border border-border bg-secondary/60 px-5 py-6 text-center text-sm text-ink-soft">
-              {schoolName} hasn&apos;t turned on {providerLabel} sign-in yet.
-              Please check back soon.
+              {notEnabled}
             </p>
           ))}
 
@@ -148,6 +159,7 @@ export function LoginForm({
         >
           {showStaffSignIn ? "Back to parent sign-in" : "School staff sign-in"}
         </button>
+        <LegalNotice className="mt-4" />
       </div>
     </AuthShell>
   );
