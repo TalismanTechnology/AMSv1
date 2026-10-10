@@ -29,7 +29,7 @@ const QUESTIONS = [
 export function CollegiateOnboarding({ schoolSlug }: { schoolSlug: string | null }) {
   // A plain anchor rather than <Button>: the global button styles use
   // !important and would paint over the white-on-navy. Like
-  // BlackbaudSignInButton, it must not be next/link (the target redirects
+  // ParentSignInButton, it must not be next/link (the target redirects
   // off-site), and the native app's bridge still catches /auth/blackbaud.
   const signInHref = schoolSlug
     ? `/auth/blackbaud?school=${encodeURIComponent(schoolSlug)}`

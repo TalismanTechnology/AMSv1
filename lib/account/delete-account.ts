@@ -26,6 +26,7 @@ export const PERSONAL_DATA: ReadonlyArray<readonly [string, string]> = [
   ["notifications", "user_id"],
   ["announcement_dismissals", "user_id"],
   ["push_devices", "user_id"],
+  ["veracross_parent_links", "user_id"],
   ["school_memberships", "user_id"],
 ];
 

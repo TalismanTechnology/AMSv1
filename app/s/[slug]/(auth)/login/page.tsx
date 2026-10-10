@@ -1,5 +1,5 @@
 import { getSchoolBySlug } from "@/lib/school-context";
-import { getSchoolEnvironmentId } from "@/lib/auth/sign-in-schools";
+import { getSchoolSignIn } from "@/lib/auth/sign-in-schools";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveSchoolName } from "@/lib/school-display-name";
 import { notFound } from "next/navigation";
@@ -31,8 +31,8 @@ export default async function LoginPage({ params }: LoginPageProps) {
   const school = await getSchoolBySlug(slug);
   if (!school) notFound();
 
-  const [environmentId, schoolName] = await Promise.all([
-    getSchoolEnvironmentId(school.id),
+  const [{ provider, enabled }, schoolName] = await Promise.all([
+    getSchoolSignIn(school),
     loadSchoolName(school.id, school.name),
   ]);
 
@@ -41,7 +41,8 @@ export default async function LoginPage({ params }: LoginPageProps) {
       schoolSlug={school.slug}
       schoolId={school.id}
       schoolName={schoolName}
-      blackbaudEnabled={Boolean(environmentId)}
+      provider={provider}
+      signInEnabled={enabled}
     />
   );
 }

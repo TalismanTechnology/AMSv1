@@ -11,8 +11,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { login } from "@/actions/auth";
 import { AuthShell } from "@/components/auth/auth-shell";
-import { BlackbaudSignInButton } from "@/components/auth/blackbaud-sign-in-button";
+import { ParentSignInButton } from "@/components/auth/parent-sign-in-button";
 import { LegalNotice } from "@/components/legal/legal-notice";
+import { AUTH_PROVIDERS, type AuthProvider } from "@/lib/auth/provider";
 import { schoolPossessive } from "@/lib/school-display-name";
 
 interface LoginFormProps {
@@ -20,20 +21,23 @@ interface LoginFormProps {
   schoolId: string;
   /** Null when the school has no usable name; copy falls back to "your school". */
   schoolName: string | null;
-  blackbaudEnabled: boolean;
+  provider: AuthProvider;
+  signInEnabled: boolean;
 }
 
 export function LoginForm({
   schoolSlug,
   schoolId,
   schoolName,
-  blackbaudEnabled,
+  provider,
+  signInEnabled,
 }: LoginFormProps) {
+  const { label: providerLabel, portalName } = AUTH_PROVIDERS[provider];
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(searchParams.get("error"));
   const [loading, setLoading] = useState(false);
-  // Parents only ever use Blackbaud. The password form is for staff, so it
-  // stays collapsed behind a quiet link.
+  // Parents only ever use the school's provider (Blackbaud or Veracross). The
+  // password form is for staff, so it stays collapsed behind a quiet link.
   const [showStaffSignIn, setShowStaffSignIn] = useState(false);
 
   async function handleSubmit(formData: FormData) {
@@ -53,10 +57,10 @@ export function LoginForm({
   const possessive = schoolPossessive(schoolName);
   const heading = schoolName ?? "Sign in";
   const subheading = schoolName
-    ? `Sign in with your ${schoolName} Blackbaud account.`
-    : "Sign in with your school's Blackbaud account.";
-  const portalHint = `Use the same login you use for ${possessive} Blackbaud parent portal. Only parents and guardians can sign in.`;
-  const notEnabled = `${schoolName ?? "Your school"} hasn't turned on Blackbaud sign-in yet. Please check back soon.`;
+    ? `Sign in with your ${schoolName} ${providerLabel} account.`
+    : `Sign in with your school's ${providerLabel} account.`;
+  const portalHint = `Use the same login you use for ${possessive} ${portalName}. Only parents and guardians can sign in.`;
+  const notEnabled = `${schoolName ?? "Your school"} hasn't turned on ${providerLabel} sign-in yet. Please check back soon.`;
 
   return (
     <AuthShell>
@@ -99,9 +103,9 @@ export function LoginForm({
         )}
 
         {!showStaffSignIn &&
-          (blackbaudEnabled ? (
+          (signInEnabled ? (
             <>
-              <BlackbaudSignInButton schoolSlug={schoolSlug} />
+              <ParentSignInButton schoolSlug={schoolSlug} provider={provider} />
               <p className="mt-5 text-center text-sm text-ink-soft">
                 {portalHint}
               </p>

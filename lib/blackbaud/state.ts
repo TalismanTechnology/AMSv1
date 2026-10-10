@@ -6,12 +6,14 @@ import crypto from "node:crypto";
 // don't administer. Sign it and verify on the way back.
 //
 // Two flows use it: an admin connecting their school ("connect") and a parent
-// signing in ("parent-login"). The purpose is signed into the payload so a
-// state minted for one flow is never accepted by the other.
+// signing in ("parent-login"). Veracross parent sign-in (lib/veracross) uses
+// the same signing with its own purpose ("veracross-login"). The purpose is
+// signed into the payload so a state minted for one flow is never accepted by
+// another.
 
 const MAX_AGE_MS = 10 * 60 * 1000;
 
-type StatePurpose = "connect" | "parent-login";
+type StatePurpose = "connect" | "parent-login" | "veracross-login";
 
 // Name of the cookie that binds a callback to the browser that started the
 // flow. A signature alone proves we minted the state, not that this browser
@@ -24,6 +26,9 @@ export const OAUTH_STATE_MAX_AGE_SECONDS = MAX_AGE_MS / 1000;
 // Parent sign-in keeps its state AND its PKCE verifier in one httpOnly cookie.
 // The verifier must never travel through Blackbaud, so it can't live in state.
 export const LOGIN_STATE_COOKIE = "bb_login_state";
+
+// Same shape for Veracross parent sign-in, scoped to /auth/veracross.
+export const VERACROSS_LOGIN_STATE_COOKIE = "vc_login_state";
 
 function getSigningKey(): Buffer {
   // Reuses the token encryption key as HMAC material — same trust boundary,
@@ -72,6 +77,15 @@ export function createLoginState(
   appChallenge?: string
 ): string {
   return createState("parent-login", schoolId, schoolSlug, appChallenge);
+}
+
+/** Veracross parent sign-in; see createLoginState for `appChallenge`. */
+export function createVeracrossLoginState(
+  schoolId: string,
+  schoolSlug: string,
+  appChallenge?: string
+): string {
+  return createState("veracross-login", schoolId, schoolSlug, appChallenge);
 }
 
 export interface OAuthState {
@@ -157,6 +171,13 @@ export function verifyLoginState(
   cookieState: string | undefined
 ): OAuthState | null {
   return verifyState("parent-login", state, cookieState);
+}
+
+export function verifyVeracrossLoginState(
+  state: string,
+  cookieState: string | undefined
+): OAuthState | null {
+  return verifyState("veracross-login", state, cookieState);
 }
 
 // The login cookie packs "<state>~<pkce verifier>". Neither half can contain

@@ -19,7 +19,7 @@ export const config = {
      * - / (platform landing)
      * - /s/{slug}/* (school-scoped routes)
      * - /super-admin/* (super admin routes)
-     * - /login, /login/staff, /auth/blackbaud/*
+     * - /login, /login/staff, /auth/blackbaud/*, /auth/veracross/*
      * - /register, /admin/*, /parent/* (legacy redirects)
      * - /api/* (keeps the session fresh for route handlers too)
      */

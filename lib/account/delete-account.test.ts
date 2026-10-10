@@ -31,6 +31,7 @@ test("personal data covers chats, feedback, children, push tokens and analytics"
     "notifications",
     "school_memberships",
     "unanswered_questions",
+    "veracross_parent_links",
   ]) {
     assert.ok(tables.includes(t), `${t} not deleted`);
   }

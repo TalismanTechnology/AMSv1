@@ -3,30 +3,32 @@
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { getNativePlatform } from "@/lib/native/platform";
+import { providerForStartPath, type AuthProvider } from "@/lib/auth/provider";
 
 // App-only behaviour for the iOS / Android shells. Renders nothing, and does
 // nothing on the website.
 //
-// - "Sign in with Blackbaud" links open the system sign-in sheet instead of
-//   loading Blackbaud inside the app (lib/native/blackbaud-sign-in.ts). The
-//   links themselves stay plain anchors, so the website is unchanged.
+// - "Sign in with Blackbaud" / "Sign in with Veracross" links open the system
+//   sign-in sheet instead of loading the provider inside the app
+//   (lib/native/blackbaud-sign-in.ts). The links themselves stay plain
+//   anchors, so the website is unchanged.
 // - The marketing page isn't part of the app: signing out lands on "/", which
 //   is sent on to the sign-in page.
 
-const BLACKBAUD_START_PATH = "/auth/blackbaud";
-
-function blackbaudSchoolFromClick(event: MouseEvent): string | null {
+function signInFromClick(
+  event: MouseEvent
+): { provider: AuthProvider; schoolSlug: string } | null {
   if (event.defaultPrevented || event.button !== 0) return null;
 
   const anchor = (event.target as Element | null)?.closest?.("a[href]");
   if (!(anchor instanceof HTMLAnchorElement)) return null;
 
   const url = new URL(anchor.href, window.location.href);
-  if (url.origin !== window.location.origin || url.pathname !== BLACKBAUD_START_PATH) {
-    return null;
-  }
+  if (url.origin !== window.location.origin) return null;
 
-  return url.searchParams.get("school");
+  const provider = providerForStartPath(url.pathname);
+  const schoolSlug = url.searchParams.get("school");
+  return provider && schoolSlug ? { provider, schoolSlug } : null;
 }
 
 export function NativeBridge() {
@@ -46,15 +48,17 @@ export function NativeBridge() {
     let signingIn = false;
 
     const onClick = (event: MouseEvent) => {
-      const schoolSlug = blackbaudSchoolFromClick(event);
-      if (!schoolSlug) return;
+      const target = signInFromClick(event);
+      if (!target) return;
 
       event.preventDefault();
       if (signingIn) return;
       signingIn = true;
 
       void import("@/lib/native/blackbaud-sign-in")
-        .then(({ signInWithBlackbaud }) => signInWithBlackbaud(platform, schoolSlug))
+        .then(({ signInWithSchoolProvider }) =>
+          signInWithSchoolProvider(platform, target.schoolSlug, target.provider)
+        )
         .catch((caught: unknown) => console.error("[native] sign-in failed", caught))
         .finally(() => {
           signingIn = false;
