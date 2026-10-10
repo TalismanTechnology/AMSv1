@@ -44,7 +44,7 @@ async function main() {
     }
 
     // Check how many pass the 0.65 threshold (same as sources filter)
-    const above65 = chunks.filter((c: any) => c.similarity >= 0.65);
+    const above65 = chunks.filter((c: { similarity: number }) =>c.similarity >= 0.65);
     console.log(`\nChunks >= 0.65 similarity: ${above65.length}`);
     console.log(`sources.length would be: ${above65.length > 0 ? 'non-zero (unanswered NOT recorded)' : '0 (unanswered WOULD be recorded)'}`);
   } else {

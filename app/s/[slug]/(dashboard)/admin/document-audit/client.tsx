@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useMemo } from "react";
+import { useState, useTransition, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -83,14 +83,17 @@ export function DocumentAuditClient({
   }, [auditData]);
 
   // Global item filter
-  function matchesFilter(item: { itemId: string; status: string }) {
-    if (statusFilter !== "all" && item.status !== statusFilter) return false;
-    if (priorityFilter !== "all") {
-      const ci = CHECKLIST_BY_ID.get(item.itemId);
-      if (ci && ci.priority !== priorityFilter) return false;
-    }
-    return true;
-  }
+  const matchesFilter = useCallback(
+    (item: { itemId: string; status: string }) => {
+      if (statusFilter !== "all" && item.status !== statusFilter) return false;
+      if (priorityFilter !== "all") {
+        const ci = CHECKLIST_BY_ID.get(item.itemId);
+        if (ci && ci.priority !== priorityFilter) return false;
+      }
+      return true;
+    },
+    [statusFilter, priorityFilter]
+  );
 
   const isFiltered = statusFilter !== "all" || priorityFilter !== "all";
 
@@ -101,7 +104,7 @@ export function DocumentAuditClient({
     return auditData.categories.filter((cat) =>
       cat.items.some(matchesFilter)
     );
-  }, [auditData, statusFilter, priorityFilter]);
+  }, [auditData, isFiltered, matchesFilter]);
 
   // Selected category detail
   const selectedCat = auditData?.categories.find(
@@ -110,7 +113,7 @@ export function DocumentAuditClient({
   const selectedItems = useMemo(() => {
     if (!selectedCat) return [];
     return selectedCat.items.filter(matchesFilter);
-  }, [selectedCat, statusFilter, priorityFilter]);
+  }, [selectedCat, matchesFilter]);
 
   function handleRunAudit() {
     startTransition(async () => {

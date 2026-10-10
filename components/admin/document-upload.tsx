@@ -227,8 +227,9 @@ export function DocumentUpload({
 
   // Cleanup polling on unmount
   useEffect(() => {
+    const polling = pollingRef.current;
     return () => {
-      pollingRef.current.forEach(clearInterval);
+      polling.forEach(clearInterval);
     };
   }, []);
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import {
   Users,
@@ -54,6 +54,32 @@ import type { Profile } from "@/lib/types";
 type SortKey = "full_name" | "email" | "role" | "child_grade" | "created_at";
 type SortDir = "asc" | "desc";
 
+function SortIcon({
+  column,
+  sortKey,
+  sortDir,
+}: {
+  column: SortKey;
+  sortKey: SortKey;
+  sortDir: SortDir;
+}) {
+  if (sortKey !== column)
+    return (
+      <ArrowUpDown className="ml-1 inline h-3.5 w-3.5 text-muted-foreground/70" />
+    );
+  return sortDir === "asc" ? (
+    <ArrowUp className="ml-1 inline h-3.5 w-3.5" />
+  ) : (
+    <ArrowDown className="ml-1 inline h-3.5 w-3.5" />
+  );
+}
+
+// window.location.origin never changes during the page's life; the server
+// snapshot ("") matches what the server rendered before hydration.
+const subscribeNoop = () => () => {};
+const getOrigin = () => window.location.origin;
+const getServerOrigin = () => "";
+
 interface UsersClientProps {
   users: Profile[];
   schoolId: string;
@@ -71,11 +97,7 @@ export function UsersClient({ users, schoolId, schoolSlug }: UsersClientProps) {
   const [changingRole, setChangingRole] = useState(false);
   const [approvingAll, setApprovingAll] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
-  const [origin, setOrigin] = useState("");
-
-  useEffect(() => {
-    setOrigin(window.location.origin);
-  }, []);
+  const origin = useSyncExternalStore(subscribeNoop, getOrigin, getServerOrigin);
 
   // Parents sign in with Blackbaud from here; there is no separate registration.
   const registrationUrl = `${origin}/s/${schoolSlug}/login`;
@@ -171,18 +193,6 @@ export function UsersClient({ users, schoolId, schoolSlug }: UsersClientProps) {
 
     return result;
   }, [users, sortKey, sortDir, gradeFilter]);
-
-  function SortIcon({ column }: { column: SortKey }) {
-    if (sortKey !== column)
-      return (
-        <ArrowUpDown className="ml-1 inline h-3.5 w-3.5 text-muted-foreground/70" />
-      );
-    return sortDir === "asc" ? (
-      <ArrowUp className="ml-1 inline h-3.5 w-3.5" />
-    ) : (
-      <ArrowDown className="ml-1 inline h-3.5 w-3.5" />
-    );
-  }
 
   if (users.length === 0) {
     return (
@@ -303,35 +313,35 @@ export function UsersClient({ users, schoolId, schoolSlug }: UsersClientProps) {
                 onClick={() => toggleSort("full_name")}
               >
                 Name
-                <SortIcon column="full_name" />
+                <SortIcon column="full_name" sortKey={sortKey} sortDir={sortDir} />
               </TableHead>
               <TableHead
                 className="hidden cursor-pointer select-none text-[0.7rem] uppercase tracking-[0.12em] text-ink-soft md:table-cell"
                 onClick={() => toggleSort("email")}
               >
                 Email
-                <SortIcon column="email" />
+                <SortIcon column="email" sortKey={sortKey} sortDir={sortDir} />
               </TableHead>
               <TableHead
                 className="cursor-pointer select-none text-[0.7rem] uppercase tracking-[0.12em] text-ink-soft"
                 onClick={() => toggleSort("role")}
               >
                 Role
-                <SortIcon column="role" />
+                <SortIcon column="role" sortKey={sortKey} sortDir={sortDir} />
               </TableHead>
               <TableHead
                 className="hidden cursor-pointer select-none text-[0.7rem] uppercase tracking-[0.12em] text-ink-soft md:table-cell"
                 onClick={() => toggleSort("child_grade")}
               >
                 Children
-                <SortIcon column="child_grade" />
+                <SortIcon column="child_grade" sortKey={sortKey} sortDir={sortDir} />
               </TableHead>
               <TableHead
                 className="hidden cursor-pointer select-none text-[0.7rem] uppercase tracking-[0.12em] text-ink-soft md:table-cell"
                 onClick={() => toggleSort("created_at")}
               >
                 Joined
-                <SortIcon column="created_at" />
+                <SortIcon column="created_at" sortKey={sortKey} sortDir={sortDir} />
               </TableHead>
               <TableHead className="w-[50px]" />
             </TableRow>

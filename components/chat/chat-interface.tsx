@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useState, useMemo } from "react";
+import { useRef, useEffect, useLayoutEffect, useState, useMemo } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { Send } from "lucide-react";
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
 import { MessageBubble } from "./message-bubble";
+import { preloadMarkdownRenderer } from "./lazy-markdown-renderer";
 import { SuggestedQuestions } from "./suggested-questions";
 import { SourcePanel } from "./source-panel";
 import { SourcePanelProvider } from "./source-panel-context";
@@ -44,7 +45,6 @@ export function ChatInterface({
   sessionId,
   initialMessages: dbMessages,
   onSessionCreated,
-  onNewChat,
   suggestedQuestions,
   welcomeMessage,
   sessionTitle,
@@ -65,10 +65,17 @@ export function ChatInterface({
   const scrollRef = useRef<HTMLDivElement>(null);
   const pendingMessageRef = useRef<string | null>(null);
   // Track IDs of messages loaded from DB so we can skip their entrance animation
-  const hydratedIdsRef = useRef<Set<string>>(new Set(dbMessages?.map((m) => m.id) || []));
-  // Keep a ref for sessionId so the transport body function always reads the latest value
+  // (captured once on mount, never updated)
+  const [hydratedIds] = useState<Set<string>>(
+    () => new Set(dbMessages?.map((m) => m.id) || [])
+  );
+  // Keep a ref for sessionId so the transport body function always reads the
+  // latest value. Synced in a layout effect (before any passive effect or
+  // event handler can send) rather than during render.
   const sessionIdRef = useRef(currentSessionId);
-  sessionIdRef.current = currentSessionId;
+  useLayoutEffect(() => {
+    sessionIdRef.current = currentSessionId;
+  }, [currentSessionId]);
 
   // Convert DB messages to UIMessage format for useChat hydration
   const hydratedMessages = useMemo(() => {
@@ -92,6 +99,8 @@ export function ChatInterface({
   // (DefaultChatTransport supports Resolvable<object> which accepts () => object)
   const transport = useMemo(
     () =>
+      // body() runs only when a message is sent, never during render.
+      // eslint-disable-next-line react-hooks/refs
       new DefaultChatTransport({
         api: "/api/chat",
         body: () => ({ sessionId: sessionIdRef.current, schoolId }),
@@ -102,6 +111,12 @@ export function ChatInterface({
   const { messages, sendMessage, regenerate, status, error, setMessages } = useChat({
     transport,
   });
+
+  // Fetch the markdown chunk right after first paint, before any message
+  // needs it.
+  useEffect(() => {
+    preloadMarkdownRenderer();
+  }, []);
 
   // Hydrate with DB messages on mount
   useEffect(() => {
@@ -370,7 +385,7 @@ export function ChatInterface({
                   return (
                     <motion.div
                       key={message.id}
-                      initial={hydratedIdsRef.current.has(message.id) ? false : "hidden"}
+                      initial={hydratedIds.has(message.id) ? false : "hidden"}
                       animate="visible"
                       variants={messageEntrance}
                     >
@@ -391,7 +406,7 @@ export function ChatInterface({
                           message.role === "assistant" &&
                           status === "streaming"
                         }
-                        skipAnimations={hydratedIdsRef.current.has(message.id)}
+                        skipAnimations={hydratedIds.has(message.id)}
                         onFollowUpSelect={handleFollowUpSelect}
                       />
                     </motion.div>

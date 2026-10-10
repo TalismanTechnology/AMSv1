@@ -15,6 +15,9 @@ export const metadata: Metadata = {
   description: "The terms that apply when you use AskMySchool.",
 };
 
+// Plain content with no per-request data: always prerender at build time.
+export const dynamic = "force-static";
+
 export default function TermsPage() {
   return (
     <LegalPage

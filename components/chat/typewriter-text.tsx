@@ -1,7 +1,7 @@
 "use client";
 
 import { useTypewriter } from "@/hooks/use-typewriter";
-import { MarkdownRenderer } from "./markdown-renderer";
+import { MarkdownRenderer } from "./lazy-markdown-renderer";
 import type { ChatSource } from "@/lib/types";
 
 interface TypewriterTextProps {

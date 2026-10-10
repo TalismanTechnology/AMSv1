@@ -1,18 +1,35 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
+import dynamic from "next/dynamic";
 import { useSourcePanel } from "./source-panel-context";
 import { X, FileText, Download, Maximize2 } from "lucide-react";
 import { LogoSpinner } from "@/components/logo-spinner";
 import { getDocumentSignedUrl, getDocumentUrls } from "@/lib/storage-url";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { DocumentViewer } from "@/components/shared/document-viewer";
-import { PdfPages } from "@/components/shared/pdf-pages";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { ease, duration } from "@/lib/motion";
+
+// The document viewers are only needed once a source is opened, so they load
+// in their own chunks instead of with the chat page.
+const PdfPages = dynamic(
+  () => import("@/components/shared/pdf-pages").then((m) => m.PdfPages),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center h-full">
+        <LogoSpinner size={24} />
+      </div>
+    ),
+  }
+);
+const DocumentViewer = dynamic(
+  () => import("@/components/shared/document-viewer").then((m) => m.DocumentViewer),
+  { ssr: false }
+);
 
 // Expand [start, end) outward to the nearest sentence/paragraph boundaries so
 // the highlight never visibly truncates mid-word or mid-sentence. Chunks are
