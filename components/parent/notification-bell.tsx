@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Bell, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,19 +35,20 @@ export function NotificationBell() {
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
+  const loadNotifications = useCallback(() => {
+    getNotifications(school.id).then(({ notifications: data }) => {
+      setNotifications(data as Notification[]);
+    });
+  }, [school.id]);
+
   useEffect(() => {
     loadNotifications();
-  }, []);
+  }, [loadNotifications]);
 
   // Reload when popover opens
   useEffect(() => {
     if (open) loadNotifications();
-  }, [open]);
-
-  async function loadNotifications() {
-    const { notifications: data } = await getNotifications(school.id);
-    setNotifications(data as Notification[]);
-  }
+  }, [open, loadNotifications]);
 
   async function handleMarkRead(id: string) {
     setNotifications((prev) =>

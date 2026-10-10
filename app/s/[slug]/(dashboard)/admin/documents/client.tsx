@@ -22,10 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { DocumentUpload } from "@/components/admin/document-upload";
 import { DocumentTable } from "@/components/admin/document-table";
-import { DocumentEditDialog } from "@/components/admin/document-edit-dialog";
-import { DocumentViewer } from "@/components/shared/document-viewer";
 import { FolderTree } from "@/components/admin/folder-tree";
 import { CategoryManager } from "@/components/admin/category-manager";
 import {
@@ -56,6 +53,25 @@ const SortingMap = dynamic(
       <div className="h-[calc(100dvh-13rem)] min-h-[508px] animate-pulse rounded-xl border border-border bg-muted/40" />
     ),
   }
+);
+
+// Dialogs (upload with react-dropzone, edit, the PDF/DOCX viewer) are closed at
+// first paint, so they load in their own chunks. A closed dialog renders
+// nothing, so there is no placeholder to size.
+const DocumentUpload = dynamic(
+  () => import("@/components/admin/document-upload").then((m) => m.DocumentUpload),
+  { ssr: false }
+);
+const DocumentEditDialog = dynamic(
+  () =>
+    import("@/components/admin/document-edit-dialog").then(
+      (m) => m.DocumentEditDialog
+    ),
+  { ssr: false }
+);
+const DocumentViewer = dynamic(
+  () => import("@/components/shared/document-viewer").then((m) => m.DocumentViewer),
+  { ssr: false }
 );
 
 interface DocumentsClientProps {
@@ -129,10 +145,7 @@ export function DocumentsClient({
   );
 
   useEffect(() => {
-    if (searchMode !== "content") {
-      setContentResults([]);
-      return;
-    }
+    if (searchMode !== "content") return;
     const timer = setTimeout(() => doContentSearch(searchQuery), 400);
     return () => clearTimeout(timer);
   }, [searchQuery, searchMode, doContentSearch]);
@@ -180,7 +193,7 @@ export function DocumentsClient({
     }
 
     return result;
-  }, [documents, selectedFolderId, searchQuery, statusFilter, categoryFilter]);
+  }, [documents, selectedFolderId, searchQuery, statusFilter, categoryFilter, getDescendantIds]);
 
   // From a map card's menu: the list, filtered to just that card's documents.
   const showInList = useCallback((mapView: MapView, targetId: string) => {
@@ -274,9 +287,11 @@ export function DocumentsClient({
             variant="ghost"
             size="sm"
             className="absolute right-1 top-1/2 -translate-y-1/2 h-7 text-xs px-2"
-            onClick={() =>
-              setSearchMode((m) => (m === "title" ? "content" : "title"))
-            }
+            onClick={() => {
+              // Leaving content mode drops its results.
+              if (searchMode === "content") setContentResults([]);
+              setSearchMode((m) => (m === "title" ? "content" : "title"));
+            }}
           >
             <FileSearch className="mr-1 h-3 w-3" />
             {searchMode === "title" ? "Content" : "Title"}

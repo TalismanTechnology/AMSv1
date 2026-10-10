@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { MarkdownRenderer } from "./markdown-renderer";
+import { useState, useCallback } from "react";
+import { MarkdownRenderer } from "./lazy-markdown-renderer";
 import { TypewriterText } from "./typewriter-text";
 import { FollowUpChips } from "./follow-up-chips";
 import { MessageFeedback } from "./message-feedback";
@@ -41,9 +41,13 @@ export function MessageBubble({
   // not just while the API stream is active
   const [typewriterActive, setTypewriterActive] = useState(false);
 
-  useEffect(() => {
+  // Turn typewriter mode on whenever streaming starts (adjusting state while
+  // rendering, rather than in an effect, avoids an extra commit).
+  const [prevStreaming, setPrevStreaming] = useState(false);
+  if (!!isStreaming !== prevStreaming) {
+    setPrevStreaming(!!isStreaming);
     if (isStreaming) setTypewriterActive(true);
-  }, [isStreaming]);
+  }
 
   const handleTypewriterComplete = useCallback(() => {
     setTypewriterActive(false);

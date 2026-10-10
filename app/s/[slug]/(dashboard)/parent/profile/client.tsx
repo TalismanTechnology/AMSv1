@@ -31,7 +31,8 @@ import type { Profile, Child } from "@/lib/types";
 
 interface ProfileClientProps {
   profile: Profile;
-  children: Child[];
+  /** The parent's children (records), not React children. */
+  initialChildren: Child[];
   email: string;
   schoolId: string;
   schoolSlug: string;
@@ -39,10 +40,9 @@ interface ProfileClientProps {
 
 export function ProfileClient({
   profile,
-  children: initialChildren,
+  initialChildren,
   email,
   schoolId,
-  schoolSlug,
 }: ProfileClientProps) {
   const [fullName, setFullName] = useState(profile.full_name || "");
   const [savingName, setSavingName] = useState(false);

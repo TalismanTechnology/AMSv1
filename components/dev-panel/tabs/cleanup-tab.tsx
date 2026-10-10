@@ -22,12 +22,6 @@ interface CleanupTabProps {
   schoolId: string;
 }
 
-interface TableInfo {
-  name: string;
-  label: string;
-  count: number;
-}
-
 const CONTENT_TABLES: { name: string; label: string }[] = [
   { name: "documents", label: "Documents" },
   { name: "events", label: "Events" },

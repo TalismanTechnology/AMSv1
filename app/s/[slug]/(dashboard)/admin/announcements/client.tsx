@@ -46,7 +46,6 @@ interface AnnouncementsClientProps {
 export function AnnouncementsClient({
   announcements,
   schoolId,
-  schoolSlug,
 }: AnnouncementsClientProps) {
   const [createOpen, setCreateOpen] = useState(false);
   const [editingAnnouncement, setEditingAnnouncement] =

@@ -29,7 +29,7 @@ export function SuperAdminClient({
 }: {
   schools: SchoolWithCount[];
 }) {
-  const [schools, setSchools] = useState(initialSchools);
+  const [schools] = useState(initialSchools);
   const [createOpen, setCreateOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState<string | null>(null);

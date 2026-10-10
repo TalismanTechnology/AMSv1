@@ -1,4 +1,4 @@
-import type { Variants, Transition } from "framer-motion";
+import type { Variants } from "framer-motion";
 
 // Easing curves
 export const ease = {

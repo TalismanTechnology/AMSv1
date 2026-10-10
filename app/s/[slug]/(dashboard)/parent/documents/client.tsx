@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect } from "react";
+import dynamic from "next/dynamic";
 import {
   FileText,
   File,
@@ -10,7 +11,6 @@ import {
   X,
   FolderOpen,
   FolderClosed,
-  ChevronDown,
   ChevronRight,
   FileSearch,
 } from "lucide-react";
@@ -29,7 +29,6 @@ import {
   CollapsibleTrigger,
   CollapsibleContent,
 } from "@/components/ui/collapsible";
-import { DocumentViewer } from "@/components/shared/document-viewer";
 import { searchDocumentContent } from "@/actions/documents";
 import { TimeAgo } from "@/components/ui/time-ago";
 import {
@@ -43,6 +42,13 @@ import type {
   ContentSearchResult,
   EventCalendar,
 } from "@/lib/types";
+
+// The viewer dialog is closed until a document is opened, so it (and the PDF
+// renderer behind it) loads in its own chunk.
+const DocumentViewer = dynamic(
+  () => import("@/components/shared/document-viewer").then((m) => m.DocumentViewer),
+  { ssr: false }
+);
 
 const FILE_TYPE_ICONS: Record<string, typeof FileText> = {
   pdf: FileText,
@@ -103,10 +109,7 @@ export function ParentDocumentsClient({
   );
 
   useEffect(() => {
-    if (searchMode !== "content") {
-      setContentResults([]);
-      return;
-    }
+    if (searchMode !== "content") return;
     const timer = setTimeout(() => doContentSearch(searchQuery), 400);
     return () => clearTimeout(timer);
   }, [searchQuery, searchMode, doContentSearch]);
@@ -210,9 +213,11 @@ export function ParentDocumentsClient({
                 ? "Switch to searching document content"
                 : "Switch to searching titles"
             }
-            onClick={() =>
-              setSearchMode((m) => (m === "title" ? "content" : "title"))
-            }
+            onClick={() => {
+              // Leaving content mode drops its results.
+              if (searchMode === "content") setContentResults([]);
+              setSearchMode((m) => (m === "title" ? "content" : "title"));
+            }}
           >
             <FileSearch className="mr-1 h-3 w-3" />
             {searchMode === "title" ? "Content" : "Title"}

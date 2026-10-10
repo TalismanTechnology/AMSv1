@@ -31,7 +31,10 @@ export function useTypewriter(
   const streamingRef = useRef(true);
   const stoppedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onCompleteRef = useRef(onComplete);
-  onCompleteRef.current = onComplete;
+  // Only read from the interval callback, so syncing after commit is enough.
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
 
   // Keep textRef in sync and detect ongoing streaming
   useEffect(() => {

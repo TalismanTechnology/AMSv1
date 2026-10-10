@@ -2,23 +2,7 @@
 
 import { useState, useTransition } from "react";
 import type { ReactNode } from "react";
-import {
-  BarChart,
-  Bar,
-  LineChart,
-  Line,
-  AreaChart,
-  Area,
-  PieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-} from "recharts";
+import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import {
   MessageSquare,
@@ -38,15 +22,28 @@ import {
   type TimeRange,
 } from "@/actions/analytics";
 
-const PIE_COLORS = ["#2d3a2e", "#3d5a3e", "#7a9a7c", "#b5c2b6", "#c9a86a", "#8a8f88"];
+// Recharts is heavy and its ResponsiveContainer measures the DOM anyway, so
+// the charts load client-side in their own chunk behind same-size placeholders.
+function ChartPlaceholder() {
+  return <div className="h-[250px] animate-pulse rounded-lg bg-muted/40" />;
+}
 
-const tooltipStyle = {
-  backgroundColor: "#ffffff",
-  border: "1px solid rgba(45, 58, 46, 0.15)",
-  borderRadius: "0.6rem",
-  color: "#2d3a2e",
-  boxShadow: "0 10px 30px rgba(45, 58, 46, 0.18)",
-};
+const QuestionsTrendChart = dynamic(
+  () => import("./charts").then((m) => m.QuestionsTrendChart),
+  { ssr: false, loading: ChartPlaceholder }
+);
+const DocumentTypesChart = dynamic(
+  () => import("./charts").then((m) => m.DocumentTypesChart),
+  { ssr: false, loading: ChartPlaceholder }
+);
+const QuestionsByHourChart = dynamic(
+  () => import("./charts").then((m) => m.QuestionsByHourChart),
+  { ssr: false, loading: ChartPlaceholder }
+);
+const UserGrowthChart = dynamic(
+  () => import("./charts").then((m) => m.UserGrowthChart),
+  { ssr: false, loading: ChartPlaceholder }
+);
 
 const TIME_RANGES: { value: TimeRange; label: string }[] = [
   { value: "7d", label: "7 days" },
@@ -61,7 +58,7 @@ interface AnalyticsClientProps {
   schoolSlug: string;
 }
 
-export function AnalyticsClient({ data: initialData, schoolId, schoolSlug }: AnalyticsClientProps) {
+export function AnalyticsClient({ data: initialData, schoolId }: AnalyticsClientProps) {
   const [data, setData] = useState(initialData);
   const [activeRange, setActiveRange] = useState<TimeRange>(initialData.timeRange);
   const [isPending, startTransition] = useTransition();
@@ -185,56 +182,7 @@ export function AnalyticsClient({ data: initialData, schoolId, schoolSlug }: Ana
           </h2>
           <div>
               {data.dailyData.some((d) => d.questions > 0) ? (
-                <ResponsiveContainer width="100%" height={250}>
-                  <AreaChart data={data.dailyData}>
-                    <defs>
-                      <linearGradient
-                        id="questionsGradient"
-                        x1="0"
-                        y1="0"
-                        x2="0"
-                        y2="1"
-                      >
-                        <stop offset="0%" stopColor="#4682b4" stopOpacity={0.3} />
-                        <stop offset="100%" stopColor="#4682b4" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      vertical={false}
-                      stroke="oklch(1 0 0 / 8%)"
-                    />
-                    <XAxis
-                      dataKey="date"
-                      tick={{ fill: "#536872", fontSize: 12 }}
-                      tickFormatter={(v) => {
-                        const d = new Date(v);
-                        return `${d.getMonth() + 1}/${d.getDate()}`;
-                      }}
-                      interval="preserveStartEnd"
-                    />
-                    <YAxis
-                      tick={{ fill: "#536872", fontSize: 12 }}
-                      allowDecimals={false}
-                    />
-                    <Tooltip
-                      contentStyle={tooltipStyle}
-                      labelFormatter={(v) =>
-                        new Date(v).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                        })
-                      }
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="questions"
-                      stroke="#4682b4"
-                      fill="url(#questionsGradient)"
-                      strokeWidth={2}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
+                <QuestionsTrendChart data={data.dailyData} />
               ) : (
                 <div className="flex h-[250px] items-center justify-center text-sm text-muted-foreground">
                   No question data yet
@@ -250,30 +198,7 @@ export function AnalyticsClient({ data: initialData, schoolId, schoolSlug }: Ana
           </h2>
           <div>
               {data.documentTypes.length > 0 ? (
-                <ResponsiveContainer width="100%" height={250}>
-                  <PieChart>
-                    <Pie
-                      data={data.documentTypes}
-                      dataKey="count"
-                      nameKey="type"
-                      outerRadius={100}
-                      label={(props) => {
-                        const name = props.name ?? "";
-                        const percent = typeof props.percent === "number" ? props.percent : 0;
-                        return `${name} ${(percent * 100).toFixed(0)}%`;
-                      }}
-                    >
-                      {data.documentTypes.map((_, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={PIE_COLORS[index % PIE_COLORS.length]}
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip contentStyle={tooltipStyle} />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
+                <DocumentTypesChart data={data.documentTypes} />
               ) : (
                 <div className="flex h-[250px] items-center justify-center text-sm text-muted-foreground">
                   No documents uploaded yet
@@ -289,33 +214,7 @@ export function AnalyticsClient({ data: initialData, schoolId, schoolSlug }: Ana
           </h2>
           <div>
               {data.hourlyDistribution.some((h) => h.count > 0) ? (
-                <ResponsiveContainer width="100%" height={250}>
-                  <BarChart data={data.hourlyDistribution}>
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      vertical={false}
-                      stroke="oklch(1 0 0 / 8%)"
-                    />
-                    <XAxis
-                      dataKey="hour"
-                      tick={{ fill: "#536872", fontSize: 12 }}
-                      tickFormatter={(h) => `${h}:00`}
-                    />
-                    <YAxis
-                      tick={{ fill: "#536872", fontSize: 12 }}
-                      allowDecimals={false}
-                    />
-                    <Tooltip
-                      contentStyle={tooltipStyle}
-                      labelFormatter={(h) => `${h}:00 – ${h}:59`}
-                    />
-                    <Bar
-                      dataKey="count"
-                      fill="#536872"
-                      radius={[4, 4, 0, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
+                <QuestionsByHourChart data={data.hourlyDistribution} />
               ) : (
                 <div className="flex h-[250px] items-center justify-center text-sm text-muted-foreground">
                   No message data yet
@@ -332,45 +231,7 @@ export function AnalyticsClient({ data: initialData, schoolId, schoolSlug }: Ana
           <div>
               {data.userGrowth.length > 0 &&
               data.userGrowth[data.userGrowth.length - 1].users > 0 ? (
-                <ResponsiveContainer width="100%" height={250}>
-                  <LineChart data={data.userGrowth}>
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      vertical={false}
-                      stroke="oklch(1 0 0 / 8%)"
-                    />
-                    <XAxis
-                      dataKey="date"
-                      tick={{ fill: "#536872", fontSize: 12 }}
-                      tickFormatter={(v) => {
-                        const d = new Date(v);
-                        return `${d.getMonth() + 1}/${d.getDate()}`;
-                      }}
-                      interval="preserveStartEnd"
-                    />
-                    <YAxis
-                      tick={{ fill: "#536872", fontSize: 12 }}
-                      allowDecimals={false}
-                    />
-                    <Tooltip
-                      contentStyle={tooltipStyle}
-                      labelFormatter={(v) =>
-                        new Date(v).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                        })
-                      }
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="users"
-                      stroke="#e5e4e2"
-                      strokeWidth={2}
-                      dot={{ fill: "#c0c0c0", r: 3 }}
-                      activeDot={{ fill: "#4682b4", r: 5 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+                <UserGrowthChart data={data.userGrowth} />
               ) : (
                 <div className="flex h-[250px] items-center justify-center text-sm text-muted-foreground">
                   No user data yet
