@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test lib/email/inbound.test.ts lib/blackbaud/blackbaud.test.ts lib/blackbaud/parent-login.test.ts lib/blackbaud/calendar.test.ts lib/documents/eml.test.ts lib/documents/sorting-map.test.ts lib/documents/division-categories.test.ts lib/ai/classify-document.test.ts lib/ai/citations.test.ts lib/auth/app-handoff.test.ts lib/push/push.test.ts lib/school-display-name.test.ts lib/account/delete-account.test.ts lib/native/links.test.ts lib/share-answer.test.ts lib/ai/consent.test.ts lib/ai/child-privacy.test.ts lib/supabase/cookie-options.test.ts lib/supabase/response-cookies.test.ts lib/supabase/middleware.test.ts",
+    "test": "tsx --test lib/email/inbound.test.ts lib/blackbaud/blackbaud.test.ts lib/blackbaud/parent-login.test.ts lib/blackbaud/calendar.test.ts lib/documents/eml.test.ts lib/documents/sorting-map.test.ts lib/documents/division-categories.test.ts lib/ai/classify-document.test.ts lib/ai/citations.test.ts lib/auth/app-handoff.test.ts lib/push/push.test.ts lib/school-display-name.test.ts lib/account/delete-account.test.ts lib/native/links.test.ts lib/share-answer.test.ts lib/ai/consent.test.ts lib/ai/child-privacy.test.ts lib/ai/rewrite-query.test.ts lib/supabase/cookie-options.test.ts lib/supabase/response-cookies.test.ts lib/supabase/middleware.test.ts",
     "check:feed": "tsx scripts/check-ical-feed.ts",
     "seed:demo": "NODE_OPTIONS='--max-old-space-size=4096' tsx scripts/seed-demo.ts",
     "migrate:clusters": "NODE_OPTIONS='--max-old-space-size=4096' tsx scripts/migrate-clusters.ts",
