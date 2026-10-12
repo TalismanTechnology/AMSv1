@@ -127,6 +127,7 @@ export interface ChatSession {
   school_id: string;
   created_at: string;
   updated_at: string;
+  hidden_from_parent?: boolean;
 }
 
 export interface ChatMessage {

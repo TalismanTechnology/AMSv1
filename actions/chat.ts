@@ -3,6 +3,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
+import {
+  CHAT_HISTORY_LIMIT,
+  findFlaggedSessionIds,
+  pruneChatHistory,
+  truncateTitle,
+} from "@/lib/chat/history-retention";
 
 export async function getChatSessions(schoolId: string) {
   const supabase = await createClient();
@@ -17,7 +23,9 @@ export async function getChatSessions(schoolId: string) {
     .select("id, title, created_at, updated_at")
     .eq("user_id", user.id)
     .eq("school_id", schoolId)
-    .order("updated_at", { ascending: false });
+    .eq("hidden_from_parent", false)
+    .order("updated_at", { ascending: false })
+    .limit(CHAT_HISTORY_LIMIT);
 
   if (error) return { error: error.message, sessions: [] };
   return { sessions: sessions || [] };
@@ -30,6 +38,17 @@ export async function getChatMessages(sessionId: string) {
   } = await supabase.auth.getUser();
 
   if (!user) return { error: "Not authenticated", messages: [] };
+
+  // Only the owner's chats that are still in their visible history.
+  const { data: session } = await supabase
+    .from("chat_sessions")
+    .select("id")
+    .eq("id", sessionId)
+    .eq("user_id", user.id)
+    .eq("hidden_from_parent", false)
+    .maybeSingle();
+
+  if (!session) return { error: "Chat not found", messages: [] };
 
   const { data: messages, error } = await supabase
     .from("chat_messages")
@@ -69,9 +88,7 @@ export async function createChatSession(schoolId: string, title?: string) {
     }
   }
 
-  const sessionTitle = title
-    ? title.slice(0, 60) + (title.length > 60 ? "..." : "")
-    : "New chat";
+  const sessionTitle = (title && truncateTitle(title)) || "New chat";
 
   // Insert with the admin client: the request is already authorized above, and
   // the chat_sessions RLS policy (is_school_member) would otherwise reject
@@ -87,6 +104,8 @@ export async function createChatSession(schoolId: string, title?: string) {
     console.error("createChatSession insert failed:", error);
     return { error: error.message };
   }
+
+  await pruneChatHistory(admin, user.id, schoolId, CHAT_HISTORY_LIMIT);
   return { sessionId: data.id };
 }
 
@@ -105,6 +124,7 @@ export async function searchChatMessages(query: string, schoolId: string) {
     )
     .eq("chat_sessions.user_id", user.id)
     .eq("chat_sessions.school_id", schoolId)
+    .eq("chat_sessions.hidden_from_parent", false)
     .ilike("content", `%${query}%`)
     .order("created_at", { ascending: false })
     .limit(20);
@@ -123,16 +143,70 @@ export async function searchChatMessages(query: string, schoolId: string) {
   return { results };
 }
 
+/**
+ * Remove chats (already verified as owned by userId) from the parent's
+ * history. Flagged chats (unanswered, or the owner's thumbs-down) stay
+ * reviewable by staff (migration 031), so they're hidden, not deleted.
+ */
+async function removeFromHistory(
+  userId: string,
+  sessionIds: string[]
+): Promise<{ error?: string }> {
+  if (sessionIds.length === 0) return {};
+  const admin = createAdminClient();
+
+  let flagged: Set<string>;
+  try {
+    flagged = await findFlaggedSessionIds(admin, userId, sessionIds);
+  } catch (err) {
+    console.error("removeFromHistory flag lookup failed:", err);
+    return { error: "Couldn't delete chat. Please try again." };
+  }
+
+  const hide = sessionIds.filter((id) => flagged.has(id));
+  const remove = sessionIds.filter((id) => !flagged.has(id));
+
+  if (hide.length > 0) {
+    const { error } = await admin
+      .from("chat_sessions")
+      .update({ hidden_from_parent: true })
+      .in("id", hide)
+      .eq("user_id", userId);
+    if (error) return { error: error.message };
+  }
+  if (remove.length > 0) {
+    const { error } = await admin
+      .from("chat_sessions")
+      .delete()
+      .in("id", remove)
+      .eq("user_id", userId);
+    if (error) return { error: error.message };
+  }
+  return {};
+}
+
 export async function deleteChatSession(sessionId: string, schoolId: string) {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  const { error } = await supabase
+  if (!user) return { error: "Not authenticated" };
+
+  // Verify ownership with the user's client before acting with the admin one.
+  const { data: session, error: lookupError } = await supabase
     .from("chat_sessions")
-    .delete()
+    .select("id")
     .eq("id", sessionId)
-    .eq("school_id", schoolId);
+    .eq("user_id", user.id)
+    .eq("school_id", schoolId)
+    .maybeSingle();
 
-  if (error) return { error: error.message };
+  if (lookupError) return { error: lookupError.message };
+  if (!session) return { error: "Chat not found" };
+
+  const { error } = await removeFromHistory(user.id, [session.id]);
+  if (error) return { error };
   revalidatePath("/", "layout");
   return { success: true };
 }
@@ -145,13 +219,20 @@ export async function deleteAllChatSessions(schoolId: string) {
 
   if (!user) return { error: "Not authenticated" };
 
-  const { error } = await supabase
+  const { data: sessions, error: lookupError } = await supabase
     .from("chat_sessions")
-    .delete()
+    .select("id")
     .eq("user_id", user.id)
-    .eq("school_id", schoolId);
+    .eq("school_id", schoolId)
+    .eq("hidden_from_parent", false);
 
-  if (error) return { error: error.message };
+  if (lookupError) return { error: lookupError.message };
+
+  const { error } = await removeFromHistory(
+    user.id,
+    (sessions || []).map((s) => s.id)
+  );
+  if (error) return { error };
   revalidatePath("/", "layout");
   return { success: true };
 }
