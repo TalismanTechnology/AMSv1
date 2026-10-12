@@ -21,7 +21,7 @@ const STEPS = [
   {
     n: "02",
     title: "Ask in plain words",
-    body: "Type the question the way you'd ask the front office: pickup times, dress code, the next early dismissal. Answers come from your school's own documents, calendar, and announcements.",
+    body: "Type the question the way you'd ask the front office: pickup times, dress code, the next early dismissal. Answers come from your school's own documents and calendar.",
     lean: "md:-translate-y-2",
   },
   {

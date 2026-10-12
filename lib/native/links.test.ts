@@ -28,8 +28,8 @@ test("same-site, relative and non-web links stay put", () => {
 
 test("universal links map to their in-app path", () => {
   assert.equal(
-    deepLinkPath("https://askmyschool.app/s/demo/parent/announcements#announcement-42"),
-    "/s/demo/parent/announcements#announcement-42"
+    deepLinkPath("https://askmyschool.app/s/demo/parent/events#event-42"),
+    "/s/demo/parent/events#event-42"
   );
   assert.equal(deepLinkPath("https://askmyschool.app/s/demo/parent?tab=x"), "/s/demo/parent?tab=x");
 });

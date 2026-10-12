@@ -44,7 +44,6 @@ on the app.
 | --- | --- | --- |
 | `/api/cron/sync-blackbaud-calendar` | every 6 hours | A game time can move the morning of. |
 | `/api/cron/sync-blackbaud-roster` | daily, 08:00 UTC | Rosters change a few times a term. |
-| `/api/cron/publish-announcements` | hourly | Scheduled announcements go live. |
 
 Any of them can be run by hand:
 

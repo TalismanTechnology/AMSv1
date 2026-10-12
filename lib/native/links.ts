@@ -43,8 +43,8 @@ function safePath(value: string | null | undefined): string | null {
  * The in-app path a deep link should open, or null when the URL isn't one of
  * ours. Accepts
  *
- *   https://askmyschool.app/s/collegiate/parent/announcements   (universal link)
- *   app.askmyschool://open?path=/s/collegiate/parent             (custom scheme)
+ *   https://askmyschool.app/s/collegiate/parent/events   (universal link)
+ *   app.askmyschool://open?path=/s/collegiate/parent      (custom scheme)
  *
  * The sign-in callback (app.askmyschool://auth-callback) is handled by the
  * sign-in flow itself, never here.

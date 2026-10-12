@@ -46,7 +46,7 @@ export function SiteFooter() {
           </div>
           <p className="mt-3 max-w-xs text-sm text-muted-foreground">
             An assistant that answers parents&apos; questions from the
-            school&apos;s own documents, calendar, and announcements.
+            school&apos;s own documents and calendar.
           </p>
         </div>
         {FOOTER_LINKS.map((group) => (

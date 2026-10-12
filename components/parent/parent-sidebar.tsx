@@ -8,7 +8,6 @@ import {
   MessageSquare,
   FileText,
   CalendarDays,
-  Megaphone,
   User,
   LogOut,
   PlusCircle,
@@ -36,7 +35,6 @@ function getNavItems(slug: string) {
     { href: `/s/${slug}/parent/chat`, label: "Chat", icon: MessageSquare },
     { href: `/s/${slug}/parent/documents`, label: "Documents", icon: FileText },
     { href: `/s/${slug}/parent/events`, label: "Calendar", icon: CalendarDays },
-    { href: `/s/${slug}/parent/announcements`, label: "Announcements", icon: Megaphone },
     { href: `/s/${slug}/parent/profile`, label: "Profile", icon: User },
   ];
 }

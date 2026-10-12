@@ -31,8 +31,8 @@ export default function PrivacyPage() {
           <p>
             AskMySchool (&ldquo;AskMySchool,&rdquo; &ldquo;we,&rdquo;
             &ldquo;us&rdquo;) is an assistant that answers parents&apos;
-            questions using documents, calendars, and announcements their
-            school has approved. This policy explains what information we
+            questions using documents and calendars their school has
+            approved. This policy explains what information we
             handle at askmyschool.app and in our iOS and Android apps (the
             &ldquo;Service&rdquo;), why, who we share it with, and the choices
             you have.
@@ -47,8 +47,8 @@ export default function PrivacyPage() {
       <LegalSection id="schools" title="1. Your school and AskMySchool">
         <p>
           We provide the Service to schools, and parents get access through
-          their school. The school decides which documents, calendars, and
-          announcements go into the Service and which families may use it. For
+          their school. The school decides which documents and calendars go
+          into the Service and which families may use it. For
           information that comes from a school&apos;s records (for example, its
           parent roster), the school is in control of that information and we
           process it on the school&apos;s behalf and under its direction.
@@ -163,8 +163,8 @@ export default function PrivacyPage() {
             tailored to your children&apos;s grade levels, with citations.
           </li>
           <li>
-            To send announcements and notifications your school publishes,
-            including push notifications if you turn them on.
+            To send you notifications about your school, including push
+            notifications if you turn them on.
           </li>
           <li>
             To help your school improve its information, for example by showing

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronRight, Check, FileText, CalendarDays, Megaphone, Tag } from "lucide-react";
+import { ChevronDown, ChevronRight, Check, FileText, CalendarDays, Tag } from "lucide-react";
 import { LogoSpinner } from "@/components/logo-spinner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,7 +16,6 @@ import {
 } from "@/components/ui/select";
 import { generateBulkDocuments, type BulkDocumentRow } from "@/actions/dev-panel";
 import { createEvent } from "@/actions/events";
-import { createAnnouncement } from "@/actions/announcements";
 import { createCategory } from "@/actions/categories";
 
 interface QuickAddTabProps {
@@ -158,55 +157,6 @@ function QuickEvent({ schoolId }: { schoolId: string }) {
   );
 }
 
-function QuickAnnouncement({ schoolId }: { schoolId: string }) {
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
-
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setLoading(true);
-    setSuccess(false);
-
-    const fd = new FormData(e.currentTarget);
-    const result = await createAnnouncement(schoolId, fd);
-    setLoading(false);
-    if (result.success) {
-      setSuccess(true);
-      (e.target as HTMLFormElement).reset();
-      setTimeout(() => setSuccess(false), 2000);
-    }
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-2.5">
-      <div>
-        <Label htmlFor="ann-title" className="text-xs">Title</Label>
-        <Input id="ann-title" name="title" required placeholder="Important Update" className="h-8 text-sm mt-1" />
-      </div>
-      <div>
-        <Label htmlFor="ann-content" className="text-xs">Content</Label>
-        <Textarea id="ann-content" name="content" required placeholder="Announcement content..." className="text-sm min-h-[60px] mt-1" />
-      </div>
-      <div>
-        <Label htmlFor="ann-priority" className="text-xs">Priority</Label>
-        <Select name="priority" defaultValue="normal">
-          <SelectTrigger className="h-8 text-sm mt-1">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="normal">Normal</SelectItem>
-            <SelectItem value="important">Important</SelectItem>
-            <SelectItem value="urgent">Urgent</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <Button type="submit" size="sm" disabled={loading} className="w-full">
-        {loading ? <LogoSpinner size={14} /> : success ? <Check className="h-3.5 w-3.5" /> : "Add Announcement"}
-      </Button>
-    </form>
-  );
-}
-
 function QuickCategory({ schoolId }: { schoolId: string }) {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -259,10 +209,6 @@ export function QuickAddTab({ schoolId }: QuickAddTabProps) {
 
       <CollapsibleSection title="Event" icon={CalendarDays}>
         <QuickEvent schoolId={schoolId} />
-      </CollapsibleSection>
-
-      <CollapsibleSection title="Announcement" icon={Megaphone}>
-        <QuickAnnouncement schoolId={schoolId} />
       </CollapsibleSection>
 
       <CollapsibleSection title="Category" icon={Tag}>

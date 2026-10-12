@@ -182,40 +182,6 @@ export async function generateBulkEvents(
   return { success: true, count: rows.length };
 }
 
-export interface BulkAnnouncementRow {
-  title: string;
-  content: string;
-  priority: string;
-  pinned: boolean;
-  status: string;
-}
-
-export async function generateBulkAnnouncements(
-  schoolId: string,
-  rows: BulkAnnouncementRow[]
-) {
-  const user = await requireAdmin(schoolId);
-  const admin = createAdminClient();
-
-  const insertRows = rows.map((r) => ({
-    ...r,
-    expires_at: null,
-    publish_at: null,
-    created_by: user.id,
-    school_id: schoolId,
-  }));
-
-  for (let i = 0; i < insertRows.length; i += 50) {
-    const batch = insertRows.slice(i, i + 50);
-    const { error } = await admin.from("announcements").insert(batch);
-    if (error) return { error: error.message, inserted: i };
-  }
-
-  logAudit(user.id, "dev_generate_announcements", "announcement", undefined, { count: rows.length }, schoolId);
-  revalidatePath("/", "layout");
-  return { success: true, count: rows.length };
-}
-
 export interface BulkCategoryRow {
   name: string;
   description: string | null;
@@ -322,7 +288,6 @@ export async function generateBulkFolders(
 const ALLOWED_CLEAR_TABLES = [
   "documents",
   "events",
-  "announcements",
   "categories",
   "folders",
   "document_chunks",
@@ -331,7 +296,6 @@ const ALLOWED_CLEAR_TABLES = [
   "analytics_events",
   "audit_log",
   "notifications",
-  "announcement_dismissals",
   "chat_feedback",
 ] as const;
 
@@ -351,13 +315,6 @@ export async function clearTable(tableName: string, schoolId: string) {
     await admin.from("chat_feedback").delete().eq("school_id", schoolId);
     await admin.from("chat_messages").delete().eq("school_id", schoolId);
     await admin.from("chat_sessions").delete().eq("school_id", schoolId);
-  } else if (tableName === "announcements") {
-    await admin.from("announcement_dismissals").delete().eq(
-      "announcement_id",
-      admin.from("announcements").select("id").eq("school_id", schoolId)
-    );
-    // Simpler approach: just delete announcements, cascade should handle dismissals
-    await admin.from("announcements").delete().eq("school_id", schoolId);
   } else {
     await admin.from(tableName).delete().eq("school_id", schoolId);
   }
@@ -380,9 +337,7 @@ export async function clearAllTestData(schoolId: string) {
     "analytics_events",
     "audit_log",
     "notifications",
-    "announcement_dismissals",
     "documents",
-    "announcements",
     "events",
     "categories",
     "folders",

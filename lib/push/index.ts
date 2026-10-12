@@ -1,7 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isApnsConfigured, sendApns, type SendResult } from "./apns";
 import { isFcmConfigured, sendFcm } from "./fcm";
-import { announcementPath, truncateBody, type PushMessage } from "./messages";
+import type { PushMessage } from "./messages";
 
 // Push notifications to the iOS / Android apps. Everything here is
 // best-effort: a failed push is logged, never surfaced to whoever triggered it.
@@ -44,45 +44,5 @@ export async function sendPushToUsers(userIds: string[], message: PushMessage): 
   if (dead.length > 0) {
     const { error: deleteError } = await admin.from("push_devices").delete().in("token", dead);
     if (deleteError) console.error("[push] could not remove dead tokens", deleteError);
-  }
-}
-
-/** Tells every approved parent at the school's devices about an announcement. */
-export async function notifyAnnouncementPublished(announcementId: string): Promise<void> {
-  try {
-    const admin = createAdminClient();
-    const { data: announcement, error } = await admin
-      .from("announcements")
-      .select("title, content, school_id, status, schools(slug)")
-      .eq("id", announcementId)
-      .single();
-
-    if (error || !announcement || announcement.status !== "published") return;
-
-    const school = announcement.schools as unknown as { slug: string } | null;
-    if (!school) return;
-
-    const { data: members, error: membersError } = await admin
-      .from("school_memberships")
-      .select("user_id")
-      .eq("school_id", announcement.school_id)
-      .eq("role", "parent")
-      .eq("approved", true);
-
-    if (membersError) {
-      console.error("[push] could not load school parents", membersError);
-      return;
-    }
-
-    await sendPushToUsers(
-      (members ?? []).map((member) => member.user_id as string),
-      {
-        title: announcement.title,
-        body: truncateBody(announcement.content ?? ""),
-        url: announcementPath(school.slug, announcementId),
-      }
-    );
-  } catch (caught: unknown) {
-    console.error(`[push] announcement ${announcementId} notification failed`, caught);
   }
 }
