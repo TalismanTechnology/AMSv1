@@ -37,8 +37,8 @@ export default function TermsPage() {
       <LegalSection id="service" title="1. The Service">
         <p>
           AskMySchool lets parents and guardians ask questions about their
-          school and get answers, with citations, generated from documents,
-          calendars, and announcements the school has provided. School staff use
+          school and get answers, with citations, generated from documents and
+          calendars the school has provided. School staff use
           it to manage that content and see how families use it. Features may
           change over time.
         </p>

@@ -54,7 +54,7 @@ website's data too, whenever someone signs in from the app.
 | Browsing History | — | No | | |
 | Search History | **Search History** | Yes | Questions typed into chat / document search are stored, and shown to the school's admins as question analytics | `analytics_events` (`event_type = question`) |
 | Identifiers | **User ID** | Yes | AskMySchool account id; Blackbaud user id / Veracross account id | `auth.users`, `blackbaud_roster.bb_user_id`, `veracross_parent_links` |
-| Identifiers | **Device ID** | Yes (conservative) | APNs push token, stored to deliver announcements. Apple doesn't strictly call a push token a device ID; declaring it is the safe choice | `push_devices` |
+| Identifiers | **Device ID** | Yes (conservative) | APNs push token, stored to deliver push notifications. Apple doesn't strictly call a push token a device ID; declaring it is the safe choice | `push_devices` |
 | Purchases | — | No | | |
 | Usage Data | **Product Interaction** | Yes | First-party usage events (questions asked, feedback) | `analytics_events` |
 | Usage Data | Advertising Data | No | | |

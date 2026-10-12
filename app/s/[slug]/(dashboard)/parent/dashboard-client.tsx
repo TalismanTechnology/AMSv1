@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import {
   MessageSquare,
-  Megaphone,
   CalendarDays,
   User,
   ArrowRight,
@@ -12,19 +11,10 @@ import {
   Clock,
   PlusCircle,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { TimeAgo } from "@/components/ui/time-ago";
 import { JoinSchoolDialog } from "@/components/shared/join-school-dialog";
 
 interface DashboardClientProps {
   userName: string;
-  announcements: {
-    id: string;
-    title: string;
-    content: string;
-    priority: string;
-    created_at: string;
-  }[];
   events: {
     id: string;
     title: string;
@@ -45,12 +35,6 @@ function getQuickActions(schoolSlug: string) {
       description: "Chat with the school AI assistant",
     },
     {
-      href: `/s/${schoolSlug}/parent/announcements`,
-      icon: Megaphone,
-      label: "Announcements",
-      description: "View school announcements",
-    },
-    {
       href: `/s/${schoolSlug}/parent/events`,
       icon: CalendarDays,
       label: "Calendar",
@@ -67,7 +51,6 @@ function getQuickActions(schoolSlug: string) {
 
 export function DashboardClient({
   userName,
-  announcements,
   events,
   schoolSlug,
 }: DashboardClientProps) {
@@ -103,7 +86,7 @@ export function DashboardClient({
           >
             Shortcuts
           </h2>
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
             {quickActions.map((action) => (
               <Link
                 key={action.href}
@@ -117,56 +100,6 @@ export function DashboardClient({
               </Link>
             ))}
           </div>
-        </section>
-
-        {/* Recent Announcements */}
-        <section aria-labelledby="announcements-heading">
-          <div className="mb-3 flex items-baseline justify-between">
-            <h2
-              id="announcements-heading"
-              className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
-            >
-              Recent Announcements
-            </h2>
-            <Link
-              href={`/s/${schoolSlug}/parent/announcements`}
-              className="group flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-ink"
-            >
-              View all
-              <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
-            </Link>
-          </div>
-          {announcements.length === 0 ? (
-            <p className="py-6 text-sm text-muted-foreground">No announcements yet</p>
-          ) : (
-            <div className="divide-y divide-border">
-              {announcements.map((a) => (
-                <div key={a.id} className="flex items-start gap-3 py-3">
-                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/40" />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="truncate text-sm font-medium text-ink">
-                        {a.title}
-                      </p>
-                      {a.priority !== "normal" && (
-                        <Badge
-                          variant={
-                            a.priority === "urgent" ? "destructive" : "secondary"
-                          }
-                          className="px-1.5 py-0 text-[10px]"
-                        >
-                          {a.priority}
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      <TimeAgo date={a.created_at} />
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </section>
 
         {/* Upcoming Calendar */}

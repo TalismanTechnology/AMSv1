@@ -25,7 +25,6 @@ interface CleanupTabProps {
 const CONTENT_TABLES: { name: string; label: string }[] = [
   { name: "documents", label: "Documents" },
   { name: "events", label: "Events" },
-  { name: "announcements", label: "Announcements" },
   { name: "categories", label: "Categories" },
   { name: "folders", label: "Folders" },
 ];
@@ -190,8 +189,8 @@ export function CleanupTab({ schoolId }: CleanupTabProps) {
             <AlertDialogHeader>
               <AlertDialogTitle>Clear ALL data?</AlertDialogTitle>
               <AlertDialogDescription>
-                This will permanently delete all documents, events, announcements,
-                categories, folders, chat sessions, analytics, audit logs, and
+                This will permanently delete all documents, events, categories,
+                folders, chat sessions, analytics, audit logs, and
                 notifications for this school. Only user profiles and settings
                 will be preserved. This cannot be undone.
               </AlertDialogDescription>

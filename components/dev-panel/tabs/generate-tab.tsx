@@ -10,12 +10,10 @@ import { Badge } from "@/components/ui/badge";
 import {
   generateBulkDocuments,
   generateBulkEvents,
-  generateBulkAnnouncements,
   generateBulkCategories,
   generateBulkFolders,
   type BulkDocumentRow,
   type BulkEventRow,
-  type BulkAnnouncementRow,
   type BulkCategoryRow,
   type BulkFolderRow,
 } from "@/actions/dev-panel";
@@ -25,8 +23,6 @@ import {
   EVENT_TITLES,
   EVENT_DESCRIPTIONS,
   EVENT_LOCATIONS,
-  ANNOUNCEMENT_TITLES,
-  ANNOUNCEMENT_CONTENT,
   CATEGORY_NAMES,
   CATEGORY_DESCRIPTIONS,
   FOLDER_NAMES,
@@ -48,7 +44,6 @@ interface Counts {
   folders: number;
   documents: number;
   events: number;
-  announcements: number;
 }
 
 type Step = keyof Counts;
@@ -58,10 +53,9 @@ const STEP_LABELS: Record<Step, string> = {
   folders: "Folders",
   documents: "Documents",
   events: "Events",
-  announcements: "Announcements",
 };
 
-const STEP_ORDER: Step[] = ["categories", "folders", "documents", "events", "announcements"];
+const STEP_ORDER: Step[] = ["categories", "folders", "documents", "events"];
 
 export function GenerateTab({ schoolId }: GenerateTabProps) {
   const [counts, setCounts] = useState<Counts>({
@@ -69,7 +63,6 @@ export function GenerateTab({ schoolId }: GenerateTabProps) {
     folders: 3,
     documents: 5,
     events: 15,
-    announcements: 5,
   });
   const [generating, setGenerating] = useState(false);
   const [currentStep, setCurrentStep] = useState<Step | null>(null);
@@ -146,31 +139,6 @@ export function GenerateTab({ schoolId }: GenerateTabProps) {
     return rows;
   };
 
-  const buildAnnouncementRows = (count: number): BulkAnnouncementRow[] => {
-    const rows: BulkAnnouncementRow[] = [];
-    for (let i = 0; i < count; i++) {
-      // Distribution: 60% normal, 25% important, 15% urgent
-      const rand = Math.random();
-      const priority = rand < 0.6 ? "normal" : rand < 0.85 ? "important" : "urgent";
-      const titles = ANNOUNCEMENT_TITLES[priority];
-      const contents = ANNOUNCEMENT_CONTENT[priority];
-      const idx = i % titles.length;
-
-      // 70% published, 20% draft, 10% scheduled
-      const statusRand = Math.random();
-      const status = statusRand < 0.7 ? "published" : statusRand < 0.9 ? "draft" : "scheduled";
-
-      rows.push({
-        title: titles[idx],
-        content: contents[idx],
-        priority,
-        pinned: priority === "urgent" && Math.random() < 0.5,
-        status,
-      });
-    }
-    return rows;
-  };
-
   const handleGenerate = useCallback(async () => {
     setGenerating(true);
     setResults({});
@@ -218,10 +186,6 @@ export function GenerateTab({ schoolId }: GenerateTabProps) {
           const rows = buildEventRows(counts.events);
           const result = await generateBulkEvents(schoolId, rows);
           setResults((prev) => ({ ...prev, events: { success: !!result.success, count: result.count, error: result.error } }));
-        } else if (step === "announcements") {
-          const rows = buildAnnouncementRows(counts.announcements);
-          const result = await generateBulkAnnouncements(schoolId, rows);
-          setResults((prev) => ({ ...prev, announcements: { success: !!result.success, count: result.count, error: result.error } }));
         }
       } catch (err) {
         setResults((prev) => ({

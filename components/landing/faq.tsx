@@ -10,7 +10,7 @@ import { ChevronDown } from "lucide-react";
 const FAQS = [
   {
     q: "How does it know the answer?",
-    a: "It searches your school's approved documents, calendar, and announcements for the passages that match your question, then writes an answer only from what it found. Every fact carries a numbered citation back to the source.",
+    a: "It searches your school's approved documents and calendar for the passages that match your question, then writes an answer only from what it found. Every fact carries a numbered citation back to the source.",
   },
   {
     q: "What if the answer isn't in the documents?",
@@ -26,7 +26,7 @@ const FAQS = [
   },
   {
     q: "Which files and sources are supported?",
-    a: "PDF, Word, Excel, and PowerPoint, plus scanned handouts and images. Schools can also forward emails to a private inbound address, connect calendar feeds (including Blackbaud iCal), and post announcements — all of it becomes answerable.",
+    a: "PDF, Word, Excel, and PowerPoint, plus scanned handouts and images. Schools can also forward emails to a private inbound address, and connect calendar feeds (including Blackbaud iCal) — all of it becomes answerable.",
   },
   {
     q: "How does a school get set up?",

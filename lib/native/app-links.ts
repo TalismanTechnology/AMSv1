@@ -32,7 +32,7 @@ export function appleAppSiteAssociation(teamId: string) {
             { "/": "/api/*", exclude: true },
             { "/": "/s/*/admin*", exclude: true, comment: "Staff pages are web-only" },
             { "/": "/s/*/parent", comment: "Parent dashboard" },
-            { "/": "/s/*/parent/*", comment: "Announcements, chat, documents, calendar, profile" },
+            { "/": "/s/*/parent/*", comment: "Chat, documents, calendar, profile" },
           ],
         },
       ],

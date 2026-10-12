@@ -23,7 +23,7 @@ the app has, and are worth pointing out in the review notes:
 
 | Feature | How | Code |
 | --- | --- | --- |
-| **Push notifications for school announcements** | APNs via `@capacitor/push-notifications`; the token is stored in `push_devices` and announcements are pushed when published. Tapping one opens that announcement | `components/native/native-push.tsx`, `app/api/push/devices`, `lib/push/*` |
+| **Push notifications** | APNs via `@capacitor/push-notifications`; the token is stored in `push_devices` and messages go out through `sendPushToUsers`. Tapping one opens the path it carries | `components/native/native-push.tsx`, `app/api/push/devices`, `lib/push/*` |
 | **Deep links** | Notification taps, universal links (`https://askmyschool.app/s/<school>/parent/...` opens the app) and `app.askmyschool://open?path=...` | `components/native/native-shell.tsx`, `lib/native/links.ts`, `app/.well-known/apple-app-site-association` |
 | **Secure sign-in in the system sheet** | Blackbaud (and Veracross, PR #14) sign-in runs in `ASWebAuthenticationSession`, never in the app's web view, then hands the session back with PKCE | `ios/App/App/AuthSessionPlugin.swift`, `lib/native/blackbaud-sign-in.ts`, `lib/auth/app-handoff.ts` |
 | **Native share sheet** | "Share" on every chat answer, with the cited documents listed | `components/chat/message-share.tsx`, `lib/share-answer.ts` |
@@ -48,8 +48,8 @@ and Face ID to reopen the app.
 **Category:** Education (primary), Productivity (secondary)
 
 **Promotional text** (170 max, can change without review):
-> Ask a question, get the answer from your school's own handbooks, calendars
-> and announcements, with the source page cited.
+> Ask a question, get the answer from your school's own handbooks and
+> calendars, with the source page cited.
 
 **Description** (4000 max):
 > AskMySchool gives parents instant, accurate answers from their school's own
@@ -63,8 +63,7 @@ and Face ID to reopen the app.
 >
 > FOR PARENTS
 > • Ask questions in everyday language and get answers with citations
-> • Browse your school's documents, calendar and announcements in one place
-> • Get a notification when your school posts an announcement
+> • Browse your school's documents and calendar in one place
 > • Share an answer with a co-parent or caregiver in one tap
 > • Sign in securely with your school's Blackbaud or Veracross parent account
 >
@@ -78,8 +77,8 @@ and Face ID to reopen the app.
 
 **Keywords** (100 max, comma separated, no spaces needed; don't repeat the
 app name):
-`school,parent,handbook,calendar,announcements,blackbaud,veracross,questions,answers,ai,pta,k12`
-(94 characters)
+`school,parent,handbook,calendar,blackbaud,veracross,questions,answers,ai,pta,k12`
+(80 characters)
 
 **Support URL:** a page with a way to contact AskMySchool. **TODO (Lucas):**
 there isn't one on `main` yet (PR #11 adds contact details to the homepage).
@@ -130,7 +129,7 @@ working demo login**. Apple needs credentials that work for the whole review
    App Store Connect > App Review Information > Sign-in required.
 2. **Fallback: a staff (password) account** for the demo school
    (`/login/staff`), so the reviewer can at least see chat, documents and
-   announcements. Parents can't use passwords by design, so this doesn't show
+   the calendar. Parents can't use passwords by design, so this doesn't show
    the parent sign-in; say so in the notes.
 
 Reviewers usually try **account deletion**. After review, check the demo
@@ -153,18 +152,12 @@ account still exists, and re-create it if they deleted it.
 >   code?". Answers cite the school document they came from; tap a citation
 >   to see the passage.
 > • Share an answer with the share icon under it (native share sheet).
-> • Announcements: we can send a test push notification during review on
->   request; tapping it opens that announcement.
 > • Pull down on any page to refresh. Turn on Airplane Mode to see the
 >   offline screen; it reconnects by itself.
 > • Account deletion: Menu > Profile > Delete account.
 >
 > Privacy policy: https://askmyschool.app/privacy. Questions: [Lucas's email /
 > phone].
-
-**Push during review:** have a way to publish a test announcement for the demo
-school while the app is in review, since reviewers can't post one themselves
-as a parent.
 
 ## 5. Screenshots plan
 
@@ -180,8 +173,7 @@ families' data):
 
 1. Chat answer with citations ("Ask anything about your school").
 2. Source passage open beside the answer ("Every answer shows its source").
-3. Announcements list plus a notification on the lock screen ("Never miss
-   an announcement").
+3. Documents library ("Every school document in one place").
 4. Calendar ("Your school calendar, in your pocket").
 5. School picker / Sign in with Blackbaud sheet ("Sign in with your school
    account").
@@ -290,9 +282,8 @@ then Organizer > Distribute App > App Store Connect > Upload.
 2. Internal testing: add yourself and Jesse as internal testers; install the
    TestFlight app on an iPhone and test:
    - [ ] Sign in with Blackbaud for a real school, and for the demo school
-   - [ ] Notification permission prompt appears after sign-in; publish a test
-         announcement and check the push arrives and opens the announcement
-   - [ ] Universal link: tap `https://askmyschool.app/s/<school>/parent/announcements`
+   - [ ] Notification permission prompt appears after sign-in
+   - [ ] Universal link: tap `https://askmyschool.app/s/<school>/parent/events`
          in Notes or Messages; it should open the app (needs the real
          `APPLE_TEAM_ID` deployed)
    - [ ] Share an answer; pull to refresh; Airplane Mode shows the offline

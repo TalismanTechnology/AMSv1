@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { CalendarDays, Check, FileText, Megaphone, Send, type LucideIcon } from "lucide-react";
+import { CalendarDays, Check, FileText, Mail, Send, type LucideIcon } from "lucide-react";
 import { usePhaseCycle } from "@/hooks/use-phase-cycle";
 import { useTypedCount } from "@/hooks/use-typed-count";
 import { useStepPlayback } from "@/components/landing/step-playback";
@@ -16,7 +16,7 @@ import { useStepPlayback } from "@/components/landing/step-playback";
 // Then the conversation clears and the next question comes in. Pauses
 // off-screen; reduced motion shows one finished exchange.
 
-type SourceKind = "Handbook" | "Calendar" | "Announcements";
+type SourceKind = "Handbook" | "Calendar" | "Emails";
 
 type Ask = {
   question: string;
@@ -55,15 +55,15 @@ const ASKS: Ask[] = [
     question: SUGGESTIONS[2],
     viaChip: 2,
     answer: "Closures are posted on the website by 6:00 AM and texted to every family.",
-    source: "Announcements",
-    cite: "Weather closures · pinned",
+    source: "Emails",
+    cite: "Weather closures · school email",
   },
 ];
 
 const SOURCE_KINDS: { kind: SourceKind; icon: LucideIcon }[] = [
   { kind: "Handbook", icon: FileText },
   { kind: "Calendar", icon: CalendarDays },
-  { kind: "Announcements", icon: Megaphone },
+  { kind: "Emails", icon: Mail },
 ];
 
 const TYPE_MS = 36;
