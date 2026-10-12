@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { TimeAgo } from "@/components/ui/time-ago";
 import { toast } from "sonner";
 import { ChatSearch } from "./chat-search";
+import { CHAT_HISTORY_LIMIT } from "@/lib/chat/history-retention";
 import type { ChatSession } from "@/lib/types";
 
 interface ChatHistorySidebarProps {
@@ -19,6 +20,8 @@ interface ChatHistorySidebarProps {
   onNewChat: () => void;
   onSelectSession: (sessionId: string) => void;
   schoolId?: string;
+  /** Called after a chat is removed from history, to refresh the list. */
+  onDeleted?: (sessionId: string) => void;
 }
 
 function SessionRow({
@@ -52,12 +55,13 @@ function SessionRow({
       </div>
       <button
         type="button"
-        className="flex h-6 w-6 items-center justify-center rounded-md text-sidebar-foreground/40 opacity-0 transition-all hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
+        className="flex h-6 w-6 items-center justify-center rounded-md text-sidebar-foreground/40 transition-all hover:bg-destructive/10 hover:text-destructive focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100"
         onClick={(e) => {
           e.stopPropagation();
           onDelete();
         }}
         title="Delete chat"
+        aria-label="Delete chat"
       >
         <Trash2 className="h-3.5 w-3.5" />
       </button>
@@ -71,6 +75,7 @@ function SidebarContent({
   onNewChat,
   onSelectSession,
   schoolId,
+  onDeleted,
 }: ChatHistorySidebarProps) {
   const [showSearch, setShowSearch] = useState(false);
 
@@ -90,7 +95,12 @@ function SidebarContent({
   return (
     <>
       <div className="flex items-center justify-between px-4 py-3.5">
-        <p className="text-xs font-medium text-sidebar-foreground/55">Chat History</p>
+        <div>
+          <p className="text-xs font-medium text-sidebar-foreground/55">Recent chats</p>
+          <p className="mt-0.5 text-[11px] text-sidebar-foreground/40">
+            Your last {CHAT_HISTORY_LIMIT} chats are kept
+          </p>
+        </div>
         <div className="flex items-center gap-0.5">
           <Button
             size="icon"
@@ -131,6 +141,7 @@ function SidebarContent({
                 } else {
                   toast.success("Chat deleted");
                   if (activeSessionId === session.id) onNewChat();
+                  onDeleted?.(session.id);
                 }
               }}
             />
@@ -155,14 +166,19 @@ export function ChatHistorySidebar(props: ChatHistorySidebarProps) {
 
   return (
     <>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="absolute left-2 top-2 z-10 md:hidden"
-        onClick={() => setMobileOpen(true)}
-      >
-        <History className="h-5 w-5" />
-      </Button>
+      {/* In normal flow (not absolute) so it sits above the chat and never
+          overlaps ChatInterface's title/export header. */}
+      <div className="flex shrink-0 items-center px-2 pt-2 md:hidden">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 gap-1.5 text-xs text-muted-foreground"
+          onClick={() => setMobileOpen(true)}
+        >
+          <History className="h-4 w-4" />
+          Recent chats
+        </Button>
+      </div>
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetContent side="left" className="flex w-72 flex-col p-0">
           <SidebarContent

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireSchoolContext } from "@/lib/school-context";
 import { ChatPageClient } from "./chat-page-client";
 import { hasAiConsent } from "@/lib/ai/consent";
+import { CHAT_HISTORY_LIMIT } from "@/lib/chat/history-retention";
 
 export default async function ChatPage({
   params,
@@ -19,8 +20,9 @@ export default async function ChatPage({
     .select("*")
     .eq("user_id", user.id)
     .eq("school_id", school.id)
+    .eq("hidden_from_parent", false)
     .order("updated_at", { ascending: false })
-    .limit(1);
+    .limit(CHAT_HISTORY_LIMIT);
 
   // Whether to show the one-time AI-processing notice before the first
   // question (the chat API enforces it too).
