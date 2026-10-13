@@ -8,6 +8,14 @@
     {
       "path": "/api/cron/sync-blackbaud-roster",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/sync-websites/start",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/sync-websites",
+      "schedule": "*/10 * * * *"
     }
   ]
 }

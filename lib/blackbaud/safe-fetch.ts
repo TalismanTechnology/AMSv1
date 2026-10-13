@@ -33,7 +33,7 @@ export function normalizeFeedUrl(raw: string): string {
   return trimmed;
 }
 
-function isBlockedIp(ip: string): boolean {
+export function isBlockedIp(ip: string): boolean {
   const version = net.isIP(ip);
   if (version === 0) return true; // not an IP we can reason about
 

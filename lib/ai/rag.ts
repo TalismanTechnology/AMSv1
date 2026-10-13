@@ -12,6 +12,8 @@ export interface RelevantChunk {
   document_title?: string;
   document_file_url?: string;
   document_file_type?: string;
+  /** The web page a website-sourced document was crawled from. */
+  document_source_url?: string;
   document_tags?: string[];
   document_category?: string;
   document_folder?: string;
@@ -242,18 +244,36 @@ export async function attachDocumentInfo(
 
   // Fetch document metadata for the matched chunks (tags, category, folder, divisions)
   const docIds = [...new Set(chunks.map((c: RelevantChunk) => c.document_id))];
-  const { data: docs } = await supabase
-    .from("documents")
-    .select(
-      "id, title, file_url, file_type, tags, category:categories(name), folder:folders(name), divisions:event_calendars(name)"
-    )
-    .in("id", docIds);
+  const columns =
+    "id, title, file_url, file_type, tags, category:categories(name), folder:folders(name), divisions:event_calendars(name)";
+  const fetchDocs = (select: string) =>
+    supabase
+      .from("documents")
+      .select(select)
+      .in("id", docIds)
+      .returns<
+        {
+          id: string;
+          title: string;
+          file_url: string;
+          file_type: string;
+          source_url?: string | null;
+          tags: unknown;
+          category: unknown;
+          folder: unknown;
+          divisions: unknown;
+        }[]
+      >();
+  const withSourceUrl = await fetchDocs(`${columns}, source_url`);
+  // source_url arrives with migration 038; until it is applied, carry on without it.
+  const { data: docs } = withSourceUrl.error ? await fetchDocs(columns) : withSourceUrl;
 
   const docInfoMap = new Map(
     docs?.map((d) => [d.id, {
       title: d.title,
       file_url: d.file_url,
       file_type: d.file_type,
+      source_url: d.source_url ?? undefined,
       tags: (d.tags as string[]) || [],
       category: (d.category as unknown as { name: string } | null)?.name,
       folder: (d.folder as unknown as { name: string } | null)?.name,
@@ -268,6 +288,7 @@ export async function attachDocumentInfo(
       document_title: info?.title || "Unknown Document",
       document_file_url: info?.file_url,
       document_file_type: info?.file_type,
+      document_source_url: info?.source_url,
       document_tags: info?.tags,
       document_category: info?.category,
       document_folder: info?.folder,
@@ -298,6 +319,7 @@ export interface CitablePassage {
   metadata: ChunkMetadata; // page range etc. across the passage's chunks
   file_url?: string;
   file_type?: string;
+  source_url?: string;
   tags?: string[];
   category?: string;
   folder?: string;
@@ -457,6 +479,7 @@ export function assemblePassages(
         metadata: mergePassageMetadata(passage.map((i) => known.get(`${documentId}:${i}`)?.metadata)),
         file_url: best.document_file_url,
         file_type: best.document_file_type,
+        source_url: best.document_source_url,
         tags: best.document_tags,
         category: best.document_category,
         folder: best.document_folder,

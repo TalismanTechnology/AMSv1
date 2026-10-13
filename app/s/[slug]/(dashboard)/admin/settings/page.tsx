@@ -11,6 +11,11 @@ import type {
   EmailIngestionLogEntry,
 } from "./client";
 import type { BlackbaudCalendarFeed, EventCalendar } from "@/lib/types";
+import type { WebsiteSourceView } from "@/components/admin/website-sources";
+
+// "Sync now" (a server action on this page) keeps crawling for a few minutes
+// after it responds, via after(); that work counts against this limit.
+export const maxDuration = 300;
 
 const CALLBACK_RESULTS: readonly string[] = ["connected", "denied", "error"];
 
@@ -203,6 +208,68 @@ async function loadInboundAddresses(
   }
 }
 
+/**
+ * The school's website sources, with progress for any sync in flight (queue
+ * rows handled vs queued this run). RLS limits rows to this school's admins.
+ */
+async function loadWebsiteSources(
+  schoolId: string
+): Promise<{ sources: WebsiteSourceView[]; loadError: string | null }> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("website_sources")
+    .select(
+      "id, root_url, include_patterns, exclude_patterns, max_pages, enabled, current_run, last_sync_started_at, last_sync_finished_at, last_sync_status, last_sync_error, page_count"
+    )
+    .eq("school_id", schoolId)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("[settings] Loading website sources failed:", error.message);
+    return {
+      sources: [],
+      loadError:
+        "Website sources couldn't be loaded. If the database migration 038_website_sources.sql hasn't been applied yet, apply it and reload.",
+    };
+  }
+
+  const sources = await Promise.all(
+    (data ?? []).map(async (row): Promise<WebsiteSourceView> => {
+      let progress: WebsiteSourceView["progress"] = null;
+      if (row.last_sync_status === "running") {
+        const queue = () =>
+          supabase
+            .from("website_sync_queue")
+            .select("id", { count: "exact", head: true })
+            .eq("source_id", row.id)
+            .eq("run", row.current_run)
+            .eq("kind", "page");
+        const [{ count: total }, { count: pending }] = await Promise.all([
+          queue(),
+          queue().eq("status", "pending"),
+        ]);
+        progress = { total: total ?? 0, processed: (total ?? 0) - (pending ?? 0) };
+      }
+      return {
+        id: row.id,
+        rootUrl: row.root_url,
+        includePatterns: row.include_patterns ?? [],
+        excludePatterns: row.exclude_patterns ?? [],
+        maxPages: row.max_pages,
+        enabled: row.enabled,
+        lastSyncStartedAt: row.last_sync_started_at,
+        lastSyncFinishedAt: row.last_sync_finished_at,
+        lastSyncStatus: row.last_sync_status,
+        lastSyncError: row.last_sync_error,
+        pageCount: row.page_count ?? 0,
+        progress,
+      };
+    })
+  );
+
+  return { sources, loadError: null };
+}
+
 export default async function SettingsPage({
   params,
   searchParams,
@@ -214,7 +281,7 @@ export default async function SettingsPage({
   const { blackbaud, tab } = await searchParams;
   const { school } = await requireSchoolContext(slug);
 
-  const [settings, blackbaudConfig, recentEmails, inboundAddresses] =
+  const [settings, blackbaudConfig, recentEmails, inboundAddresses, websiteSources] =
     await Promise.all([
       loadSettings(school.id),
       loadBlackbaudConfig(
@@ -223,6 +290,7 @@ export default async function SettingsPage({
       ),
       loadRecentEmails(school.id),
       loadInboundAddresses(school.id, school.email_ingestion_enabled ?? false),
+      loadWebsiteSources(school.id),
     ]);
 
   return (
@@ -241,6 +309,7 @@ export default async function SettingsPage({
         }}
         blackbaud={blackbaudConfig}
         blackbaudCallback={parseCallbackResult(blackbaud)}
+        websiteSources={websiteSources}
         initialTab={tab}
       />
     </PageTransition>

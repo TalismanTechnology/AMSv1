@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logAudit } from "@/lib/audit";
+import { removeWebsiteStorageForSchool } from "@/lib/website/documents";
 import { revalidatePath } from "next/cache";
 
 export async function createSchool(formData: FormData) {
@@ -219,6 +220,15 @@ export async function deleteSchool(schoolId: string) {
   const adminSupabase = createAdminClient();
 
   logAudit(user.id, "delete_school", "school", schoolId);
+
+  // Website sources, pages and their documents cascade with the school, but
+  // the crawled files in storage would not. Best-effort: a cleanup failure
+  // must not block deleting the school.
+  try {
+    await removeWebsiteStorageForSchool(adminSupabase, schoolId);
+  } catch (err) {
+    console.warn("[super-admin] Website storage cleanup failed:", err);
+  }
 
   const { error } = await adminSupabase
     .from("schools")

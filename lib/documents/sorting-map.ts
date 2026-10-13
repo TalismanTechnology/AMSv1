@@ -19,7 +19,7 @@ export interface MapDocument {
   title: string;
   file_type: string;
   status: string;
-  source?: "upload" | "email";
+  source?: "upload" | "email" | "website";
   category_id: string | null;
   folder_id: string | null;
 }
@@ -309,14 +309,20 @@ const DOC_TYPES = [
   { key: "xlsx", label: "Spreadsheet" },
   { key: "pptx", label: "Slides" },
   { key: "txt", label: "Text" },
+  { key: "web", label: "Web page" },
 ] as const;
 
-/** The kind a document is: email by how it arrived, otherwise by file type. */
+/**
+ * The kind a document is: email or web page by how it arrived (a crawled
+ * page is stored as text), otherwise by file type.
+ */
 export function docTypeOf(doc: MapDocument): { key: string; label: string } {
   const key =
     doc.source === "email" || doc.file_type === "eml"
       ? "email"
-      : doc.file_type.toLowerCase();
+      : doc.source === "website" && doc.file_type === "txt"
+        ? "web"
+        : doc.file_type.toLowerCase();
   return (
     DOC_TYPES.find((t) => t.key === key) ?? { key, label: key.toUpperCase() }
   );

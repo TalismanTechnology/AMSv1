@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { useSourcePanel } from "./source-panel-context";
-import { X, FileText, Download, Maximize2 } from "lucide-react";
+import { X, FileText, Download, Maximize2, ExternalLink } from "lucide-react";
 import { LogoSpinner } from "@/components/logo-spinner";
 import { getDocumentSignedUrl, getDocumentUrls } from "@/lib/storage-url";
 import { Button } from "@/components/ui/button";
@@ -291,6 +291,13 @@ function PanelContent() {
           )}
         </div>
         <div className="flex items-center gap-1">
+          {activeSource.source_url && (
+            <Button asChild variant="ghost" size="icon-xs" title="Open the web page">
+              <a href={activeSource.source_url} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="h-4 w-4" />
+              </a>
+            </Button>
+          )}
           {activeSource.file_url && (
             <>
               <Button
