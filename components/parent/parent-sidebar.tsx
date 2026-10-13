@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useRef, useCallback, useEffect, useState } from "react";
 import {
-  LayoutDashboard,
   MessageSquare,
   FileText,
   CalendarDays,
@@ -31,7 +30,6 @@ import { JoinSchoolDialog } from "@/components/shared/join-school-dialog";
 
 function getNavItems(slug: string) {
   return [
-    { href: `/s/${slug}/parent`, label: "Dashboard", icon: LayoutDashboard, exact: true },
     { href: `/s/${slug}/parent/chat`, label: "Chat", icon: MessageSquare },
     { href: `/s/${slug}/parent/documents`, label: "Documents", icon: FileText },
     { href: `/s/${slug}/parent/events`, label: "Calendar", icon: CalendarDays },
@@ -74,9 +72,7 @@ export function ParentSidebarContent({ onNavigate, forceExpanded }: SidebarConte
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-2.5 py-4">
         <LayoutGroup id="parent-sidebar">
           {navItems.map((item) => {
-            const isActive = item.exact
-              ? pathname === item.href
-              : pathname.startsWith(item.href);
+            const isActive = pathname.startsWith(item.href);
 
             const link = (
               <Link
@@ -228,7 +224,7 @@ export function ParentSidebar() {
       variants={sidebarVariants}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className="relative z-20 hidden h-screen flex-col border-r border-border bg-sidebar md:flex"
+      className="relative z-20 hidden h-screen flex-col border-r border-border bg-sidebar pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:flex"
     >
       <ParentSidebarContent />
     </motion.aside>

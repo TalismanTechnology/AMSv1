@@ -19,7 +19,7 @@ export function NewChatFab({ visible, onClick }: NewChatFabProps) {
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.8, y: 20 }}
           transition={{ duration: 0.2 }}
-          className="fixed bottom-24 right-6 z-50"
+          className="fixed bottom-[calc(6rem_+_env(safe-area-inset-bottom))] right-[calc(1.5rem_+_env(safe-area-inset-right))] z-50"
         >
           <MagneticButton strength={0.2} radius={60}>
             <Button

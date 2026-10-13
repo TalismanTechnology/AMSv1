@@ -22,7 +22,9 @@ export function SuggestedQuestions({
   questions,
   welcomeMessage,
 }: SuggestedQuestionsProps) {
-  const displayQuestions = questions?.length ? questions : SUGGESTED_QUESTIONS;
+  const displayQuestions = (
+    questions?.length ? questions : SUGGESTED_QUESTIONS
+  ).slice(0, 3);
 
   return (
     <div className="flex flex-col items-center py-20 text-center">

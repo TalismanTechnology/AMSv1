@@ -437,7 +437,7 @@ export function ChatInterface({
           </div>
 
           {/* Floating Input */}
-          <div className="pointer-events-none absolute inset-x-0 bottom-6 z-10 px-4 pb-4 pt-12 bg-gradient-to-t from-background via-background/85 to-transparent">
+          <div className="pointer-events-none absolute inset-x-0 bottom-6 z-10 px-4 pb-[calc(1rem_+_env(safe-area-inset-bottom))] pt-12 bg-gradient-to-t from-background via-background/85 to-transparent">
             <form
               onSubmit={handleSubmit}
               className="pointer-events-auto mx-auto flex max-w-3xl items-end gap-2 rounded-2xl border border-border bg-background p-2 pl-4 transition-colors focus-within:border-ink/20"

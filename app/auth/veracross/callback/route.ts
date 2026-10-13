@@ -169,7 +169,7 @@ export async function GET(request: Request) {
 
   // Middleware sends first-time parents on to /welcome from here; that page
   // skips itself when children were filled in from Veracross.
-  return finish(`${origin}/s/${schoolSlug}/parent`);
+  return finish(`${origin}/s/${schoolSlug}/parent/chat`);
 }
 
 /**

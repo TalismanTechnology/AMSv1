@@ -146,7 +146,7 @@ export async function GET(request: Request) {
   }
 
   // Middleware sends first-time parents on to /welcome from here.
-  return finish(`${origin}/s/${schoolSlug}/parent`);
+  return finish(`${origin}/s/${schoolSlug}/parent/chat`);
 }
 
 function logFailure(schoolId: string, step: string, caught: unknown): void {

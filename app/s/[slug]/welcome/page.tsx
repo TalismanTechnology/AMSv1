@@ -27,7 +27,7 @@ export default async function WelcomePage({ params }: WelcomePageProps) {
     .single();
 
   if (profile?.onboarding_completed) {
-    redirect(`/s/${slug}/parent`);
+    redirect(`/s/${slug}/parent/chat`);
   }
 
   // Parents who registered before SSO existed already have children on file.
@@ -40,7 +40,7 @@ export default async function WelcomePage({ params }: WelcomePageProps) {
 
   if ((childCount ?? 0) > 0) {
     await markOnboardingComplete();
-    redirect(`/s/${slug}/parent`);
+    redirect(`/s/${slug}/parent/chat`);
   }
 
   // The name the school has on file. Shown so the parent can see which record

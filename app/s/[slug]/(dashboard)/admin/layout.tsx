@@ -16,7 +16,7 @@ export default async function AdminLayout({
   const { role, isSuperAdmin } = await requireSchoolContext(slug);
 
   if (role !== "admin" && !isSuperAdmin) {
-    redirect(`/s/${slug}/parent`);
+    redirect(`/s/${slug}/parent/chat`);
   }
 
   return (

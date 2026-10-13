@@ -31,7 +31,7 @@ export function appleAppSiteAssociation(teamId: string) {
             { "/": "/auth/*", exclude: true, comment: "OAuth sign-in stays in the browser" },
             { "/": "/api/*", exclude: true },
             { "/": "/s/*/admin*", exclude: true, comment: "Staff pages are web-only" },
-            { "/": "/s/*/parent", comment: "Parent dashboard" },
+            { "/": "/s/*/parent", comment: "Parent home (redirects to chat)" },
             { "/": "/s/*/parent/*", comment: "Chat, documents, calendar, profile" },
           ],
         },

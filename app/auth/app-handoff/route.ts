@@ -40,7 +40,7 @@ export async function POST(request: Request) {
     await startParentSession(handoff.email);
 
     // Middleware sends first-time parents on to /welcome from here.
-    return NextResponse.redirect(`${origin}/s/${handoff.schoolSlug}/parent`, 303);
+    return NextResponse.redirect(`${origin}/s/${handoff.schoolSlug}/parent/chat`, 303);
   } catch (caught: unknown) {
     const message = caught instanceof Error ? caught.message : "Unknown error";
     console.error(`App sign-in handoff failed: ${message}`);

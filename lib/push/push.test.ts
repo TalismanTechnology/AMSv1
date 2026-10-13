@@ -14,7 +14,7 @@ import {
 const MESSAGE = {
   title: "Early dismissal Friday",
   body: "School lets out at 12:30 for teacher training.",
-  url: "/s/demo/parent",
+  url: "/s/demo/parent/chat",
 };
 
 test("the APNs payload carries the alert and the in-app path", () => {

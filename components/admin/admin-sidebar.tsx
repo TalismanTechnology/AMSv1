@@ -184,7 +184,7 @@ export function AdminSidebar() {
       variants={sidebarVariants}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className="hidden md:flex h-screen flex-col bg-transparent relative z-20"
+      className="hidden md:flex h-screen flex-col bg-transparent relative z-20 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]"
     >
       <AdminSidebarContent />
     </motion.aside>
