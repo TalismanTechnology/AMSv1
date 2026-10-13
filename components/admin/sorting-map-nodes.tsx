@@ -420,6 +420,7 @@ function DocumentRow({
     `${doc.file_type.toUpperCase()} file`,
     statusOf(doc),
     doc.source === "email" ? "Came by email" : null,
+    doc.source === "website" ? "From the school website" : null,
   ].filter(Boolean);
 
   return (

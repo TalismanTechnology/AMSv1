@@ -173,6 +173,7 @@ export async function prepareChatTurn({
     similarity: passage.similarity,
     file_url: passage.file_url,
     file_type: passage.file_type,
+    source_url: passage.source_url,
     chunk_index: passage.chunk_index,
     source_number: i + 1,
     source_type: "document" as const,

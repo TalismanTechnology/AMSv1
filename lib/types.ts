@@ -99,8 +99,11 @@ export interface Document {
   error_message: string | null;
   page_count: number | null;
   uploaded_by: string | null;
-  /** Where the document came from: an admin upload or an inbound email. */
-  source?: "upload" | "email";
+  /** Where the document came from: an admin upload, an inbound email, or a
+   * crawl of the school's website. */
+  source?: "upload" | "email" | "website";
+  /** The page a website document was crawled from. */
+  source_url?: string | null;
   school_id: string;
   created_at: string;
   updated_at: string;
@@ -151,6 +154,8 @@ export interface ChatSource {
   similarity: number;
   file_url?: string;
   file_type?: string;
+  /** Set for documents crawled from the school's website: the page to cite. */
+  source_url?: string;
   chunk_index?: number;
   source_number?: number;
   source_type?: ChatSourceType;

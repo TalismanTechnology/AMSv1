@@ -11,6 +11,7 @@ import {
   Eye,
   Mail,
   Sparkles,
+  Globe,
 } from "lucide-react";
 import { LogoSpinner } from "@/components/logo-spinner";
 import { Badge } from "@/components/ui/badge";
@@ -46,6 +47,19 @@ function EmailedBadge() {
     <Badge variant="outline" className="gap-1 text-xs" title="Added from an email">
       <Mail />
       Emailed
+    </Badge>
+  );
+}
+
+function WebsiteBadge({ url }: { url?: string | null }) {
+  return (
+    <Badge
+      variant="outline"
+      className="gap-1 text-xs"
+      title={url ? `Synced from ${url}` : "Synced from the school website"}
+    >
+      <Globe />
+      Website
     </Badge>
   );
 }
@@ -323,6 +337,7 @@ export function DocumentTable({
                         {doc.file_type}
                       </Badge>
                       {doc.source === "email" && <EmailedBadge />}
+                      {doc.source === "website" && <WebsiteBadge url={doc.source_url} />}
                       {doc.category && (
                         <Badge
                           style={{
@@ -342,6 +357,7 @@ export function DocumentTable({
                       {doc.file_type}
                     </Badge>
                     {doc.source === "email" && <EmailedBadge />}
+                    {doc.source === "website" && <WebsiteBadge url={doc.source_url} />}
                   </div>
                 </TableCell>
                 <TableCell className="hidden md:table-cell">

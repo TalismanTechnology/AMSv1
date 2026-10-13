@@ -12,6 +12,7 @@ import {
   Download,
   PanelRight,
   Eye,
+  ExternalLink,
 } from "lucide-react";
 import {
   Collapsible,
@@ -170,6 +171,14 @@ function DocumentSourceCard({
               <PanelRight className="h-3 w-3" />
               Open in sidebar
             </Button>
+            {source.source_url && (
+              <Button asChild variant="ghost" size="xs">
+                <a href={source.source_url} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="h-3 w-3" />
+                  Visit page
+                </a>
+              </Button>
+            )}
             {source.file_url && (
               <Button type="button" variant="ghost" size="xs" onClick={handleDownload}>
                 <Download className="h-3 w-3" />

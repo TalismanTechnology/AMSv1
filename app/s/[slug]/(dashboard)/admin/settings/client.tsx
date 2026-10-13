@@ -12,6 +12,7 @@ import {
   Sparkles,
   Mail,
   Plug,
+  Globe,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { LogoSpinner } from "@/components/logo-spinner";
@@ -32,6 +33,10 @@ import {
   BlackbaudCalendarFeeds,
   type FeedWithMapping,
 } from "@/components/admin/blackbaud-calendar-feeds";
+import {
+  WebsiteSources,
+  type WebsiteSourceView,
+} from "@/components/admin/website-sources";
 import { calendarColorClasses } from "@/lib/event-calendars";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -78,11 +83,11 @@ export interface BlackbaudConfig {
   eventCalendars: EventCalendar[];
 }
 
-const SETTINGS_TABS = ["general", "assistant", "email", "blackbaud"] as const;
+const SETTINGS_TABS = ["general", "assistant", "email", "website", "blackbaud"] as const;
 type SettingsTab = (typeof SETTINGS_TABS)[number];
 
 // Tabs whose fields are saved by the header's save button. Email has its own
-// save button and Blackbaud saves as you go.
+// save button; Website and Blackbaud save as you go.
 const SAVED_BY_HEADER: readonly SettingsTab[] = ["general", "assistant"];
 
 function isSettingsTab(value: string | null | undefined): value is SettingsTab {
@@ -96,6 +101,7 @@ interface SettingsClientProps {
   emailIngestion: EmailIngestionConfig;
   blackbaud: BlackbaudConfig;
   blackbaudCallback: BlackbaudCallbackResult;
+  websiteSources: { sources: WebsiteSourceView[]; loadError: string | null };
   /** The ?tab= value from the URL, so a refresh keeps the open tab. */
   initialTab?: string;
 }
@@ -107,6 +113,7 @@ export function SettingsClient({
   emailIngestion,
   blackbaud,
   blackbaudCallback,
+  websiteSources,
   initialTab,
 }: SettingsClientProps) {
   // Returning from Blackbaud's consent screen opens the Blackbaud tab so the
@@ -203,6 +210,10 @@ export function SettingsClient({
             <TabsTrigger value="email" className="px-3">
               <Mail />
               Email
+            </TabsTrigger>
+            <TabsTrigger value="website" className="px-3">
+              <Globe />
+              Website
             </TabsTrigger>
             <TabsTrigger value="blackbaud" className="px-3">
               <Plug />
@@ -401,6 +412,18 @@ export function SettingsClient({
           <EmailIngestionSection
             schoolId={schoolId}
             config={emailIngestion}
+          />
+        </TabsContent>
+
+        <TabsContent
+          value="website"
+          forceMount
+          className="data-[state=inactive]:hidden"
+        >
+          <WebsiteSources
+            schoolId={schoolId}
+            sources={websiteSources.sources}
+            loadError={websiteSources.loadError}
           />
         </TabsContent>
 
