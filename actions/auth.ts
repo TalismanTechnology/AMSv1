@@ -34,6 +34,42 @@ export async function login(formData: FormData) {
 
   const staffRole = await getStaffRole(user.id);
 
+  // parent_password_login is an app_metadata flag (settable only with the
+  // service role) for parents who aren't in Blackbaud, e.g. App Review demo
+  // accounts. It lets them sign in with a password as a parent.
+  if (!staffRole && user.app_metadata?.parent_password_login === true) {
+    if (schoolSlug && schoolId) {
+      const { data: membership } = await supabase
+        .from("school_memberships")
+        .select("role, approved")
+        .eq("user_id", user.id)
+        .eq("school_id", schoolId)
+        .maybeSingle();
+
+      if (membership?.role !== "parent" || !membership.approved) {
+        await supabase.auth.signOut({ scope: "local" });
+        return { error: "You do not have access to this school." };
+      }
+
+      redirect(`/s/${schoolSlug}/parent/chat`);
+    }
+
+    const { data: membership } = await supabase
+      .from("school_memberships")
+      .select("schools(slug)")
+      .eq("user_id", user.id)
+      .eq("role", "parent")
+      .eq("approved", true)
+      .limit(1)
+      .maybeSingle();
+
+    const slug = (membership?.schools as { slug: string } | null | undefined)?.slug;
+    if (slug) redirect(`/s/${slug}/parent/chat`);
+
+    await supabase.auth.signOut({ scope: "local" });
+    return { error: PARENT_PASSWORD_ERROR };
+  }
+
   if (!staffRole) {
     await supabase.auth.signOut({ scope: "local" });
     return { error: PARENT_PASSWORD_ERROR };
