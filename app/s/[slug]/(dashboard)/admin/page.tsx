@@ -17,7 +17,7 @@ export default async function AdminDashboard({
 }) {
   const { slug } = await params;
   const { school, role, isSuperAdmin } = await requireSchoolContext(slug);
-  if (role !== "admin" && !isSuperAdmin) redirect(`/s/${slug}/parent`);
+  if (role !== "admin" && !isSuperAdmin) redirect(`/s/${slug}/parent/chat`);
 
   const supabase = await createClient();
   // analytics_events holds parents' question text, so school admins can't read

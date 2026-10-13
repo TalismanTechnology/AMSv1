@@ -96,7 +96,7 @@ export function WelcomeForm({
       return;
     }
 
-    router.replace(`/s/${schoolSlug}/parent`);
+    router.replace(`/s/${schoolSlug}/parent/chat`);
   }
 
   return (

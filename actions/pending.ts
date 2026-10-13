@@ -59,7 +59,7 @@ export async function checkApprovalStatus(
       redirectTo:
         membership.role === "admin"
           ? `/s/${slug}/admin`
-          : `/s/${slug}/parent`,
+          : `/s/${slug}/parent/chat`,
     };
   }
 

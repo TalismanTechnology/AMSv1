@@ -176,7 +176,7 @@ export async function updateSession(request: NextRequest) {
           return redirectTo(`/s/${slug}/admin`);
         }
         if (membership) {
-          return redirectTo(`/s/${slug}/parent`);
+          return redirectTo(`/s/${slug}/parent/chat`);
         }
       }
       return supabaseResponse;
@@ -200,7 +200,7 @@ export async function updateSession(request: NextRequest) {
         const dest =
           profile?.role === "super_admin" || membership?.role === "admin"
             ? `/s/${slug}/admin`
-            : `/s/${slug}/parent`;
+            : `/s/${slug}/parent/chat`;
         return redirectTo(dest);
       }
 
@@ -237,7 +237,7 @@ export async function updateSession(request: NextRequest) {
       if (isSuperAdmin || membership?.role === "admin") {
         return supabaseResponse;
       }
-      return redirectTo(`/s/${slug}/parent`);
+      return redirectTo(`/s/${slug}/parent/chat`);
     }
 
     // First-run onboarding is required, so it is enforced here rather than in
@@ -260,7 +260,7 @@ export async function updateSession(request: NextRequest) {
       return redirectTo(
         isSuperAdmin || membership?.role === "admin"
           ? `/s/${slug}/admin`
-          : `/s/${slug}/parent`
+          : `/s/${slug}/parent/chat`
       );
     }
 
@@ -328,7 +328,7 @@ async function getDefaultDashboard(
     }
     return membership.role === "admin"
       ? `/s/${slug}/admin`
-      : `/s/${slug}/parent`;
+      : `/s/${slug}/parent/chat`;
   }
 
   return "/";

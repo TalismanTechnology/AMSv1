@@ -25,11 +25,11 @@ function refreshedSessionResponse(): NextResponse {
 test("a redirect carries the refreshed session cookies", () => {
   const redirect = copyResponseCookies(
     refreshedSessionResponse(),
-    NextResponse.redirect(`${SITE}/s/demo/parent`)
+    NextResponse.redirect(`${SITE}/s/demo/parent/chat`)
   );
 
   assert.equal(redirect.status, 307);
-  assert.equal(redirect.headers.get("location"), `${SITE}/s/demo/parent`);
+  assert.equal(redirect.headers.get("location"), `${SITE}/s/demo/parent/chat`);
   assert.equal(redirect.cookies.get("sb-ref-auth-token.0")?.value, "new-session-part-0");
   assert.equal(redirect.cookies.get("sb-ref-auth-token.1")?.value, "new-session-part-1");
 });
@@ -37,7 +37,7 @@ test("a redirect carries the refreshed session cookies", () => {
 test("cookie options survive the copy", () => {
   const redirect = copyResponseCookies(
     refreshedSessionResponse(),
-    NextResponse.redirect(`${SITE}/s/demo/parent`)
+    NextResponse.redirect(`${SITE}/s/demo/parent/chat`)
   );
 
   const cookie = redirect.cookies.get("sb-ref-auth-token.0");
@@ -55,7 +55,7 @@ test("cookie options survive the copy", () => {
 test("deletions are copied too, so stale unchunked cookies are cleared", () => {
   const redirect = copyResponseCookies(
     refreshedSessionResponse(),
-    NextResponse.redirect(`${SITE}/s/demo/parent`)
+    NextResponse.redirect(`${SITE}/s/demo/parent/chat`)
   );
 
   assert.equal(redirect.cookies.get("sb-ref-auth-token")?.maxAge, 0);
@@ -64,7 +64,7 @@ test("deletions are copied too, so stale unchunked cookies are cleared", () => {
 test("responses that set auth cookies are not cacheable", () => {
   const redirect = copyResponseCookies(
     refreshedSessionResponse(),
-    NextResponse.redirect(`${SITE}/s/demo/parent`)
+    NextResponse.redirect(`${SITE}/s/demo/parent/chat`)
   );
 
   assert.equal(redirect.headers.get("cache-control"), AUTH_NO_STORE_CACHE_CONTROL);
@@ -82,7 +82,7 @@ test("nothing to copy leaves the redirect untouched", () => {
 });
 
 test("cookies already on the target are kept", () => {
-  const target = NextResponse.redirect(`${SITE}/s/demo/parent`);
+  const target = NextResponse.redirect(`${SITE}/s/demo/parent/chat`);
   target.cookies.set("other", "kept");
 
   copyResponseCookies(refreshedSessionResponse(), target);
