@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+const SIGNED_URL_TTL_SECONDS = 600;
+
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -31,10 +33,11 @@ export async function GET(
   const admin = createAdminClient();
 
   // Generate signed URL for the best viewable version (PDF when available)
+  // Short-lived: viewers request a fresh URL each time a document opens.
   const viewPath = doc.pdf_url || doc.file_url;
   const { data: viewData, error: viewError } = await admin.storage
     .from("documents")
-    .createSignedUrl(viewPath, 3600);
+    .createSignedUrl(viewPath, SIGNED_URL_TTL_SECONDS);
 
   if (viewError || !viewData?.signedUrl) {
     return NextResponse.json(
@@ -48,7 +51,7 @@ export async function GET(
   if (doc.pdf_url) {
     const { data: dlData } = await admin.storage
       .from("documents")
-      .createSignedUrl(doc.file_url, 3600);
+      .createSignedUrl(doc.file_url, SIGNED_URL_TTL_SECONDS);
     downloadUrl = dlData?.signedUrl;
   }
 

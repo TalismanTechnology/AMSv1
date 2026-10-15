@@ -1,4 +1,5 @@
 import type { Resend } from "resend";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { isBlockedFile } from "@/lib/documents/file-types";
 import {
   addDocumentDivisions,
@@ -32,6 +33,9 @@ export async function ingestReceivedEmail(params: {
 }): Promise<string[]> {
   const { resend, schoolId, emailId, fromAddress, divisionIds, origin } = params;
   const documentIds: string[] = [];
+  // Storage keys outside documents.file_url (the original HTML body), which
+  // removeIngestedDocuments doesn't know about.
+  const extraPaths: string[] = [];
 
   try {
     const subject = (params.subject ?? "").trim() || "(no subject)";
@@ -54,8 +58,16 @@ export async function ingestReceivedEmail(params: {
         title: subject,
         description: fromAddress ? `Emailed by ${fromAddress}` : null,
       });
-      if (documentId) documentIds.push(documentId);
-      else console.warn(`[inbound-email] Body ingest skipped: ${error}`);
+      if (documentId) {
+        documentIds.push(documentId);
+        const htmlPath = await saveEmailSourceMeta({
+          schoolId,
+          documentId,
+          subject,
+          email,
+        });
+        if (htmlPath) extraPaths.push(htmlPath);
+      } else console.warn(`[inbound-email] Body ingest skipped: ${error}`);
     }
 
     // Each real attachment as its own document.
@@ -101,8 +113,70 @@ export async function ingestReceivedEmail(params: {
   } catch (err) {
     // Undo the partial ingest so a retry starts clean.
     await removeIngestedDocuments(documentIds);
+    if (extraPaths.length) {
+      try {
+        await createAdminClient().storage.from("documents").remove(extraPaths);
+      } catch (cleanupErr) {
+        console.warn("[inbound-email] Could not remove email HTML:", cleanupErr);
+      }
+    }
     throw err;
   }
+}
+
+type ReceivedEmail = NonNullable<
+  Awaited<ReturnType<Resend["emails"]["receiving"]["get"]>>["data"]
+>;
+
+/**
+ * Keep what the source viewer needs to show the email as an email: its
+ * headers, and the original HTML body in storage. Best-effort — the body text
+ * is already ingested, so a failure here only warns. Returns the stored HTML
+ * key, if one was written.
+ */
+async function saveEmailSourceMeta(params: {
+  schoolId: string;
+  documentId: string;
+  subject: string;
+  email: ReceivedEmail | null;
+}): Promise<string | null> {
+  const { schoolId, documentId, subject, email } = params;
+  if (!email) return null;
+  let htmlPath: string | null = null;
+
+  try {
+    const supabase = createAdminClient();
+    if (email.html?.trim()) {
+      const key = `${schoolId}/email/${documentId}.html`;
+      const { error } = await supabase.storage
+        .from("documents")
+        .upload(key, new Blob([email.html], { type: "text/html" }), {
+          contentType: "text/html",
+          upsert: true,
+        });
+      if (error) console.warn(`[inbound-email] HTML upload failed: ${error.message}`);
+      else htmlPath = key;
+    }
+
+    const { error } = await supabase
+      .from("documents")
+      .update({
+        email_meta: {
+          from: email.from || null,
+          to: email.to ?? [],
+          cc: email.cc ?? [],
+          reply_to: email.reply_to ?? [],
+          date: email.created_at || null,
+          subject: email.subject?.trim() || subject,
+          html_path: htmlPath,
+        },
+      })
+      .eq("id", documentId);
+    if (error) console.warn(`[inbound-email] Saving email_meta failed: ${error.message}`);
+  } catch (err) {
+    console.warn("[inbound-email] Saving email source failed:", err);
+  }
+  return htmlPath;
 }
 
 /** Strip HTML tags to a plain-text fallback when no text/plain part exists. */

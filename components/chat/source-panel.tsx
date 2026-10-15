@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import { useSourcePanel } from "./source-panel-context";
 import { X, FileText, Download, Maximize2, ExternalLink } from "lucide-react";
@@ -12,6 +12,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { ease, duration } from "@/lib/motion";
+import { ViewToggle, type SourceView } from "@/components/shared/view-toggle";
 
 // The document viewers are only needed once a source is opened, so they load
 // in their own chunks instead of with the chat page.
@@ -30,94 +31,17 @@ const DocumentViewer = dynamic(
   () => import("@/components/shared/document-viewer").then((m) => m.DocumentViewer),
   { ssr: false }
 );
-
-// Expand [start, end) outward to the nearest sentence/paragraph boundaries so
-// the highlight never visibly truncates mid-word or mid-sentence. Chunks are
-// produced by a fixed-size splitter and routinely begin/end inside a word.
-function snapToSentence(full: string, start: number, end: number): [number, number] {
-  const isSentenceEnd = (i: number) =>
-    /[.!?]/.test(full[i]) && (i + 1 >= full.length || /\s/.test(full[i + 1]));
-  const isParagraphBreak = (i: number) =>
-    full[i] === "\n" && (full[i + 1] === "\n" || i + 1 >= full.length);
-
-  let s = start;
-  while (s > 0) {
-    const prev = s - 1;
-    if (isSentenceEnd(prev) || isParagraphBreak(prev)) break;
-    s--;
+const SourceRenderer = dynamic(
+  () => import("@/components/shared/source-renderer").then((m) => m.SourceRenderer),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center py-12">
+        <LogoSpinner size={24} />
+      </div>
+    ),
   }
-  while (s < full.length && /\s/.test(full[s])) s++;
-
-  let e = end;
-  while (e < full.length) {
-    if (isSentenceEnd(e)) { e++; break; }
-    if (isParagraphBreak(e)) break;
-    e++;
-  }
-  return [s, e];
-}
-
-// Locate `chunk` inside `full` tolerating whitespace differences and trailing
-// ellipsis markers that come from server-side excerpt truncation.
-// Returns [start, end) indices in the original `full` string, or null if not found.
-function locateChunk(full: string, chunk: string): [number, number] | null {
-  if (!full || !chunk) return null;
-  // Strip both ASCII "..." and the Unicode ellipsis "…" that the API appends
-  // when truncating the excerpt — neither will appear in `full`.
-  const cleanChunk = chunk.replace(/(?:\.{3}|…)\s*$/u, "").trim();
-  if (!cleanChunk) return null;
-
-  // Fast path: exact substring
-  const direct = full.indexOf(cleanChunk);
-  if (direct !== -1) return [direct, direct + cleanChunk.length];
-
-  // Whitespace-tolerant match: build a map from normalized index -> original index
-  const orig: number[] = [];
-  let normalized = "";
-  let prevWs = false;
-  for (let i = 0; i < full.length; i++) {
-    const c = full[i];
-    const isWs = /\s/.test(c);
-    if (isWs) {
-      if (!prevWs && normalized.length > 0) {
-        normalized += " ";
-        orig.push(i);
-      }
-      prevWs = true;
-    } else {
-      normalized += c.toLowerCase();
-      orig.push(i);
-      prevWs = false;
-    }
-  }
-
-  const normChunk = cleanChunk.replace(/\s+/g, " ").trim().toLowerCase();
-  if (!normChunk) return null;
-
-  const idx = normalized.indexOf(normChunk);
-  if (idx !== -1) {
-    const start = orig[idx];
-    const endIdx = idx + normChunk.length - 1;
-    const end = (orig[endIdx] ?? full.length - 1) + 1;
-    return [start, end];
-  }
-
-  // Anchor fallback: try progressively shorter prefixes (60→40→24 chars) so
-  // we still find a match when the excerpt was cut mid-sentence or contains
-  // light punctuation drift between excerpt and reconstructed full text.
-  for (const len of [60, 40, 24]) {
-    if (normChunk.length < len) continue;
-    const anchor = normChunk.slice(0, len);
-    const anchorIdx = normalized.indexOf(anchor);
-    if (anchorIdx === -1) continue;
-    const start = orig[anchorIdx];
-    const tailLen = Math.min(normChunk.length, normalized.length - anchorIdx);
-    const endIdx = anchorIdx + tailLen - 1;
-    const end = (orig[endIdx] ?? full.length - 1) + 1;
-    return [start, end];
-  }
-  return null;
-}
+);
 
 const DOCX_TYPES = new Set(["docx", "doc"]);
 
@@ -125,17 +49,18 @@ function PanelContent() {
   const { activeSource, fullContent, isLoadingContent, closePanel } =
     useSourcePanel();
   const [viewerOpen, setViewerOpen] = useState(false);
-  const highlightRef = useRef<HTMLElement>(null);
 
   const [viewUrl, setViewUrl] = useState<string | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [hasPdf, setHasPdf] = useState(false);
   const [docxBlob, setDocxBlob] = useState<Blob | null>(null);
+  const [docxView, setDocxView] = useState<SourceView>("original");
   const [loadingDoc, setLoadingDoc] = useState(false);
   const docxContainerRef = useRef<HTMLDivElement>(null);
 
   const documentId = activeSource?.document_id;
   const fileType = activeSource?.file_type;
+  const isDocument = !activeSource?.source_type || activeSource.source_type === "document";
 
   useEffect(() => {
     if (!documentId) return;
@@ -145,6 +70,7 @@ function PanelContent() {
     setDownloadUrl(null);
     setHasPdf(false);
     setDocxBlob(null);
+    setDocxView("original");
 
     (async () => {
       const urls = await getDocumentUrls(documentId);
@@ -169,7 +95,7 @@ function PanelContent() {
 
   // Render DOCX blob into container
   useEffect(() => {
-    if (!docxBlob || !docxContainerRef.current) return;
+    if (!docxBlob || !docxContainerRef.current || docxView !== "original") return;
     const container = docxContainerRef.current;
     container.innerHTML = "";
     import("docx-preview").then(({ renderAsync }) => {
@@ -185,61 +111,13 @@ function PanelContent() {
           '<p class="text-sm text-muted-foreground p-4">Failed to render document preview.</p>';
       });
     });
-  }, [docxBlob]);
+  }, [docxBlob, docxView]);
 
   const showAsPdf = !!viewUrl && (fileType === "pdf" || hasPdf);
   const showAsDocx =
     !!docxBlob && !!fileType && DOCX_TYPES.has(fileType) && !hasPdf;
   const showAsImage = !!viewUrl && !!fileType && fileType.startsWith("image");
   const canRenderInline = showAsPdf || showAsDocx || showAsImage;
-
-  const segments = useMemo(() => {
-    if (!activeSource) return null;
-    const body = fullContent ?? activeSource.chunk_content;
-    if (!body) return null;
-    if (!fullContent) {
-      // Only the chunk itself — highlight the whole thing
-      return { before: "", match: body, after: "" };
-    }
-    const range = locateChunk(fullContent, activeSource.chunk_content);
-    if (!range) return { before: body, match: "", after: "" };
-    const [start, end] = snapToSentence(fullContent, range[0], range[1]);
-    return {
-      before: fullContent.slice(0, start),
-      match: fullContent.slice(start, end),
-      after: fullContent.slice(end),
-    };
-  }, [fullContent, activeSource]);
-
-  // Auto-scroll to the highlighted chunk once it renders (text fallback only).
-  // The panel animates open (~300ms width transition); scrollIntoView fired
-  // during that window can resolve against pre-animation layout and land in
-  // the wrong place. We instead set scrollTop directly on the Radix viewport
-  // after the animation has settled.
-  useEffect(() => {
-    if (canRenderInline) return;
-    if (!segments?.match || isLoadingContent) return;
-    const el = highlightRef.current;
-    if (!el) return;
-
-    const scrollToHighlight = () => {
-      const viewport = el.closest(
-        '[data-slot="scroll-area-viewport"]'
-      ) as HTMLElement | null;
-      if (!viewport) {
-        el.scrollIntoView({ block: "center" });
-        return;
-      }
-      const elTop = el.getBoundingClientRect().top;
-      const vpTop = viewport.getBoundingClientRect().top;
-      const target =
-        viewport.scrollTop + (elTop - vpTop) - viewport.clientHeight / 2 + el.clientHeight / 2;
-      viewport.scrollTo({ top: Math.max(0, target), behavior: "smooth" });
-    };
-
-    const timeout = window.setTimeout(scrollToHighlight, 350);
-    return () => window.clearTimeout(timeout);
-  }, [segments, isLoadingContent, canRenderInline]);
 
   if (!activeSource) return null;
 
@@ -261,6 +139,7 @@ function PanelContent() {
         file_type: activeSource.file_type || "txt",
         file_name: activeSource.title,
         file_url: activeSource.file_url,
+        source_url: activeSource.source_url,
       }
     : null;
 
@@ -339,6 +218,16 @@ function PanelContent() {
         </motion.div>
       )}
 
+      {showAsDocx && !loadingDoc && (
+        <div className="flex items-center justify-between border-b border-border px-4 py-2">
+          <ViewToggle value={docxView} onChange={setDocxView} />
+          <Button variant="ghost" size="xs" onClick={handleDownload}>
+            <Download />
+            Download
+          </Button>
+        </div>
+      )}
+
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
@@ -355,7 +244,7 @@ function PanelContent() {
             page={activeSource.location?.page}
             title={activeSource.title}
           />
-        ) : showAsDocx ? (
+        ) : showAsDocx && docxView === "original" ? (
           <ScrollArea className="h-full">
             <div
               ref={docxContainerRef}
@@ -374,25 +263,30 @@ function PanelContent() {
             </div>
           </ScrollArea>
         ) : (
-          <ScrollArea className="h-full px-4 py-4">
-            {isLoadingContent ? (
-              <div className="flex items-center justify-center py-12">
-                <LogoSpinner size={24} />
-              </div>
-            ) : segments ? (
-              <div className="whitespace-pre-wrap text-sm leading-relaxed text-ink-soft">
-                {segments.before}
-                {segments.match && (
-                  <mark
-                    ref={highlightRef}
-                    className="rounded-sm bg-primary/20 px-0.5 text-ink ring-1 ring-primary/40"
-                  >
-                    {segments.match}
-                  </mark>
-                )}
-                {segments.after}
-              </div>
-            ) : null}
+          <ScrollArea className="h-full">
+            <div className="px-4 py-5 sm:px-6">
+              {!isDocument ? (
+                <SourceRenderer
+                  key={`${activeSource.document_id}-text`}
+                  text={fullContent ?? activeSource.chunk_content}
+                  title={activeSource.title}
+                />
+              ) : isLoadingContent && !showAsDocx ? (
+                <div className="flex items-center justify-center py-12">
+                  <LogoSpinner size={24} />
+                </div>
+              ) : (
+                <SourceRenderer
+                  key={activeSource.document_id}
+                  documentId={activeSource.document_id}
+                  fileType={fileType}
+                  sourceUrl={activeSource.source_url}
+                  title={activeSource.title}
+                  highlight={activeSource.chunk_content}
+                  fallbackText={fullContent}
+                />
+              )}
+            </div>
           </ScrollArea>
         )}
       </motion.div>

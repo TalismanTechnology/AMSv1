@@ -23,6 +23,8 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { getDocumentSignedUrl, getDocumentUrls } from "@/lib/storage-url";
 import { PdfPages } from "@/components/shared/pdf-pages";
+import { SourceRenderer } from "@/components/shared/source-renderer";
+import { ViewToggle, type SourceView } from "@/components/shared/view-toggle";
 
 const FILE_TYPE_ICONS: Record<string, typeof FileText> = {
   pdf: FileText,
@@ -43,6 +45,8 @@ interface ViewerDocument {
   file_type: string;
   file_name: string;
   file_url?: string;
+  source?: string | null;
+  source_url?: string | null;
 }
 
 interface DocumentViewerProps {
@@ -61,8 +65,8 @@ export function DocumentViewer({
 }: DocumentViewerProps) {
   const [viewUrl, setViewUrl] = useState<string | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
-  const [textContent, setTextContent] = useState<string | null>(null);
   const [docxBlob, setDocxBlob] = useState<Blob | null>(null);
+  const [docxView, setDocxView] = useState<SourceView>("original");
   const [hasPdf, setHasPdf] = useState(false);
   const [loading, setLoading] = useState(false);
   const [imageZoom, setImageZoom] = useState(1);
@@ -72,19 +76,19 @@ export function DocumentViewer({
     setLoading(true);
     setViewUrl(null);
     setDownloadUrl(null);
-    setTextContent(null);
     setDocxBlob(null);
+    setDocxView("original");
     setHasPdf(false);
     setImageZoom(1);
 
+    // Text-only documents need nothing here: SourceRenderer fetches their
+    // text itself.
     try {
-      let hasPdfResult = false;
       if (doc.file_url) {
         const urls = await getDocumentUrls(doc.id);
         setViewUrl(urls.viewUrl);
         setDownloadUrl(urls.downloadUrl);
         setHasPdf(urls.hasPdf);
-        hasPdfResult = urls.hasPdf;
 
         // For DOCX without a converted PDF, fetch the blob for client-side rendering
         if (DOCX_TYPES.has(doc.file_type) && !urls.hasPdf && urls.viewUrl) {
@@ -94,20 +98,6 @@ export function DocumentViewer({
           }
         }
       }
-
-      // Load text content as fallback when no inline/PDF view is available
-      const canViewInline =
-        doc.file_type === "pdf" ||
-        doc.file_type.startsWith("image") ||
-        hasPdfResult ||
-        DOCX_TYPES.has(doc.file_type);
-      if (!canViewInline) {
-        const res = await fetch(`/api/documents/${doc.id}/content`);
-        if (res.ok) {
-          const data = await res.json();
-          setTextContent(data.content);
-        }
-      }
     } finally {
       setLoading(false);
     }
@@ -115,7 +105,7 @@ export function DocumentViewer({
 
   // Render DOCX blob into container when available
   useEffect(() => {
-    if (!docxBlob || !docxContainerRef.current) return;
+    if (!docxBlob || !docxContainerRef.current || docxView !== "original") return;
 
     const container = docxContainerRef.current;
     container.innerHTML = "";
@@ -133,7 +123,7 @@ export function DocumentViewer({
           '<p class="text-sm text-muted-foreground p-4">Failed to render document preview.</p>';
       });
     });
-  }, [docxBlob]);
+  }, [docxBlob, docxView]);
 
   useEffect(() => {
     if (open && document) {
@@ -142,7 +132,6 @@ export function DocumentViewer({
     if (!open) {
       setViewUrl(null);
       setDownloadUrl(null);
-      setTextContent(null);
       setDocxBlob(null);
       setHasPdf(false);
       setImageZoom(1);
@@ -197,7 +186,7 @@ export function DocumentViewer({
             </div>
           ) : showAsPdf ? (
             <PdfPages url={viewUrl!} page={page} title={document.title} />
-          ) : showAsDocx ? (
+          ) : showAsDocx && docxView === "original" ? (
             <ScrollArea className="h-full">
               <div
                 ref={docxContainerRef}
@@ -216,24 +205,28 @@ export function DocumentViewer({
                 />
               </div>
             </ScrollArea>
-          ) : textContent ? (
+          ) : (
             <ScrollArea className="h-full">
-              <div className="px-6 py-4 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
-                {textContent}
+              <div className="px-4 py-5 sm:px-6">
+                <SourceRenderer
+                  key={document.id}
+                  documentId={document.id}
+                  fileType={document.file_type}
+                  source={document.source ?? undefined}
+                  sourceUrl={document.source_url}
+                  title={document.title}
+                />
               </div>
             </ScrollArea>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-              <FileIcon className="h-12 w-12 mb-3 opacity-50" />
-              <p className="text-sm">No preview available</p>
-              <p className="text-xs mt-1">Download the file to view it</p>
-            </div>
           )}
         </div>
 
         {/* Footer */}
         <div className="flex items-center justify-between border-t px-6 py-3">
           <div className="flex items-center gap-2">
+            {DOCX_TYPES.has(document.file_type) && !hasPdf && docxBlob && (
+              <ViewToggle value={docxView} onChange={setDocxView} />
+            )}
             {document.file_type.startsWith("image") && viewUrl && (
               <>
                 <Button

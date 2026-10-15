@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
+import { ExternalLink } from "lucide-react";
 import { LogoSpinner } from "@/components/logo-spinner";
+import { Button } from "@/components/ui/button";
 
 type PdfJs = typeof import("pdfjs-dist");
 
@@ -53,14 +55,21 @@ export function PdfPages({
   const [width, setWidth] = useState(0);
   const [error, setError] = useState(false);
 
+  // A new document starts from a clean slate (reset during render, not in
+  // the effect, so the old document never flashes).
+  const [loadedUrl, setLoadedUrl] = useState(url);
+  if (loadedUrl !== url) {
+    setLoadedUrl(url);
+    setPdf(null);
+    setSizes([]);
+    setError(false);
+  }
+
   // Load the document and every page's size up front, so placeholders hold
   // the right height and scrolling to a page is exact before it renders.
   useEffect(() => {
     let cancelled = false;
     let doc: PDFDocumentProxy | null = null;
-    setPdf(null);
-    setSizes([]);
-    setError(false);
 
     (async () => {
       try {
@@ -119,20 +128,29 @@ export function PdfPages({
     return () => cancelAnimationFrame(frame);
   }, [page, sizes, width]);
 
+  // A plain link the user taps, so iOS opens the PDF in its own viewer
+  // rather than blocking a script-opened window.
+  const openLink = (
+    <Button asChild variant="outline" size="xs">
+      <a href={url} target="_blank" rel="noopener noreferrer">
+        <ExternalLink />
+        Open PDF
+      </a>
+    </Button>
+  );
+
   if (error) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
         <p className="text-sm text-muted-foreground">
           This PDF couldn&apos;t be shown here.
         </p>
-        <a
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-sm font-medium text-primary hover:underline"
-        >
-          Open {title}
-        </a>
+        <Button asChild size="sm">
+          <a href={url} target="_blank" rel="noopener noreferrer">
+            <ExternalLink />
+            Open {title}
+          </a>
+        </Button>
       </div>
     );
   }
@@ -140,41 +158,49 @@ export function PdfPages({
   const pageWidth = Math.max(width - 24, 0);
 
   return (
-    <div
-      ref={scrollRef}
-      className="h-full overflow-y-auto bg-secondary/40 px-3 py-3"
-      aria-label={title}
-    >
-      {!pdf ? (
-        <div className="flex h-full items-center justify-center">
-          <LogoSpinner size={24} />
-        </div>
-      ) : (
-        <div className="flex flex-col gap-3">
-          {sizes.map((size, i) => (
-            <div
-              key={i}
-              ref={(el) => {
-                pageRefs.current[i] = el;
-              }}
-              className={`relative overflow-hidden rounded-sm bg-white shadow-sm ${
-                page === i + 1 ? "ring-2 ring-primary/50" : ""
-              }`}
-              style={{
-                width: pageWidth,
-                height: pageWidth ? (pageWidth * size.height) / size.width : 0,
-              }}
-            >
-              <PdfPage
-                pdf={pdf}
-                pageNumber={i + 1}
-                width={pageWidth}
-                root={scrollRef}
-              />
-            </div>
-          ))}
-        </div>
-      )}
+    <div className="flex h-full flex-col">
+      <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-1.5">
+        <span className="text-xs text-muted-foreground">
+          {sizes.length ? `${sizes.length} page${sizes.length === 1 ? "" : "s"}` : " "}
+        </span>
+        {openLink}
+      </div>
+      <div
+        ref={scrollRef}
+        className="min-h-0 flex-1 overflow-y-auto bg-secondary/40 px-3 py-3"
+        aria-label={title}
+      >
+        {!pdf ? (
+          <div className="flex h-full items-center justify-center">
+            <LogoSpinner size={24} />
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {sizes.map((size, i) => (
+              <div
+                key={i}
+                ref={(el) => {
+                  pageRefs.current[i] = el;
+                }}
+                className={`relative overflow-hidden rounded-sm bg-white shadow-sm ${
+                  page === i + 1 ? "ring-2 ring-primary/50" : ""
+                }`}
+                style={{
+                  width: pageWidth,
+                  height: pageWidth ? (pageWidth * size.height) / size.width : 0,
+                }}
+              >
+                <PdfPage
+                  pdf={pdf}
+                  pageNumber={i + 1}
+                  width={pageWidth}
+                  root={scrollRef}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
