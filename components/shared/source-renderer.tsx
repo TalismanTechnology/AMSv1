@@ -340,15 +340,18 @@ function Inline({
           );
           return hit ? <Mark key={i}>{link}</Mark> : <Fragment key={i}>{link}</Fragment>;
         }
-        if (!hit || !local) return <Fragment key={i}>{seg.text}</Fragment>;
-        const a = Math.max(0, local[0] - seg.start);
-        const b = Math.min(seg.text.length, local[1] - seg.start);
+        const Wrap = seg.emphasis === "strong" ? "strong" : seg.emphasis === "em" ? "em" : Fragment;
+        const wrapProps = seg.emphasis === "strong" ? { className: "font-semibold text-ink" } : {};
+        if (!hit || !local) return <Wrap key={i} {...wrapProps}>{seg.text}</Wrap>;
+        const textOffset = seg.start + (seg.markerLen ?? 0);
+        const a = Math.min(seg.text.length, Math.max(0, local[0] - textOffset));
+        const b = Math.max(a, Math.min(seg.text.length, local[1] - textOffset));
         return (
-          <Fragment key={i}>
+          <Wrap key={i} {...wrapProps}>
             {seg.text.slice(0, a)}
             <Mark>{seg.text.slice(a, b)}</Mark>
             {seg.text.slice(b)}
-          </Fragment>
+          </Wrap>
         );
       })}
     </>

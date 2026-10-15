@@ -90,7 +90,7 @@ test("parseInline: Label <url> hides the url", () => {
   const segs = parseInline("Please Register now <https://track.example.com/abc?u=1> today.");
   const link = segs.find((s) => s.type === "link");
   assert.ok(link && link.type === "link");
-  assert.equal(link.text, "Please Register now");
+  assert.equal(link.text, "Register now");
   assert.equal(link.href, "https://track.example.com/abc?u=1");
   assert.equal(segs.map((s) => s.text).join(""), "Please Register now today.");
 });
@@ -98,7 +98,7 @@ test("parseInline: Label <url> hides the url", () => {
 test("parseInline: label stops at punctuation and word limit", () => {
   const segs = parseInline("Questions? Read the full parent handbook for this school year <https://x.org/h>");
   const link = segs.find((s) => s.type === "link");
-  assert.equal(link?.text, "handbook for this school year");
+  assert.equal(link?.text, "school year");
   const bare = parseInline("Done. <https://x.org/very/long/path>");
   assert.equal(bare.find((s) => s.type === "link")?.text, "x.org");
 });
@@ -125,4 +125,52 @@ test("cleanWebsiteText blanks title, url and nav noise, keeping length", () => {
   assert.equal(cleaned.length, text.length);
   assert.equal(cleaned.trim(), "Apply by January 15.");
   assert.equal(cleaned.indexOf("Apply"), text.indexOf("Apply"));
+});
+
+// ── PR #28 follow-ups ───────────────────────────────────────────────────
+
+test("emphasis: *bold*, **bold**, __bold__ and _italic_ drop their markers", () => {
+  const segs = parseInline("On *Friday, October 30*, bring **lunch** and __water__; _optional_ hat. 2*3*4 snake_case_name");
+  const em = segs.filter((s) => s.type === "text" && s.emphasis).map((s) => s.type === "text" && [s.emphasis, s.text]);
+  assert.deepEqual(em, [
+    ["strong", "Friday, October 30"],
+    ["strong", "lunch"],
+    ["strong", "water"],
+    ["em", "optional"],
+  ]);
+  const first = segs.find((s) => s.type === "text" && s.emphasis)!;
+  assert.equal(first.start, 3);
+  assert.equal(first.end, 3 + "*Friday, October 30*".length);
+  assert.ok(segs.map((s) => s.text).join("").includes("2*3*4 snake_case_name"));
+});
+
+test("link labels: proper name only, not the preceding words", () => {
+  const t = "the eighth grade will travel to Brooklyn to experience Ferox's Ninja Park <https://t.example.com/c/abc>, which";
+  const link = parseInline(t).find((s) => s.type === "link")!;
+  assert.equal(link.text, "Ferox's Ninja Park");
+  const before = parseInline(t).find((s) => s.type === "text")!;
+  assert.ok(before.text.endsWith("to experience "));
+});
+
+test("link labels: lowercase phrase stops at function words", () => {
+  const link = parseInline("please complete the mandatory waiver form <https://t.example.com/w>").find((s) => s.type === "link")!;
+  assert.equal(link.text, "mandatory waiver form");
+  const named = parseInline("See the Museum of Natural History <https://x.org>").find((s) => s.type === "link")!;
+  assert.equal(named.text, "Museum of Natural History");
+});
+
+test("dates and times on their own lines are not headings", () => {
+  const text = "Intro paragraph here.\n\nOct 19 2026\n\nAdmissions Open House\n\n5:30 PM - 7:30 PM\n\nAuditorium\n\nFriday\n\n10/30/2026\n\nRead more about the event below.";
+  const blocks = formatText(text);
+  const headings = blocks.filter((b) => b.type === "heading").map((b) => b.type === "heading" && b.text);
+  assert.ok(!headings.includes("Oct 19 2026"));
+  assert.ok(!headings.includes("5:30 PM - 7:30 PM"));
+  assert.ok(!headings.includes("Friday"));
+  assert.ok(!headings.includes("10/30/2026"));
+  // Nor are short data lines like a location.
+  assert.ok(!headings.includes("Auditorium"));
+  assert.deepEqual(headings, []);
+  // Words that merely start like a weekday/month aren't dates.
+  const m = formatText("Intro.\n\nMarching Band Schedule\n\nRehearsals run every Tuesday and Thursday after school.").filter((b) => b.type === "heading");
+  assert.equal(m.length, 1);
 });

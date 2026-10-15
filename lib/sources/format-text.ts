@@ -71,7 +71,13 @@ function listItem(line: Line): { kind: MarkerKind; textOffset: number } | null {
 
 function isAllCaps(t: string): boolean {
   const letters = t.replace(/[^A-Za-z]/g, "");
-  return letters.length >= 3 && !/[a-z]/.test(t) && t.length < 80;
+  return (
+    letters.length >= 4 &&
+    !/[a-z]/.test(t) &&
+    t.length < 80 &&
+    letters.length >= t.replace(/\s/g, "").length * 0.6 &&
+    !looksLikeDateOrTime(t)
+  );
 }
 
 function isUrlLine(t: string): boolean {
@@ -319,8 +325,18 @@ export function formatText(text: string, offset = 0): Block[] {
       /[A-Za-z]/.test(trimmed) &&
       /^["'“(]?[A-Z0-9]/.test(trimmed) &&
       trimmed.split(/\s+/).length <= 12 &&
-      !isUrlLine(trimmed);
-    if (isAllCaps(trimmed) || (standalone && looksLikeTitle)) {
+      !isUrlLine(trimmed) &&
+      !looksLikeDateOrTime(trimmed) &&
+      // Mostly letters: "5:30 PM - 7:30 PM", "Room 204", "$1,250" are data, not titles.
+      (trimmed.match(/[A-Za-z]/g)?.length ?? 0) >= Math.max(4, trimmed.replace(/\s/g, "").length * 0.6);
+    // A heading introduces content: the next line must be a real paragraph
+    // or list, not another short data line ("Auditorium", "Room 204").
+    const nextLine = lines.slice(i + 1).find((l) => !isBlank(l))?.text.trim() ?? "";
+    const introducesContent =
+      nextLine.length >= 40 ||
+      (nextLine.length >= 20 && /[.!?:]$/.test(nextLine)) ||
+      /^(?:[-*•·▪]|\d+[.)]|#)\s/.test(nextLine);
+    if (isAllCaps(trimmed) || (standalone && looksLikeTitle && introducesContent)) {
       const [s, e] = trimmedBounds(line);
       blocks.push({
         type: "heading",
@@ -346,10 +362,39 @@ export function formatText(text: string, offset = 0): Block[] {
   return blocks.map((b) => shift(b, offset));
 }
 
+const MONTH =
+  "(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\.?";
+const WEEKDAY =
+  "(?:mon(?:day)?|tue(?:s(?:day)?)?|wed(?:nesday)?|thu(?:r(?:s(?:day)?)?)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)\\.?,?";
+const DATE_OR_TIME = new RegExp(
+  [
+    `^(?:${WEEKDAY}\\s+)?${MONTH}\\s+\\d{1,2}(?:st|nd|rd|th)?,?(?:\\s+\\d{4})?(?:\\s*[-–@,]?\\s*.*\\d{1,2}(?::\\d{2})?\\s*(?:am|pm))?$`,
+    `^(?:${WEEKDAY}\\s+)?\\d{1,2}\\s+${MONTH}(?:\\s+\\d{4})?$`,
+    `^${WEEKDAY}$`,
+    `^\\d{1,2}[/.-]\\d{1,2}[/.-]\\d{2,4}$`,
+    `^(?:all day|noon|midnight|\\d{1,2}(?::\\d{2})?\\s*(?:am|pm|a\\.m\\.|p\\.m\\.)?)(?:\\s*[-–to]+\\s*\\d{1,2}(?::\\d{2})?\\s*(?:am|pm|a\\.m\\.|p\\.m\\.)?)?$`,
+  ].join("|"),
+  "i"
+);
+
+/** Dates and times ("Oct 19 2026", "5:30 PM - 7:30 PM", "Friday") are data lines, not headings. */
+export function looksLikeDateOrTime(line: string): boolean {
+  return DATE_OR_TIME.test(line.trim());
+}
+
 // ── Inline links ────────────────────────────────────────────────────────
 
 export type InlineSegment =
-  | { type: "text"; text: string; start: number; end: number }
+  | {
+      type: "text";
+      text: string;
+      start: number;
+      end: number;
+      /** Markdown-style *bold*, **bold** or _italic_; `text` has the markers removed. */
+      emphasis?: "strong" | "em";
+      /** Characters of marker before `text` begins (offset of text = start + markerLen). */
+      markerLen?: number;
+    }
   | { type: "link"; text: string; href: string; start: number; end: number };
 
 const INLINE_TOKEN =
@@ -358,6 +403,78 @@ const INLINE_TOKEN =
 // Characters that end the label before a "Label <https://…>" link.
 const LABEL_BOUNDARY = /[.!?:;|•·()[\]<>"\n]/;
 const MAX_LABEL_WORDS = 5;
+
+// Words that end a link label when walking back from the link: a label is
+// "waiver form", not "complete the mandatory waiver form".
+const LABEL_STOP_WORDS = new Set(
+  "a an the to and or but of for in on at by with from into via this that these those our your their my his her its we you they i it is are was were be will can please click here see visit".split(" ")
+);
+
+/**
+ * Where, within the words before a "<https://…>" link, the link's label
+ * starts. A trailing run of Capitalized words (a name like "Ferox's Ninja
+ * Park", allowing "of"/"the"/"&" inside) is the label; otherwise the
+ * trailing words up to the nearest function word, at most MAX_LABEL_WORDS.
+ */
+export function labelStartIn(phrase: string): number {
+  const words = [...phrase.matchAll(/\S+/g)];
+  if (!words.length) return phrase.length;
+  const bare = (w: string) => w.replace(/^["'“(]+|["'”),]+$/g, "");
+  const isCap = (w: string) => /^[A-Z0-9]/.test(bare(w));
+  const CONNECTORS = new Set(["of", "the", "&", "and", "for", "at", "on", "de"]);
+
+  // Proper-noun run.
+  let k = words.length - 1;
+  if (isCap(words[k][0])) {
+    let first = k;
+    while (k > 0) {
+      const prev = words[k - 1][0];
+      if (isCap(prev)) { first = --k; continue; }
+      if (CONNECTORS.has(bare(prev).toLowerCase()) && k - 2 >= 0 && isCap(words[k - 2][0])) {
+        k -= 2; first = k; continue;
+      }
+      break;
+    }
+    // A sentence-initial capital ("This year we visit Park") isn't part of the name.
+    while (first < words.length - 1 && LABEL_STOP_WORDS.has(bare(words[first][0]).toLowerCase())) first++;
+    if (words.length - first <= MAX_LABEL_WORDS + 2) return words[first].index!;
+  }
+
+  // Lowercase phrase: walk back until a function word.
+  let first = words.length;
+  while (first > 0 && words.length - first < MAX_LABEL_WORDS) {
+    if (LABEL_STOP_WORDS.has(bare(words[first - 1][0]).toLowerCase())) break;
+    first--;
+  }
+  return words[Math.min(first, words.length - 1)].index!;
+}
+
+const EMPHASIS = /(\*\*|__)(?=\S)([^*_\n]+?)(?<=\S)\1|(?<![\w*])\*(?=\S)([^*\n]+?)(?<=\S)\*(?![\w*])|(?<![\w_])_(?=\S)([^_\n]+?)(?<=\S)_(?![\w_])/g;
+
+/** Split a plain run into text and markdown-style emphasis segments. */
+export function splitEmphasis(text: string, start: number, end: number): InlineSegment[] {
+  const out: InlineSegment[] = [];
+  const run = text.slice(start, end);
+  let cursor = 0;
+  EMPHASIS.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = EMPHASIS.exec(run))) {
+    if (m.index > cursor) out.push({ type: "text", text: run.slice(cursor, m.index), start: start + cursor, end: start + m.index });
+    const inner = m[2] ?? m[3] ?? m[4];
+    const marker = m[1] ? 2 : 1;
+    out.push({
+      type: "text",
+      text: inner,
+      start: start + m.index,
+      end: start + m.index + m[0].length,
+      emphasis: m[4] !== undefined ? "em" : "strong",
+      markerLen: marker,
+    });
+    cursor = m.index + m[0].length;
+  }
+  if (cursor < run.length) out.push({ type: "text", text: run.slice(cursor), start: start + cursor, end });
+  return out;
+}
 
 export function hostnameOf(href: string): string {
   try {
@@ -391,7 +508,7 @@ export function parseInline(text: string): InlineSegment[] {
   const out: InlineSegment[] = [];
   let cursor = 0;
   const pushText = (start: number, end: number) => {
-    if (end > start) out.push({ type: "text", text: text.slice(start, end), start, end });
+    if (end > start) out.push(...splitEmphasis(text, start, end));
   };
 
   INLINE_TOKEN.lastIndex = 0;
@@ -408,11 +525,7 @@ export function parseInline(text: string): InlineSegment[] {
       while (b >= 0 && !LABEL_BOUNDARY.test(trimmed[b])) b--;
       let labelRel = b + 1;
       while (labelRel < trimmed.length && /\s/.test(trimmed[labelRel])) labelRel++;
-      // Keep only the last few words, so a sentence doesn't become a link.
-      const words = [...trimmed.slice(labelRel).matchAll(/\S+/g)];
-      if (words.length > MAX_LABEL_WORDS) {
-        labelRel += words[words.length - MAX_LABEL_WORDS].index!;
-      }
+      labelRel += labelStartIn(trimmed.slice(labelRel));
       const label = trimmed.slice(labelRel);
       if (label) {
         pushText(cursor, cursor + labelRel);
