@@ -9,13 +9,11 @@ import { ViewToggle, type SourceView } from "@/components/shared/view-toggle";
 import { cn } from "@/lib/utils";
 import { parseEmailText, splitQuoted, type EmailHeaders } from "@/lib/sources/email";
 import {
-  cleanWebsiteText,
   formatText,
   hostnameOf,
   parseInline,
   type Block,
 } from "@/lib/sources/format-text";
-import { locateHighlight } from "@/lib/sources/locate";
 
 type SourceKind = "pdf" | "docx" | "image" | "email" | "website" | "text";
 
@@ -42,23 +40,15 @@ interface SourceRendererProps {
   source?: string;
   sourceUrl?: string | null;
   title: string;
-  /** A cited passage to highlight and scroll to. */
-  highlight?: string | null;
   /** Text to use when the document has no stored text (saves a /content fetch). */
   fallbackText?: string | null;
   className?: string;
 }
 
-type Range = [number, number] | null;
-
-const overlaps = (range: Range, start: number, end: number) =>
-  !!range && range[0] < end && range[1] > start;
-
 /**
  * A document's text shown the way it was meant to be read: emails with their
- * header card and original HTML, web pages with a link back to the page, and
- * plain text laid out as headings, paragraphs, lists and tables. A cited
- * passage is highlighted and scrolled into view.
+ * header card and original HTML, web pages as a card linking back to the page,
+ * and plain text laid out as headings, paragraphs, lists and tables.
  */
 export function SourceRenderer({
   documentId,
@@ -67,14 +57,12 @@ export function SourceRenderer({
   source,
   sourceUrl,
   title,
-  highlight,
   fallbackText,
   className,
 }: SourceRendererProps) {
   const [data, setData] = useState<SourceResponse | null>(null);
   const [rawText, setRawText] = useState<string | null>(documentId ? null : (text ?? null));
   const [loading, setLoading] = useState(!!documentId);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!documentId) {
@@ -98,7 +86,8 @@ export function SourceRenderer({
       }
       let raw = res?.rawText ?? null;
       if (!raw) raw = fallbackText ?? null;
-      if (!raw) {
+      // A web page shows only its card, so its text isn't worth a second fetch.
+      if (!raw && res?.kind !== "website") {
         try {
           const r = await fetch(`/api/documents/${documentId}/content`);
           if (r.ok) raw = ((await r.json()) as { content?: string }).content ?? null;
@@ -119,37 +108,9 @@ export function SourceRenderer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [documentId, text]);
 
-  const range = useMemo(
-    () => (rawText ? locateHighlight(rawText, highlight) : null),
-    [rawText, highlight]
-  );
-
   const kind: SourceKind =
     data?.kind ??
     (fileType === "eml" ? "email" : source === "website" ? "website" : "text");
-
-  // Scroll the first highlighted element to the middle of the view. Waits for
-  // the side panel's open animation (~300ms), whose in-flight layout would
-  // otherwise put the target in the wrong place, and sets scrollTop on the
-  // Radix viewport directly.
-  useEffect(() => {
-    if (loading || !range) return;
-    const timeout = window.setTimeout(() => {
-      const el = containerRef.current?.querySelector<HTMLElement>("[data-highlight]");
-      if (!el) return;
-      const viewport = el.closest('[data-slot="scroll-area-viewport"]') as HTMLElement | null;
-      if (!viewport) {
-        el.scrollIntoView({ block: "center", behavior: "smooth" });
-        return;
-      }
-      const elTop = el.getBoundingClientRect().top;
-      const vpTop = viewport.getBoundingClientRect().top;
-      const target =
-        viewport.scrollTop + (elTop - vpTop) - viewport.clientHeight / 2 + el.clientHeight / 2;
-      viewport.scrollTo({ top: Math.max(0, target), behavior: "smooth" });
-    }, 350);
-    return () => window.clearTimeout(timeout);
-  }, [loading, range]);
 
   if (loading) {
     return (
@@ -169,19 +130,18 @@ export function SourceRenderer({
         raw={rawText ?? ""}
         headers={data?.email?.headers ?? { subject: displayTitle }}
         html={data?.email?.html ?? null}
-        range={range}
       />
     );
   } else if (kind === "website") {
-    body = <WebsiteView raw={rawText ?? ""} title={displayTitle} url={pageUrl} range={range} />;
+    body = <WebsiteView title={displayTitle} url={pageUrl} />;
   } else if (rawText?.trim()) {
-    body = <FormattedText raw={rawText} start={0} end={rawText.length} range={range} />;
+    body = <FormattedText raw={rawText} start={0} end={rawText.length} />;
   } else {
     body = <p className="py-8 text-center text-sm text-muted-foreground">No text to show for this document.</p>;
   }
 
   return (
-    <div ref={containerRef} className={cn("mx-auto w-full max-w-[68ch]", className)}>
+    <div className={cn("mx-auto w-full max-w-[68ch]", className)}>
       {body}
     </div>
   );
@@ -195,44 +155,39 @@ const HEADING_CLASS: Record<1 | 2 | 3, string> = {
   3: "mt-6 mb-2 text-[15px] font-semibold first:mt-0",
 };
 
-const HIGHLIGHT_BLOCK = "rounded-md bg-primary/10 ring-1 ring-primary/30";
-
 function FormattedText({
   raw,
   start,
   end,
-  range,
 }: {
   raw: string;
   start: number;
   end: number;
-  range: Range;
 }) {
   const blocks = useMemo(() => formatText(raw.slice(start, end), start), [raw, start, end]);
   return (
     <div className="text-[15px] leading-7 text-ink-soft break-words">
       {blocks.map((block, i) => (
-        <BlockView key={`${block.start}-${i}`} block={block} range={range} />
+        <BlockView key={`${block.start}-${i}`} block={block} />
       ))}
     </div>
   );
 }
 
-function BlockView({ block, range }: { block: Block; range: Range }) {
-  const hit = overlaps(range, block.start, block.end);
+function BlockView({ block }: { block: Block }) {
   switch (block.type) {
     case "heading": {
       const Tag = block.level === 1 ? "h2" : block.level === 2 ? "h3" : "h4";
       return (
         <Tag className={cn("text-ink", HEADING_CLASS[block.level])}>
-          <Inline text={block.text} textStart={block.textStart} range={range} />
+          <Inline text={block.text} />
         </Tag>
       );
     }
     case "paragraph":
       return (
         <p className="my-4 whitespace-pre-line first:mt-0 last:mb-0">
-          <Inline text={block.text} textStart={block.textStart} range={range} />
+          <Inline text={block.text} />
         </p>
       );
     case "list": {
@@ -246,7 +201,7 @@ function BlockView({ block, range }: { block: Block; range: Range }) {
         >
           {block.items.map((item) => (
             <li key={item.start} className="whitespace-pre-line pl-1">
-              <Inline text={item.text} textStart={item.textStart} range={range} />
+              <Inline text={item.text} />
             </li>
           ))}
         </ListTag>
@@ -256,10 +211,7 @@ function BlockView({ block, range }: { block: Block; range: Range }) {
       const [head, ...rest] = block.header ? block.rows : [null, ...block.rows];
       const cols = Math.max(...block.rows.map((r) => r.length));
       return (
-        <div
-          data-highlight={hit || undefined}
-          className={cn("my-5 overflow-x-auto rounded-md border border-border", hit && HIGHLIGHT_BLOCK)}
-        >
+        <div className="my-5 overflow-x-auto rounded-md border border-border">
           <table className="w-full border-collapse text-sm leading-6">
             {head && (
               <thead className="bg-muted">
@@ -289,13 +241,7 @@ function BlockView({ block, range }: { block: Block; range: Range }) {
     }
     case "quote":
       return (
-        <blockquote
-          data-highlight={hit || undefined}
-          className={cn(
-            "my-4 whitespace-pre-line border-l-2 border-border pl-4 text-muted-foreground",
-            hit && HIGHLIGHT_BLOCK
-          )}
-        >
+        <blockquote className="my-4 whitespace-pre-line border-l-2 border-border pl-4 text-muted-foreground">
           <Inline text={block.text} />
         </blockquote>
       );
@@ -304,31 +250,17 @@ function BlockView({ block, range }: { block: Block; range: Range }) {
   }
 }
 
-/**
- * Inline text with links, and a <mark> over the part of `range` it covers.
- * `textStart` places the text in the raw document; omit it for text that
- * doesn't map character-for-character (table cells, quotes).
- */
-function Inline({
-  text,
-  textStart,
-  range,
-}: {
-  text: string;
-  textStart?: number;
-  range?: Range;
-}) {
+/** Inline text with links and *emphasis*. */
+function Inline({ text }: { text: string }) {
   const segments = useMemo(() => parseInline(text), [text]);
-  const local: Range =
-    range && textStart != null ? [range[0] - textStart, range[1] - textStart] : null;
 
   return (
     <>
       {segments.map((seg, i) => {
-        const hit = overlaps(local, seg.start, seg.end);
         if (seg.type === "link") {
-          const link = (
+          return (
             <a
+              key={i}
               href={seg.href}
               target="_blank"
               rel="noopener noreferrer"
@@ -338,76 +270,37 @@ function Inline({
               {seg.text}
             </a>
           );
-          return hit ? <Mark key={i}>{link}</Mark> : <Fragment key={i}>{link}</Fragment>;
         }
         const Wrap = seg.emphasis === "strong" ? "strong" : seg.emphasis === "em" ? "em" : Fragment;
         const wrapProps = seg.emphasis === "strong" ? { className: "font-semibold text-ink" } : {};
-        if (!hit || !local) return <Wrap key={i} {...wrapProps}>{seg.text}</Wrap>;
-        const textOffset = seg.start + (seg.markerLen ?? 0);
-        const a = Math.min(seg.text.length, Math.max(0, local[0] - textOffset));
-        const b = Math.max(a, Math.min(seg.text.length, local[1] - textOffset));
-        return (
-          <Wrap key={i} {...wrapProps}>
-            {seg.text.slice(0, a)}
-            <Mark>{seg.text.slice(a, b)}</Mark>
-            {seg.text.slice(b)}
-          </Wrap>
-        );
+        return <Wrap key={i} {...wrapProps}>{seg.text}</Wrap>;
       })}
     </>
   );
 }
 
-function Mark({ children }: { children: React.ReactNode }) {
-  return (
-    <mark
-      data-highlight
-      className="rounded-sm bg-primary/15 px-0.5 text-ink ring-1 ring-primary/30 [box-decoration-break:clone]"
-    >
-      {children}
-    </mark>
-  );
-}
-
 // ── Website pages ───────────────────────────────────────────────────────
 
-function WebsiteView({
-  raw,
-  title,
-  url,
-  range,
-}: {
-  raw: string;
-  title: string;
-  url: string | null;
-  range: Range;
-}) {
-  const cleaned = useMemo(() => cleanWebsiteText(raw, title, url), [raw, title, url]);
+/** Only the page's card: the live page reads better than its extracted text. */
+function WebsiteView({ title, url }: { title: string; url: string | null }) {
   return (
-    <>
-      <div className="mb-6 rounded-xl border border-border bg-muted/40 p-4">
-        <p className="text-base font-semibold leading-snug text-ink">{title}</p>
-        {url && (
-          <>
-            <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Globe className="size-3.5 shrink-0" />
-              <span className="truncate">{hostnameOf(url)}</span>
-            </p>
-            <Button asChild variant="outline" size="sm" className="mt-3">
-              <a href={url} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="size-3.5" />
-                View original page
-              </a>
-            </Button>
-          </>
-        )}
-      </div>
-      {cleaned.trim() ? (
-        <FormattedText raw={cleaned} start={0} end={cleaned.length} range={range} />
-      ) : (
-        <p className="text-sm text-muted-foreground">No text to show for this page.</p>
+    <div className="rounded-xl border border-border bg-muted/40 p-4">
+      <p className="text-base font-semibold leading-snug text-ink">{title}</p>
+      {url && (
+        <>
+          <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Globe className="size-3.5 shrink-0" />
+            <span className="truncate">{hostnameOf(url)}</span>
+          </p>
+          <Button asChild variant="outline" size="sm" className="mt-3">
+            <a href={url} target="_blank" rel="noopener noreferrer">
+              <ExternalLink className="size-3.5" />
+              View original page
+            </a>
+          </Button>
+        </>
       )}
-    </>
+    </div>
   );
 }
 
@@ -470,24 +363,19 @@ function EmailView({
   raw,
   headers,
   html,
-  range,
 }: {
   raw: string;
   headers: EmailHeaders;
   html: string | null;
-  range: Range;
 }) {
   const parsed = useMemo(() => parseEmailText(raw), [raw]);
   const split = useMemo(() => splitQuoted(parsed.body), [parsed.body]);
   const mainEnd = parsed.bodyStart + split.main.length;
   const quotedStart = split.quotedStart != null ? parsed.bodyStart + split.quotedStart : null;
-  const quoteHit = quotedStart != null && overlaps(range, quotedStart, raw.length);
 
-  // The original HTML reads best, but a cited passage can only be found in
-  // the text, so open on the text when there's one to show.
-  const [view, setView] = useState<SourceView>(html && !range ? "original" : "text");
-  const [showQuoted, setShowQuoted] = useState(false);
-  const quotedOpen = showQuoted || quoteHit;
+  // The original HTML reads best when there is one.
+  const [view, setView] = useState<SourceView>(html ? "original" : "text");
+  const [quotedOpen, setQuotedOpen] = useState(false);
 
   const fwd =
     parsed.forwarded &&
@@ -510,19 +398,19 @@ function EmailView({
         <>
           {fwd ? (
             <>
-              <FormattedText raw={raw} start={parsed.bodyStart} end={fwd.start} range={range} />
+              <FormattedText raw={raw} start={parsed.bodyStart} end={fwd.start} />
               <ForwardedCard headers={fwd.headers} />
-              <FormattedText raw={raw} start={fwd.end} end={mainEnd} range={range} />
+              <FormattedText raw={raw} start={fwd.end} end={mainEnd} />
             </>
           ) : (
-            <FormattedText raw={raw} start={parsed.bodyStart} end={mainEnd} range={range} />
+            <FormattedText raw={raw} start={parsed.bodyStart} end={mainEnd} />
           )}
 
           {quotedStart != null && (
             <div className="mt-6">
               <button
                 type="button"
-                onClick={() => setShowQuoted((s) => !s)}
+                onClick={() => setQuotedOpen((open) => !open)}
                 className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-0.5 text-xs font-medium text-muted-foreground hover:text-ink"
                 aria-expanded={quotedOpen}
               >
@@ -531,7 +419,7 @@ function EmailView({
               </button>
               {quotedOpen && (
                 <div className="mt-4 border-l-2 border-border pl-4 opacity-85">
-                  <FormattedText raw={raw} start={quotedStart} end={raw.length} range={range} />
+                  <FormattedText raw={raw} start={quotedStart} end={raw.length} />
                 </div>
               )}
             </div>

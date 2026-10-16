@@ -227,12 +227,11 @@ test("lists a document once with a chip for each passage the answer cites", () =
   assert.equal(groups[0].isCited, true);
 });
 
-test("lists cited documents before uncited ones, uncited at their strongest passage", () => {
+test("lists only the documents the answer cites", () => {
   const sources = [source(1, "Letter", 1, 0.6), source(2, "Letter", 2, 0.9), source(3, "Handbook", 7)];
 
   const groups = groupSources(sources, new Set([3]));
 
-  assert.deepEqual(groups.map((g) => g.key), ["Handbook", "Letter"]);
-  assert.equal(groups[1].isCited, false);
-  assert.equal(groups[1].passages[0].source_number, 2);
+  assert.deepEqual(groups.map((g) => g.key), ["Handbook"]);
+  assert.equal(groups[0].isCited, true);
 });

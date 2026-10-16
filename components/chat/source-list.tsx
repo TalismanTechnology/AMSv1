@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText } from "lucide-react";
+import { FileText, Globe } from "lucide-react";
 import { useSourcePanel } from "./source-panel-context";
 import { groupSources } from "@/lib/source-groups";
 import type { ChatSource } from "@/lib/types";
@@ -33,22 +33,30 @@ export function SourceList({
             onClick={() => openSource(group.passages[0])}
             className="flex min-w-0 flex-1 items-center gap-2 text-left focus:outline-none focus-visible:underline"
           >
-            <FileText className="size-3.5 shrink-0" />
+            {group.isWebsite ? (
+              <Globe className="size-3.5 shrink-0" />
+            ) : (
+              <FileText className="size-3.5 shrink-0" />
+            )}
             <span className={`truncate ${group.isCited ? "text-ink-soft" : ""}`}>
               {group.title}
             </span>
           </button>
-          <span className="flex shrink-0 flex-wrap gap-1">
-            {group.passages.map((passage) => (
-              <PassageChip
-                key={passage.source_number ?? passage.chunk_index}
-                passage={passage}
-                showNumber={group.isCited}
-                active={isActive(passage)}
-                onClick={() => openSource(passage)}
-              />
-            ))}
-          </span>
+          {/* A web page opens as a card linking to the page, so passage
+              chips would all lead to the same place. */}
+          {!group.isWebsite && (
+            <span className="flex shrink-0 flex-wrap gap-1">
+              {group.passages.map((passage) => (
+                <PassageChip
+                  key={passage.source_number ?? passage.chunk_index}
+                  passage={passage}
+                  showNumber={group.isCited}
+                  active={isActive(passage)}
+                  onClick={() => openSource(passage)}
+                />
+              ))}
+            </span>
+          )}
         </div>
       ))}
     </div>

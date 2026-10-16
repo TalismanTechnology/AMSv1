@@ -14,6 +14,8 @@ export interface RelevantChunk {
   document_file_type?: string;
   /** The web page a website-sourced document was crawled from. */
   document_source_url?: string;
+  /** How the document arrived: 'upload', 'email', 'website'… */
+  document_source?: string;
   document_tags?: string[];
   document_category?: string;
   document_folder?: string;
@@ -245,7 +247,7 @@ export async function attachDocumentInfo(
   // Fetch document metadata for the matched chunks (tags, category, folder, divisions)
   const docIds = [...new Set(chunks.map((c: RelevantChunk) => c.document_id))];
   const columns =
-    "id, title, file_url, file_type, tags, category:categories(name), folder:folders(name), divisions:event_calendars(name)";
+    "id, title, file_url, file_type, source, tags, category:categories(name), folder:folders(name), divisions:event_calendars(name)";
   const fetchDocs = (select: string) =>
     supabase
       .from("documents")
@@ -257,6 +259,7 @@ export async function attachDocumentInfo(
           title: string;
           file_url: string;
           file_type: string;
+          source?: string | null;
           source_url?: string | null;
           tags: unknown;
           category: unknown;
@@ -273,6 +276,7 @@ export async function attachDocumentInfo(
       title: d.title,
       file_url: d.file_url,
       file_type: d.file_type,
+      source: d.source ?? undefined,
       source_url: d.source_url ?? undefined,
       tags: (d.tags as string[]) || [],
       category: (d.category as unknown as { name: string } | null)?.name,
@@ -289,6 +293,7 @@ export async function attachDocumentInfo(
       document_file_url: info?.file_url,
       document_file_type: info?.file_type,
       document_source_url: info?.source_url,
+      document_source: info?.source,
       document_tags: info?.tags,
       document_category: info?.category,
       document_folder: info?.folder,
@@ -311,7 +316,7 @@ export interface CitablePassage {
   document_id: string;
   title: string;
   // The passage text, overlaps removed. Exactly what the model saw under this
-  // number, and what the source sidebar highlights inside the document.
+  // number.
   content: string;
   similarity: number; // best semantic score within the passage (else the document's)
   chunk_index: number; // first chunk of the passage
@@ -320,6 +325,7 @@ export interface CitablePassage {
   file_url?: string;
   file_type?: string;
   source_url?: string;
+  source?: string;
   tags?: string[];
   category?: string;
   folder?: string;
@@ -480,6 +486,7 @@ export function assemblePassages(
         file_url: best.document_file_url,
         file_type: best.document_file_type,
         source_url: best.document_source_url,
+        source: best.document_source,
         tags: best.document_tags,
         category: best.document_category,
         folder: best.document_folder,
