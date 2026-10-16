@@ -199,7 +199,8 @@ function multiChildRules(childCount: number): string {
 function citationRules(hasEvents: boolean): string {
   const rules = [
     "Every sentence that states a fact from <documents> ends with the matching source number in square brackets, e.g. [1] or [1][2]. The app turns each number into a link that opens the document at that exact passage, so an uncited document fact is one the parent can't check. Cite even facts that feel obvious.",
-    "Each [Source N] is one passage, and a document can have several. Cite the number of the passage the fact is written in — not another passage from the same document, and not the first number that document shows. If the fact appears in two passages, cite both.",
+    "Each [Source N] is one passage, and a document can have several. Cite the number of the passage the fact is written in — not another passage from the same document, and not the first number that document shows.",
+    "Cite only the sources a claim actually relies on, and use the fewest that support the answer — usually one or two documents, never more than three distinct documents in one answer. When the same fact appears in several sources, cite the single clearest one, not all of them. Never cite a source just because it is related to the topic. (Sources that disagree are the exception: cite each value's own source, as above.)",
     "Place each citation right after the sentence or clause it supports, never bunched at the end. Only use numbers shown in <documents>.",
     "Don't cite follow-up questions, greetings, or clarifying questions.",
   ];

@@ -117,8 +117,6 @@ function PanelContent() {
   const showAsDocx =
     !!docxBlob && !!fileType && DOCX_TYPES.has(fileType) && !hasPdf;
   const showAsImage = !!viewUrl && !!fileType && fileType.startsWith("image");
-  const canRenderInline = showAsPdf || showAsDocx || showAsImage;
-
   if (!activeSource) return null;
 
   async function handleDownload() {
@@ -139,6 +137,7 @@ function PanelContent() {
         file_type: activeSource.file_type || "txt",
         file_name: activeSource.title,
         file_url: activeSource.file_url,
+        source: activeSource.source_url ? "website" : undefined,
         source_url: activeSource.source_url,
       }
     : null;
@@ -203,21 +202,6 @@ function PanelContent() {
         </div>
       </motion.div>
 
-      {!canRenderInline && !loadingDoc && (
-        <motion.div
-          initial={{ opacity: 0, x: -6 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.25, ease: ease.out, delay: 0.15 }}
-        >
-          <div className="border-b border-border px-4 py-2.5">
-            <span className="inline-flex items-center gap-1.5 text-[0.7rem] font-medium text-muted-foreground">
-              <span className="size-1.5 rounded-full bg-muted-foreground/60" />
-              {Math.round(activeSource.similarity * 100)}% match
-            </span>
-          </div>
-        </motion.div>
-      )}
-
       {showAsDocx && !loadingDoc && (
         <div className="flex items-center justify-between border-b border-border px-4 py-2">
           <ViewToggle value={docxView} onChange={setDocxView} />
@@ -280,9 +264,9 @@ function PanelContent() {
                   key={activeSource.document_id}
                   documentId={activeSource.document_id}
                   fileType={fileType}
+                  source={activeSource.source_url ? "website" : undefined}
                   sourceUrl={activeSource.source_url}
                   title={activeSource.title}
-                  highlight={activeSource.chunk_content}
                   fallbackText={fullContent}
                 />
               )}
@@ -334,7 +318,7 @@ export function SourcePanel() {
             screen readers, which Radix requires of every sheet. */}
         <SheetTitle className="sr-only">{activeSource?.title ?? "Source"}</SheetTitle>
         <SheetDescription className="sr-only">
-          The school document this answer cites, opened at the cited passage.
+          The school document this answer cites.
         </SheetDescription>
         <PanelContent />
       </SheetContent>

@@ -23,6 +23,7 @@ import {
 import { rewriteQueryWithContext } from "@/lib/ai/rewrite-query";
 import { redactChildNames, redactChildNamesInMessages } from "@/lib/ai/child-privacy";
 import { buildSystemPrompt } from "@/lib/ai/system-prompt";
+import { selectPassages } from "@/lib/ai/source-selection";
 import type { ChatSource } from "@/lib/types";
 
 /** The model that writes parent-facing answers. Shared with the eval harness. */
@@ -147,7 +148,9 @@ export async function prepareChatTurn({
   // neighbours, cut into short runs that each get their own number. The same
   // ordered set is fed to the LLM as [Source 1..N] AND returned to the client
   // as sources[N-1], so every inline [N] opens the passage the fact came from.
-  const passages = assemblePassages(relevantChunks, keywordHits, knownChunks);
+  // selectPassages then drops the weak and the duplicate, so the model isn't
+  // handed near-copies it will cite side by side.
+  const passages = selectPassages(assemblePassages(relevantChunks, keywordHits, knownChunks));
 
   // The calendar is prompt context, not a citable source — see
   // formatEventsContext. Multi-day events are still collapsed from their
@@ -167,8 +170,7 @@ export async function prepareChatTurn({
   const sources: ChatSource[] = passages.map((passage, i) => ({
     document_id: passage.document_id,
     title: passage.title,
-    // The passage exactly as the model saw it under [N] — the sidebar locates
-    // and highlights this span inside the document.
+    // The passage exactly as the model saw it under [N].
     chunk_content: passage.content,
     similarity: passage.similarity,
     file_url: passage.file_url,
