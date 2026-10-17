@@ -140,6 +140,9 @@ export function SettingsClient({
   const [disableAnimations, setDisableAnimations] = useState(
     settings.disable_animations
   );
+  const [newDocumentPush, setNewDocumentPush] = useState(
+    settings.new_document_push_enabled
+  );
   const [newQuestion, setNewQuestion] = useState("");
   const [saving, setSaving] = useState(false);
   async function handleSave() {
@@ -152,6 +155,10 @@ export function SettingsClient({
       suggested_questions: questions,
       welcome_message: welcomeMessage.trim() || null,
       disable_animations: disableAnimations,
+      // Only sent when changed, so saving still works before migration 042.
+      ...(newDocumentPush !== settings.new_document_push_enabled
+        ? { new_document_push_enabled: newDocumentPush }
+        : {}),
     });
     if (result.error) toast.error(result.error);
     else toast.success("Settings saved");
@@ -281,6 +288,36 @@ export function SettingsClient({
                   id="disable-animations"
                   checked={disableAnimations}
                   onCheckedChange={setDisableAnimations}
+                />
+              </div>
+            </div>
+          </section>
+
+          <section className="space-y-4">
+            <div className="space-y-1">
+              <h2 className="text-base font-semibold text-ink">
+                Notifications
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Push notifications parents get in the iPhone and Android app.
+              </p>
+            </div>
+            <div>
+              <div className="flex items-center justify-between gap-4">
+                <div className="space-y-0.5">
+                  <Label htmlFor="new-document-push">
+                    Notify parents about new documents
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Sends one push notification to parents in the app when new
+                    uploaded or emailed documents are ready (at most once every
+                    3 hours; website pages and edits don&apos;t notify).
+                  </p>
+                </div>
+                <Switch
+                  id="new-document-push"
+                  checked={newDocumentPush}
+                  onCheckedChange={setNewDocumentPush}
                 />
               </div>
             </div>

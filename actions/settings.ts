@@ -19,6 +19,7 @@ export async function updateSettings(
     disable_animations?: boolean;
     require_join_code?: boolean;
     require_approval?: boolean;
+    new_document_push_enabled?: boolean;
     join_code?: string | null;
   }
 ) {

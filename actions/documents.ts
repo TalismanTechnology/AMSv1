@@ -6,6 +6,8 @@ import { after } from "next/server";
 import { logAudit } from "@/lib/audit";
 import type { PreviewResult, ContentSearchResult } from "@/lib/types";
 import { isBlockedFile, fileTypeFromName } from "@/lib/documents/file-types";
+import { enqueueDocumentPush } from "@/lib/push/document-push-runner";
+import { APPROVAL_MAX_AGE_MS } from "@/lib/push/document-push";
 
 function triggerProcessing(documentId: string) {
   // Use after() so processing runs after the response is sent.
@@ -253,13 +255,18 @@ export async function approveDocument(documentId: string, schoolId: string) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { error } = await supabase
+  const { data: approved, error } = await supabase
     .from("documents")
     .update({ status: "ready", updated_at: new Date().toISOString() })
     .eq("id", documentId)
-    .eq("school_id", schoolId);
+    .eq("school_id", schoolId)
+    .select("id");
 
   if (error) return { error: error.message };
+
+  // A held document reaches parents only now. Only if RLS let this admin
+  // approve it; already-queued documents are left alone.
+  if (approved?.length) await enqueueDocumentPush(documentId, APPROVAL_MAX_AGE_MS);
 
   if (user)
     logAudit(

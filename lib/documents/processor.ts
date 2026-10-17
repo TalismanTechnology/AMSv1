@@ -10,6 +10,8 @@ import {
   type SortChoice,
   type SortableDoc,
 } from "./auto-sort";
+import { enqueueDocumentPush } from "@/lib/push/document-push-runner";
+import { ENQUEUE_MAX_AGE_MS } from "@/lib/push/document-push";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const BATCH_SIZE = 5;
@@ -213,6 +215,10 @@ export async function processDocument(documentId: string) {
         updated_at: new Date().toISOString(),
       })
       .eq("id", documentId);
+
+    // 10. Queue a push to parents if this is a new upload or emailed
+    //     document (best-effort; re-processing never queues it twice).
+    await enqueueDocumentPush(documentId, ENQUEUE_MAX_AGE_MS);
 
     logMem(`Done: ${documentId} (${totalInserted} chunks)`);
     return { success: true, chunkCount: totalInserted };

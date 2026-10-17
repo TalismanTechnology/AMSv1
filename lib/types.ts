@@ -271,6 +271,8 @@ export interface Settings {
   disable_animations: boolean;
   require_join_code: boolean;
   require_approval: boolean;
+  /** Push parents when new uploaded / emailed documents are ready (migration 042). */
+  new_document_push_enabled: boolean;
   updated_at: string;
 }
 

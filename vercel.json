@@ -20,6 +20,10 @@
     {
       "path": "/api/cron/label-question-topics",
       "schedule": "30 7 * * *"
+    },
+    {
+      "path": "/api/cron/send-document-pushes",
+      "schedule": "*/15 * * * *"
     }
   ]
 }
