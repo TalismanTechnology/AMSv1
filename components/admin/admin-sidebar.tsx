@@ -14,6 +14,7 @@ import {
   ScrollText,
   MessageSquare,
   ShieldCheck,
+  Lightbulb,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -33,6 +34,7 @@ import { NotificationBell } from "@/components/parent/notification-bell";
 function getNavItems(slug: string) {
   return [
     { href: `/s/${slug}/admin`, label: "Dashboard", icon: LayoutDashboard },
+    { href: `/s/${slug}/admin/insights`, label: "Insights", icon: Lightbulb },
     { href: `/s/${slug}/admin/documents`, label: "Documents", icon: FileText },
     { href: `/s/${slug}/admin/events`, label: "Events", icon: CalendarDays },
     { href: `/s/${slug}/admin/users`, label: "Users", icon: Users },

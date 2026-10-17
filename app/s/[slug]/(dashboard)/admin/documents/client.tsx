@@ -82,6 +82,8 @@ interface DocumentsClientProps {
   schoolId: string;
   schoolSlug: string;
   autoSortEnabled: boolean;
+  /** Open the upload dialog on mount (?upload=1). */
+  initialUploadOpen?: boolean;
 }
 
 export function DocumentsClient({
@@ -92,11 +94,12 @@ export function DocumentsClient({
   schoolId,
   schoolSlug,
   autoSortEnabled,
+  initialUploadOpen = false,
 }: DocumentsClientProps) {
   // Map mode hides the list's filters, which keep their values, and puts the
   // map where the folder tree and table were.
   const [view, setView] = useState<"list" | "map">("list");
-  const [uploadOpen, setUploadOpen] = useState(false);
+  const [uploadOpen, setUploadOpen] = useState(initialUploadOpen);
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState<Document | null>(null);
   const [viewingDoc, setViewingDoc] = useState<Document | null>(null);
@@ -123,6 +126,14 @@ export function DocumentsClient({
     [documents]
   );
   const { setFolders } = useSidebar();
+
+  // Drop ?upload=1 once handled so a reload doesn't reopen the dialog.
+  useEffect(() => {
+    if (!initialUploadOpen) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("upload");
+    window.history.replaceState(null, "", url.toString());
+  }, [initialUploadOpen]);
 
   // Sync folders to sidebar context so the sidebar can show them
   useEffect(() => {
