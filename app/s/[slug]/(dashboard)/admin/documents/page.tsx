@@ -5,10 +5,14 @@ import { PageTransition } from "@/components/motion";
 
 export default async function DocumentsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ upload?: string }>;
 }) {
   const { slug } = await params;
+  // ?upload=1 (e.g. from Insights) opens the upload dialog on arrival.
+  const { upload } = await searchParams;
   const { school } = await requireSchoolContext(slug);
 
   const supabase = await createClient();
@@ -54,6 +58,7 @@ export default async function DocumentsPage({
         schoolId={school.id}
         schoolSlug={slug}
         autoSortEnabled={school.auto_sort_enabled ?? true}
+        initialUploadOpen={upload === "1"}
       />
     </PageTransition>
   );
