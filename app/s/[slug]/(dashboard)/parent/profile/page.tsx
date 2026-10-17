@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { requireSchoolContext } from "@/lib/school-context";
+import { resolveSchoolName } from "@/lib/school-display-name";
 import { ProfileClient } from "./client";
 import { PageTransition } from "@/components/motion";
 
@@ -26,6 +27,13 @@ export default async function ParentProfilePage({
     .eq("school_id", school.id)
     .order("created_at", { ascending: true });
 
+  // No row (or migration 042 not applied yet) means the default: on.
+  const { data: preferences } = await supabase
+    .from("notification_preferences")
+    .select("new_document_push")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
   return (
     <PageTransition>
       <ProfileClient
@@ -34,6 +42,8 @@ export default async function ParentProfilePage({
         email={user.email || ""}
         schoolId={school.id}
         schoolSlug={slug}
+        schoolName={resolveSchoolName(school.name)}
+        newDocumentPush={preferences?.new_document_push !== false}
       />
     </PageTransition>
   );

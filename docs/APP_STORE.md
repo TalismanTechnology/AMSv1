@@ -23,7 +23,7 @@ the app has, and are worth pointing out in the review notes:
 
 | Feature | How | Code |
 | --- | --- | --- |
-| **Push notifications** | APNs via `@capacitor/push-notifications`; the token is stored in `push_devices` and messages go out through `sendPushToUsers`. Tapping one opens the path it carries | `components/native/native-push.tsx`, `app/api/push/devices`, `lib/push/*` |
+| **Push notifications for new school documents** | APNs via `@capacitor/push-notifications`; the token is stored in `push_devices`. When a school uploads or emails in new documents, parents get one push per batch (e.g. "New from Westfield Academy: Field Trip Permission Form", at most once every 3 hours per school; website pages and edits don't notify). Tapping it opens the chat. Parents can turn it off in Profile > Notifications; schools in Admin > Settings | `components/native/native-push.tsx`, `app/api/push/devices`, `lib/push/*`, `app/api/cron/send-document-pushes` |
 | **Deep links** | Notification taps, universal links (`https://askmyschool.app/s/<school>/parent/...` opens the app) and `app.askmyschool://open?path=...` | `components/native/native-shell.tsx`, `lib/native/links.ts`, `app/.well-known/apple-app-site-association` |
 | **Secure sign-in in the system sheet** | Blackbaud (and Veracross, PR #14) sign-in runs in `ASWebAuthenticationSession`, never in the app's web view, then hands the session back with PKCE | `ios/App/App/AuthSessionPlugin.swift`, `lib/native/blackbaud-sign-in.ts`, `lib/auth/app-handoff.ts` |
 | **Native share sheet** | "Share" on every chat answer, with the cited documents listed | `components/chat/message-share.tsx`, `lib/share-answer.ts` |
@@ -152,6 +152,13 @@ account still exists, and re-create it if they deleted it.
 >   code?". Answers cite the school document they came from; tap a citation
 >   to see the passage.
 > • Share an answer with the share icon under it (native share sheet).
+> • Push notifications: when the school adds new documents, parents get a
+>   notification such as "New from Westfield Academy: Field Trip Permission
+>   Form". Tapping it opens the app to the chat, ready to ask about it.
+>   Parents can turn these off in Menu > Profile > Notifications, and a
+>   school can turn them off for all its parents. We can add a document to
+>   the demo school during review so a notification arrives (within about
+>   25 minutes).
 > • Pull down on any page to refresh. Turn on Airplane Mode to see the
 >   offline screen; it reconnects by itself.
 > • Account deletion: Menu > Profile > Delete account.
@@ -221,6 +228,13 @@ An app preview video is optional.
    `.p8` contents; `\n` escapes are fine), which `lib/push/apns.ts` reads.
    It tries the production APNs host first and falls back to sandbox, so
    TestFlight / App Store builds and Xcode debug builds both work.
+   `APNS_BUNDLE_ID` is optional (defaults to `app.askmyschool`). For the
+   Android app, set `FCM_SERVICE_ACCOUNT_JSON` (a Firebase service account
+   key, JSON). New-document pushes also need migration
+   `042_new_document_push.sql` and `CRON_SECRET` (the
+   `/api/cron/send-document-pushes` cron runs every 15 minutes). Until APNs
+   or FCM is configured the cron logs a warning and drops queued documents
+   rather than saving them up, so parents don't get a backlog all at once.
 4. **App Store Connect API key** (for building without a Mac): App Store
    Connect > Users and Access > Integrations > App Store Connect API > Team
    Keys > +, role **Admin** (cloud signing needs Admin), download

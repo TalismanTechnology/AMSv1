@@ -22,6 +22,7 @@ import {
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { DeleteAccountSection } from "@/components/account/delete-account-section";
 import { AiConsentSection } from "@/components/account/ai-consent-section";
+import { NotificationsSection } from "@/components/account/notifications-section";
 import { hasAiConsent } from "@/lib/ai/consent";
 import { updateProfile } from "@/actions/profile";
 import { addChild, updateChild, removeChild } from "@/actions/children";
@@ -36,6 +37,8 @@ interface ProfileClientProps {
   email: string;
   schoolId: string;
   schoolSlug: string;
+  schoolName: string | null;
+  newDocumentPush: boolean;
 }
 
 export function ProfileClient({
@@ -43,6 +46,8 @@ export function ProfileClient({
   initialChildren,
   email,
   schoolId,
+  schoolName,
+  newDocumentPush,
 }: ProfileClientProps) {
   const [fullName, setFullName] = useState(profile.full_name || "");
   const [savingName, setSavingName] = useState(false);
@@ -240,6 +245,11 @@ export function ProfileClient({
           )}
         </div>
       </section>
+
+      <NotificationsSection
+        newDocumentPush={newDocumentPush}
+        schoolName={schoolName}
+      />
 
       <AiConsentSection
         consented={hasAiConsent(profile)}

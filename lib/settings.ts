@@ -14,6 +14,7 @@ function getDefaultSettings(schoolId: string): Settings {
     disable_animations: false,
     require_join_code: false,
     require_approval: true,
+    new_document_push_enabled: true,
     updated_at: new Date().toISOString(),
   };
 }
@@ -32,5 +33,7 @@ export async function loadSettings(schoolId: string): Promise<Settings> {
     suggested_questions: Array.isArray(data.suggested_questions)
       ? data.suggested_questions
       : [],
+    // Missing until migration 042 is applied.
+    new_document_push_enabled: data.new_document_push_enabled ?? true,
   } as Settings;
 }

@@ -20,13 +20,14 @@ test("analytics_events cascades with the profile in 033", () => {
   assert.match(migration, /\('analytics_events',\s*'user_id',\s*'public\.profiles',\s*'CASCADE'\)/);
 });
 
-test("personal data covers chats, feedback, children, push tokens and analytics", () => {
+test("personal data covers chats, feedback, children, push tokens, notification settings and analytics", () => {
   const tables = PERSONAL_DATA.map(([table]) => table);
   for (const t of [
     "chat_sessions",
     "chat_feedback",
     "children",
     "push_devices",
+    "notification_preferences",
     "analytics_events",
     "notifications",
     "school_memberships",
