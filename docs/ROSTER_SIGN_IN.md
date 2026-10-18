@@ -64,7 +64,8 @@ add them in the app. A failure here is logged and sign-in continues.
 ## CSV format
 
 One header row, then data. Comma, semicolon or tab separated; quotes, BOM,
-CRLF all fine. Up to 10,000 rows and 2 MB. Header names are matched ignoring
+CRLF all fine. Up to 10,000 rows and 900 KB (kept under
+Next's default 1 MB server-action body limit). Header names are matched ignoring
 case, spaces, underscores and hyphens.
 
 | Column | Accepted headers |
@@ -98,21 +99,28 @@ Re-uploading brings them back. A file with no valid rows is refused.
 
 1. Apply `044_school_roster.sql` (once, manually).
 2. A school admin opens **Settings → Sign-in**, uploads the roster and checks
-   the preview, then picks **Email code** (only possible once the roster has
-   an active parent) and confirms. Every change is in the audit log.
+   the preview. A super admin then picks **Email code** (only possible once
+   the roster has an active parent) and confirms. Every change is in the
+   audit log.
 3. The school now appears on `/login` (picking it opens `/s/<slug>/login`).
    Old `/auth/blackbaud?school=<slug>` links redirect to the login page.
 
-To switch back, pick Blackbaud/Veracross in the same panel. Nothing is
-deleted.
+To switch back, a super admin picks Blackbaud/Veracross in the same panel.
+Nothing is deleted.
+
+Changing the provider can lock every parent out of a school, so only super
+admins (`profiles.role = 'super_admin'`) can do it; school admins see the
+current method read-only with a note to contact AskMySchool support. Roster
+uploads stay with school admins.
 
 ### Require roster match (any provider)
 
 **Settings → Sign-in → Require roster match for every sign-in.** Default off;
-can't be turned on with an empty roster. When on, the Blackbaud and Veracross
+can't be turned on with an empty roster. Only super admins can turn it on;
+school admins can turn it off. When on, the Blackbaud and Veracross
 callbacks check the roster right after the provider accepts the parent and
 before any account is touched; parents who aren't listed see "Your email
-isn't on <school>'s parent list for Ask My School yet. Please contact the
+isn't on <school>'s parent list for AskMySchool yet. Please contact the
 school office." (`lib/roster/gate.ts`). While it's off, nothing changes. If the
 school row can't be read the gate is treated as off; if the roster lookup
 itself fails while the gate is on, sign-in fails with the usual "please try
@@ -123,7 +131,7 @@ again".
 | Variable | |
 | --- | --- |
 | `LOGIN_CODE_SECRET` | Optional. HMAC key for codes and IP hashes. Falls back to `BLACKBAUD_TOKEN_ENC_KEY` (already set in prod). Changing it invalidates outstanding codes. |
-| `AUTH_EMAIL_FROM` | Optional sender for code emails. Falls back to `EMAIL_FROM`, then `Ask My School <noreply@askmyschool.app>`. The domain must be verified in Resend. |
+| `AUTH_EMAIL_FROM` | Optional sender for code emails. Falls back to `EMAIL_FROM`, then `AskMySchool <noreply@askmyschool.app>`. The domain must be verified in Resend. |
 | `RESEND_API_KEY` | Required to actually send codes (existing). |
 
 ## Deploying (before / after 044)

@@ -52,7 +52,7 @@ test("gate decisions", () => {
   assert.equal(decideRosterGate(true, "error"), "error");
   assert.equal(
     rosterGateMessage("Acme School"),
-    "Your email isn't on Acme School's parent list for Ask My School yet. Please contact the school office."
+    "Your email isn't on Acme School's parent list for AskMySchool yet. Please contact the school office."
   );
 });
 

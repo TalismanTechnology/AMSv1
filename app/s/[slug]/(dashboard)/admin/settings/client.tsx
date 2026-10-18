@@ -108,6 +108,8 @@ interface SettingsClientProps {
   blackbaudCallback: BlackbaudCallbackResult;
   websiteSources: { sources: WebsiteSourceView[]; loadError: string | null };
   parentSignIn: ParentSignInConfig;
+  /** Viewer is a platform super admin (see requireSchoolContext). */
+  isSuperAdmin: boolean;
   /** The ?tab= value from the URL, so a refresh keeps the open tab. */
   initialTab?: string;
 }
@@ -121,6 +123,7 @@ export function SettingsClient({
   blackbaudCallback,
   websiteSources,
   parentSignIn,
+  isSuperAdmin,
   initialTab,
 }: SettingsClientProps) {
   // Returning from Blackbaud's consent screen opens the Blackbaud tab so the
@@ -480,7 +483,11 @@ export function SettingsClient({
           forceMount
           className="data-[state=inactive]:hidden"
         >
-          <ParentSignInSettings schoolId={schoolId} config={parentSignIn} />
+          <ParentSignInSettings
+            schoolId={schoolId}
+            config={parentSignIn}
+            isSuperAdmin={isSuperAdmin}
+          />
         </TabsContent>
 
         <TabsContent

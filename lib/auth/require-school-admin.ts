@@ -42,3 +42,27 @@ export async function requireSchoolAdmin(
 
   return { userId: user.id };
 }
+
+// Platform-wide gate for school settings that can lock every parent out of a
+// school (parent sign-in provider, turning on require-roster-match). School
+// admins can see these settings but not change them.
+export async function requireSuperAdmin(): Promise<SchoolAdminResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { error: "Not authenticated" };
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (profile?.role !== "super_admin") {
+    return { error: "Only AskMySchool support can change how parents sign in" };
+  }
+
+  return { userId: user.id };
+}

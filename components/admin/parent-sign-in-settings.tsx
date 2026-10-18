@@ -18,7 +18,9 @@ import {
 } from "@/actions/parent-sign-in";
 import type { AuthProvider } from "@/lib/auth/provider";
 import {
+  MAX_ROSTER_BYTES,
   ROSTER_TEMPLATE_CSV,
+  ROSTER_TOO_LARGE,
   parseRosterCsv,
   type RosterParseResult,
   type RowIssue,
@@ -63,6 +65,8 @@ const PROVIDER_PHRASE: Record<AuthProvider, string> = {
   roster: "a code emailed to the address on your roster",
 };
 
+const SUPPORT_NOTE = "Contact AskMySchool support to change how parents sign in.";
+
 const PREVIEW_PARENTS = 20;
 const PREVIEW_ISSUES = 50;
 
@@ -84,9 +88,12 @@ function plural(count: number, one: string, many: string): string {
 export function ParentSignInSettings({
   schoolId,
   config,
+  isSuperAdmin,
 }: {
   schoolId: string;
   config: ParentSignInConfig;
+  /** Only super admins may change the provider or turn the roster gate on. */
+  isSuperAdmin: boolean;
 }) {
   return (
     <section className="space-y-4">
@@ -110,16 +117,24 @@ export function ParentSignInSettings({
         </div>
       ) : (
         <div className="space-y-5">
-          <ProviderCard schoolId={schoolId} config={config} />
+          <ProviderCard schoolId={schoolId} config={config} isSuperAdmin={isSuperAdmin} />
           <RosterCard schoolId={schoolId} config={config} />
-          <GateCard schoolId={schoolId} config={config} />
+          <GateCard schoolId={schoolId} config={config} isSuperAdmin={isSuperAdmin} />
         </div>
       )}
     </section>
   );
 }
 
-function ProviderCard({ schoolId, config }: { schoolId: string; config: ParentSignInConfig }) {
+function ProviderCard({
+  schoolId,
+  config,
+  isSuperAdmin,
+}: {
+  schoolId: string;
+  config: ParentSignInConfig;
+  isSuperAdmin: boolean;
+}) {
   const router = useRouter();
   const [pending, setPending] = useState<AuthProvider | null>(null);
   const [saving, setSaving] = useState(false);
@@ -154,18 +169,22 @@ function ProviderCard({ schoolId, config }: { schoolId: string; config: ParentSi
         <legend className="text-sm font-medium text-ink">Sign-in method</legend>
         <p className="mt-0.5 text-xs text-muted-foreground">
           Staff always sign in with their email and password.
+          {isSuperAdmin ? "" : ` ${SUPPORT_NOTE}`}
         </p>
         <div className="mt-4 space-y-2">
           {PROVIDER_OPTIONS.map((option) => {
-            const reason = option.value === config.provider ? null : disabledReason(option.value);
             const checked = option.value === config.provider;
+            const reason = checked ? null : disabledReason(option.value);
+            const locked = !checked && (!isSuperAdmin || Boolean(reason));
             return (
               <label
                 key={option.value}
                 className={cn(
                   "flex items-start gap-3 rounded-lg border p-3 transition-colors",
                   checked ? "border-primary/60 bg-primary/5" : "border-border",
-                  reason ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:bg-secondary/50"
+                  locked
+                    ? "cursor-not-allowed opacity-60"
+                    : isSuperAdmin && "cursor-pointer hover:bg-secondary/50"
                 )}
               >
                 <input
@@ -173,7 +192,7 @@ function ProviderCard({ schoolId, config }: { schoolId: string; config: ParentSi
                   name="parent-sign-in-provider"
                   value={option.value}
                   checked={checked}
-                  disabled={Boolean(reason) || saving}
+                  disabled={locked || saving}
                   onChange={() => setPending(option.value)}
                   className="mt-0.5 size-4 accent-primary"
                 />
@@ -241,6 +260,12 @@ function RosterCard({ schoolId, config }: { schoolId: string; config: ParentSign
 
   async function handleFile(file: File | undefined) {
     if (!file) return;
+    // The text goes to a server action, which has a 1 MB body limit.
+    if (file.size > MAX_ROSTER_BYTES) {
+      clearFile();
+      toast.error(ROSTER_TOO_LARGE);
+      return;
+    }
     const text = await file.text();
     setFileName(file.name);
     setCsvText(text);
@@ -455,11 +480,21 @@ function RosterCard({ schoolId, config }: { schoolId: string; config: ParentSign
   );
 }
 
-function GateCard({ schoolId, config }: { schoolId: string; config: ParentSignInConfig }) {
+function GateCard({
+  schoolId,
+  config,
+  isSuperAdmin,
+}: {
+  schoolId: string;
+  config: ParentSignInConfig;
+  isSuperAdmin: boolean;
+}) {
   const router = useRouter();
   const [enabled, setEnabled] = useState(config.requireRosterMatch);
   const [saving, setSaving] = useState(false);
   const emptyRoster = config.rosterActiveCount === 0;
+  // School admins may turn the gate off, but only support can turn it on.
+  const cannotEnable = !enabled && (!isSuperAdmin || emptyRoster);
 
   async function toggle(next: boolean) {
     setSaving(true);
@@ -483,13 +518,17 @@ function GateCard({ schoolId, config }: { schoolId: string; config: ParentSignIn
           <p className="text-xs text-muted-foreground">
             Parents must also be on this list, even when they sign in with
             Blackbaud or Veracross.
-            {emptyRoster && !enabled ? " Upload a roster first." : ""}
+            {!enabled && !isSuperAdmin
+              ? ` ${SUPPORT_NOTE}`
+              : emptyRoster && !enabled
+                ? " Upload a roster first."
+                : ""}
           </p>
         </div>
         <Switch
           id="require-roster-match"
           checked={enabled}
-          disabled={saving || (emptyRoster && !enabled)}
+          disabled={saving || cannotEnable}
           onCheckedChange={(next) => void toggle(next)}
         />
       </div>

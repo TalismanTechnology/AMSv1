@@ -171,7 +171,7 @@ test("the sender comes from AUTH_EMAIL_FROM, then EMAIL_FROM", () => {
   try {
     delete process.env.AUTH_EMAIL_FROM;
     delete process.env.EMAIL_FROM;
-    assert.equal(loginCodeFromAddress(), "Ask My School <noreply@askmyschool.app>");
+    assert.equal(loginCodeFromAddress(), "AskMySchool <noreply@askmyschool.app>");
     process.env.EMAIL_FROM = "General <g@x.com>";
     assert.equal(loginCodeFromAddress(), "General <g@x.com>");
     process.env.AUTH_EMAIL_FROM = "Auth <a@x.com>";

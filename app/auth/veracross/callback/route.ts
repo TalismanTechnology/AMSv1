@@ -147,8 +147,17 @@ export async function GET(request: Request) {
   // Optional school setting (off unless the school turned it on): parents
   // must also be on the school's uploaded roster.
   const gate = await checkRosterGate(schoolId, normalizeEmail(decision.email));
-  if (gate.outcome === "blocked") return fail(rosterGateMessage(gate.schoolName));
-  if (gate.outcome === "error") return fail(MESSAGES.failed);
+  if (gate.outcome !== "pass") {
+    logVeracrossFailure({
+      step: "gate",
+      schoolId,
+      route: connection.schoolRoute,
+      reason: gate.outcome === "blocked" ? "not on school roster" : "roster lookup failed",
+    });
+    return fail(
+      gate.outcome === "blocked" ? rosterGateMessage(gate.schoolName) : MESSAGES.failed
+    );
+  }
 
   let handoffCode: string | null = null;
 

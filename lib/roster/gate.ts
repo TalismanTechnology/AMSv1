@@ -93,5 +93,5 @@ export async function checkRosterGate(schoolId: string, email: string): Promise<
 }
 
 export function rosterGateMessage(schoolName: string): string {
-  return `Your email isn't on ${schoolName}'s parent list for Ask My School yet. Please contact the school office.`;
+  return `Your email isn't on ${schoolName}'s parent list for AskMySchool yet. Please contact the school office.`;
 }

@@ -313,7 +313,7 @@ export default async function SettingsPage({
 }) {
   const { slug } = await params;
   const { blackbaud, tab } = await searchParams;
-  const { school } = await requireSchoolContext(slug);
+  const { school, isSuperAdmin } = await requireSchoolContext(slug);
 
   const [
     settings,
@@ -352,6 +352,7 @@ export default async function SettingsPage({
         blackbaudCallback={parseCallbackResult(blackbaud)}
         websiteSources={websiteSources}
         parentSignIn={parentSignIn}
+        isSuperAdmin={isSuperAdmin}
         initialTab={tab}
       />
     </PageTransition>

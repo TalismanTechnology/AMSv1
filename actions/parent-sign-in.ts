@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requireSchoolAdmin } from "@/lib/auth/require-school-admin";
+import { requireSchoolAdmin, requireSuperAdmin } from "@/lib/auth/require-school-admin";
 import { logAudit } from "@/lib/audit";
 import { resolveAuthProvider, type AuthProvider } from "@/lib/auth/provider";
 import { isNotInstalledError } from "@/lib/supabase/not-installed";
@@ -10,6 +10,7 @@ import { getVeracrossConnection } from "@/lib/veracross/connection";
 import {
   MAX_ROSTER_BYTES,
   MAX_ROSTER_ROWS,
+  ROSTER_TOO_LARGE,
   parseRosterCsv,
   type RowIssue,
 } from "@/lib/roster/csv";
@@ -18,7 +19,10 @@ import { getRosterSummary, previewRosterReplacement, replaceRoster } from "@/lib
 // Server actions behind the "Parent sign-in" panel in admin settings: which
 // provider parents use, the uploaded parent roster, and the optional
 // require-roster-match gate. Every entry point re-authorizes against the
-// *specific* school id it was handed (see actions/blackbaud.ts).
+// *specific* school id it was handed (see actions/blackbaud.ts). Changing the
+// provider and turning the gate on can lock every parent out of a school, so
+// those are super-admin only; school admins manage the roster and can turn the
+// gate off.
 
 const NOT_INSTALLED = "Email-code sign-in isn't available yet. It will be after the next database update.";
 const PROVIDERS: readonly AuthProvider[] = ["blackbaud", "veracross", "roster"];
@@ -38,7 +42,7 @@ export async function updateParentSignInProvider(
   schoolId: string,
   provider: AuthProvider
 ): Promise<{ error?: string; success?: boolean }> {
-  const auth = await requireSchoolAdmin(schoolId);
+  const auth = await requireSuperAdmin();
   if ("error" in auth) return { error: auth.error };
 
   if (!PROVIDERS.includes(provider)) return { error: "Unknown sign-in method." };
@@ -112,7 +116,7 @@ export async function uploadRoster(
 
   if (typeof csvText !== "string") return { error: "No file received." };
   // Cheap guard before parsing; parseRosterCsv checks the exact byte size.
-  if (csvText.length > MAX_ROSTER_BYTES) return { error: "This file is larger than 2 MB." };
+  if (csvText.length > MAX_ROSTER_BYTES) return { error: ROSTER_TOO_LARGE };
 
   const parsed = parseRosterCsv(csvText);
   if (parsed.fatal) return { error: parsed.fatal };
@@ -158,12 +162,15 @@ export async function uploadRoster(
   }
 }
 
-/** Toggle schools.require_roster_match (migration 044). */
+/**
+ * Toggle schools.require_roster_match (migration 044). Turning it on is
+ * super-admin only; any admin of the school may turn it off.
+ */
 export async function updateRequireRosterMatch(
   schoolId: string,
   enabled: boolean
 ): Promise<{ error?: string; success?: boolean }> {
-  const auth = await requireSchoolAdmin(schoolId);
+  const auth = enabled === true ? await requireSuperAdmin() : await requireSchoolAdmin(schoolId);
   if ("error" in auth) return { error: auth.error };
 
   if (typeof enabled !== "boolean") return { error: "Invalid setting." };

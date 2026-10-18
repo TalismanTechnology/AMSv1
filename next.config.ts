@@ -8,11 +8,6 @@ const PUBLIC_ASSET_CACHE = "public, max-age=86400, stale-while-revalidate=604800
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ["officeparser", "pdfjs-dist", "libreoffice-convert", "resend"],
-  experimental: {
-    // Parent roster CSVs (up to 2 MB, lib/roster/csv.ts) are sent to a server
-    // action as text; the default limit is 1 MB.
-    serverActions: { bodySizeLimit: "3mb" },
-  },
   async headers() {
     return [
       {

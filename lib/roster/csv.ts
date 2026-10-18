@@ -11,7 +11,11 @@ import { GRADE_VALUES } from "@/lib/grades";
 // Rows are grouped by email, so a parent listed once per child ends up with
 // one roster entry holding every child.
 
-export const MAX_ROSTER_BYTES = 2 * 1024 * 1024;
+// Kept under Next's default 1 MB server-action body limit: the CSV text is
+// sent to the upload action as-is.
+export const MAX_ROSTER_BYTES = 900 * 1024;
+export const ROSTER_TOO_LARGE =
+  "This file is larger than 900 KB. Split it or remove extra columns.";
 export const MAX_ROSTER_ROWS = 10_000;
 const MAX_EMAIL_LENGTH = 254;
 const MAX_NAME_LENGTH = 200;
@@ -308,7 +312,7 @@ function byteLength(text: string): number {
 
 export function parseRosterCsv(text: string): RosterParseResult {
   if (byteLength(text) > MAX_ROSTER_BYTES) {
-    return emptyResult("This file is larger than 2 MB. Split it or remove extra columns.");
+    return emptyResult(ROSTER_TOO_LARGE);
   }
 
   const records = parseCsvRecords(text);

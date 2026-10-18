@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  MAX_ROSTER_BYTES,
   MAX_ROSTER_ROWS,
   ROSTER_TEMPLATE_CSV,
   isValidEmail,
@@ -211,7 +212,7 @@ test("files without an email column, empty files and oversized files are rejecte
   assert.match(parseRosterCsv("name,grade\nJane,3\n").fatal ?? "", /No email column/);
   assert.match(parseRosterCsv("").fatal ?? "", /empty/);
   assert.match(parseRosterCsv("\n\n").fatal ?? "", /empty/);
-  assert.match(parseRosterCsv(`email\n${"a".repeat(2 * 1024 * 1024)}`).fatal ?? "", /2 MB/);
+  assert.match(parseRosterCsv(`email\n${"a".repeat(MAX_ROSTER_BYTES)}`).fatal ?? "", /900 KB/);
 
   const tooMany = ["email", ...Array.from({ length: MAX_ROSTER_ROWS + 1 }, (_, i) => `p${i}@x.com`)];
   assert.match(parseRosterCsv(tooMany.join("\n")).fatal ?? "", /limit is 10,000/);
