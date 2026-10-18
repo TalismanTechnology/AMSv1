@@ -21,7 +21,11 @@ import {
   type ChildContext,
 } from "@/lib/ai/context";
 import { rewriteQueryWithContext } from "@/lib/ai/rewrite-query";
-import { redactChildNames, redactChildNamesInMessages } from "@/lib/ai/child-privacy";
+import {
+  redactChildNames,
+  redactChildNamesInMessages,
+  splitGraduatedChildren,
+} from "@/lib/ai/child-privacy";
 import { buildSystemPrompt } from "@/lib/ai/system-prompt";
 import { selectPassages } from "@/lib/ai/source-selection";
 import type { ChatSource } from "@/lib/types";
@@ -88,13 +92,15 @@ export async function prepareChatTurn({
       .single()
       .then((r) => r.data),
   ]);
-  const resolvedChildren = await children;
+  // Graduated children are left out of the context (the assistant shouldn't
+  // answer about them as 12th graders) but their names are still redacted.
+  const { current: resolvedChildren, redactable } = splitGraduatedChildren(await children);
 
   // Children's names never leave for the AI provider: every name in the
   // conversation becomes that child's grade label before anything below
   // (rewrite, embedding, answer model) sees it. See lib/ai/child-privacy.ts.
-  const providerMessages = redactChildNamesInMessages(messages, resolvedChildren);
-  const providerQuestion = redactChildNames(lastMessageText, resolvedChildren);
+  const providerMessages = redactChildNamesInMessages(messages, redactable);
+  const providerQuestion = redactChildNames(lastMessageText, redactable);
 
   // Rewrite follow-up questions into standalone queries for better RAG
   // search. Children are passed so "and my other kid?" resolves to a grade
