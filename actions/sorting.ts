@@ -5,6 +5,18 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { logAudit } from "@/lib/audit";
 import { applySorting, chooseSorting } from "@/lib/documents/auto-sort";
+import { toFolderOptions } from "@/lib/ai/classify-document";
+import { proposeFolders } from "@/lib/ai/propose-folders";
+import {
+  autoFolderCandidates,
+  protectedFolderIds,
+  reusableRootFolders,
+  sanitizeAutoFolderProposal,
+  type AutoFolderDoc,
+  type AutoFolderFolder,
+  type AutoFolderPlan,
+  type AutoFolderScope,
+} from "@/lib/documents/auto-folder";
 import {
   DEFAULT_DIVISIONS,
   STARTER_CATEGORIES,
@@ -70,6 +82,15 @@ async function labelsFor(admin: SupabaseClient, schoolId: string) {
   return categoryLabels(categories ?? [], divisions ?? []);
 }
 
+/** Folder id -> full path ("Athletics / Forms"). */
+async function folderPathsFor(admin: SupabaseClient, schoolId: string) {
+  const { data } = await admin
+    .from("folders")
+    .select("id, name, parent_id")
+    .eq("school_id", schoolId);
+  return new Map(toFolderOptions(data ?? []).map((f) => [f.id, f.name]));
+}
+
 export interface SortResult {
   id: string;
   title: string;
@@ -95,8 +116,10 @@ function reasonFor(err: unknown): string {
 
 /**
  * File unfiled documents now, with the same AI that auto-sorts new ones,
- * whether or not auto-sort is switched on. Fills only what is still empty.
- * Takes at most a few documents per call.
+ * whether or not auto-sort is switched on. Fills only what is still empty —
+ * a missing category, a missing folder, or both — from the categories and
+ * folders the school already has; never creates either. Takes at most a few
+ * documents per call.
  */
 export async function sortDocumentsNow(
   schoolId: string,
@@ -118,19 +141,27 @@ export async function sortDocumentsNow(
     .in("id", ids);
   if (error) return { error: error.message };
 
+  type Sorted = SortResult & { categoryId?: string; folderId?: string };
   const sorted = await Promise.all(
-    (docs ?? []).map(async (doc): Promise<SortResult & { categoryId?: string }> => {
+    (docs ?? []).map(async (doc): Promise<Sorted> => {
       const base = { id: doc.id as string, title: doc.title as string };
       if (doc.status !== "ready") return { ...base, error: "Still processing" };
-      if (doc.category_id) {
-        return { ...base, categoryId: doc.category_id as string, alreadyFiled: true };
-      }
+      const had = {
+        categoryId: (doc.category_id as string | null) ?? undefined,
+        folderId: (doc.folder_id as string | null) ?? undefined,
+      };
+      if (had.categoryId && had.folderId) return { ...base, ...had, alreadyFiled: true };
       try {
+        // Fills whichever of category and folder is still empty, from the
+        // school's existing ones only.
         const choice = await chooseSorting(admin, doc, await documentText(admin, doc));
-        const { categoryId } = await applySorting(admin, doc.id, choice);
-        return categoryId
-          ? { ...base, categoryId }
-          : { ...base, error: "No category fits it. File it by hand, or add an Other category." };
+        const written = await applySorting(admin, doc.id, choice);
+        const categoryId = written.categoryId ?? had.categoryId;
+        const folderId = written.folderId ?? had.folderId;
+        if (written.categoryId || written.folderId) return { ...base, categoryId, folderId };
+        // It had a category and no folder fits: left as it was.
+        if (categoryId) return { ...base, categoryId, folderId, alreadyFiled: true };
+        return { ...base, error: "No category fits it. File it by hand, or add an Other category." };
       } catch (err) {
         console.error(`[sort] Sorting ${doc.id} failed:`, err);
         return { ...base, error: reasonFor(err) };
@@ -138,11 +169,17 @@ export async function sortDocumentsNow(
     })
   );
 
-  const labels = await labelsFor(admin, schoolId);
-  const results: SortResult[] = sorted.map(({ categoryId, ...rest }) => ({
-    ...rest,
-    label: categoryId ? labels.get(categoryId) : undefined,
-  }));
+  const [labels, folderPaths] = await Promise.all([
+    labelsFor(admin, schoolId),
+    folderPathsFor(admin, schoolId),
+  ]);
+  const results: SortResult[] = sorted.map(({ categoryId, folderId, ...rest }) => {
+    const parts = [
+      categoryId ? labels.get(categoryId) : undefined,
+      folderId ? folderPaths.get(folderId) : undefined,
+    ].filter(Boolean);
+    return { ...rest, label: parts.length ? parts.join(" · ") : undefined };
+  });
 
   logAudit(
     user.id,
@@ -245,4 +282,204 @@ export async function setUpDivisionCategories(
   );
   revalidatePath("/", "layout");
   return { unfiledIds: (unfiled ?? []).map((d) => d.id) };
+}
+
+/** Documents one Auto-folder run proposes for; run it again for the rest. */
+const AUTO_FOLDER_MAX_DOCS = 400;
+/** Ids per update, to keep the request URL short. */
+const UPDATE_CHUNK = 200;
+
+async function autoFolderInputs(admin: SupabaseClient, schoolId: string) {
+  const [{ data: folders, error: folderError }, { data: docs, error: docError }] =
+    await Promise.all([
+      admin.from("folders").select("id, name, parent_id, school_id").eq("school_id", schoolId),
+      admin
+        .from("documents")
+        .select("id, title, school_id, folder_id, source, status, summary")
+        .eq("school_id", schoolId)
+        .order("created_at", { ascending: false }),
+    ]);
+  if (folderError || docError) throw new Error((folderError ?? docError)!.message);
+  return {
+    folders: (folders ?? []) as AutoFolderFolder[],
+    docs: (docs ?? []) as (AutoFolderDoc & { summary: string | null })[],
+  };
+}
+
+export interface AutoFolderPreview extends AutoFolderPlan {
+  scope: AutoFolderScope;
+  /** Documents in scope that this run didn't look at (over the per-run cap). */
+  remaining: number;
+}
+
+/**
+ * Auto-folder, step 1: ask the AI for a folder structure for the documents in
+ * scope and where each one goes. Changes nothing; the admin sees the plan
+ * and applies it with applyAutoFolders.
+ */
+export async function proposeAutoFolders(
+  schoolId: string,
+  scope: AutoFolderScope
+): Promise<{ preview?: AutoFolderPreview; error?: string }> {
+  try {
+    await requireSchoolAdmin(schoolId);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Not authorized" };
+  }
+  const safeScope: AutoFolderScope = scope === "all" ? "all" : "unfiled";
+  const admin = createAdminClient();
+
+  try {
+    const { folders, docs } = await autoFolderInputs(admin, schoolId);
+    const inScope = autoFolderCandidates(docs, folders, schoolId, safeScope);
+    const batch = inScope.slice(0, AUTO_FOLDER_MAX_DOCS);
+    if (!batch.length) {
+      return { preview: { scope: safeScope, folders: [], moves: [], skipped: [], remaining: 0 } };
+    }
+
+    const roots = reusableRootFolders(folders, schoolId);
+    const examples = new Map<string, string[]>();
+    for (const doc of docs) {
+      if (!doc.folder_id) continue;
+      const list = examples.get(doc.folder_id) ?? [];
+      if (list.length < 3) examples.set(doc.folder_id, [...list, doc.title]);
+    }
+    const proposal = await proposeFolders({
+      docs: batch,
+      existingFolders: roots.map((f) => ({ name: f.name, examples: examples.get(f.id) })),
+    });
+    const plan = sanitizeAutoFolderProposal({
+      schoolId,
+      scope: safeScope,
+      folders,
+      docs: batch,
+      proposal,
+    });
+    if (plan.skipped.length) {
+      console.warn(`[auto-folder] Dropped ${plan.skipped.length} proposed assignment(s)`, plan.skipped.slice(0, 20));
+    }
+    return {
+      preview: { ...plan, scope: safeScope, remaining: inScope.length - batch.length },
+    };
+  } catch (err) {
+    console.error(`[auto-folder] Proposal for ${schoolId} failed:`, err);
+    return { error: reasonFor(err) };
+  }
+}
+
+/**
+ * Auto-folder, step 2: apply a previewed plan. Everything is checked again
+ * against the database: only this school's documents still in scope move,
+ * nothing goes into or out of Website/Responses, website-synced documents
+ * are left alone, and only missing root folders are created. Never deletes,
+ * renames or moves folders, and never deletes documents.
+ */
+export async function applyAutoFolders(
+  schoolId: string,
+  scope: AutoFolderScope,
+  moves: { documentId: string; folder: string }[]
+): Promise<{ created?: string[]; moved?: number; skipped?: number; error?: string }> {
+  let user;
+  try {
+    user = await requireSchoolAdmin(schoolId);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Not authorized" };
+  }
+  const safeScope: AutoFolderScope = scope === "all" ? "all" : "unfiled";
+  const admin = createAdminClient();
+
+  try {
+    const { folders, docs } = await autoFolderInputs(admin, schoolId);
+    const plan = sanitizeAutoFolderProposal({
+      schoolId,
+      scope: safeScope,
+      folders,
+      docs,
+      proposal: {
+        assignments: (Array.isArray(moves) ? moves : []).map((m) => ({
+          documentId: String(m?.documentId ?? ""),
+          folder: String(m?.folder ?? ""),
+        })),
+      },
+    });
+
+    // Root folders: reuse what exists, create what doesn't.
+    const folderIds = new Map<string, string>();
+    const created: string[] = [];
+    for (const target of plan.folders) {
+      if (target.existingId) {
+        folderIds.set(target.name, target.existingId);
+        continue;
+      }
+      const { data, error } = await admin
+        .from("folders")
+        .insert({ name: target.name, parent_id: null, school_id: schoolId })
+        .select("id")
+        .single();
+      if (data) {
+        folderIds.set(target.name, data.id);
+        created.push(target.name);
+        continue;
+      }
+      // Created by someone else since the plan was checked: use theirs.
+      if (error?.code === "23505") {
+        const { data: existing } = await admin
+          .from("folders")
+          .select("id")
+          .eq("school_id", schoolId)
+          .is("parent_id", null)
+          .eq("name", target.name)
+          .maybeSingle();
+        if (existing) {
+          folderIds.set(target.name, existing.id);
+          continue;
+        }
+      }
+      throw new Error(`Couldn't create the folder “${target.name}”: ${error?.message ?? "unknown error"}`);
+    }
+
+    const locked = [...protectedFolderIds(folders)];
+    const byFolder = new Map<string, string[]>();
+    for (const move of plan.moves) {
+      const id = folderIds.get(move.folder);
+      if (!id) continue;
+      byFolder.set(id, [...(byFolder.get(id) ?? []), move.documentId]);
+    }
+
+    let moved = 0;
+    const now = new Date().toISOString();
+    for (const [folderId, ids] of byFolder) {
+      for (let i = 0; i < ids.length; i += UPDATE_CHUNK) {
+        let update = admin
+          .from("documents")
+          .update({ folder_id: folderId, updated_at: now })
+          .eq("school_id", schoolId)
+          .in("id", ids.slice(i, i + UPDATE_CHUNK))
+          .neq("source", "website");
+        // The same rules again in the write itself, in case a document was
+        // filed between the check above and now.
+        if (safeScope === "unfiled") update = update.is("folder_id", null);
+        else if (locked.length) {
+          update = update.or(`folder_id.is.null,folder_id.not.in.(${locked.join(",")})`);
+        }
+        const { data, error } = await update.select("id");
+        if (error) throw new Error(error.message);
+        moved += data?.length ?? 0;
+      }
+    }
+
+    logAudit(
+      user.id,
+      "auto_folder_documents",
+      "document",
+      undefined,
+      { scope: safeScope, created, moved, skipped: plan.skipped.length },
+      schoolId
+    );
+    revalidatePath("/", "layout");
+    return { created, moved, skipped: plan.moves.length - moved + plan.skipped.length };
+  } catch (err) {
+    console.error(`[auto-folder] Applying for ${schoolId} failed:`, err);
+    return { error: reasonFor(err) };
+  }
 }

@@ -214,14 +214,15 @@ export async function setDocumentDivision(
 /**
  * Write a sorting choice. Each field is written only while it is still empty:
  * the document was read before sorting began, and a choice someone made since
- * wins. Returns the category written, if any.
+ * wins. Returns the category and folder written, if any.
  */
 export async function applySorting(
   supabase: SupabaseClient,
   documentId: string,
   choice: SortChoice
-): Promise<{ categoryId: string | null }> {
+): Promise<{ categoryId: string | null; folderId: string | null }> {
   let categoryId: string | null = null;
+  let folderId: string | null = null;
 
   if (choice.category_id) {
     const { data, error } = await supabase
@@ -246,13 +247,15 @@ export async function applySorting(
   }
 
   if (choice.folder_id) {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("documents")
       .update({ folder_id: choice.folder_id })
       .eq("id", documentId)
-      .is("folder_id", null);
+      .is("folder_id", null)
+      .select("id");
     if (error) throw new Error(error.message);
+    if (data?.length) folderId = choice.folder_id;
   }
 
-  return { categoryId };
+  return { categoryId, folderId };
 }
