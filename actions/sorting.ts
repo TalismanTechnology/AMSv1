@@ -113,7 +113,7 @@ export async function sortDocumentsNow(
   const admin = createAdminClient();
   const { data: docs, error } = await admin
     .from("documents")
-    .select("id, title, school_id, category_id, folder_id, status, summary, text_url")
+    .select("id, title, school_id, category_id, folder_id, source, status, summary, text_url")
     .eq("school_id", schoolId)
     .in("id", ids);
   if (error) return { error: error.message };
