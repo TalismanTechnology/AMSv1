@@ -2,9 +2,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isNotInstalledError } from "@/lib/supabase/not-installed";
 import type { RosterChild, RosterParent } from "./csv";
 
-// The school-uploaded parent roster (school_roster, migration 044). Service
+// The school-uploaded parent roster (school_roster, migration 045). Service
 // role only: the table has RLS on and no policies. Every function reports
-// `installed: false` instead of throwing while 044 hasn't been applied.
+// `installed: false` instead of throwing while 045 hasn't been applied.
 
 export interface RosterEntry {
   email: string;

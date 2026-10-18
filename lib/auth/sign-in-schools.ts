@@ -86,7 +86,7 @@ export async function getSignInSchools(): Promise<SignInSchool[]> {
 }
 
 /**
- * Roster schools whose roster has active parents. Before migration 044 no
+ * Roster schools whose roster has active parents. Before migration 045 no
  * school can be one, and any failure here just leaves them off the list.
  */
 async function getRosterSignInSchools(): Promise<SchoolRow[]> {

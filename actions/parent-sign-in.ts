@@ -71,7 +71,7 @@ export async function updateParentSignInProvider(
     .eq("id", schoolId);
 
   if (error) {
-    // 23514: the pre-044 check constraint doesn't allow 'roster' yet.
+    // 23514: the pre-045 check constraint doesn't allow 'roster' yet.
     if (provider === "roster" && (error.code === "23514" || isNotInstalledError(error))) {
       return { error: NOT_INSTALLED };
     }
@@ -163,7 +163,7 @@ export async function uploadRoster(
 }
 
 /**
- * Toggle schools.require_roster_match (migration 044). Turning it on is
+ * Toggle schools.require_roster_match (migration 045). Turning it on is
  * super-admin only; any admin of the school may turn it off.
  */
 export async function updateRequireRosterMatch(

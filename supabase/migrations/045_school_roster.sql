@@ -1,11 +1,11 @@
 -- ============================================
--- 044_school_roster.sql
+-- 045_school_roster.sql
 -- Parent roster + emailed one-time-code sign-in ("roster" provider), and an
 -- optional per-school "require roster match" gate for every provider.
 --
 -- MUST BE APPLIED MANUALLY (Supabase SQL editor / `supabase db push`).
--- Numbered after 043 (open PR); it touches none of 043's objects, so the
--- order is for bookkeeping. Requires 034 (schools.auth_provider,
+-- Numbered after 043 (open PR #33) and 044 (open PR #36, school contacts);
+-- it touches none of their objects, so the order is for bookkeeping. Requires 034 (schools.auth_provider,
 -- children.external_source / external_id).
 --
 -- Safe to deploy the code first: until this runs, the code treats the

@@ -1,7 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getRosterEntry } from "./store";
 
-// Optional per-school gate (schools.require_roster_match, migration 044,
+// Optional per-school gate (schools.require_roster_match, migration 045,
 // default off): parents must also be on the school's uploaded roster, however
 // they sign in. Checked by the Blackbaud and Veracross callbacks after the
 // provider has accepted the parent and before any account is touched; the
@@ -21,7 +21,7 @@ export function isRosterMatchRequired(
 
 /**
  * Pure: may this parent continue? Not required → yes. Table missing → yes
- * (the flag can't really be on without migration 044). A failed lookup while
+ * (the flag can't really be on without migration 045). A failed lookup while
  * required refuses: the school asked for the check.
  */
 export function decideRosterGate(required: boolean, lookup: RosterLookup): "pass" | "blocked" | "error" {
@@ -38,7 +38,7 @@ async function lookupRoster(schoolId: string, email: string): Promise<RosterLook
     if (!result.installed) {
       if (!loggedNotInstalled) {
         loggedNotInstalled = true;
-        console.warn("Roster gate: school_roster is not installed (migration 044); gate treated as off.");
+        console.warn("Roster gate: school_roster is not installed (migration 045); gate treated as off.");
       }
       return "not_installed";
     }
@@ -62,7 +62,7 @@ export type RosterGateResult =
 
 /**
  * The whole check for the provider callbacks. Loads the school itself
- * (`select("*")`, so it works before 044); if that read fails the gate is
+ * (`select("*")`, so it works before 045); if that read fails the gate is
  * treated as not required, so a school that never turned it on sees no new
  * failure mode.
  */

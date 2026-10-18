@@ -29,7 +29,7 @@ import { formatGrade } from "@/lib/grades";
 import { cn } from "@/lib/utils";
 
 export interface ParentSignInConfig {
-  /** Migration 044 applied (school_roster exists). */
+  /** Migration 045 applied (school_roster exists). */
   installed: boolean;
   /** Set when the roster couldn't be read for another reason. */
   loadError: string | null;

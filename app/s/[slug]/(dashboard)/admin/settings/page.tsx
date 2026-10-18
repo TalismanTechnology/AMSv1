@@ -278,7 +278,7 @@ async function loadWebsiteSources(
 
 /**
  * Parent sign-in provider, uploaded roster and the require-roster-match gate.
- * Before migration 044 the roster table is missing and the panel says so
+ * Before migration 045 the roster table is missing and the panel says so
  * instead of offering controls.
  */
 async function loadParentSignInConfig(school: School): Promise<ParentSignInConfig> {

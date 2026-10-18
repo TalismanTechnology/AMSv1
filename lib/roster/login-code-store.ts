@@ -2,7 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isNotInstalledError } from "@/lib/supabase/not-installed";
 import { CODE_TTL_MS, MINUTE_MS, type StoredCode } from "./login-code";
 
-// parent_login_codes I/O (migration 044). The rules live in login-code.ts.
+// parent_login_codes I/O (migration 045). The rules live in login-code.ts.
 // Rows double as the rate-limit ledger, so limits hold across serverless
 // instances without any other store.
 
@@ -10,7 +10,7 @@ const TABLE = "parent_login_codes";
 
 export class LoginCodesNotInstalledError extends Error {
   constructor() {
-    super("parent_login_codes is not installed (migration 044)");
+    super("parent_login_codes is not installed (migration 045)");
   }
 }
 

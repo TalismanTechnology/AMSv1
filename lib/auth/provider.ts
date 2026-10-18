@@ -2,7 +2,7 @@
 // server imports) so the login UI and the native bridge can use it too.
 //
 // Stored per school in schools.auth_provider (migration 034; "roster" needs
-// 044). Anything other than "veracross" or "roster" — including the column
+// 045). Anything other than "veracross" or "roster" — including the column
 // not existing yet because 034 hasn't been applied — means Blackbaud, so
 // existing schools are unaffected.
 

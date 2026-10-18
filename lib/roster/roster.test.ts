@@ -38,7 +38,7 @@ test("the gate is off unless the school row says exactly true", () => {
   assert.equal(isRosterMatchRequired({ require_roster_match: false }), false);
   assert.equal(isRosterMatchRequired({ require_roster_match: null }), false);
   assert.equal(isRosterMatchRequired({ require_roster_match: "true" }), false);
-  assert.equal(isRosterMatchRequired({}), false); // pre-044 row
+  assert.equal(isRosterMatchRequired({}), false); // pre-045 row
   assert.equal(isRosterMatchRequired(null), false);
 });
 

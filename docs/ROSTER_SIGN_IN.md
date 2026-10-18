@@ -9,7 +9,7 @@ sign-in provider, `schools.auth_provider` = `blackbaud` (default),
 Separately, any school can turn on **Require roster match**: parents must also
 be on the uploaded roster, whichever provider they sign in with.
 
-Both need migration `044_school_roster.sql`. Until it's applied, the code
+Both need migration `045_school_roster.sql`. Until it's applied, the code
 behaves exactly as before (see "Deploying").
 
 ## How it works
@@ -97,7 +97,7 @@ Re-uploading brings them back. A file with no valid rows is refused.
 
 ## Turning it on for a school
 
-1. Apply `044_school_roster.sql` (once, manually).
+1. Apply `045_school_roster.sql` (once, manually).
 2. A school admin opens **Settings → Sign-in**, uploads the roster and checks
    the preview. A super admin then picks **Email code** (only possible once
    the roster has an active parent) and confirms. Every change is in the
@@ -134,7 +134,7 @@ again".
 | `AUTH_EMAIL_FROM` | Optional sender for code emails. Falls back to `EMAIL_FROM`, then `AskMySchool <noreply@askmyschool.app>`. The domain must be verified in Resend. |
 | `RESEND_API_KEY` | Required to actually send codes (existing). |
 
-## Deploying (before / after 044)
+## Deploying (before / after 045)
 
 The code is safe to deploy before the migration:
 
@@ -144,7 +144,7 @@ The code is safe to deploy before the migration:
   `PGRST205`) are treated as "not installed" (`lib/supabase/not-installed.ts`):
   no school can be a roster school, the gate is off, and the settings panel
   says "Roster sign-in will be available after the next database update."
-- Saving `auth_provider = 'roster'` before 044 hits the old check constraint
+- Saving `auth_provider = 'roster'` before 045 hits the old check constraint
   and returns "Email-code sign-in isn't available yet".
 
 ## iOS / Android
