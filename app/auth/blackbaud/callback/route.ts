@@ -18,6 +18,7 @@ import {
 } from "@/lib/blackbaud/parent-login";
 import { normalizeEmail } from "@/lib/blackbaud/crypto";
 import { appCallbackUrl, createAppHandoff } from "@/lib/auth/app-handoff";
+import { checkRosterGate, rosterGateMessage } from "@/lib/roster/gate";
 import {
   LOGIN_STATE_COOKIE,
   unpackLoginCookie,
@@ -110,6 +111,12 @@ export async function GET(request: Request) {
     logFailure(schoolId, "token email", new Error(`no email for school user ${caller.id}`));
     return fail(MESSAGES.failed);
   }
+
+  // Optional school setting (off unless the school turned it on): parents
+  // must also be on the school's uploaded roster.
+  const gate = await checkRosterGate(schoolId, normalizeEmail(token.email));
+  if (gate.outcome === "blocked") return fail(rosterGateMessage(gate.schoolName));
+  if (gate.outcome === "error") return fail(MESSAGES.failed);
 
   let handoffCode: string | null = null;
 

@@ -9,6 +9,7 @@ import {
 } from "@/lib/auth/parent-session";
 import { normalizeEmail } from "@/lib/blackbaud/crypto";
 import { appCallbackUrl, createAppHandoff } from "@/lib/auth/app-handoff";
+import { checkRosterGate, rosterGateMessage } from "@/lib/roster/gate";
 import {
   VERACROSS_LOGIN_STATE_COOKIE,
   unpackLoginCookie,
@@ -118,6 +119,12 @@ export async function GET(request: Request) {
   if (!decision.allowed) {
     return fail(decision.reason === "no_email" ? MESSAGES.noEmail : MESSAGES.notParent);
   }
+
+  // Optional school setting (off unless the school turned it on): parents
+  // must also be on the school's uploaded roster.
+  const gate = await checkRosterGate(schoolId, normalizeEmail(decision.email));
+  if (gate.outcome === "blocked") return fail(rosterGateMessage(gate.schoolName));
+  if (gate.outcome === "error") return fail(MESSAGES.failed);
 
   let handoffCode: string | null = null;
 

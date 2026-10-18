@@ -43,6 +43,12 @@ export async function GET(request: Request) {
     );
   }
 
+  // An email-code (roster) school's parents sign in on its login page; there
+  // is nothing to hand over to.
+  if (resolveAuthProvider(school.auth_provider) === "roster") {
+    return NextResponse.redirect(`${origin}/s/${school.slug}/login`);
+  }
+
   // A Veracross school's parents sign in there instead. Older links and app
   // builds still point here, so hand the request over with its parameters.
   if (resolveAuthProvider(school.auth_provider) === "veracross") {

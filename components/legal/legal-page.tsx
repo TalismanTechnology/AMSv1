@@ -24,9 +24,17 @@ interface LegalPageProps {
   title: string;
   intro: React.ReactNode;
   children: React.ReactNode;
+  /** When this page changed more recently than LEGAL_LAST_UPDATED. */
+  lastUpdated?: string;
 }
 
-export function LegalPage({ eyebrow, title, intro, children }: LegalPageProps) {
+export function LegalPage({
+  eyebrow,
+  title,
+  intro,
+  children,
+  lastUpdated = LEGAL_LAST_UPDATED,
+}: LegalPageProps) {
   return (
     <div className="relative z-10 flex min-h-screen flex-col">
       <header className="mx-auto flex w-full max-w-3xl items-center justify-between px-6 pt-6">
@@ -49,7 +57,7 @@ export function LegalPage({ eyebrow, title, intro, children }: LegalPageProps) {
           {title}
         </h1>
         <p className="mt-3 text-sm text-muted-foreground">
-          Last updated: {LEGAL_LAST_UPDATED}
+          Last updated: {lastUpdated}
         </p>
         <div className="mt-6 text-base leading-relaxed text-ink-soft">{intro}</div>
         <div className="mt-12 space-y-12">{children}</div>

@@ -172,3 +172,17 @@ export async function ensureParentMembership(
     throw new Error(`Could not add parent to school: ${error.message}`);
   }
 }
+
+/**
+ * True when the account carries the parent_password_login app_metadata flag
+ * (App Review / demo accounts that sign in with a password, see
+ * actions/auth.ts). Sign-in paths that would otherwise revoke the password
+ * check this first so those accounts keep working.
+ */
+export async function allowsParentPasswordLogin(userId: string): Promise<boolean> {
+  const { data, error } = await createAdminClient().auth.admin.getUserById(userId);
+  if (error || !data.user) {
+    throw new Error(`Could not load parent account: ${error?.message ?? "no user"}`);
+  }
+  return data.user.app_metadata?.parent_password_login === true;
+}

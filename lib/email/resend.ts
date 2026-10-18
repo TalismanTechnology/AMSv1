@@ -38,3 +38,33 @@ export async function sendEmail(
     console.error("[email] Failed to send:", error);
   }
 }
+
+export type SendEmailResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Like sendEmail, but reports whether Resend accepted the message instead of
+ * only logging, and supports a plain-text part and a per-message sender.
+ * Used where the caller must know (sign-in codes).
+ */
+export async function sendEmailWithResult(message: {
+  to: string;
+  subject: string;
+  html: string;
+  text?: string;
+  from?: string;
+}): Promise<SendEmailResult> {
+  if (!resend) return { ok: false, error: "RESEND_API_KEY not set" };
+
+  try {
+    const { error } = await resend.emails.send({
+      from: message.from ?? DEFAULT_FROM,
+      to: [message.to],
+      subject: message.subject,
+      html: message.html,
+      ...(message.text ? { text: message.text } : {}),
+    });
+    return error ? { ok: false, error: error.message } : { ok: true };
+  } catch (caught: unknown) {
+    return { ok: false, error: caught instanceof Error ? caught.message : "Unknown error" };
+  }
+}

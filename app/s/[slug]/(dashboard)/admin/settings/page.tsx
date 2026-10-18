@@ -12,6 +12,12 @@ import type {
 } from "./client";
 import type { BlackbaudCalendarFeed, EventCalendar } from "@/lib/types";
 import type { WebsiteSourceView } from "@/components/admin/website-sources";
+import type { ParentSignInConfig } from "@/components/admin/parent-sign-in-settings";
+import type { School } from "@/lib/types";
+import { resolveAuthProvider } from "@/lib/auth/provider";
+import { getRosterSummary } from "@/lib/roster/store";
+import { isRosterMatchRequired } from "@/lib/roster/gate";
+import { getVeracrossConnection } from "@/lib/veracross/connection";
 
 // "Sync now" (a server action on this page) keeps crawling for a few minutes
 // after it responds, via after(); that work counts against this limit.
@@ -270,6 +276,34 @@ async function loadWebsiteSources(
   return { sources, loadError: null };
 }
 
+/**
+ * Parent sign-in provider, uploaded roster and the require-roster-match gate.
+ * Before migration 044 the roster table is missing and the panel says so
+ * instead of offering controls.
+ */
+async function loadParentSignInConfig(school: School): Promise<ParentSignInConfig> {
+  const [summary, veracross] = await Promise.all([
+    getRosterSummary(school.id).catch((err: unknown) => {
+      console.error(
+        "[settings] Loading parent roster failed:",
+        err instanceof Error ? err.message : err
+      );
+      return null;
+    }),
+    getVeracrossConnection(school.id),
+  ]);
+
+  return {
+    installed: summary !== null && summary.installed,
+    loadError: summary === null ? "The parent roster couldn't be loaded. Reload to try again." : null,
+    provider: resolveAuthProvider(school.auth_provider),
+    veracrossAvailable: Boolean(veracross),
+    rosterActiveCount: summary?.installed ? summary.activeCount : 0,
+    rosterUpdatedAt: summary?.installed ? summary.lastUpdatedAt : null,
+    requireRosterMatch: isRosterMatchRequired(school),
+  };
+}
+
 export default async function SettingsPage({
   params,
   searchParams,
@@ -281,8 +315,14 @@ export default async function SettingsPage({
   const { blackbaud, tab } = await searchParams;
   const { school } = await requireSchoolContext(slug);
 
-  const [settings, blackbaudConfig, recentEmails, inboundAddresses, websiteSources] =
-    await Promise.all([
+  const [
+    settings,
+    blackbaudConfig,
+    recentEmails,
+    inboundAddresses,
+    websiteSources,
+    parentSignIn,
+  ] = await Promise.all([
       loadSettings(school.id),
       loadBlackbaudConfig(
         school.id,
@@ -291,6 +331,7 @@ export default async function SettingsPage({
       loadRecentEmails(school.id),
       loadInboundAddresses(school.id, school.email_ingestion_enabled ?? false),
       loadWebsiteSources(school.id),
+      loadParentSignInConfig(school),
     ]);
 
   return (
@@ -310,6 +351,7 @@ export default async function SettingsPage({
         blackbaud={blackbaudConfig}
         blackbaudCallback={parseCallbackResult(blackbaud)}
         websiteSources={websiteSources}
+        parentSignIn={parentSignIn}
         initialTab={tab}
       />
     </PageTransition>

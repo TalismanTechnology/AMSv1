@@ -6,7 +6,7 @@ import { forgetThisDevice } from "@/lib/push/device-cookie";
 import { redirect } from "next/navigation";
 
 const PARENT_PASSWORD_ERROR =
-  "Parents sign in with their school account. Choose your school and use “Sign in with Blackbaud” or “Sign in with Veracross”.";
+  "Parents sign in with their school account. Choose your school and use “Sign in with Blackbaud”, “Sign in with Veracross”, or the email code option your school uses.";
 
 // Email/password sign-in is for school staff and super admins only. Parents
 // come in through Blackbaud or Veracross (app/auth/blackbaud,
