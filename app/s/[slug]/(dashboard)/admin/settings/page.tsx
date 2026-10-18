@@ -12,6 +12,12 @@ import type {
 } from "./client";
 import type { BlackbaudCalendarFeed, EventCalendar } from "@/lib/types";
 import type { WebsiteSourceView } from "@/components/admin/website-sources";
+import type { ContactsDirectoryData } from "@/components/admin/contacts-directory";
+import {
+  CONTACTS_TABLE_MISSING_MESSAGE,
+  isMissingTableError,
+  type SchoolContact,
+} from "@/lib/contacts/directory";
 
 // "Sync now" (a server action on this page) keeps crawling for a few minutes
 // after it responds, via after(); that work counts against this limit.
@@ -270,6 +276,55 @@ async function loadWebsiteSources(
   return { sources, loadError: null };
 }
 
+/**
+ * The staff contact directory (approved and suggested; rejected rows are kept
+ * only so they aren't suggested again) and the school's divisions. RLS limits
+ * rows to this school's admins. Migration 044 not applied yet → an empty
+ * directory with a notice.
+ */
+async function loadContacts(schoolId: string): Promise<ContactsDirectoryData> {
+  const supabase = await createClient();
+  const [{ data, error }, { data: divisions }] = await Promise.all([
+    supabase
+      .from("school_contacts")
+      .select("*, source_document:documents(title)")
+      .eq("school_id", schoolId)
+      .in("status", ["approved", "suggested"])
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("event_calendars")
+      .select("id, name")
+      .eq("school_id", schoolId)
+      .eq("kind", "division")
+      .order("sort_order", { ascending: true }),
+  ]);
+
+  const base = { divisions: divisions ?? [], contacts: [] };
+  if (error) {
+    if (isMissingTableError(error)) {
+      return { ...base, loadError: CONTACTS_TABLE_MISSING_MESSAGE, tableMissing: true };
+    }
+    console.error("[settings] Loading contacts failed:", error.message);
+    return { ...base, loadError: "Contacts couldn't be loaded.", tableMissing: false };
+  }
+
+  return {
+    ...base,
+    loadError: null,
+    tableMissing: false,
+    contacts: (data ?? []).map((row) => {
+      const { source_document, ...contact } = row as SchoolContact & {
+        source_document: { title: string | null } | null;
+      };
+      return {
+        ...contact,
+        topics: contact.topics ?? [],
+        source_document_title: source_document?.title ?? null,
+      };
+    }),
+  };
+}
+
 export default async function SettingsPage({
   params,
   searchParams,
@@ -281,7 +336,7 @@ export default async function SettingsPage({
   const { blackbaud, tab } = await searchParams;
   const { school } = await requireSchoolContext(slug);
 
-  const [settings, blackbaudConfig, recentEmails, inboundAddresses, websiteSources] =
+  const [settings, blackbaudConfig, recentEmails, inboundAddresses, websiteSources, contacts] =
     await Promise.all([
       loadSettings(school.id),
       loadBlackbaudConfig(
@@ -291,6 +346,7 @@ export default async function SettingsPage({
       loadRecentEmails(school.id),
       loadInboundAddresses(school.id, school.email_ingestion_enabled ?? false),
       loadWebsiteSources(school.id),
+      loadContacts(school.id),
     ]);
 
   return (
@@ -310,6 +366,7 @@ export default async function SettingsPage({
         blackbaud={blackbaudConfig}
         blackbaudCallback={parseCallbackResult(blackbaud)}
         websiteSources={websiteSources}
+        contacts={contacts}
         initialTab={tab}
       />
     </PageTransition>
