@@ -38,6 +38,19 @@ With a `client_credentials` token from the same OAuth Application:
 3. `GET /v3/students?household_id=…` plus `GET /v3/relationships?person_id=…` (rows with legal custody or parent-portal access) → `GET /v3/students/{id}` for children in other households
 4. `GET /v3/academics/config/grade_levels` → map each student's `grade_level` id to AskMySchool grades (`Pre-K`, `K`, `1`–`12`; unrecognised names are kept verbatim)
 
+The `client_credentials` token is **cached in memory** per school route +
+client id + scope set (`lib/veracross/token-cache.ts`). Veracross allows at
+most 10 active tokens per OAuth Application and silently revokes the oldest
+when an 11th is created; tokens last an hour and can't be refreshed. So each
+warm server instance mints one token and reuses it for
+min(`expires_in` − 5 min, 55 min); concurrent sign-ins share one in-flight
+request. On Vercel that's roughly one token per warm instance per hour, far
+below the cap. If the Data API answers 401 (expired, or revoked by the cap),
+the token is dropped and the lookup retried once with a fresh one; a second
+401 is logged and sign-in continues without children. The per-parent
+authorization-code tokens are not cached: Veracross counts those per user,
+and each is used once for userinfo and dropped.
+
 Children are inserted (tagged `external_source='veracross'`) on the first
 linked sign-in when the parent has no hand-entered children, and their names
 and grades are refreshed on later sign-ins. A child the parent deletes is not
@@ -55,8 +68,13 @@ Record), or to invite us as an Integration Partner, and send back:
 2. **Client ID** and **Client Secret** of that OAuth Application. Prefer the
    Partner Portal over email for the secret.
 3. Confirmation that these are on the application:
-   - **Scopes:** `sso` (SSO / Single Sign-On). `openid` instead also works if
-     that's what they enable; tell us which.
+   - **Scopes:** please enable **both** `sso` (SSO / Single Sign-On) and
+     `openid`, and tell us which ones you actually enabled. (Finalsite's
+     Veracross guide asks for both too:
+     https://www.finalsitesupport.com/hc/en-us/articles/360007065032.) We
+     request `sso` by default; Veracross requires the app to have "one of"
+     the two, so this works with either or both. If a school only has
+     `openid`, set `--scopes openid`.
    - **Redirect URI:** `https://askmyschool.app/auth/veracross/callback`
      (exactly; HTTPS only. Add a staging URL too if needed.)
 4. Optional, for automatic children/grades: also enable `person_accounts:list`,
@@ -64,6 +82,13 @@ Record), or to invite us as an Integration Partner, and send back:
    `academics.config.grade_levels:list`.
 5. Which Veracross role(s) parents have. Default is `Parent`. A school whose
    guardians use a different role name must tell us.
+   - Newly enrolled families carry **"Parent of Future Student"** instead of
+     `Parent` until the school runs its Start School Year procedure
+     ([Start School Year](https://community.veracross.com/s/article/Start-School-Year-Procedure),
+     [role definitions](https://community.veracross.com/s/article/Person-Role-Definitions)).
+     They are **refused by default**. Ask whether the school wants incoming
+     families to have access before the year starts; if so, save the
+     connection with `--parent-roles "Parent,Parent of Future Student"`.
 6. A test parent account (or a staff member willing to try it) for the first
    sign-in.
 
@@ -82,9 +107,78 @@ Record), or to invite us as an Integration Partner, and send back:
 3. When the school is ready, re-run with `--activate` (sets
    `schools.auth_provider = 'veracross'`). `--deactivate` switches back to
    Blackbaud and disables the stored credentials.
-4. Optional env: `VERACROSS_LOGIN_REDIRECT_URI` to pin the callback URL
-   (defaults to the request origin + `/auth/veracross/callback`). It must match
-   what the school registered.
+   The script prints the scopes and parent roles it saved; check them
+   against what the school told us. `--help` lists every option.
+4. Production sets `VERACROSS_LOGIN_REDIRECT_URI=https://askmyschool.app/auth/veracross/callback`
+   (Vercel env), so the redirect URI is the one the school registered no
+   matter which host served the request. Without it, the request origin +
+   `/auth/veracross/callback` is used. A value that isn't an absolute
+   `https://` URL ending in `/auth/veracross/callback` is logged
+   (`[veracross] VERACROSS_LOGIN_REDIRECT_URI must be …`) and ignored.
+
+### Veracross env vars
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `VERACROSS_LOGIN_REDIRECT_URI` | request origin + `/auth/veracross/callback` | Production: `https://askmyschool.app/auth/veracross/callback`. Must be absolute `https` and end in `/auth/veracross/callback`, else ignored with an error log. Must exactly match the school's registered Redirect URI. |
+| `VERACROSS_ACCOUNTS_ORIGIN` | `https://accounts.veracross.com` | Tests / staging mocks only. `https`, or `http` for `localhost`/`127.0.0.1`; otherwise ignored with a warning. **Ignored when `VERCEL_ENV=production`.** |
+| `VERACROSS_API_ORIGIN` | `https://api.veracross.com` | Same rules, for the Data API. |
+| `BLACKBAUD_TOKEN_ENC_KEY` | (required) | Reused: encrypts each school's Veracross client secret and signs the sign-in `state`. No separate Veracross key. |
+
+## Go-live checklist (first school)
+
+1. School created the OAuth Application with `sso` and/or `openid`, the exact
+   redirect URI above, and (optional) the Data API scopes. They told us which
+   sign-in scopes are on and which parent roles to admit (incl. whether
+   "Parent of Future Student" should get in).
+2. `VERACROSS_LOGIN_REDIRECT_URI` is set in Vercel production; no
+   `VERACROSS_*_ORIGIN` overrides are set there (they'd be ignored anyway,
+   with a warning).
+3. Migration 034 applied; `scripts/veracross-connect.ts` run **without**
+   `--activate`; printed scopes/roles checked.
+4. Activate, then sign in with the school's test parent on web and in the
+   app. Check Vercel logs for the `[veracross] {"event":"sign_in",…}` line.
+5. Sign in with a staff/faculty account: it must be refused (log line
+   `"step":"gate","reason":"not_a_parent"` with the roles it carried).
+6. If the Data API is on: the test parent's children and grades appear. If
+   not, look for `"step":"client_token"` / `"step":"data_api"` lines and
+   `veracross_connections.last_error`.
+7. Rollback is `--deactivate` (back to Blackbaud).
+
+## Logs
+
+Every failure writes one line to the server log, searchable as `[veracross]`:
+
+```
+[veracross] {"event":"failure","step":"token","school":"<uuid>","route":"polyprep","status":400,"reason":"invalid_grant","hint":"code expired/used or redirect_uri mismatch"}
+```
+
+`step` is one of `authorize`, `token`, `userinfo`, `gate`, `link`,
+`children`, `client_token`, `data_api`. Lines carry the HTTP status and OAuth
+error code when there is one, plus a hint for the usual suspects
+(`invalid_grant`, `invalid_client`, Data API 401 → "token expired or revoked
+(10-token cap?)"). They never include secrets, tokens, codes or full emails.
+Token, userinfo and children failures are also stored in
+`veracross_connections.last_error` as before. Each successful sign-in logs
+`{"event":"sign_in","school":…,"route":…,"firstLink":…,"app":…,"children":{"found","inserted","updated"}}`
+(no personal data).
+
+## Testing without a school
+
+`lib/veracross/veracross.mock.test.ts` (part of `npm test`) runs the real
+sign-in code against a mock Veracross on `127.0.0.1`
+(`lib/veracross/mock-server.test-helper.ts`): authorize redirect, token
+exchange (PKCE, wrong secret, reused code), userinfo, the parent gate, the
+Data API children lookup, the client-token cache (single-flight, TTL, 401
+retry, 10-token cap) and the origin-override rules. The route handlers call
+`buildVeracrossStart` / `identifyVeracrossParent` (`lib/veracross/sign-in.ts`),
+which those tests exercise directly.
+
+Veracross also has a sandbox route, `api-sandbox`
+(`https://accounts.veracross.com/api-sandbox/...`), but credentials for it
+come from partners@veracross.com. With sandbox credentials, save a test
+school's connection with `--route api-sandbox` and sign in as a sandbox
+parent.
 
 ## Roster and calendar sync (not implemented — plan)
 
@@ -143,3 +237,9 @@ Veracross. Before the first school goes live, verify on a test account:
   https://api-docs.veracross.com/docs/docs/74c4f2ba95b13-list-calendars-parent-calendars
 - Creating an OAuth Application (school workflow) — https://community.veracross.com/s/article/Creating-an-OAuth-Application-School-Workflow
 - Setting up Integration Partners — https://community.veracross.com/s/article/Setting-Up-New-Integration-Partners-in-Veracross-API
+
+Added 2026-10-18 (role and scope guidance; not re-fetched when this was written):
+
+- Start School Year Procedure — https://community.veracross.com/s/article/Start-School-Year-Procedure
+- Person Role Definitions — https://community.veracross.com/s/article/Person-Role-Definitions
+- Finalsite: Veracross SSO setup — https://www.finalsitesupport.com/hc/en-us/articles/360007065032
