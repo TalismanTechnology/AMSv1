@@ -8,6 +8,9 @@
 //
 //   npx tsx scripts/veracross-connect.ts --school <slug> --deactivate
 //
+// Run with --help for what each option does (incl. admitting "Parent of
+// Future Student" families).
+//
 // The secret is read from the environment, not a flag, so it stays out of
 // shell history. Needs NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY and
 // BLACKBAUD_TOKEN_ENC_KEY (the same key the app uses) in env or .env.local.
@@ -31,9 +34,30 @@ try {
   // Env may come from the shell instead.
 }
 
+const USAGE = `Usage:
+  VERACROSS_CLIENT_SECRET=... npx tsx scripts/veracross-connect.ts \\
+    --school <askmyschool-slug> --route <veracross-school-route> \\
+    --client-id <client id> [--scopes "sso"] [--parent-roles "Parent"] \\
+    [--data-api] [--activate]
+
+  npx tsx scripts/veracross-connect.ts --school <slug> --deactivate
+
+  --scopes        Sign-in scope(s). Default "sso" (works if the school enabled
+                  sso, openid or both). Must include sso or openid.
+  --parent-roles  Comma-separated Veracross roles admitted as parents.
+                  Default "Parent". Newly enrolled families have "Parent of
+                  Future Student" until Start School Year; to admit them:
+                  --parent-roles "Parent,Parent of Future Student"
+  --data-api      Fill in children + grades from the Veracross Data API.
+  --activate      Switch the school's parent sign-in to Veracross.
+  --deactivate    Switch back to Blackbaud and disable the stored credentials.
+
+See docs/VERACROSS.md.`;
+
 async function main() {
   const { values } = parseArgs({
     options: {
+      help: { type: "boolean", short: "h", default: false },
       school: { type: "string" },
       route: { type: "string" },
       "client-id": { type: "string" },
@@ -45,7 +69,12 @@ async function main() {
     },
   });
 
-  if (!values.school) throw new Error("--school <slug> is required");
+  if (values.help) {
+    console.log(USAGE);
+    return;
+  }
+
+  if (!values.school) throw new Error(`--school <slug> is required\n\n${USAGE}`);
 
   const { createAdminClient } = await import("@/lib/supabase/admin");
   const { buildConnectionRow } = await import("@/lib/veracross/connection");
@@ -87,6 +116,9 @@ async function main() {
     .upsert(row, { onConflict: "school_id" });
   if (error) throw new Error(`Could not save Veracross connection: ${error.message}`);
   console.log(`${school.name}: Veracross credentials saved for route "${row.school_route}".`);
+  console.log(`  Sign-in scopes requested: ${row.scopes}`);
+  console.log(`  Parent roles admitted:    ${row.parent_roles.join(", ")}`);
+  console.log(`  Children from Data API:   ${row.data_api_enabled ? "on" : "off"}`);
 
   if (values.activate) {
     const { error: switchError } = await admin
