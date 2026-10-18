@@ -10,7 +10,6 @@ import {
   FileSearch,
   LayoutList,
   Network,
-  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +36,7 @@ import {
 } from "@/components/admin/category-select-items";
 import { useSortDocuments } from "@/components/admin/use-sort-documents";
 import { SortSummaryDialog } from "@/components/admin/sort-summary-dialog";
+import { LibraryAiToolbar } from "@/components/admin/library-ai-toolbar";
 import { useSidebar } from "@/components/admin/sidebar-context";
 import { Badge } from "@/components/ui/badge";
 import { searchDocumentContent } from "@/actions/documents";
@@ -123,14 +123,6 @@ export function DocumentsClient({
     summary: sortSummary,
     dismissSummary,
   } = useSortDocuments(schoolId);
-  // Ready documents with no category, which AI can sort on request.
-  const unfiled = useMemo(
-    () =>
-      documents
-        .filter((d) => !d.category_id && d.status === "ready")
-        .map((d) => d.id),
-    [documents]
-  );
   const { setFolders } = useSidebar();
 
   // Drop ?upload=1 once handled so a reload doesn't reopen the dialog.
@@ -243,17 +235,6 @@ export function DocumentsClient({
               { value: "map", label: "Map", icon: <Network /> },
             ]}
           />
-          {categories.length > 0 && unfiled.length > 0 && (
-            <Button
-              variant="outline"
-              onClick={() => sortDocuments(unfiled)}
-              disabled={unfiled.every((id) => sorting.has(id))}
-              title="File every document that has no category, using AI"
-            >
-              <Sparkles className="mr-2 h-4 w-4" />
-              Sort {unfiled.length} unfiled
-            </Button>
-          )}
           <Button variant="outline" onClick={() => setCategoryOpen(true)}>
             <Tags className="mr-2 h-4 w-4" />
             Manage Categories
@@ -264,6 +245,20 @@ export function DocumentsClient({
           </Button>
         </div>
       </header>
+
+      {/* Auto-sort and Auto-folder, the same in the list and the map. */}
+      <div className="relative mb-4">
+        <LibraryAiToolbar
+          documents={documents}
+          categories={categories}
+          folders={folders}
+          schoolId={schoolId}
+          autoSortEnabled={autoSortEnabled}
+          settingsHref={`/s/${schoolSlug}/admin/settings`}
+          sortingIds={sorting}
+          onSortDocuments={sortDocuments}
+        />
+      </div>
 
       <div
         className={cn(
@@ -412,8 +407,6 @@ export function DocumentsClient({
           folders={folders}
           divisions={divisions}
           schoolId={schoolId}
-          autoSortEnabled={autoSortEnabled}
-          settingsHref={`/s/${schoolSlug}/admin/settings`}
           onOpenDocument={openFromMap}
           onEditDocument={setEditingDoc}
           onShowInList={showInList}
