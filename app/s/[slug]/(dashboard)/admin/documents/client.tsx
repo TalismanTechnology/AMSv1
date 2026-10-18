@@ -24,6 +24,12 @@ import {
 } from "@/components/ui/select";
 import { DocumentTable } from "@/components/admin/document-table";
 import { FolderTree } from "@/components/admin/folder-tree";
+import {
+  UNFILED,
+  filterByFolderSelection,
+  folderDocumentCounts,
+  type FolderSelection,
+} from "@/lib/documents/folders";
 import { CategoryManager } from "@/components/admin/category-manager";
 import {
   CategorySelectItems,
@@ -103,7 +109,7 @@ export function DocumentsClient({
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState<Document | null>(null);
   const [viewingDoc, setViewingDoc] = useState<Document | null>(null);
-  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  const [selectedFolderId, setSelectedFolderId] = useState<FolderSelection>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchMode, setSearchMode] = useState<"title" | "content">("title");
   const [contentResults, setContentResults] = useState<ContentSearchResult[]>([]);
@@ -163,32 +169,13 @@ export function DocumentsClient({
 
   const hasActiveFilters = searchQuery || statusFilter !== "all" || categoryFilter !== "all";
 
-  // Collect all descendant folder IDs for a given folder
-  const getDescendantIds = useCallback(
-    (folderId: string): Set<string> => {
-      const ids = new Set<string>([folderId]);
-      const queue = [folderId];
-      while (queue.length > 0) {
-        const current = queue.shift()!;
-        for (const f of folders) {
-          if (f.parent_id === current && !ids.has(f.id)) {
-            ids.add(f.id);
-            queue.push(f.id);
-          }
-        }
-      }
-      return ids;
-    },
-    [folders]
+  const folderCounts = useMemo(
+    () => folderDocumentCounts(folders, documents),
+    [folders, documents]
   );
 
   const filteredDocs = useMemo(() => {
-    let result = [...documents];
-
-    if (selectedFolderId) {
-      const folderIds = getDescendantIds(selectedFolderId);
-      result = result.filter((d) => d.folder_id !== null && folderIds.has(d.folder_id));
-    }
+    let result = filterByFolderSelection(documents, folders, selectedFolderId);
 
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -204,7 +191,7 @@ export function DocumentsClient({
     }
 
     return result;
-  }, [documents, selectedFolderId, searchQuery, statusFilter, categoryFilter, getDescendantIds]);
+  }, [documents, folders, selectedFolderId, searchQuery, statusFilter, categoryFilter]);
 
   // From a map card's menu: the list, filtered to just that card's documents.
   const showInList = useCallback((mapView: MapView, targetId: string) => {
@@ -237,9 +224,11 @@ export function DocumentsClient({
           <p className="mt-1 text-sm text-muted-foreground">
             <span className="text-ink">{shownCount}</span>{" "}
             document{shownCount !== 1 ? "s" : ""}
-            {view === "list" && selectedFolderId
-              ? " in this folder"
-              : " in your library"}
+            {view === "list" && selectedFolderId === UNFILED
+              ? " not in a folder"
+              : view === "list" && selectedFolderId
+                ? " in this folder"
+                : " in your library"}
             .
           </p>
         </div>
@@ -397,6 +386,7 @@ export function DocumentsClient({
             <div className="rounded-xl border border-border p-3">
               <FolderTree
                 folders={folders}
+                counts={folderCounts}
                 selectedFolderId={selectedFolderId}
                 onSelectFolder={setSelectedFolderId}
                 schoolId={schoolId}
@@ -438,7 +428,7 @@ export function DocumentsClient({
         folders={folders}
         open={uploadOpen}
         onOpenChange={setUploadOpen}
-        selectedFolderId={selectedFolderId}
+        selectedFolderId={selectedFolderId === UNFILED ? null : selectedFolderId}
         schoolId={schoolId}
       />
 
