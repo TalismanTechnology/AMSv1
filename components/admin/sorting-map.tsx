@@ -2,7 +2,6 @@
 
 import "@xyflow/react/dist/style.css";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   startTransition,
@@ -33,7 +32,6 @@ import {
   Folder as FolderIcon,
   GraduationCap,
   Search,
-  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
@@ -116,9 +114,6 @@ interface SortingMapProps {
   folders: Folder[];
   divisions: EventCalendar[];
   schoolId: string;
-  autoSortEnabled: boolean;
-  /** Where the auto-sort switch lives. */
-  settingsHref: string;
   onOpenDocument: (doc: Document) => void;
   onEditDocument: (doc: Document) => void;
   /** Leave the map for the list, filtered to this category or folder. */
@@ -140,8 +135,6 @@ export function SortingMap({
   folders,
   divisions,
   schoolId,
-  autoSortEnabled,
-  settingsHref,
   onOpenDocument,
   onEditDocument,
   onShowInList,
@@ -294,17 +287,6 @@ export function SortingMap({
               </>
             ))}
         </p>
-
-        <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-          <Link
-            href={settingsHref}
-            title="New documents without a category or folder are sorted by AI. Change this in Settings."
-            className="flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-ink-soft transition-colors hover:bg-muted/60 hover:text-ink"
-          >
-            <Sparkles className="size-3" />
-            Auto-sort {autoSortEnabled ? "on" : "off"}
-          </Link>
-        </div>
       </div>
 
       <div
@@ -608,7 +590,7 @@ function MapCanvas({
         panActivationKeyCode={null}
         panOnScroll
         zoomOnDoubleClick={false}
-        attributionPosition="top-right"
+        proOptions={{ hideAttribution: true }}
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1.25} />
         <Controls position="bottom-left" showInteractive={false}>

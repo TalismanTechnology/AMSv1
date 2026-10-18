@@ -3,6 +3,10 @@ import { requireSchoolContext } from "@/lib/school-context";
 import { DocumentsClient } from "./client";
 import { PageTransition } from "@/components/motion";
 
+// Auto-folder (a server action on this page) makes several model calls over
+// the whole library; that work counts against this limit.
+export const maxDuration = 300;
+
 export default async function DocumentsPage({
   params,
   searchParams,

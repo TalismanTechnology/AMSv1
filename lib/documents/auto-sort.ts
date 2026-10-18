@@ -7,6 +7,7 @@ import {
   hasDivisionCategories,
   type GroupedCategory,
 } from "./division-categories";
+import { autoSortFolderCandidates, findWebsiteFolder } from "./folders";
 
 /** How many recent filed documents to scan when collecting example titles. */
 const EXAMPLE_POOL = 300;
@@ -18,6 +19,8 @@ export interface SortableDoc {
   school_id: string | null;
   category_id: string | null;
   folder_id: string | null;
+  /** 'upload' | 'email' | 'website'; website documents file into "Website". */
+  source?: string | null;
 }
 
 interface FiledDoc {
@@ -119,6 +122,12 @@ export async function chooseSorting(
   // "Upper School / Academics": the group is part of what the model picks.
   const labels = categoryLabels(categories, divisionList, " / ");
 
+  // A website document goes into the school's "Website" folder when there is
+  // one, without asking the model.
+  const websiteFolder =
+    !doc.folder_id && doc.source === "website" ? findWebsiteFolder(folders ?? []) : null;
+  const pickFolder = !doc.folder_id && !websiteFolder;
+
   const filedRows: FiledDoc[] = filed ?? [];
   const categoryExamples = exampleTitles(filedRows, "category_id");
   const folderExamples = exampleTitles(filedRows, "folder_id");
@@ -138,7 +147,9 @@ export async function chooseSorting(
           description: c.description,
           examples: categoryExamples.get(c.id)?.examples,
         })),
-    folders: doc.folder_id ? [] : toFolderOptions(folders ?? [], folderExamples),
+    folders: pickFolder
+      ? toFolderOptions(autoSortFolderCandidates(folders ?? [], doc.source), folderExamples)
+      : [],
   });
 
   const choice: SortChoice = {};
@@ -153,8 +164,28 @@ export async function chooseSorting(
       }
     }
   }
-  if (!doc.folder_id && result.folderId) choice.folder_id = result.folderId;
+  if (websiteFolder) choice.folder_id = websiteFolder.id;
+  else if (pickFolder && result.folderId) choice.folder_id = result.folderId;
   return choice;
+}
+
+/**
+ * The school's root "Website" folder id for an unfiled website document, or
+ * null (other sources, already filed, or the school has no such folder).
+ * Never creates the folder.
+ */
+export async function websiteFolderFor(
+  supabase: SupabaseClient,
+  doc: SortableDoc
+): Promise<string | null> {
+  if (doc.source !== "website" || doc.folder_id || !doc.school_id) return null;
+  const { data, error } = await supabase
+    .from("folders")
+    .select("id, name, parent_id")
+    .eq("school_id", doc.school_id)
+    .is("parent_id", null);
+  if (error) throw new Error(error.message);
+  return findWebsiteFolder(data ?? [])?.id ?? null;
 }
 
 /**
@@ -183,14 +214,15 @@ export async function setDocumentDivision(
 /**
  * Write a sorting choice. Each field is written only while it is still empty:
  * the document was read before sorting began, and a choice someone made since
- * wins. Returns the category written, if any.
+ * wins. Returns the category and folder written, if any.
  */
 export async function applySorting(
   supabase: SupabaseClient,
   documentId: string,
   choice: SortChoice
-): Promise<{ categoryId: string | null }> {
+): Promise<{ categoryId: string | null; folderId: string | null }> {
   let categoryId: string | null = null;
+  let folderId: string | null = null;
 
   if (choice.category_id) {
     const { data, error } = await supabase
@@ -215,13 +247,15 @@ export async function applySorting(
   }
 
   if (choice.folder_id) {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("documents")
       .update({ folder_id: choice.folder_id })
       .eq("id", documentId)
-      .is("folder_id", null);
+      .is("folder_id", null)
+      .select("id");
     if (error) throw new Error(error.message);
+    if (data?.length) folderId = choice.folder_id;
   }
 
-  return { categoryId };
+  return { categoryId, folderId };
 }

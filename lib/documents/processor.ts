@@ -7,6 +7,7 @@ import { generateSummary } from "@/lib/ai/summary";
 import {
   applySorting,
   chooseSorting,
+  websiteFolderFor,
   type SortChoice,
   type SortableDoc,
 } from "./auto-sort";
@@ -15,6 +16,22 @@ import { ENQUEUE_MAX_AGE_MS } from "@/lib/push/document-push";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const BATCH_SIZE = 5;
+
+/**
+ * The "Website" folder for an unfiled website document (see websiteFolderFor);
+ * null when there isn't one. Never throws.
+ */
+async function maybeWebsiteFolder(
+  supabase: SupabaseClient,
+  doc: SortableDoc
+): Promise<string | null> {
+  try {
+    return await websiteFolderFor(supabase, doc);
+  } catch (err) {
+    console.warn(`[processor] Website folder lookup failed:`, err);
+    return null;
+  }
+}
 
 /**
  * When the school has auto-sort enabled and the document is missing a category
@@ -188,10 +205,16 @@ export async function processDocument(documentId: string) {
       console.warn(`[processor] Summary generation failed:`, err);
     }
 
-    // 8b. AI auto-sort: fill in category/folder when unset (non-fatal).
-    //     Runs for any unsorted document (emailed or manually uploaded)
-    //     when the school has auto-sort enabled.
-    const autoSort = await maybeAutoSort(supabase, doc, summary ?? text);
+    // 8b. Website-synced documents go into the school's "Website" folder
+    //     when it has one, whether or not auto-sort is on. Then AI auto-sort
+    //     fills in category/folder when unset (non-fatal), for any unsorted
+    //     document when the school has auto-sort enabled.
+    const websiteFolderId = await maybeWebsiteFolder(supabase, doc);
+    const sortable = websiteFolderId ? { ...doc, folder_id: websiteFolderId } : doc;
+    const aiSort = await maybeAutoSort(supabase, sortable, summary ?? text);
+    const autoSort: SortChoice = websiteFolderId
+      ? { ...aiSort, folder_id: websiteFolderId }
+      : aiSort;
 
     // `doc` was read before processing began, so an admin may have filed the
     // document since: applySorting writes each guess only into a field that's

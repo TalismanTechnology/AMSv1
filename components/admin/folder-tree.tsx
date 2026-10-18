@@ -7,6 +7,7 @@ import {
   ChevronRight,
   ChevronDown,
   FileText,
+  Inbox,
   Trash2,
   Pencil,
   MoreHorizontal,
@@ -24,39 +25,43 @@ import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { createFolder, renameFolder, deleteFolder } from "@/actions/folders";
 import { toast } from "sonner";
 import type { Folder } from "@/lib/types";
+import {
+  UNFILED,
+  buildFolderTree,
+  type FolderCounts,
+  type FolderSelection,
+  type FolderTreeNode,
+} from "@/lib/documents/folders";
 
-function buildTree(folders: Folder[]): (Folder & { children: Folder[] })[] {
-  const map = new Map<string, Folder & { children: Folder[] }>();
-  const roots: (Folder & { children: Folder[] })[] = [];
+type FolderNodeData = FolderTreeNode<Folder>;
 
-  folders.forEach((f) => map.set(f.id, { ...f, children: [] }));
-  folders.forEach((f) => {
-    const node = map.get(f.id)!;
-    if (f.parent_id && map.has(f.parent_id)) {
-      map.get(f.parent_id)!.children.push(node);
-    } else {
-      roots.push(node);
-    }
-  });
-  return roots;
+function Count({ value }: { value: number | undefined }) {
+  return (
+    <span className="ml-auto shrink-0 pl-1 text-xs tabular-nums text-muted-foreground">
+      {value ?? 0}
+    </span>
+  );
 }
+
 
 interface FolderTreeProps {
   folders: Folder[];
-  selectedFolderId: string | null;
-  onSelectFolder: (id: string | null) => void;
+  counts: FolderCounts;
+  selectedFolderId: FolderSelection;
+  onSelectFolder: (id: FolderSelection) => void;
   schoolId: string;
 }
 
 export function FolderTree({
   folders,
+  counts,
   selectedFolderId,
   onSelectFolder,
   schoolId,
 }: FolderTreeProps) {
   const [creatingInParent, setCreatingInParent] = useState<string | null | false>(false);
   const [newName, setNewName] = useState("");
-  const tree = buildTree(folders);
+  const tree = buildFolderTree(folders);
 
   async function handleCreate(parentId: string | null) {
     if (!newName.trim()) return;
@@ -95,13 +100,30 @@ export function FolderTree({
       >
         <span className="w-3.5 shrink-0" />
         <FileText className="h-4 w-4 shrink-0" />
-        All Documents
+        All documents
+        <Count value={counts.total} />
+      </button>
+
+      <button
+        onClick={() => onSelectFolder(UNFILED)}
+        className={cn(
+          "flex w-full items-center gap-1 rounded-xl px-2 py-1.5 text-sm transition-colors",
+          selectedFolderId === UNFILED
+            ? "bg-muted font-medium text-ink"
+            : "text-muted-foreground hover:bg-muted/50 hover:text-ink"
+        )}
+      >
+        <span className="w-3.5 shrink-0" />
+        <Inbox className="h-4 w-4 shrink-0" />
+        Unfiled
+        <Count value={counts.unfiled} />
       </button>
 
       {tree.map((folder) => (
         <FolderNode
           key={folder.id}
           folder={folder}
+          counts={counts}
           depth={0}
           selectedId={selectedFolderId}
           onSelect={onSelectFolder}
@@ -133,16 +155,18 @@ export function FolderTree({
 }
 
 interface FolderNodeProps {
-  folder: Folder & { children: Folder[] };
+  folder: FolderNodeData;
+  counts: FolderCounts;
   depth: number;
-  selectedId: string | null;
-  onSelect: (id: string | null) => void;
+  selectedId: FolderSelection;
+  onSelect: (id: FolderSelection) => void;
   onCreateIn: (parentId: string | null | false) => void;
   schoolId: string;
 }
 
 function FolderNode({
   folder,
+  counts,
   depth,
   selectedId,
   onSelect,
@@ -154,7 +178,7 @@ function FolderNode({
   const [name, setName] = useState(folder.name);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const children = (folder as Folder & { children: Folder[] }).children || [];
+  const children = folder.children;
 
   async function handleRename() {
     if (!name.trim() || name === folder.name) {
@@ -237,6 +261,8 @@ function FolderNode({
           </button>
         )}
 
+        {!renaming && <Count value={counts.byFolder.get(folder.id)} />}
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -271,7 +297,8 @@ function FolderNode({
         children.map((child) => (
           <FolderNode
             key={child.id}
-            folder={child as Folder & { children: Folder[] }}
+            folder={child}
+            counts={counts}
             depth={depth + 1}
             selectedId={selectedId}
             onSelect={onSelect}
