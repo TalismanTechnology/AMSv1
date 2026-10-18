@@ -2,18 +2,13 @@ import { NextResponse } from "next/server";
 import { getSchoolBySlug } from "@/lib/school-context";
 import { resolveAuthProvider } from "@/lib/auth/provider";
 import { isValidAppChallenge } from "@/lib/auth/app-handoff";
-import { createPkcePair } from "@/lib/blackbaud/parent-login";
 import {
   OAUTH_STATE_MAX_AGE_SECONDS,
   VERACROSS_LOGIN_STATE_COOKIE,
-  createVeracrossLoginState,
-  packLoginCookie,
 } from "@/lib/blackbaud/state";
 import { getVeracrossConnection } from "@/lib/veracross/connection";
-import {
-  buildVeracrossAuthorizeUrl,
-  getVeracrossRedirectUri,
-} from "@/lib/veracross/oauth";
+import { logVeracrossFailure } from "@/lib/veracross/log";
+import { buildVeracrossStart } from "@/lib/veracross/sign-in";
 
 // Starts "Sign in with Veracross" for a parent.
 //
@@ -51,6 +46,7 @@ export async function GET(request: Request) {
   const connection = await getVeracrossConnection(school.id);
 
   if (!connection) {
+    logVeracrossFailure({ step: "authorize", schoolId: school.id, reason: "no enabled connection" });
     return NextResponse.redirect(
       `${loginUrl}?error=${encodeURIComponent(
         `${school.name} hasn't turned on Veracross sign-in yet. Please check back soon.`
@@ -62,19 +58,20 @@ export async function GET(request: Request) {
   let cookieValue: string;
 
   try {
-    const state = createVeracrossLoginState(school.id, school.slug, appChallenge);
-    const pkce = createPkcePair();
-    authorizeUrl = buildVeracrossAuthorizeUrl({
-      client: { schoolRoute: connection.schoolRoute, clientId: connection.clientId },
-      scopes: connection.scopes,
-      redirectUri: getVeracrossRedirectUri(origin),
-      state,
-      codeChallenge: pkce.challenge,
-    });
-    cookieValue = packLoginCookie(state, pkce.verifier);
+    ({ authorizeUrl, cookieValue } = buildVeracrossStart({
+      connection,
+      schoolId: school.id,
+      schoolSlug: school.slug,
+      appChallenge,
+      origin,
+    }));
   } catch (caught: unknown) {
-    const message = caught instanceof Error ? caught.message : "Unknown error";
-    console.error(`Veracross sign-in could not start for school ${school.id}: ${message}`);
+    logVeracrossFailure({
+      step: "authorize",
+      schoolId: school.id,
+      route: connection.schoolRoute,
+      error: caught,
+    });
     return NextResponse.redirect(
       `${loginUrl}?error=${encodeURIComponent("Sign-in is temporarily unavailable. Please try again later.")}`
     );

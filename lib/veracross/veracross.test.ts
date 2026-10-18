@@ -5,7 +5,9 @@ import crypto from "node:crypto";
 import {
   buildVeracrossAuthorizeUrl,
   decideVeracrossParentAccess,
+  getVeracrossRedirectUri,
   isValidSchoolRoute,
+  isValidVeracrossRedirectUri,
   normalizeSignInScopes,
   parseVeracrossUserInfo,
   veracrossEndpoints,
@@ -18,6 +20,13 @@ import {
   studentDisplayName,
 } from "./data-api";
 import { decideLink } from "./link";
+import {
+  VeracrossHttpError,
+  describeVeracrossFailure,
+  parseOAuthErrorCode,
+  redactForLog,
+  veracrossHint,
+} from "./log";
 import { buildConnectionRow } from "./connection";
 import { decryptToken } from "../blackbaud/crypto";
 import {
@@ -116,6 +125,41 @@ test("authorize URL carries the documented parameters plus state and PKCE", () =
   assert.equal(url.searchParams.get("state"), "the-state");
   assert.equal(url.searchParams.get("code_challenge"), "the-challenge");
   assert.equal(url.searchParams.get("code_challenge_method"), "S256");
+});
+
+test("redirect URI: a valid env value wins, a malformed one falls back to the origin", (t) => {
+  const error = t.mock.method(console, "error", () => undefined);
+  const origin = "https://preview.askmyschool.app";
+  const pinned = "https://askmyschool.app/auth/veracross/callback";
+
+  try {
+    delete process.env.VERACROSS_LOGIN_REDIRECT_URI;
+    assert.equal(getVeracrossRedirectUri(origin), `${origin}/auth/veracross/callback`);
+
+    process.env.VERACROSS_LOGIN_REDIRECT_URI = ` ${pinned} `;
+    assert.equal(getVeracrossRedirectUri(origin), pinned);
+    assert.equal(error.mock.callCount(), 0);
+
+    for (const bad of [
+      "http://askmyschool.app/auth/veracross/callback",
+      "https://askmyschool.app/auth/blackbaud/callback",
+      "https://askmyschool.app/auth/veracross/callback?x=1",
+      "/auth/veracross/callback",
+      "askmyschool.app",
+    ]) {
+      assert.equal(isValidVeracrossRedirectUri(bad), false, bad);
+      process.env.VERACROSS_LOGIN_REDIRECT_URI = bad;
+      assert.equal(getVeracrossRedirectUri(origin), `${origin}/auth/veracross/callback`, bad);
+    }
+    // Logged once per bad value, not once per sign-in.
+    getVeracrossRedirectUri(origin);
+    assert.equal(error.mock.callCount(), 5);
+
+    process.env.VERACROSS_LOGIN_REDIRECT_URI = "";
+    assert.equal(getVeracrossRedirectUri(origin), `${origin}/auth/veracross/callback`);
+  } finally {
+    delete process.env.VERACROSS_LOGIN_REDIRECT_URI;
+  }
 });
 
 test("userinfo parses the documented shape", () => {
@@ -273,5 +317,45 @@ test("connection rows store the client secret encrypted", () => {
   );
   assert.throws(() =>
     buildConnectionRow({ schoolId: "s", schoolRoute: "ok", clientId: "c", clientSecret: "x", scopes: "students:list" })
+  );
+});
+
+// ── log lines ────────────────────────────────────────────
+
+test("log reasons are redacted and hints cover the common failures", () => {
+  assert.equal(
+    redactForLog("user jane.doe@example.com sent Bearer abc.def and code AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"),
+    "user j***@example.com sent Bearer [redacted] and code [redacted]"
+  );
+  // UUIDs (school / user ids) stay readable.
+  assert.equal(redactForLog("8b0f9c1e-1234-4abc-9def-0123456789ab"), "8b0f9c1e-1234-4abc-9def-0123456789ab");
+
+  assert.equal(parseOAuthErrorCode('{"error":"invalid_grant"}'), "invalid_grant");
+  assert.equal(parseOAuthErrorCode("<html>"), null);
+
+  assert.equal(veracrossHint("token", 400, "invalid_grant"), "code expired/used or redirect_uri mismatch");
+  assert.equal(veracrossHint("token", 401, "invalid_client"), "client id/secret wrong or reset");
+  assert.equal(veracrossHint("data_api", 401, null), "token expired or revoked (10-token cap?)");
+  assert.equal(veracrossHint("gate", null, null), null);
+
+  const fields = describeVeracrossFailure({
+    step: "data_api",
+    schoolId: "s1",
+    route: "poly",
+    error: new VeracrossHttpError("Veracross /parents/12 failed (403): no", "data_api", 403, null, "/parents/{id}"),
+  });
+  assert.deepEqual(fields, {
+    event: "failure",
+    step: "data_api",
+    school: "s1",
+    route: "poly",
+    status: 403,
+    endpoint: "/parents/{id}",
+    reason: "http 403",
+    hint: "scope not enabled on the OAuth Application",
+  });
+  assert.equal(
+    describeVeracrossFailure({ step: "link", schoolId: "s1", error: new Error("for a@b.org") }).reason,
+    "for a***@b.org"
   );
 });
