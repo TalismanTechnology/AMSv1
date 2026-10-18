@@ -590,7 +590,7 @@ function MapCanvas({
         panActivationKeyCode={null}
         panOnScroll
         zoomOnDoubleClick={false}
-        attributionPosition="top-right"
+        proOptions={{ hideAttribution: true }}
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1.25} />
         <Controls position="bottom-left" showInteractive={false}>
