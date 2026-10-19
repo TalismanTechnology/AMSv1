@@ -11,7 +11,7 @@ export const config = {
      * Match all request paths except:
      * - _next/static (static files)
      * - _next/image (image optimization files)
-     * - favicon.ico and static assets (images, icons, fonts, robots.txt,
+     * - favicon.ico and static assets (images, videos, icons, fonts, robots.txt,
      *   sitemap.xml, the web manifest)
      * - .well-known (apple-app-site-association must never redirect)
      *
@@ -23,6 +23,6 @@ export const config = {
      * - /register, /admin/*, /parent/* (legacy redirects)
      * - /api/* (keeps the session fresh for route handlers too)
      */
-    "/((?!_next/static|_next/image|favicon.ico|\\.well-known/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico|txt|xml|webmanifest|woff2?|ttf|otf)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|\\.well-known/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico|txt|xml|webmanifest|woff2?|ttf|otf|mp4)$).*)",
   ],
 };
