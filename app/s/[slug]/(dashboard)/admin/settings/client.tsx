@@ -13,6 +13,7 @@ import {
   Mail,
   Plug,
   Globe,
+  Contact,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { LogoSpinner } from "@/components/logo-spinner";
@@ -44,6 +45,10 @@ import {
   WebsiteSources,
   type WebsiteSourceView,
 } from "@/components/admin/website-sources";
+import {
+  ContactsDirectory,
+  type ContactsDirectoryData,
+} from "@/components/admin/contacts-directory";
 import { calendarColorClasses } from "@/lib/event-calendars";
 import {
   ROLLOVER_MONTHS,
@@ -97,11 +102,11 @@ export interface BlackbaudConfig {
   eventCalendars: EventCalendar[];
 }
 
-const SETTINGS_TABS = ["general", "assistant", "email", "website", "blackbaud"] as const;
+const SETTINGS_TABS = ["general", "assistant", "contacts", "email", "website", "blackbaud"] as const;
 type SettingsTab = (typeof SETTINGS_TABS)[number];
 
 // Tabs whose fields are saved by the header's save button. Email has its own
-// save button; Website and Blackbaud save as you go.
+// save button; Contacts, Website and Blackbaud save as you go.
 const SAVED_BY_HEADER: readonly SettingsTab[] = ["general", "assistant"];
 
 function isSettingsTab(value: string | null | undefined): value is SettingsTab {
@@ -116,6 +121,7 @@ interface SettingsClientProps {
   blackbaud: BlackbaudConfig;
   blackbaudCallback: BlackbaudCallbackResult;
   websiteSources: { sources: WebsiteSourceView[]; loadError: string | null };
+  contacts: ContactsDirectoryData;
   /** The ?tab= value from the URL, so a refresh keeps the open tab. */
   initialTab?: string;
 }
@@ -128,6 +134,7 @@ export function SettingsClient({
   blackbaud,
   blackbaudCallback,
   websiteSources,
+  contacts,
   initialTab,
 }: SettingsClientProps) {
   // Returning from Blackbaud's consent screen opens the Blackbaud tab so the
@@ -258,6 +265,10 @@ export function SettingsClient({
             <TabsTrigger value="assistant" className="px-3">
               <Sparkles />
               Assistant
+            </TabsTrigger>
+            <TabsTrigger value="contacts" className="px-3">
+              <Contact />
+              Contacts
             </TabsTrigger>
             <TabsTrigger value="email" className="px-3">
               <Mail />
@@ -546,6 +557,14 @@ export function SettingsClient({
               </div>
             </div>
           </section>
+        </TabsContent>
+
+        <TabsContent
+          value="contacts"
+          forceMount
+          className="data-[state=inactive]:hidden"
+        >
+          <ContactsDirectory schoolId={schoolId} data={contacts} />
         </TabsContent>
 
         <TabsContent

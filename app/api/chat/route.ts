@@ -17,6 +17,12 @@ import { CHAT_MODEL_ID, prepareChatTurn } from "@/lib/ai/chat-turn";
 import { aiConsentGate } from "@/lib/ai/consent";
 import { parseFollowUps } from "@/lib/chat-utils";
 import type { ChatSource } from "@/lib/types";
+import {
+  contactCardPrompt,
+  loadApprovedContacts,
+  routeUnansweredQuestion,
+} from "@/lib/contacts/route-contact";
+import type { ContactCardData } from "@/lib/contacts/directory";
 
 // A write the response doesn't depend on: already running, never awaited, and
 // kept alive past the end of the response by after().
@@ -104,6 +110,10 @@ export async function POST(request: NextRequest) {
         .join("") || "";
 
     const adminSupabase = createAdminClient();
+    // The school's approved staff contacts (migration 044), read alongside
+    // retrieval and used only if nothing answers the question. Never rejects:
+    // a missing table or any error is "no contacts".
+    const approvedContacts = loadApprovedContacts(adminSupabase, schoolId);
     const {
       searchQuery,
       systemPrompt,
@@ -126,6 +136,30 @@ export async function POST(request: NextRequest) {
       debugLog(`RAG: ${relevantChunks.length} chunks found. Top: "${relevantChunks[0].document_title}" (sim: ${relevantChunks[0].similarity.toFixed(3)})`);
     } else {
       debugLog(`RAG: 0 chunks found for query: "${lastMessageText.slice(0, 80)}"`);
+    }
+
+    // Unanswered: route the parent to the right approved staff contact, shown
+    // as a card. No approved contacts (or no table yet) → no card, and the
+    // answer is exactly what it was before contacts existed.
+    let contactCard: ContactCardData | null = null;
+    let answerSystemPrompt = systemPrompt;
+    if (sources.length === 0) {
+      try {
+        const routed = await routeUnansweredQuestion({
+          supabase: adminSupabase,
+          schoolId,
+          contacts: await approvedContacts,
+          providerQuestion,
+          divisionHints: [lastMessageText, searchQuery],
+        });
+        if (routed) {
+          contactCard = routed.card;
+          answerSystemPrompt = `${systemPrompt}\n\n${contactCardPrompt(routed.card)}`;
+          debugLog(`Contact routing: topic=${routed.topic ?? "none"} → contact ${routed.card.id}`);
+        }
+      } catch (err) {
+        debugLog(`Contact routing failed (continuing without a card): ${err}`);
+      }
     }
 
     // Documents are the only citable sources; the calendar never produces
@@ -249,7 +283,7 @@ export async function POST(request: NextRequest) {
     // Stream the response, save assistant message on finish
     const result = streamText({
       model: google(CHAT_MODEL_ID),
-      system: systemPrompt,
+      system: answerSystemPrompt,
       messages: modelMessages,
       temperature,
       maxRetries: 5,
@@ -282,6 +316,10 @@ export async function POST(request: NextRequest) {
       execute: ({ writer }) => {
         if (allSources.length > 0) {
           writer.write({ type: "data-sources", data: allSources });
+        }
+        // Contact details come only from the approved row, never the model.
+        if (contactCard) {
+          writer.write({ type: "data-contact", data: contactCard });
         }
         writer.write({ type: "data-message-id", data: assistantMessageId });
         writer.merge(result.toUIMessageStream());
