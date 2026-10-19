@@ -3,10 +3,12 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { SiteFooter } from "@/components/landing/site-footer";
+import { DemoVideo } from "./demo-video";
 
 // Public demo-video page, shared as a link (email, social). Same paper
 // background and type as the marketing site; the video is a native <video>
-// so it plays everywhere without a client bundle. Assets live in public/demo.
+// (in a small client component that handles autoplay with sound). Assets
+// live in public/demo.
 
 const SITE_URL = "https://askmyschool.app";
 const PAGE_URL = `${SITE_URL}/demo`;
@@ -73,16 +75,7 @@ export default function DemoPage() {
         </div>
 
         <div className="mt-8 overflow-hidden rounded-2xl bg-black shadow-[0_24px_60px_-24px_rgba(0,0,0,0.45)] sm:mt-10 sm:rounded-3xl">
-          <video
-            controls
-            preload="metadata"
-            playsInline
-            poster="/demo/askmyschool-demo-poster.webp"
-            className="block aspect-video h-auto w-full"
-          >
-            <source src="/demo/askmyschool-demo.mp4" type="video/mp4" />
-            <source src="/demo/askmyschool-demo-720p.mp4" type="video/mp4" />
-          </video>
+          <DemoVideo />
         </div>
 
         <div className="mt-10 flex justify-center">
