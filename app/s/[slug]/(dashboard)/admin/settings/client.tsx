@@ -50,6 +50,7 @@ import {
   ParentSignInSettings,
   type ParentSignInConfig,
 } from "@/components/admin/parent-sign-in-settings";
+import {
   ContactsDirectory,
   type ContactsDirectoryData,
 } from "@/components/admin/contacts-directory";
