@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { GRADE_VALUES } from "@/lib/grades";
 import { getVeracrossClientCredentialsToken } from "./oauth";
+import { veracrossApiOrigin } from "./config";
+import { VeracrossHttpError } from "./log";
+import { invalidateVeracrossClientToken } from "./token-cache";
 import type { VeracrossConnection } from "./connection";
 
 // Veracross Data API v3: who a signed-in parent's children are, and their
@@ -9,6 +12,7 @@ import type { VeracrossConnection } from "./connection";
 //
 //   Base URL  https://api.veracross.com/{route}/v3/
 //   Auth      Bearer token from the client_credentials grant, same OAuth app
+//             (cached, see ./token-cache.ts; host overridable, see ./config.ts)
 //
 // Endpoints and the scope each needs (sources retrieved 2026-10-09):
 //   GET /person_accounts?username=  person_accounts:list   (username -> Person ID)
@@ -33,7 +37,6 @@ import type { VeracrossConnection } from "./connection";
 // TODO(veracross-sync): roster + calendar sync, not implemented. Plan in
 // docs/VERACROSS.md ("Roster and calendar sync").
 
-const DATA_API_ORIGIN = "https://api.veracross.com";
 const REQUEST_TIMEOUT_MS = 15_000;
 const MAX_RELATIONSHIP_LOOKUPS = 8;
 
@@ -65,7 +68,7 @@ async function dataGet(
   path: string,
   params: Record<string, string | number> = {}
 ): Promise<unknown> {
-  const url = `${DATA_API_ORIGIN}/${schoolRoute}/v3${path}${buildDataApiQuery(params)}`;
+  const url = `${veracrossApiOrigin()}/${schoolRoute}/v3${path}${buildDataApiQuery(params)}`;
   const response = await fetch(url, {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -78,7 +81,13 @@ async function dataGet(
   if (response.status === 404) throw new NotFoundError(path);
   if (!response.ok) {
     const detail = (await response.text()).slice(0, 300);
-    throw new Error(`Veracross ${path} failed (${response.status}): ${detail}`);
+    throw new VeracrossHttpError(
+      `Veracross ${path} failed (${response.status}): ${detail}`,
+      "data_api",
+      response.status,
+      null,
+      path.replace(/\/\d+(?=\/|$)/g, "/{id}")
+    );
   }
 
   return response.json();
@@ -214,6 +223,11 @@ export interface VeracrossFamily {
 /**
  * The signed-in parent's Person ID and current children with grades, or null
  * if the parent can't be matched to exactly one Veracross person.
+ *
+ * Uses the cached client_credentials token. If the Data API answers 401 (the
+ * token expired, or Veracross revoked it because the app hit its 10-token
+ * cap), the token is dropped and the whole lookup retried once with a fresh
+ * one. A second 401 is thrown.
  */
 export async function lookupVeracrossFamily(input: {
   connection: VeracrossConnection;
@@ -221,16 +235,33 @@ export async function lookupVeracrossFamily(input: {
   username: string;
 }): Promise<VeracrossFamily | null> {
   const route = input.connection.schoolRoute;
-  const token = await getVeracrossClientCredentialsToken({
+  const tokenRequest = {
     client: { schoolRoute: route, clientId: input.connection.clientId },
     clientSecret: input.clientSecret,
     scopes: [...VERACROSS_DATA_SCOPES],
-  });
+  };
+  const token = await getVeracrossClientCredentialsToken(tokenRequest);
 
+  try {
+    return await lookupFamilyWithToken(route, token, input.username);
+  } catch (caught: unknown) {
+    if (!(caught instanceof VeracrossHttpError && caught.status === 401)) throw caught;
+    invalidateVeracrossClientToken({ ...tokenRequest.client, scopes: tokenRequest.scopes }, token);
+  }
+
+  const fresh = await getVeracrossClientCredentialsToken(tokenRequest);
+  return lookupFamilyWithToken(route, fresh, input.username);
+}
+
+async function lookupFamilyWithToken(
+  route: string,
+  token: string,
+  username: string
+): Promise<VeracrossFamily | null> {
   const accounts = personAccountsSchema.parse(
-    await dataGet(route, token, "/person_accounts", { username: input.username })
+    await dataGet(route, token, "/person_accounts", { username })
   ).data.filter(
-    (account) => account.username?.toLowerCase() === input.username.toLowerCase()
+    (account) => account.username?.toLowerCase() === username.toLowerCase()
   );
 
   const personIds = new Set(accounts.map((account) => account.person_id));

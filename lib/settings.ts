@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { DEFAULT_ROLLOVER } from "@/lib/grades";
 import type { Settings } from "@/lib/types";
 
 function getDefaultSettings(schoolId: string): Settings {
@@ -15,6 +16,8 @@ function getDefaultSettings(schoolId: string): Settings {
     require_join_code: false,
     require_approval: true,
     new_document_push_enabled: true,
+    grade_rollover_month: DEFAULT_ROLLOVER.month,
+    grade_rollover_day: DEFAULT_ROLLOVER.day,
     updated_at: new Date().toISOString(),
   };
 }
@@ -35,5 +38,8 @@ export async function loadSettings(schoolId: string): Promise<Settings> {
       : [],
     // Missing until migration 042 is applied.
     new_document_push_enabled: data.new_document_push_enabled ?? true,
+    // Missing until migration 043 is applied.
+    grade_rollover_month: data.grade_rollover_month ?? DEFAULT_ROLLOVER.month,
+    grade_rollover_day: data.grade_rollover_day ?? DEFAULT_ROLLOVER.day,
   } as Settings;
 }

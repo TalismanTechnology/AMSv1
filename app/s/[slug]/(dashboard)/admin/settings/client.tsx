@@ -23,6 +23,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TimeAgo } from "@/components/ui/time-ago";
 import { updateSettings, updateEmailIngestion } from "@/actions/settings";
@@ -43,6 +50,13 @@ import {
   type ContactsDirectoryData,
 } from "@/components/admin/contacts-directory";
 import { calendarColorClasses } from "@/lib/event-calendars";
+import {
+  ROLLOVER_MONTHS,
+  formatRollover,
+  isValidRollover,
+  rolloverDaysInMonth,
+  schoolYearStart,
+} from "@/lib/grades";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { EventCalendar, Settings } from "@/lib/types";
@@ -150,9 +164,36 @@ export function SettingsClient({
   const [newDocumentPush, setNewDocumentPush] = useState(
     settings.new_document_push_enabled
   );
+  const [rolloverMonth, setRolloverMonth] = useState(settings.grade_rollover_month);
+  const [rolloverDay, setRolloverDay] = useState(settings.grade_rollover_day);
+  // Fixed at mount, so the render stays pure; only the date part matters.
+  const [today] = useState(() => new Date());
+  const rolloverChanged =
+    rolloverMonth !== settings.grade_rollover_month ||
+    rolloverDay !== settings.grade_rollover_day;
+  // Moving the date across today changes which school year it is now, so
+  // every grade shifts by one at the next hourly update.
+  const rolloverYearShift = rolloverChanged
+    ? schoolYearStart(today, { month: rolloverMonth, day: rolloverDay }) -
+      schoolYearStart(today, {
+        month: settings.grade_rollover_month,
+        day: settings.grade_rollover_day,
+      })
+    : 0;
   const [newQuestion, setNewQuestion] = useState("");
   const [saving, setSaving] = useState(false);
+
+  function changeRolloverMonth(value: string) {
+    const month = Number(value);
+    setRolloverMonth(month);
+    setRolloverDay((day) => Math.min(day, rolloverDaysInMonth(month)));
+  }
+
   async function handleSave() {
+    if (rolloverChanged && !isValidRollover(rolloverMonth, rolloverDay)) {
+      toast.error("Choose a valid date for grades to move up.");
+      return;
+    }
     setSaving(true);
     const result = await updateSettings(schoolId, {
       school_name: schoolName.trim() || "AskMySchool",
@@ -165,6 +206,10 @@ export function SettingsClient({
       // Only sent when changed, so saving still works before migration 042.
       ...(newDocumentPush !== settings.new_document_push_enabled
         ? { new_document_push_enabled: newDocumentPush }
+        : {}),
+      // Same for migration 043.
+      ...(rolloverChanged
+        ? { grade_rollover_month: rolloverMonth, grade_rollover_day: rolloverDay }
         : {}),
     });
     if (result.error) toast.error(result.error);
@@ -331,6 +376,68 @@ export function SettingsClient({
                   onCheckedChange={setNewDocumentPush}
                 />
               </div>
+            </div>
+          </section>
+
+          <section className="space-y-4">
+            <div className="space-y-1">
+              <h2 className="text-base font-semibold text-ink">School year</h2>
+              <p className="text-sm text-muted-foreground">
+                When children&apos;s grades move up.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="grade-rollover-month">Grades move up on</Label>
+              <div className="flex gap-2">
+                <Select value={String(rolloverMonth)} onValueChange={changeRolloverMonth}>
+                  <SelectTrigger
+                    id="grade-rollover-month"
+                    aria-label="Month"
+                    aria-describedby="grade-rollover-hint"
+                    className="w-40"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ROLLOVER_MONTHS.map((m) => (
+                      <SelectItem key={m.value} value={String(m.value)}>
+                        {m.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={String(rolloverDay)}
+                  onValueChange={(value) => setRolloverDay(Number(value))}
+                >
+                  <SelectTrigger
+                    aria-label="Day"
+                    aria-describedby="grade-rollover-hint"
+                    className="w-20"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: rolloverDaysInMonth(rolloverMonth) }, (_, i) => (
+                      <SelectItem key={i + 1} value={String(i + 1)}>
+                        {i + 1}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <p id="grade-rollover-hint" className="text-xs text-muted-foreground">
+                Each child&apos;s grade advances by one on this date every year;
+                12th graders are marked graduated (not deleted). Parents can
+                still correct a grade, and Veracross sign-in updates it.
+              </p>
+              {rolloverYearShift !== 0 && (
+                <p className="text-xs text-amber-700 dark:text-amber-400">
+                  {rolloverYearShift < 0
+                    ? `${formatRollover(rolloverMonth, rolloverDay)} hasn't come yet this year, so once you save, every child's grade goes back by one until then.`
+                    : `${formatRollover(rolloverMonth, rolloverDay)} has already passed this year, so once you save, every child's grade moves up by one within the hour.`}
+                </p>
+              )}
             </div>
           </section>
         </TabsContent>
