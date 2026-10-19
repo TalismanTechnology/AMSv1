@@ -1,7 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { labelChildren, redactChildNames, redactChildNamesInMessages } from "./child-privacy";
+import {
+  labelChildren,
+  redactChildNames,
+  redactChildNamesInMessages,
+  splitGraduatedChildren,
+} from "./child-privacy";
 import { formatChildrenContext } from "./context";
 
 const KIDS = [
@@ -91,4 +96,28 @@ test("every text part of every message is redacted; other parts pass through", (
   assert.equal(out[1].parts[1].type, "data-sources");
   // The originals (saved to our own history) are not mutated.
   assert.equal(messages[0].parts[0].text, "Lunch for Mia?");
+});
+
+test("graduated children leave the context but their names are still redacted", () => {
+  const { current, redactable } = splitGraduatedChildren([
+    { name: "Noah", grade: "12", graduated: true },
+    ...KIDS,
+  ]);
+  assert.deepEqual(
+    current.map((c) => c.name),
+    ["Mia Lopez", "Lucas"]
+  );
+  assert.ok(!formatChildrenContext(current).includes("12th"));
+  // Current children keep the labels they'd have on their own.
+  assert.deepEqual(labelChildren(redactable).slice(0, 2), labelChildren(KIDS));
+  assert.equal(
+    redactChildNames("Did Noah leave his jacket? Mia needs hers.", redactable),
+    "Did [your graduated child] leave his jacket? [your 3rd Grade child] needs hers."
+  );
+});
+
+test("without graduates nothing changes", () => {
+  const { current, redactable } = splitGraduatedChildren(KIDS);
+  assert.deepEqual(current, KIDS);
+  assert.deepEqual(redactable, KIDS);
 });

@@ -7,9 +7,11 @@ import { FollowUpChips } from "./follow-up-chips";
 import { MessageFeedback } from "./message-feedback";
 import { MessageShare } from "./message-share";
 import { SourceList } from "./source-list";
+import { ContactCard } from "./contact-card";
 import { useSourcePanel } from "./source-panel-context";
 import { parseFollowUps } from "@/lib/chat-utils";
 import type { ChatSource } from "@/lib/types";
+import type { ContactCardData } from "@/lib/contacts/directory";
 
 interface MessageBubbleProps {
   role: "user" | "assistant";
@@ -17,6 +19,8 @@ interface MessageBubbleProps {
   messageId?: string;
   schoolId?: string;
   sources?: ChatSource[];
+  /** The staff contact an unanswered question was routed to. */
+  contact?: ContactCardData;
   isLastAssistant?: boolean;
   isStreaming?: boolean;
   skipAnimations?: boolean;
@@ -29,6 +33,7 @@ export function MessageBubble({
   messageId,
   schoolId,
   sources,
+  contact,
   isLastAssistant,
   isStreaming,
   skipAnimations,
@@ -100,6 +105,9 @@ export function MessageBubble({
           />
         )}
       </div>
+
+      {/* Shown once the answer that points to it has finished arriving. */}
+      {contact && !showTypewriter && <ContactCard contact={contact} />}
 
       {sources && sources.length > 0 && (
         <SourceList sources={sources} citedNumbers={citedNumbers} />

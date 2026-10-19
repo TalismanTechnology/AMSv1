@@ -112,6 +112,9 @@ export async function syncVeracrossChildren(input: {
     const rowId = linked.get(child.externalId);
 
     if (rowId) {
+      // A changed grade re-anchors the child's class year and clears
+      // graduated_at (children_anchor_class_year trigger, migration 043), so
+      // the school's grade wins over the yearly rollover whenever it's synced.
       const { error: updateError } = await admin
         .from("children")
         .update({ name: child.name, grade: child.grade })

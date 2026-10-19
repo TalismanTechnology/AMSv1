@@ -126,6 +126,9 @@ export function WelcomeForm({
           Tell us who your children are so answers can be tailored to their
           grade. You can change this later in your profile.
         </p>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Enter this year&apos;s grade — it moves up automatically each school year.
+        </p>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
           {children.map((child, index) => (

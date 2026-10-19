@@ -49,7 +49,12 @@ import { approveUser, approveAllPending, changeUserRole, deleteUser } from "@/ac
 import { toast } from "sonner";
 import { TimeAgo } from "@/components/ui/time-ago";
 import { GRADES, formatGrade } from "@/lib/grades";
-import type { Profile } from "@/lib/types";
+import type { Child, Profile } from "@/lib/types";
+
+/** "8th Grade", or "Graduated" once the child is past 12th (migration 043). */
+function childGradeLabel(child: Child): string {
+  return child.graduated_at ? "Graduated" : formatGrade(child.grade);
+}
 
 type SortKey = "full_name" | "email" | "role" | "child_grade" | "created_at";
 type SortDir = "asc" | "desc";
@@ -169,7 +174,8 @@ export function UsersClient({ users, schoolId, schoolSlug }: UsersClientProps) {
     if (gradeFilter !== "all") {
       result = result.filter((u) => {
         if (u.children && u.children.length > 0) {
-          return u.children.some((c) => c.grade === gradeFilter);
+          // A graduate's grade stays "12"; they aren't a 12th grader.
+          return u.children.some((c) => !c.graduated_at && c.grade === gradeFilter);
         }
         return u.child_grade === gradeFilter;
       });
@@ -383,7 +389,7 @@ export function UsersClient({ users, schoolId, schoolSlug }: UsersClientProps) {
                       <span>
                         {user.children[0].name}{" "}
                         <span className="text-xs opacity-60">
-                          ({formatGrade(user.children[0].grade)})
+                          ({childGradeLabel(user.children[0])})
                         </span>
                       </span>
                     ) : (
@@ -396,7 +402,7 @@ export function UsersClient({ users, schoolId, schoolSlug }: UsersClientProps) {
                         <TooltipContent>
                           {user.children.map((c) => (
                             <div key={c.id}>
-                              {c.name} ({formatGrade(c.grade)})
+                              {c.name} ({childGradeLabel(c)})
                             </div>
                           ))}
                         </TooltipContent>

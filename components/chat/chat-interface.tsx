@@ -23,6 +23,7 @@ import { createChatSession } from "@/actions/chat";
 import { searchDocumentsByName } from "@/actions/documents";
 import { parseFollowUps } from "@/lib/chat-utils";
 import type { ChatSource, ChatMessage } from "@/lib/types";
+import type { ContactCardData } from "@/lib/contacts/directory";
 
 interface ChatInterfaceProps {
   sessionId?: string;
@@ -336,6 +337,15 @@ export function ChatInterface({
       );
   }
 
+  function getMessageContact(
+    message: (typeof messages)[number]
+  ): ContactCardData | undefined {
+    const part = message.parts.find((p) => p.type === "data-contact");
+    return part
+      ? (part as { type: "data-contact"; data: ContactCardData }).data
+      : undefined;
+  }
+
   function getDbMessageId(
     message: (typeof messages)[number]
   ): string | undefined {
@@ -397,6 +407,11 @@ export function ChatInterface({
                         sources={
                           message.role === "assistant"
                             ? getMessageSources(message)
+                            : undefined
+                        }
+                        contact={
+                          message.role === "assistant"
+                            ? getMessageContact(message)
                             : undefined
                         }
                         isLastAssistant={index === lastAssistantIndex && !isLoading}

@@ -59,6 +59,10 @@ export interface Child {
   grade: string;
   school_id: string;
   created_at: string;
+  /** Graduating class: the year they finish 12th grade. Null for unrecognised grades, or before migration 043. */
+  class_year: number | null;
+  /** Set once the child is past 12th grade. They stay listed and grade stays "12" (migration 043). */
+  graduated_at: string | null;
 }
 
 export interface Category {
@@ -275,6 +279,9 @@ export interface Settings {
   require_approval: boolean;
   /** Push parents when new uploaded / emailed documents are ready (migration 042). */
   new_document_push_enabled: boolean;
+  /** The date children's grades move up each year (migration 043). Default July 1. */
+  grade_rollover_month: number;
+  grade_rollover_day: number;
   updated_at: string;
 }
 
