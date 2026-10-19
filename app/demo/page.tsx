@@ -3,10 +3,12 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { SiteFooter } from "@/components/landing/site-footer";
+import { DemoVideo } from "./demo-video";
 
 // Public demo-video page, shared as a link (email, social). Same paper
 // background and type as the marketing site; the video is a native <video>
-// so it plays everywhere without a client bundle. Assets live in public/demo.
+// (in a small client component that handles autoplay with sound). Assets
+// live in public/demo.
 
 const SITE_URL = "https://askmyschool.app";
 const PAGE_URL = `${SITE_URL}/demo`;
@@ -55,40 +57,33 @@ export const dynamic = "force-static";
 export default function DemoPage() {
   return (
     <div className="relative z-10 flex min-h-screen flex-col">
-      <header className="mx-auto flex w-full max-w-[1100px] items-center justify-center px-6 pt-6">
+      <header className="mx-auto flex w-full max-w-[1100px] items-center justify-center px-6 pt-4">
         <Link href="/" className="flex items-center gap-2" aria-label="AskMySchool home">
-          <Logo size={20} className="text-brand-dark" />
-          <span className="text-xl tracking-tight text-brand-dark">AskMySchool</span>
+          <Logo size={16} className="text-brand-dark" />
+          <span className="text-base tracking-tight text-brand-dark">AskMySchool</span>
         </Link>
       </header>
 
-      <main className="mx-auto w-full max-w-[1100px] flex-1 px-4 pb-20 pt-10 sm:px-6 sm:pt-14">
+      <main className="mx-auto w-full max-w-[1100px] flex-1 px-4 pb-10 pt-4 sm:px-6 sm:pt-5">
         <div className="text-center">
-          <h1 className="font-serif-display text-4xl font-medium tracking-[-0.02em] text-ink sm:text-5xl">
+          <h1 className="font-serif-display text-2xl font-medium tracking-[-0.02em] text-ink sm:text-3xl">
             {TITLE}
           </h1>
-          <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-ink-soft sm:text-lg">
+          <p className="mx-auto mt-1.5 max-w-2xl text-sm leading-relaxed text-ink-soft sm:text-base">
             {DESCRIPTION}
           </p>
         </div>
 
-        <div className="mt-8 overflow-hidden rounded-2xl bg-black shadow-[0_24px_60px_-24px_rgba(0,0,0,0.45)] sm:mt-10 sm:rounded-3xl">
-          <video
-            controls
-            preload="metadata"
-            playsInline
-            poster="/demo/askmyschool-demo-poster.webp"
-            className="block aspect-video h-auto w-full"
-          >
-            <source src="/demo/askmyschool-demo.mp4" type="video/mp4" />
-            <source src="/demo/askmyschool-demo-720p.mp4" type="video/mp4" />
-          </video>
+        {/* Capped so the whole video plus the button below fit in one
+            viewport: max width = 62svh at 16:9, so height <= 62svh. */}
+        <div className="mx-auto mt-4 w-full max-w-[calc(62svh*16/9)] overflow-hidden rounded-2xl bg-black shadow-[0_24px_60px_-24px_rgba(0,0,0,0.45)] sm:mt-5 sm:rounded-3xl">
+          <DemoVideo />
         </div>
 
-        <div className="mt-10 flex justify-center">
+        <div className="mt-5 flex justify-center">
           <Link
             href="/"
-            className="inline-flex items-center gap-2 rounded-full bg-brand-dark px-8 py-3.5 text-sm uppercase tracking-wide text-white transition-colors hover:bg-brand-green"
+            className="inline-flex items-center gap-2 rounded-full bg-brand-dark px-7 py-3 text-sm uppercase tracking-wide text-white transition-colors hover:bg-brand-green"
           >
             Visit askmyschool.app
             <ArrowRight className="h-4 w-4" />
