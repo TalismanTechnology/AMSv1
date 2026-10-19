@@ -6,6 +6,7 @@ import { LogoSpinner } from "@/components/logo-spinner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -27,7 +28,13 @@ import { hasAiConsent } from "@/lib/ai/consent";
 import { updateProfile } from "@/actions/profile";
 import { addChild, updateChild, removeChild } from "@/actions/children";
 import { toast } from "sonner";
-import { GRADES, formatGrade } from "@/lib/grades";
+import {
+  GRADES,
+  formatClassYear,
+  formatGrade,
+  formatRollover,
+  type Rollover,
+} from "@/lib/grades";
 import type { Profile, Child } from "@/lib/types";
 
 interface ProfileClientProps {
@@ -39,6 +46,8 @@ interface ProfileClientProps {
   schoolSlug: string;
   schoolName: string | null;
   newDocumentPush: boolean;
+  /** The school's date for moving grades up (settings, default July 1). */
+  gradeRollover: Rollover;
 }
 
 export function ProfileClient({
@@ -48,6 +57,7 @@ export function ProfileClient({
   schoolId,
   schoolName,
   newDocumentPush,
+  gradeRollover,
 }: ProfileClientProps) {
   const [fullName, setFullName] = useState(profile.full_name || "");
   const [savingName, setSavingName] = useState(false);
@@ -188,7 +198,9 @@ export function ProfileClient({
               Children
             </h2>
             <p className="mt-0.5 text-sm text-muted-foreground">
-              Manage your children&apos;s information.
+              Manage your children&apos;s information. Grades move up
+              automatically each school year on{" "}
+              {formatRollover(gradeRollover.month, gradeRollover.day)}.
             </p>
           </div>
           <Button size="sm" onClick={openAddChild} className="shrink-0">
@@ -216,9 +228,22 @@ export function ProfileClient({
                       {child.name.charAt(0).toUpperCase()}
                     </span>
                     <div>
-                      <p className="font-medium text-ink">{child.name}</p>
+                      <p className="flex items-center gap-2 font-medium text-ink">
+                        {child.name}
+                        {child.graduated_at && (
+                          <Badge variant="secondary" className="text-xs">
+                            Graduated
+                          </Badge>
+                        )}
+                      </p>
                       <p className="text-sm text-muted-foreground">
-                        {formatGrade(child.grade)}
+                        {child.graduated_at ? null : formatGrade(child.grade)}
+                        {child.class_year != null && (
+                          <span className="text-muted-foreground/70">
+                            {child.graduated_at ? "" : " · "}
+                            {formatClassYear(child.class_year)}
+                          </span>
+                        )}
                       </p>
                     </div>
                   </div>
@@ -290,7 +315,8 @@ export function ProfileClient({
                 </SelectContent>
               </Select>
               <p id="child-grade-hint" className="text-xs text-muted-foreground">
-                The grade your child is enrolled in — not their age.
+                The grade your child is enrolled in — not their age. It moves
+                up on its own each school year; change it here if it&apos;s wrong.
               </p>
             </div>
             <div className="flex justify-end gap-2">

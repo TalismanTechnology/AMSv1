@@ -266,12 +266,18 @@ export function formatAnnouncementsContext(
 export interface ChildContext {
   name: string;
   grade: string;
+  /**
+   * Past 12th grade (migration 043). prepareChatTurn keeps graduates out of
+   * the prompt and uses them only to redact their names.
+   */
+  graduated?: boolean;
 }
 
 /**
  * Fetch parent's children (name + grade) for context. The names are used only
  * to recognise them in the parent's own messages (lib/ai/child-privacy.ts);
- * they are never sent to the model.
+ * they are never sent to the model. Graduated children are returned flagged,
+ * not dropped, so their names are still recognised.
  */
 export async function fetchChildrenForContext(
   userId: string,
@@ -279,18 +285,28 @@ export async function fetchChildrenForContext(
 ): Promise<ChildContext[]> {
   const supabase = createAdminClient();
 
-  const { data, error } = await supabase
-    .from("children")
-    .select("name, grade")
-    .eq("parent_id", userId)
-    .eq("school_id", schoolId);
+  const query = (columns: string) =>
+    supabase
+      .from("children")
+      .select(columns)
+      .eq("parent_id", userId)
+      .eq("school_id", schoolId)
+      .returns<{ name: string; grade: string; graduated_at?: string | null }[]>();
+
+  let { data, error } = await query("name, grade, graduated_at");
+  // graduated_at is missing until migration 043 is applied.
+  if (error?.code === "42703") ({ data, error } = await query("name, grade"));
 
   if (error) {
     console.error("Failed to fetch children for AI context:", error);
     return [];
   }
 
-  return data || [];
+  return (data || []).map((c) => ({
+    name: c.name,
+    grade: c.grade,
+    graduated: Boolean(c.graduated_at),
+  }));
 }
 
 /**

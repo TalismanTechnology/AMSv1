@@ -120,6 +120,23 @@ export function redactChildNames(text: string, children: NamedChild[]): string {
   return out;
 }
 
+/**
+ * Split off children who have graduated (migration 043). They are left out of
+ * the assistant's context — it shouldn't answer about a graduate as a 12th
+ * grader — but their names must still be redacted if the parent types one, so
+ * `redactable` keeps them, labelled "your graduated child". Current children
+ * come first and keep exactly the labels labelChildren gives them alone.
+ */
+export function splitGraduatedChildren<T extends NamedChild & { graduated?: boolean }>(
+  children: T[]
+): { current: T[]; redactable: NamedChild[] } {
+  const current = children.filter((c) => !c.graduated);
+  const graduates = children
+    .filter((c) => c.graduated)
+    .map((c) => ({ name: c.name, grade: "graduated" }));
+  return { current, redactable: [...current, ...graduates] };
+}
+
 /** redactChildNames over every text part of a list of UI messages. */
 export function redactChildNamesInMessages<
   M extends { parts?: Array<{ type: string; text?: string }> },

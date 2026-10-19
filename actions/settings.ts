@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { logAudit } from "@/lib/audit";
 import { ensureInboundAddresses, type InboundAddresses } from "@/lib/email/addresses";
 import { normalizeSenderDomain } from "@/lib/email/inbound";
+import { isValidRollover } from "@/lib/grades";
 
 export async function updateSettings(
   schoolId: string,
@@ -20,9 +21,18 @@ export async function updateSettings(
     require_join_code?: boolean;
     require_approval?: boolean;
     new_document_push_enabled?: boolean;
+    grade_rollover_month?: number;
+    grade_rollover_day?: number;
     join_code?: string | null;
   }
 ) {
+  // The rollover date is sent as a pair, and only when it changed.
+  if (data.grade_rollover_month !== undefined || data.grade_rollover_day !== undefined) {
+    if (!isValidRollover(data.grade_rollover_month ?? NaN, data.grade_rollover_day ?? NaN)) {
+      return { error: "Choose a valid date for grades to move up." };
+    }
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
