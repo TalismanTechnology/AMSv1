@@ -1,4 +1,7 @@
 import { z } from "zod";
+import { DEFAULT_VERACROSS_ACCOUNTS_ORIGIN, veracrossAccountsOrigin } from "./config";
+import { VeracrossHttpError, parseOAuthErrorCode } from "./log";
+import { getCachedClientToken } from "./token-cache";
 
 // Veracross parent sign-in ("Sign in with Veracross").
 //
@@ -11,6 +14,8 @@ import { z } from "zod";
 //   token      POST https://accounts.veracross.com/{route}/oauth/token
 //   userinfo   GET  https://accounts.veracross.com/{route}/oauth/userinfo
 //
+// (The host can be pointed at a mock outside production; see ./config.ts.)
+//
 // Sources (all retrieved 2026-10-09):
 //   https://api-docs.veracross.com/docs/docs/5fb9f96bc480a-creating-an-sso-integration
 //   https://api-docs.veracross.com/docs/docs/fb8d893996a83-authorize
@@ -21,7 +26,7 @@ import { z } from "zod";
 // As with Blackbaud, nothing from Veracross is persisted for the parent: the
 // token is used once to learn who they are, then dropped.
 
-export const VERACROSS_ACCOUNTS_ORIGIN = "https://accounts.veracross.com";
+export const VERACROSS_ACCOUNTS_ORIGIN = DEFAULT_VERACROSS_ACCOUNTS_ORIGIN;
 
 const REQUEST_TIMEOUT_MS = 15_000;
 
@@ -37,7 +42,7 @@ export function veracrossAccountsBase(schoolRoute: string): string {
   if (!isValidSchoolRoute(schoolRoute)) {
     throw new Error(`Invalid Veracross school route: ${JSON.stringify(schoolRoute)}`);
   }
-  return `${VERACROSS_ACCOUNTS_ORIGIN}/${schoolRoute}`;
+  return `${veracrossAccountsOrigin()}/${schoolRoute}`;
 }
 
 export const veracrossEndpoints = (schoolRoute: string) => {
@@ -64,15 +69,48 @@ export function normalizeSignInScopes(raw: string): string {
   return scopes.join(" ");
 }
 
+const CALLBACK_PATH = "/auth/veracross/callback";
+
+/** True for an absolute https URL ending in /auth/veracross/callback. */
+export function isValidVeracrossRedirectUri(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === "https:" &&
+      url.pathname.endsWith(CALLBACK_PATH) &&
+      !url.search &&
+      !url.hash
+    );
+  } catch {
+    return false;
+  }
+}
+
+const reportedRedirectUris = new Set<string>();
+
 /**
  * Callback URL Veracross sends parents back to. It must be registered on
  * EACH school's OAuth Application exactly as returned here (Veracross
  * requires HTTPS), and the authorize and token calls must use the same value.
+ *
+ * VERACROSS_LOGIN_REDIRECT_URI wins (production pins it to
+ * https://askmyschool.app/auth/veracross/callback); a malformed value is
+ * logged and ignored in favour of the request origin.
  */
 export function getVeracrossRedirectUri(origin: string): string {
-  return (
-    process.env.VERACROSS_LOGIN_REDIRECT_URI ?? `${origin}/auth/veracross/callback`
-  );
+  const configured = process.env.VERACROSS_LOGIN_REDIRECT_URI?.trim();
+
+  if (configured) {
+    if (isValidVeracrossRedirectUri(configured)) return configured;
+    if (!reportedRedirectUris.has(configured)) {
+      reportedRedirectUris.add(configured);
+      console.error(
+        `[veracross] VERACROSS_LOGIN_REDIRECT_URI must be an absolute https URL ending in ${CALLBACK_PATH}; using the request origin instead`
+      );
+    }
+  }
+
+  return `${origin}${CALLBACK_PATH}`;
 }
 
 export interface VeracrossClient {
@@ -117,7 +155,8 @@ export type VeracrossTokenResponse = z.infer<typeof tokenResponseSchema>;
 
 async function postToken(
   schoolRoute: string,
-  body: URLSearchParams
+  body: URLSearchParams,
+  step: "token" | "client_token"
 ): Promise<VeracrossTokenResponse> {
   const response = await fetch(veracrossEndpoints(schoolRoute).token, {
     method: "POST",
@@ -130,8 +169,19 @@ async function postToken(
   });
 
   if (!response.ok) {
-    const detail = (await response.text()).slice(0, 500);
-    throw new Error(`Veracross token request failed (${response.status}): ${detail}`);
+    const text = await response.text();
+    // Never let an echoed secret or code reach logs or last_error.
+    let detail = text.slice(0, 500);
+    for (const name of ["client_secret", "code", "code_verifier"]) {
+      const value = body.get(name);
+      if (value && value.length >= 6) detail = detail.split(value).join("[redacted]");
+    }
+    throw new VeracrossHttpError(
+      `Veracross token request failed (${response.status}): ${detail}`,
+      step,
+      response.status,
+      parseOAuthErrorCode(text)
+    );
   }
 
   return tokenResponseSchema.parse(await response.json());
@@ -158,30 +208,40 @@ export async function exchangeVeracrossCode(input: {
       code: input.code,
       redirect_uri: input.redirectUri,
       code_verifier: input.codeVerifier,
-    })
+    }),
+    "token"
   );
 }
 
 /**
  * Server-to-server token for the Data API (children lookup). Requires the
  * school to have enabled those scopes on the same OAuth Application.
+ *
+ * Cached per OAuth Application + scope set (./token-cache.ts) because of
+ * Veracross's 10-active-tokens cap; call invalidateVeracrossClientToken when
+ * the Data API rejects it.
  */
 export async function getVeracrossClientCredentialsToken(input: {
   client: VeracrossClient;
   clientSecret: string;
   scopes: string[];
 }): Promise<string> {
-  const token = await postToken(
-    input.client.schoolRoute,
-    new URLSearchParams({
-      grant_type: "client_credentials",
-      client_id: input.client.clientId,
-      client_secret: input.clientSecret,
-      scope: input.scopes.join(" "),
-    })
+  return getCachedClientToken(
+    { schoolRoute: input.client.schoolRoute, clientId: input.client.clientId, scopes: input.scopes },
+    async () => {
+      const token = await postToken(
+        input.client.schoolRoute,
+        new URLSearchParams({
+          grant_type: "client_credentials",
+          client_id: input.client.clientId,
+          client_secret: input.clientSecret,
+          scope: input.scopes.join(" "),
+        }),
+        "client_token"
+      );
+      return { accessToken: token.access_token, expiresIn: token.expires_in };
+    }
   );
-
-  return token.access_token;
 }
 
 // Documented fields are sub, preferred_username, email, roles. The name
@@ -234,8 +294,13 @@ export async function fetchVeracrossUser(
   });
 
   if (!response.ok) {
-    const detail = (await response.text()).slice(0, 500);
-    throw new Error(`Veracross userinfo failed (${response.status}): ${detail}`);
+    const text = await response.text();
+    throw new VeracrossHttpError(
+      `Veracross userinfo failed (${response.status}): ${text.slice(0, 500)}`,
+      "userinfo",
+      response.status,
+      parseOAuthErrorCode(text)
+    );
   }
 
   return parseVeracrossUserInfo(await response.json());

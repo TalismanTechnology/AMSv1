@@ -19,14 +19,18 @@ import {
   recordVeracrossError,
   type VeracrossConnection,
 } from "@/lib/veracross/connection";
-import {
-  decideVeracrossParentAccess,
-  exchangeVeracrossCode,
-  fetchVeracrossUser,
-  getVeracrossRedirectUri,
-  type VeracrossUser,
-} from "@/lib/veracross/oauth";
+import { getVeracrossRedirectUri, type VeracrossUser } from "@/lib/veracross/oauth";
 import { lookupVeracrossFamily } from "@/lib/veracross/data-api";
+import {
+  VeracrossHttpError,
+  logVeracrossFailure,
+  logVeracrossSignIn,
+  type VeracrossFailure,
+} from "@/lib/veracross/log";
+import {
+  identifyVeracrossParent,
+  type VeracrossIdentifyResult,
+} from "@/lib/veracross/sign-in";
 import {
   checkVeracrossLink,
   recordVeracrossLink,
@@ -71,6 +75,7 @@ export async function GET(request: Request) {
   };
 
   if (!verified || !packed) {
+    logVeracrossFailure({ step: "authorize", schoolId: null, reason: "missing or invalid state" });
     return finish(`${origin}/login?error=${encodeURIComponent(MESSAGES.expired)}`);
   }
 
@@ -85,37 +90,56 @@ export async function GET(request: Request) {
   const code = searchParams.get("code");
 
   if (searchParams.get("error") || !code) {
+    const error = searchParams.get("error");
+    logVeracrossFailure({
+      step: "authorize",
+      schoolId,
+      reason: error ? `provider error ${error.replace(/[^a-z_]/gi, "").slice(0, 40)}` : "no code",
+    });
     return fail(MESSAGES.cancelled);
   }
 
   let connection: VeracrossConnection;
   let clientSecret: string;
-  let user: VeracrossUser;
+  let identified: VeracrossIdentifyResult;
 
   try {
     const loaded = await getVeracrossConnectionWithSecret(schoolId);
     if (!loaded) throw new Error("Veracross sign-in is not configured for this school");
     ({ connection, clientSecret } = loaded);
 
-    const token = await exchangeVeracrossCode({
-      client: { schoolRoute: connection.schoolRoute, clientId: connection.clientId },
+    identified = await identifyVeracrossParent({
+      connection,
       clientSecret,
       code,
       redirectUri: getVeracrossRedirectUri(origin),
       codeVerifier: packed.verifier,
     });
-    user = await fetchVeracrossUser(connection.schoolRoute, token.access_token);
   } catch (caught: unknown) {
-    await logFailure(schoolId, "identify caller", caught, true);
+    await logFailure({ step: "token", schoolId, error: caught }, "identify caller");
     return fail(MESSAGES.failed);
   }
 
-  const decision = decideVeracrossParentAccess({
-    user,
-    parentRoles: connection.parentRoles,
-  });
+  if (!identified.ok) {
+    await logFailure(
+      { step: identified.step, schoolId, route: connection.schoolRoute, error: identified.error },
+      "identify caller"
+    );
+    return fail(MESSAGES.failed);
+  }
+
+  const { user, decision } = identified;
 
   if (!decision.allowed) {
+    logVeracrossFailure({
+      step: "gate",
+      schoolId,
+      route: connection.schoolRoute,
+      reason: decision.reason,
+      // Role names are school-wide labels, not personal data, and are what
+      // to compare against parent_roles when a real parent is refused.
+      extra: { roles: user.roles.slice(0, 20) },
+    });
     return fail(decision.reason === "no_email" ? MESSAGES.noEmail : MESSAGES.notParent);
   }
 
@@ -126,16 +150,25 @@ export async function GET(request: Request) {
     const { userId, secured } = await findOrCreateParentAccount(email, user.fullName);
 
     if (await getStaffRole(userId)) {
+      logVeracrossFailure({
+        step: "gate",
+        schoolId,
+        route: connection.schoolRoute,
+        reason: "staff account",
+      });
       return fail(MESSAGES.staff);
     }
 
     const link = await checkVeracrossLink(schoolId, userId, user.sub);
     if (!link.ok) {
-      await logFailure(
+      await logFailure({
+        step: "link",
         schoolId,
-        "link",
-        new Error(`Veracross account ${user.sub} does not match the account linked to ${userId}`)
-      );
+        route: connection.schoolRoute,
+        error: new Error(
+          `Veracross account ${user.sub} does not match the account linked to ${userId}`
+        ),
+      });
       return fail(MESSAGES.mismatch);
     }
 
@@ -144,22 +177,30 @@ export async function GET(request: Request) {
     if (!secured) await revokeParentPassword(userId);
     await ensureParentMembership(userId, schoolId);
 
-    const personId = await linkFamily({
+    const family = await linkFamily({
       connection,
       clientSecret,
       user,
       userId,
       firstLink: link.firstLink,
     });
-    await recordVeracrossLink({ schoolId, userId, accountSub: user.sub, personId });
+    await recordVeracrossLink({ schoolId, userId, accountSub: user.sub, personId: family.personId });
 
     if (appChallenge) {
       handoffCode = await createAppHandoff({ email, schoolSlug, appChallenge });
     } else {
       await startParentSession(email);
     }
+
+    logVeracrossSignIn({
+      schoolId,
+      route: connection.schoolRoute,
+      firstLink: link.firstLink,
+      app: Boolean(appChallenge),
+      children: family.children,
+    });
   } catch (caught: unknown) {
-    await logFailure(schoolId, "session", caught);
+    await logFailure({ step: "link", schoolId, route: connection.schoolRoute, error: caught });
     return fail(MESSAGES.failed);
   }
 
@@ -172,6 +213,12 @@ export async function GET(request: Request) {
   return finish(`${origin}/s/${schoolSlug}/parent/chat`);
 }
 
+interface LinkedFamily {
+  personId: string | null;
+  /** Counts for the sign-in log line; null when the lookup didn't run or failed. */
+  children: { found: number; inserted: number; updated: number } | null;
+}
+
 /**
  * Best-effort: children + grades from the Data API. Never blocks sign-in —
  * the parent can always add children on /welcome. Returns the Person ID.
@@ -182,8 +229,9 @@ async function linkFamily(input: {
   user: VeracrossUser;
   userId: string;
   firstLink: boolean;
-}): Promise<string | null> {
-  if (!input.connection.dataApiEnabled || !input.user.username) return null;
+}): Promise<LinkedFamily> {
+  const skipped: LinkedFamily = { personId: null, children: null };
+  if (!input.connection.dataApiEnabled || !input.user.username) return skipped;
 
   try {
     const family = await lookupVeracrossFamily({
@@ -191,31 +239,42 @@ async function linkFamily(input: {
       clientSecret: input.clientSecret,
       username: input.user.username,
     });
-    if (!family) return null;
+    if (!family) return skipped;
 
-    await syncVeracrossChildren({
+    const counts = await syncVeracrossChildren({
       userId: input.userId,
       schoolId: input.connection.schoolId,
       children: family.children,
       firstLink: input.firstLink,
     });
 
-    return family.personId;
+    return {
+      personId: family.personId,
+      children: { found: family.children.length, ...counts },
+    };
   } catch (caught: unknown) {
-    await logFailure(input.connection.schoolId, "children lookup", caught, true);
-    return null;
+    await logFailure(
+      {
+        // client_token / data_api when Veracross answered with an error.
+        step: caught instanceof VeracrossHttpError ? caught.step : "children",
+        schoolId: input.connection.schoolId,
+        route: input.connection.schoolRoute,
+        error: caught,
+      },
+      "children lookup"
+    );
+    return skipped;
   }
 }
 
-async function logFailure(
-  schoolId: string,
-  step: string,
-  caught: unknown,
-  record = false
-): Promise<void> {
-  const message = caught instanceof Error ? caught.message : "Unknown error";
-  console.error(`Veracross parent sign-in failed at ${step} for school ${schoolId}: ${message}`);
-  if (record) {
-    await recordVeracrossError(schoolId, `${step}: ${message}`).catch(() => undefined);
+/**
+ * One structured `[veracross]` log line; with `recordAs`, also the full
+ * message in veracross_connections.last_error (as `<recordAs>: <message>`).
+ */
+async function logFailure(failure: VeracrossFailure, recordAs?: string): Promise<void> {
+  logVeracrossFailure(failure);
+  if (recordAs && failure.schoolId) {
+    const message = failure.error instanceof Error ? failure.error.message : "Unknown error";
+    await recordVeracrossError(failure.schoolId, `${recordAs}: ${message}`).catch(() => undefined);
   }
 }
