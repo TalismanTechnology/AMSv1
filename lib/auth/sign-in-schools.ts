@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveAuthProvider, type AuthProvider } from "@/lib/auth/provider";
 import { getVeracrossConnection } from "@/lib/veracross/connection";
+import { getRosterSummary } from "@/lib/roster/store";
 
 export interface SignInSchool {
   id: string;
@@ -30,8 +31,9 @@ function toSignInSchool(school: SchoolRow, provider: AuthProvider): SignInSchool
 
 /**
  * Schools a parent can pick on the "Choose your school" screen: Blackbaud
- * schools whose admin has connected Blackbaud, and Veracross schools with an
- * enabled Veracross OAuth Application. Blackbaud sign-in needs only the
+ * schools whose admin has connected Blackbaud, Veracross schools with an
+ * enabled Veracross OAuth Application, and roster schools with at least one
+ * active parent on their uploaded roster. Blackbaud sign-in needs only the
  * connection's environment id (the parent's own token does the rest), so an
  * expired admin token doesn't hide the school.
  */
@@ -40,7 +42,7 @@ export async function getSignInSchools(): Promise<SignInSchool[]> {
 
   // `schools(*)`, not a column list: auth_provider only exists once migration
   // 034 is applied, and naming it would break this query before then.
-  const [blackbaud, veracross] = await Promise.all([
+  const [blackbaud, veracross, roster] = await Promise.all([
     admin
       .from("blackbaud_connections")
       .select("school_id, environment_id, schools(*)")
@@ -49,6 +51,7 @@ export async function getSignInSchools(): Promise<SignInSchool[]> {
       .from("veracross_connections")
       .select("school_id, schools(*)")
       .eq("enabled", true),
+    getRosterSignInSchools(),
   ]);
 
   if (blackbaud.error) {
@@ -75,8 +78,38 @@ export async function getSignInSchools(): Promise<SignInSchool[]> {
       schools.set(school.id, toSignInSchool(school, "veracross"));
     }
   }
+  for (const school of roster) {
+    schools.set(school.id, toSignInSchool(school, "roster"));
+  }
 
   return Array.from(schools.values()).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
+ * Roster schools whose roster has active parents. Before migration 045 no
+ * school can be one, and any failure here just leaves them off the list.
+ */
+async function getRosterSignInSchools(): Promise<SchoolRow[]> {
+  try {
+    const { data, error } = await createAdminClient()
+      .from("schools")
+      .select("*")
+      .eq("auth_provider", "roster");
+    if (error) throw new Error(error.message);
+
+    const rows = (data ?? []) as SchoolRow[];
+    const ready = await Promise.all(
+      rows.map(async (school) => {
+        const summary = await getRosterSummary(school.id);
+        return summary.installed && summary.activeCount > 0 ? school : null;
+      })
+    );
+    return ready.filter((school): school is SchoolRow => school !== null);
+  } catch (caught: unknown) {
+    const message = caught instanceof Error ? caught.message : "Unknown error";
+    console.error(`Could not load roster sign-in schools: ${message}`);
+    return [];
+  }
 }
 
 /** The environment a school's parents must sign in to, or null if not connected. */

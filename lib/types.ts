@@ -18,8 +18,10 @@ export interface School {
   sso_domain: string | null;
   sso_provider_id: string | null;
   sso_button_label: string | null;
-  /** Parent sign-in provider (migration 034). Absent before 034 is applied. */
-  auth_provider?: "blackbaud" | "veracross" | null;
+  /** Parent sign-in provider (migration 034; "roster" needs 045). Absent before 034 is applied. */
+  auth_provider?: "blackbaud" | "veracross" | "roster" | null;
+  /** Parents must also be on school_roster (migration 045). Absent before 045. */
+  require_roster_match?: boolean | null;
   created_at: string;
   updated_at: string;
 }

@@ -17,7 +17,8 @@ function monogram(name: string): string {
 
 /**
  * "Choose your school": one card per school with parent sign-in turned on.
- * Picking one goes straight to that school's Blackbaud or Veracross sign-in.
+ * Picking one goes straight to that school's Blackbaud or Veracross sign-in,
+ * or, for email-code (roster) schools, to the school's login page.
  */
 export function SchoolPicker({ schools }: SchoolPickerProps) {
   if (schools.length === 0) {
@@ -56,7 +57,9 @@ export function SchoolPicker({ schools }: SchoolPickerProps) {
             <span className="min-w-0 flex-1">
               <span className="block truncate font-medium text-ink">{school.name}</span>
               <span className="block text-sm text-ink-soft">
-                Sign in with your {AUTH_PROVIDERS[school.provider].label} account
+                {school.provider === "roster"
+                  ? "Sign in with a code sent to your email"
+                  : `Sign in with your ${AUTH_PROVIDERS[school.provider].label} account`}
               </span>
             </span>
             <ArrowRight className="size-4 shrink-0 text-ink-soft transition-transform group-hover:translate-x-0.5 group-hover:text-ink" />

@@ -13,6 +13,7 @@ import {
   Mail,
   Plug,
   Globe,
+  KeyRound,
   Contact,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -45,6 +46,10 @@ import {
   WebsiteSources,
   type WebsiteSourceView,
 } from "@/components/admin/website-sources";
+import {
+  ParentSignInSettings,
+  type ParentSignInConfig,
+} from "@/components/admin/parent-sign-in-settings";
 import {
   ContactsDirectory,
   type ContactsDirectoryData,
@@ -102,11 +107,11 @@ export interface BlackbaudConfig {
   eventCalendars: EventCalendar[];
 }
 
-const SETTINGS_TABS = ["general", "assistant", "contacts", "email", "website", "blackbaud"] as const;
+const SETTINGS_TABS = ["general", "assistant", "contacts", "email", "website", "sign-in", "blackbaud"] as const;
 type SettingsTab = (typeof SETTINGS_TABS)[number];
 
 // Tabs whose fields are saved by the header's save button. Email has its own
-// save button; Contacts, Website and Blackbaud save as you go.
+// save button; Contacts, Website, Sign-in and Blackbaud save as you go.
 const SAVED_BY_HEADER: readonly SettingsTab[] = ["general", "assistant"];
 
 function isSettingsTab(value: string | null | undefined): value is SettingsTab {
@@ -121,6 +126,9 @@ interface SettingsClientProps {
   blackbaud: BlackbaudConfig;
   blackbaudCallback: BlackbaudCallbackResult;
   websiteSources: { sources: WebsiteSourceView[]; loadError: string | null };
+  parentSignIn: ParentSignInConfig;
+  /** Viewer is a platform super admin (see requireSchoolContext). */
+  isSuperAdmin: boolean;
   contacts: ContactsDirectoryData;
   /** The ?tab= value from the URL, so a refresh keeps the open tab. */
   initialTab?: string;
@@ -134,6 +142,8 @@ export function SettingsClient({
   blackbaud,
   blackbaudCallback,
   websiteSources,
+  parentSignIn,
+  isSuperAdmin,
   contacts,
   initialTab,
 }: SettingsClientProps) {
@@ -277,6 +287,10 @@ export function SettingsClient({
             <TabsTrigger value="website" className="px-3">
               <Globe />
               Website
+            </TabsTrigger>
+            <TabsTrigger value="sign-in" className="px-3">
+              <KeyRound />
+              Sign-in
             </TabsTrigger>
             <TabsTrigger value="blackbaud" className="px-3">
               <Plug />
@@ -587,6 +601,18 @@ export function SettingsClient({
             schoolId={schoolId}
             sources={websiteSources.sources}
             loadError={websiteSources.loadError}
+          />
+        </TabsContent>
+
+        <TabsContent
+          value="sign-in"
+          forceMount
+          className="data-[state=inactive]:hidden"
+        >
+          <ParentSignInSettings
+            schoolId={schoolId}
+            config={parentSignIn}
+            isSuperAdmin={isSuperAdmin}
           />
         </TabsContent>
 

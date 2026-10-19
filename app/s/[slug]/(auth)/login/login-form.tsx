@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { login } from "@/actions/auth";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { ParentSignInButton } from "@/components/auth/parent-sign-in-button";
+import { RosterSignInForm } from "@/components/auth/roster-sign-in-form";
 import { LegalNotice } from "@/components/legal/legal-notice";
 import { AUTH_PROVIDERS, type AuthProvider } from "@/lib/auth/provider";
 import { schoolPossessive } from "@/lib/school-display-name";
@@ -56,9 +57,12 @@ export function LoginForm({
   // missing name reads "your school's" rather than "'s".
   const possessive = schoolPossessive(schoolName);
   const heading = schoolName ?? "Sign in";
-  const subheading = schoolName
-    ? `Sign in with your ${schoolName} ${providerLabel} account.`
-    : `Sign in with your school's ${providerLabel} account.`;
+  const subheading =
+    provider === "roster"
+      ? "Sign in with the email address your school has on file."
+      : schoolName
+        ? `Sign in with your ${schoolName} ${providerLabel} account.`
+        : `Sign in with your school's ${providerLabel} account.`;
   const portalHint = `Use the same login you use for ${possessive} ${portalName}. Only parents and guardians can sign in.`;
   const notEnabled = `${schoolName ?? "Your school"} hasn't turned on ${providerLabel} sign-in yet. Please check back soon.`;
 
@@ -103,7 +107,13 @@ export function LoginForm({
         )}
 
         {!showStaffSignIn &&
-          (signInEnabled ? (
+          (signInEnabled && provider === "roster" ? (
+            <RosterSignInForm
+              schoolSlug={schoolSlug}
+              onError={setError}
+              onSignedIn={() => setLoading(true)}
+            />
+          ) : signInEnabled ? (
             <>
               <ParentSignInButton schoolSlug={schoolSlug} provider={provider} />
               <p className="mt-5 text-center text-sm text-ink-soft">

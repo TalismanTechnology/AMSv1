@@ -12,6 +12,12 @@ import type {
 } from "./client";
 import type { BlackbaudCalendarFeed, EventCalendar } from "@/lib/types";
 import type { WebsiteSourceView } from "@/components/admin/website-sources";
+import type { ParentSignInConfig } from "@/components/admin/parent-sign-in-settings";
+import type { School } from "@/lib/types";
+import { resolveAuthProvider } from "@/lib/auth/provider";
+import { getRosterSummary } from "@/lib/roster/store";
+import { isRosterMatchRequired } from "@/lib/roster/gate";
+import { getVeracrossConnection } from "@/lib/veracross/connection";
 import type { ContactsDirectoryData } from "@/components/admin/contacts-directory";
 import {
   CONTACTS_TABLE_MISSING_MESSAGE,
@@ -277,6 +283,34 @@ async function loadWebsiteSources(
 }
 
 /**
+ * Parent sign-in provider, uploaded roster and the require-roster-match gate.
+ * Before migration 045 the roster table is missing and the panel says so
+ * instead of offering controls.
+ */
+async function loadParentSignInConfig(school: School): Promise<ParentSignInConfig> {
+  const [summary, veracross] = await Promise.all([
+    getRosterSummary(school.id).catch((err: unknown) => {
+      console.error(
+        "[settings] Loading parent roster failed:",
+        err instanceof Error ? err.message : err
+      );
+      return null;
+    }),
+    getVeracrossConnection(school.id),
+  ]);
+
+  return {
+    installed: summary !== null && summary.installed,
+    loadError: summary === null ? "The parent roster couldn't be loaded. Reload to try again." : null,
+    provider: resolveAuthProvider(school.auth_provider),
+    veracrossAvailable: Boolean(veracross),
+    rosterActiveCount: summary?.installed ? summary.activeCount : 0,
+    rosterUpdatedAt: summary?.installed ? summary.lastUpdatedAt : null,
+    requireRosterMatch: isRosterMatchRequired(school),
+  };
+}
+
+/**
  * The staff contact directory (approved and suggested; rejected rows are kept
  * only so they aren't suggested again) and the school's divisions. RLS limits
  * rows to this school's admins. Migration 044 not applied yet → an empty
@@ -334,10 +368,17 @@ export default async function SettingsPage({
 }) {
   const { slug } = await params;
   const { blackbaud, tab } = await searchParams;
-  const { school } = await requireSchoolContext(slug);
+  const { school, isSuperAdmin } = await requireSchoolContext(slug);
 
-  const [settings, blackbaudConfig, recentEmails, inboundAddresses, websiteSources, contacts] =
-    await Promise.all([
+  const [
+    settings,
+    blackbaudConfig,
+    recentEmails,
+    inboundAddresses,
+    websiteSources,
+    parentSignIn,
+    contacts,
+  ] = await Promise.all([
       loadSettings(school.id),
       loadBlackbaudConfig(
         school.id,
@@ -346,6 +387,7 @@ export default async function SettingsPage({
       loadRecentEmails(school.id),
       loadInboundAddresses(school.id, school.email_ingestion_enabled ?? false),
       loadWebsiteSources(school.id),
+      loadParentSignInConfig(school),
       loadContacts(school.id),
     ]);
 
@@ -366,6 +408,8 @@ export default async function SettingsPage({
         blackbaud={blackbaudConfig}
         blackbaudCallback={parseCallbackResult(blackbaud)}
         websiteSources={websiteSources}
+        parentSignIn={parentSignIn}
+        isSuperAdmin={isSuperAdmin}
         contacts={contacts}
         initialTab={tab}
       />
