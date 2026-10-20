@@ -24,6 +24,12 @@ import {
 } from "@/lib/contacts/route-contact";
 import type { ContactCardData } from "@/lib/contacts/directory";
 import { shouldAutoTitle } from "@/lib/chat/chat-view";
+import {
+  buildModelHistory,
+  resolveParentSession,
+  retentionCutoff,
+  type StoredMessage,
+} from "@/lib/chat/retention";
 
 // A write the response doesn't depend on: already running, never awaited, and
 // kept alive past the end of the response by after().
@@ -44,8 +50,8 @@ export async function POST(request: NextRequest) {
       return new Response("Unauthorized", { status: 401 });
     }
 
-    const { messages, sessionId, schoolId } = await body;
-    debugLog(`REQUEST: sessionId=${sessionId}, schoolId=${schoolId}, messageCount=${messages?.length}`);
+    const { messages, sessionId: requestedSessionId, schoolId } = await body;
+    debugLog(`REQUEST: sessionId=${requestedSessionId}, schoolId=${schoolId}, messageCount=${messages?.length}`);
 
     // Every search is scoped to one school; an unscoped request has nothing
     // it may legitimately read.
@@ -101,7 +107,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const lastMessage = messages[messages.length - 1];
+    const lastMessage = Array.isArray(messages) ? messages[messages.length - 1] : undefined;
+    if (!lastMessage || lastMessage.role !== "user") {
+      return new Response(JSON.stringify({ error: "A question is required" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
 
     // AI SDK v6 sends UIMessages with `parts` array, not a `content` string
     const lastMessageText =
@@ -111,6 +123,35 @@ export async function POST(request: NextRequest) {
         .join("") || "";
 
     const adminSupabase = createAdminClient();
+
+    // The parent's one chat: the session the client named if it's still their
+    // visible chat (touched now, so the 30-minute purge can't remove it
+    // mid-request), otherwise their current one. Access is verified above.
+    const sessionId = await resolveParentSession(
+      adminSupabase,
+      user.id,
+      schoolId,
+      requestedSessionId
+    );
+    const sessionMoved = sessionId !== requestedSessionId;
+
+    // Model context is the session's stored messages from the last 30
+    // minutes plus this question — never the history the client sent, which
+    // may hold expired (or invented) turns. Read before this turn is saved.
+    const cutoff = retentionCutoff();
+    const { data: storedRows, error: storedError } = await adminSupabase
+      .from("chat_messages")
+      .select("id, role, content, created_at")
+      .eq("session_id", sessionId)
+      .gte("created_at", cutoff)
+      .order("created_at", { ascending: true });
+    if (storedError) throw new Error(storedError.message);
+    const contextMessages = buildModelHistory(
+      (storedRows ?? []) as StoredMessage[],
+      lastMessage,
+      lastMessageText,
+      cutoff
+    );
     // The school's approved staff contacts (migration 044), read alongside
     // retrieval and used only if nothing answers the question. Never rejects:
     // a missing table or any error is "no contacts".
@@ -151,7 +192,7 @@ export async function POST(request: NextRequest) {
       temperature,
       providerQuestion,
     } = await prepareChatTurn({
-      messages,
+      messages: contextMessages,
       lastMessageText,
       schoolId,
       children,
@@ -340,6 +381,9 @@ export async function POST(request: NextRequest) {
     // alongside the streamed text (DefaultChatTransport parses these on the client)
     const stream = createUIMessageStream({
       execute: ({ writer }) => {
+        if (sessionMoved) {
+          writer.write({ type: "data-session-id", data: sessionId, transient: true });
+        }
         if (allSources.length > 0) {
           writer.write({ type: "data-sources", data: allSources });
         }

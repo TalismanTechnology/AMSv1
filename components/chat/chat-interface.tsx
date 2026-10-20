@@ -3,7 +3,7 @@
 import { useRef, useEffect, useLayoutEffect, useState, useMemo } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { Send } from "lucide-react";
+import { Send, Trash2 } from "lucide-react";
 import { LogoSpinner } from "@/components/logo-spinner";
 import { motion } from "framer-motion";
 import { messageEntrance } from "@/lib/motion";
@@ -30,6 +30,11 @@ interface ChatInterfaceProps {
   initialMessages?: ChatMessage[];
   onSessionCreated?: (sessionId: string) => void;
   onNewChat?: () => void;
+  /**
+   * "Clear chat": resolves to an error message, or null once cleared (the
+   * parent then remounts this component on the fresh chat).
+   */
+  onClearChat?: () => Promise<string | null>;
   suggestedQuestions?: string[];
   welcomeMessage?: string | null;
   sessionTitle?: string;
@@ -46,6 +51,7 @@ export function ChatInterface({
   sessionId,
   initialMessages: dbMessages,
   onSessionCreated,
+  onClearChat,
   suggestedQuestions,
   welcomeMessage,
   sessionTitle,
@@ -63,6 +69,7 @@ export function ChatInterface({
   const [currentSessionId, setCurrentSessionId] = useState(sessionId);
   const [creatingSession, setCreatingSession] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [clearing, setClearing] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const pendingMessageRef = useRef<string | null>(null);
   // Track IDs of messages loaded from DB so we can skip their entrance animation
@@ -111,6 +118,15 @@ export function ChatInterface({
 
   const { messages, sendMessage, regenerate, status, error, setMessages } = useChat({
     transport,
+    // The server wrote this turn into a different session (the one sent had
+    // expired or been hidden): send the next turn there too.
+    onData: (part) => {
+      if (part.type === "data-session-id" && typeof part.data === "string") {
+        sessionIdRef.current = part.data;
+        setCurrentSessionId(part.data);
+        onSessionCreated?.(part.data);
+      }
+    },
   });
 
   // Fetch the markdown chunk right after first paint, before any message
@@ -127,7 +143,19 @@ export function ChatInterface({
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isLoading =
-    status === "streaming" || status === "submitted" || creatingSession;
+    status === "streaming" || status === "submitted" || creatingSession || clearing;
+
+  async function handleClearChat() {
+    if (!onClearChat || isLoading) return;
+    setClearing(true);
+    setSendError(null);
+    const clearError = await onClearChat();
+    // On success this component is remounted; only an error lands here.
+    if (clearError) {
+      setSendError(clearError);
+      setClearing(false);
+    }
+  }
 
   // The server refused for missing consent (e.g. it was withdrawn in another
   // tab): show the notice again rather than a raw error.
@@ -366,13 +394,27 @@ export function ChatInterface({
               <p className="truncate text-sm font-medium text-ink">
                 {sessionTitle || "Conversation"}
               </p>
-              <ChatExport
-                messages={messages.map((m) => ({
-                  role: m.role,
-                  content: parseFollowUps(getMessageText(m)).content,
-                }))}
-                sessionTitle={sessionTitle}
-              />
+              <div className="flex shrink-0 items-center gap-1">
+                {onClearChat && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleClearChat}
+                    disabled={isLoading}
+                    className="text-muted-foreground"
+                  >
+                    <Trash2 className="size-4" />
+                    Clear chat
+                  </Button>
+                )}
+                <ChatExport
+                  messages={messages.map((m) => ({
+                    role: m.role,
+                    content: parseFollowUps(getMessageText(m)).content,
+                  }))}
+                  sessionTitle={sessionTitle}
+                />
+              </div>
             </div>
           )}
 
