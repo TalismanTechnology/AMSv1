@@ -17,12 +17,15 @@ import {
 } from "@/lib/insights/aggregate";
 import { chunk, daysAgoISO, fetchAllPages } from "@/lib/insights/queries";
 import { labelPendingQuestions } from "@/lib/insights/topics";
+import { askerHashSecret, askerKey } from "@/lib/insights/scrub";
 
 // Privacy (app/privacy/page.tsx §6, migration 031): staff may read a parent's
 // words ONLY for flagged exchanges — the assistant couldn't answer, or the
 // parent gave a thumbs-down. Everything else this returns is an aggregate:
 // no parent names/emails/user ids/session ids ever leave this file, and no
 // unflagged question text. Topic counts are k-anonymous (summarizeTopics).
+// Question events older than ~30 minutes are scrubbed (lib/insights/scrub.ts):
+// no text, user_id null, a keyed asker hash in metadata.asker instead.
 
 export interface InsightsData {
   rangeDays: RangeDays;
@@ -49,6 +52,9 @@ interface EventRow {
   unanswered: unknown;
   session_id: string | null;
   question: string | null;
+  /** Scrubbed events: keyed hash of the asker, and whether they were a parent. */
+  asker: string | null;
+  asker_parent: unknown;
 }
 
 interface UnansweredRow {
@@ -95,7 +101,7 @@ export async function getInsightsData(
       supabase
         .from("analytics_events")
         .select(
-          "id, user_id, unanswered:metadata->unanswered, session_id:metadata->>session_id, question:metadata->>question"
+          "id, user_id, unanswered:metadata->unanswered, session_id:metadata->>session_id, question:metadata->>question, asker:metadata->>asker, asker_parent:metadata->asker_parent"
         )
         .eq("school_id", schoolId)
         .eq("event_type", "question")
@@ -138,8 +144,19 @@ export async function getInsightsData(
   ]);
 
   // --- stat cards ---
+  // One key per asker whether or not their events are scrubbed yet.
+  const secret = askerHashSecret();
+  const keyOf = (e: EventRow) => askerKey(e, schoolId, secret);
   const askerIds = [...new Set(events.map((e) => e.user_id).filter((id): id is string => !!id))];
-  const activeParents = await countParents(supabase, schoolId, askerIds);
+  const parentKeys = new Set<string>();
+  for (const id of await findParents(supabase, schoolId, askerIds)) {
+    const key = askerKey({ user_id: id }, schoolId, secret);
+    if (key) parentKeys.add(key);
+  }
+  for (const e of events) {
+    if (e.asker && e.asker_parent === true) parentKeys.add(e.asker);
+  }
+  const activeParents = parentKeys.size;
 
   const unansweredKeys = new Set(
     unansweredRows
@@ -154,7 +171,7 @@ export async function getInsightsData(
   ).length;
 
   // --- topics (k-anonymous aggregate) ---
-  const askerByEvent = new Map(events.map((e) => [e.id, e.user_id]));
+  const askerByEvent = new Map(events.map((e) => [e.id, keyOf(e)]));
   const labeledEvents = new Set<string>();
   const topicInputs: { topic: string; askerId: string | null }[] = [];
   for (const row of topicRows) {
@@ -223,23 +240,23 @@ function scheduleTopicLabeling(schoolId: string) {
 }
 
 /** Askers whose membership in THIS school is a parent membership. */
-async function countParents(
+async function findParents(
   supabase: AdminClient,
   schoolId: string,
   userIds: string[]
-): Promise<number> {
-  let count = 0;
+): Promise<string[]> {
+  const parents: string[] = [];
   for (const ids of chunk(userIds)) {
-    const { count: n, error } = await supabase
+    const { data, error } = await supabase
       .from("school_memberships")
-      .select("user_id", { count: "exact", head: true })
+      .select("user_id")
       .eq("school_id", schoolId)
       .eq("role", "parent")
       .in("user_id", ids);
     if (error) throw new Error(error.message);
-    count += n ?? 0;
+    for (const row of (data ?? []) as { user_id: string }[]) parents.push(row.user_id);
   }
-  return count;
+  return parents;
 }
 
 async function loadClusterLabels(

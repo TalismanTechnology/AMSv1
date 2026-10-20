@@ -28,6 +28,10 @@
     {
       "path": "/api/cron/roll-grades",
       "schedule": "5 * * * *"
+    },
+    {
+      "path": "/api/cron/purge-chats",
+      "schedule": "*/10 * * * *"
     }
   ]
 }

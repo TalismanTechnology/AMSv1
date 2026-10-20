@@ -3,44 +3,42 @@ import { createClient } from "@/lib/supabase/server";
 import { requireSchoolContext } from "@/lib/school-context";
 import { ChatPageClient } from "./chat-page-client";
 import { hasAiConsent } from "@/lib/ai/consent";
-import { CHAT_HISTORY_LIMIT } from "@/lib/chat/history-retention";
+import { loadCurrentChat } from "@/lib/chat/current-chat";
 
 export default async function ChatPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ chat?: string | string[] }>;
 }) {
   const { slug } = await params;
-  const { chat } = await searchParams;
   const { user, school } = await requireSchoolContext(slug);
 
   const supabase = await createClient();
 
-  const { data: sessions } = await supabase
-    .from("chat_sessions")
-    .select("*")
-    .eq("user_id", user.id)
-    .eq("school_id", school.id)
-    .eq("hidden_from_parent", false)
-    .order("updated_at", { ascending: false })
-    .limit(CHAT_HISTORY_LIMIT);
+  // The parent's one chat (last 30 minutes), loaded before the chat input
+  // mounts so they can never send into a chat whose history isn't shown.
+  const chatPromise = loadCurrentChat(user.id, school.id);
 
   // Whether to show the one-time AI-processing notice before the first
   // question (the chat API enforces it too).
-  const { data: consent } = await supabase
+  const consentPromise = supabase
     .from("profiles")
     .select("ai_consent_at, ai_consent_version")
     .eq("id", user.id)
     .single();
 
   // Load suggested questions from settings (fallback to empty)
-  const { data: settings } = await supabase
+  const settingsPromise = supabase
     .from("settings")
     .select("suggested_questions, welcome_message")
     .eq("school_id", school.id)
     .single();
+
+  const [chat, { data: consent }, { data: settings }] = await Promise.all([
+    chatPromise,
+    consentPromise,
+    settingsPromise,
+  ]);
 
   const suggestedQuestions =
     settings?.suggested_questions && Array.isArray(settings.suggested_questions)
@@ -50,7 +48,8 @@ export default async function ChatPage({
   return (
     <Suspense>
       <ChatPageClient
-        sessions={sessions || []}
+        session={chat.session}
+        messages={chat.messages}
         suggestedQuestions={
           suggestedQuestions && suggestedQuestions.length > 0
             ? suggestedQuestions
@@ -58,9 +57,7 @@ export default async function ChatPage({
         }
         welcomeMessage={settings?.welcome_message}
         schoolId={school.id}
-        schoolSlug={slug}
         aiConsentGiven={hasAiConsent(consent)}
-        initialChatId={typeof chat === "string" ? chat : null}
       />
     </Suspense>
   );

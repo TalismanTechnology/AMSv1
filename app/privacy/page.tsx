@@ -26,7 +26,7 @@ export default function PrivacyPage() {
     <LegalPage
       eyebrow="Legal"
       title="Privacy Policy"
-      lastUpdated="October 18, 2026"
+      lastUpdated="October 19, 2026"
       intro={
         <>
           <p>
@@ -107,16 +107,21 @@ export default function PrivacyPage() {
           <strong>Questions and conversations.</strong> The questions you ask,
           the answers we generate, the documents cited, conversation titles,
           and any thumbs-up/down feedback you give. We also record whether,
-          and when, you agreed to AI processing (see section 5). Conversations
-          are saved so
-          you can return to them and search them. Your conversations are
-          private to you; school staff can see an exchange only if it is
-          flagged, as described in section 6.
+          and when, you agreed to AI processing (see section 5). Your chat
+          shows the last 30 minutes of your conversation, so you can pick it
+          up again on another device, and is then automatically deleted (see
+          section 8). Your conversations are private to you; school staff can
+          see an exchange only if it is flagged, as described in section 6.
         </p>
         <p>
           <strong>Usage information.</strong> We record a usage event each time
-          a question is asked (the question text, which school documents were
-          used, and the time). When we can&apos;t find an answer in the
+          a question is asked (which school documents were used, and the
+          time). The question text is held only long enough to give it a
+          general topic label (such as &ldquo;Lunch Menu&rdquo;), normally
+          within an hour and never more than 24 hours; after that the event is
+          anonymized, keeping only the topic, counts and an unreadable code
+          that lets us count how many different parents asked about a topic
+          without identifying them. When we can&apos;t find an answer in the
           school&apos;s documents, we log the question so the school can see
           what information is missing. We also keep notifications we send you
           in the app and which announcements you have dismissed.
@@ -244,8 +249,8 @@ export default function PrivacyPage() {
           reply, not the rest of the conversation. Removing your thumbs-down
           removes that flag. Otherwise, staff see only aggregate statistics,
           such as how many questions were asked and when, ratings totals, and
-          questions that several different parents have asked, without names
-          attached. They cannot see information from other schools.
+          the general topics that several different parents have asked about,
+          without names attached. They cannot see information from other schools.
         </p>
         <p>
           <strong>AskMySchool</strong> personnel can access data when needed to
@@ -315,18 +320,24 @@ export default function PrivacyPage() {
 
       <LegalSection id="retention" title="8. Retention and deletion">
         <p>
-          We keep account and conversation data while your account is active
-          so you can use the Service. You can delete individual conversations,
-          or all of your conversations, at any time in the app, and you can
-          remove children from your profile. Usage records and unanswered
-          questions your school can see may be kept after a conversation is
-          deleted, so that the school&apos;s statistics stay accurate.
+          We keep account data while your account is active so you can use the
+          Service. <strong>Parent chats are automatically deleted after 30
+          minutes.</strong> The exception is a chat flagged for school staff
+          review &mdash; because the assistant couldn&apos;t answer your
+          question, or because you marked an answer unhelpful &mdash; which is
+          kept so your school can review it and improve its information; it no
+          longer appears in your chat once it is 30 minutes old. You can also
+          clear your chat at any time in the app (a flagged chat is then
+          removed from your view but kept for staff), and you can remove
+          children from your profile. Analytics keep only anonymized topic
+          counts (see section 3), and unanswered questions your school can see
+          are kept for staff review.
         </p>
         <p>
           You can delete your account at any time from your Profile
           (&ldquo;Delete account&rdquo;). This permanently deletes your
           account, conversations, feedback, the questions you asked (including
-          usage records and unanswered questions), children, notifications,
+          unanswered questions and any usage records not yet anonymized), children, notifications,
           and registered devices. School administrators can also remove a
           family&apos;s account, which deletes the same data. You can also ask
           us to delete your account and associated personal information by
@@ -356,8 +367,8 @@ export default function PrivacyPage() {
 
       <LegalSection id="rights" title="10. Your choices and rights">
         <p>
-          You can view and update your profile and children, delete your
-          conversations, withdraw your consent to AI processing, delete your
+          You can view and update your profile and children, clear your chat,
+          withdraw your consent to AI processing, delete your
           account, and turn notifications off in your device settings.
           To access, correct, or delete other information, or to ask a question
           about this policy, contact us. Requests about education records held

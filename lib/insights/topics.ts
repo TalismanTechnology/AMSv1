@@ -48,9 +48,13 @@ const responseSchema = z.object({
   ),
 });
 
+/**
+ * `createdBefore` (the purge cron, ahead of scrubbing): only events older than
+ * this that still hold their text, oldest first — the ones about to lose it.
+ */
 export async function labelPendingQuestions(
   schoolId: string,
-  { limit = DEFAULT_LIMIT }: { limit?: number } = {}
+  { limit = DEFAULT_LIMIT, createdBefore }: { limit?: number; createdBefore?: string } = {}
 ): Promise<number> {
   let labeled = 0;
   try {
@@ -58,17 +62,21 @@ export async function labelPendingQuestions(
     const since = daysAgoISO(LOOKBACK_DAYS);
 
     const [events, existing] = await Promise.all([
-      fetchAllPages<QuestionEventRow>((from, to) =>
-        supabase
+      fetchAllPages<QuestionEventRow>((from, to) => {
+        let q = supabase
           .from("analytics_events")
           .select("id, user_id, question:metadata->>question")
           .eq("school_id", schoolId)
           .eq("event_type", "question")
-          .gte("created_at", since)
-          .order("created_at", { ascending: false })
+          .gte("created_at", since);
+        if (createdBefore) {
+          q = q.lt("created_at", createdBefore).is("metadata->>scrubbed", null);
+        }
+        return q
+          .order("created_at", { ascending: !!createdBefore })
           .order("id")
-          .range(from, to)
-      ),
+          .range(from, to);
+      }),
       fetchAllPages<LabeledRow>((from, to) =>
         supabase
           .from("question_topics")

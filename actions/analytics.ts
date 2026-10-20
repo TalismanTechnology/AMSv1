@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireSchoolAdmin } from "@/lib/auth/require-school-admin";
+import { askerHashSecret, askerKey } from "@/lib/insights/scrub";
 
 // A question only appears in "Top questions" once this many DIFFERENT parents
 // have asked it, so the list can't be used to read one family's questions.
@@ -81,7 +82,7 @@ export async function getAnalyticsData(
   // Build queries with optional school_id filtering
   let analyticsEventsQuery = supabase
     .from("analytics_events")
-    .select("created_at, user_id, metadata")
+    .select("created_at, user_id, school_id, metadata")
     .eq("event_type", "question")
     .gte("created_at", rangeStartISO)
     .order("created_at", { ascending: true });
@@ -180,7 +181,20 @@ export async function getAnalyticsData(
 
   // Total stats
   const totalQuestions = events?.length || 0;
-  const uniqueUsers = new Set(events?.map((e) => e.user_id)).size;
+  // Scrubbed events (lib/insights/scrub.ts) carry a keyed asker hash instead
+  // of user_id; hash the rest the same way so nobody counts twice.
+  const secret = askerHashSecret();
+  const uniqueUsers = new Set(
+    events?.map((e) => {
+      const meta = (e.metadata ?? {}) as Record<string, unknown>;
+      const school = (e as { school_id?: string }).school_id ?? schoolId ?? "";
+      return askerKey(
+        { user_id: e.user_id, asker: typeof meta.asker === "string" ? meta.asker : null },
+        school,
+        secret
+      );
+    })
+  ).size;
 
   // Document types
   const typeCountMap: Record<string, number> = {};
