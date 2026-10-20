@@ -23,6 +23,7 @@ import {
   routeUnansweredQuestion,
 } from "@/lib/contacts/route-contact";
 import type { ContactCardData } from "@/lib/contacts/directory";
+import { shouldAutoTitle } from "@/lib/chat/chat-view";
 
 // A write the response doesn't depend on: already running, never awaited, and
 // kept alive past the end of the response by after().
@@ -114,6 +115,33 @@ export async function POST(request: NextRequest) {
     // retrieval and used only if nothing answers the question. Never rejects:
     // a missing table or any error is "no contacts".
     const approvedContacts = loadApprovedContacts(adminSupabase, schoolId);
+    // The session's stored title and message count, read before this turn's
+    // user message is saved, so auto-titling goes by what's in the DB rather
+    // than how much history the client happened to send. Never rejects: an
+    // unknown state is "don't retitle".
+    const titleCheck: Promise<boolean> = sessionId
+      ? Promise.all([
+          adminSupabase
+            .from("chat_sessions")
+            .select("title")
+            .eq("id", sessionId)
+            .maybeSingle(),
+          adminSupabase
+            .from("chat_messages")
+            .select("id", { count: "exact", head: true })
+            .eq("session_id", sessionId),
+        ]).then(
+          ([session, prior]) =>
+            !session.error &&
+            !!session.data &&
+            !prior.error &&
+            shouldAutoTitle({
+              title: session.data.title,
+              priorMessageCount: prior.count,
+            }),
+          () => false
+        )
+      : Promise.resolve(false);
     const {
       searchQuery,
       systemPrompt,
@@ -169,6 +197,7 @@ export async function POST(request: NextRequest) {
     // Save user message in the background. Each write starts now and never
     // blocks the stream; after() keeps the function alive until it lands.
     if (sessionId) {
+      const autoTitle = await titleCheck;
       inBackground(adminSupabase
         .from("chat_messages")
         .insert({
@@ -190,11 +219,8 @@ export async function POST(request: NextRequest) {
         .eq("id", sessionId)
         .then(({ error }) => { if (error) console.error("Failed to update session timestamp:", error); }));
 
-      // Auto-title: if this looks like the first message, set session title
-      const userMessages = messages.filter(
-        (m: { role: string }) => m.role === "user"
-      );
-      if (userMessages.length <= 1) {
+      // Auto-title: only the session's first stored question titles it.
+      if (autoTitle) {
         const title =
           lastMessageText.slice(0, 60) +
           (lastMessageText.length > 60 ? "..." : "");
