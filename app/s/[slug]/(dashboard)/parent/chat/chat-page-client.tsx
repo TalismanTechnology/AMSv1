@@ -8,12 +8,14 @@ import type { ChatSession, ChatMessage } from "@/lib/types";
 
 interface ChatPageClientProps {
   /** The parent's one chat for this school (lib/chat/current-chat.ts). */
-  session: Pick<ChatSession, "id" | "title">;
+  session: Pick<ChatSession, "id">;
   /** Its messages from the last 30 minutes, loaded server-side. */
   messages: ChatMessage[];
   suggestedQuestions?: string[];
   welcomeMessage?: string | null;
   schoolId: string;
+  /** Header text (parentChatHeading); parent chats show no per-session title. */
+  heading: string;
   aiConsentGiven: boolean;
 }
 
@@ -21,7 +23,6 @@ interface View {
   /** Remount key for ChatInterface. */
   key: string;
   sessionId: string;
-  title: string | null;
   messages: ChatMessage[];
 }
 
@@ -31,6 +32,7 @@ export function ChatPageClient({
   suggestedQuestions,
   welcomeMessage,
   schoolId,
+  heading,
   aiConsentGiven,
 }: ChatPageClientProps) {
   // The history arrives with the page, so ChatInterface never mounts on a
@@ -38,7 +40,6 @@ export function ChatPageClient({
   const [view, setView] = useState<View>(() => ({
     key: session.id,
     sessionId: session.id,
-    title: session.title,
     messages,
   }));
 
@@ -50,7 +51,6 @@ export function ChatPageClient({
     setView({
       key: `${result.sessionId}-${Date.now()}`,
       sessionId: result.sessionId,
-      title: null,
       messages: [],
     });
     return null;
@@ -62,8 +62,6 @@ export function ChatPageClient({
     setView((v) => (v.sessionId === sessionId ? v : { ...v, sessionId }));
   }, []);
 
-  const title = view.title && view.title !== "New chat" ? view.title : undefined;
-
   return (
     <div className="relative flex h-full flex-col overflow-hidden">
       <MagicBentoCard enableParticles={false} className="flex-1 min-w-0 min-h-0 h-full">
@@ -73,7 +71,7 @@ export function ChatPageClient({
           initialMessages={view.messages}
           onSessionCreated={handleSessionCreated}
           onClearChat={handleClear}
-          sessionTitle={title}
+          heading={heading}
           suggestedQuestions={suggestedQuestions}
           welcomeMessage={welcomeMessage}
           schoolId={schoolId}

@@ -1,4 +1,6 @@
-// Session titling for /api/chat.
+// Session titling for /api/chat, and the parent chat header.
+
+import { resolveSchoolName } from "../school-display-name";
 
 /**
  * Server side: whether this question should (re)title its session. Only the
@@ -12,4 +14,13 @@ export function shouldAutoTitle(session: {
 }): boolean {
   if (!session.title?.trim()) return true;
   return session.priorMessageCount === 0;
+}
+
+/**
+ * The parent chat's header. A parent has one rolling 30-minute chat, so a
+ * per-session title (its first question, possibly long gone) would be stale;
+ * show the school instead. Staff views still show session titles.
+ */
+export function parentChatHeading(schoolName: string | null | undefined): string {
+  return resolveSchoolName(schoolName) ?? "Ask about your school";
 }

@@ -4,6 +4,7 @@ import { requireSchoolContext } from "@/lib/school-context";
 import { ChatPageClient } from "./chat-page-client";
 import { hasAiConsent } from "@/lib/ai/consent";
 import { loadCurrentChat } from "@/lib/chat/current-chat";
+import { parentChatHeading } from "@/lib/chat/chat-view";
 
 export default async function ChatPage({
   params,
@@ -57,6 +58,7 @@ export default async function ChatPage({
         }
         welcomeMessage={settings?.welcome_message}
         schoolId={school.id}
+        heading={parentChatHeading(school.name)}
         aiConsentGiven={hasAiConsent(consent)}
       />
     </Suspense>

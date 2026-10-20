@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import {
   findFlaggedSessionIds,
   getOrCreateParentSession,
+  recheckDeletable,
   retentionCutoff,
   truncateTitle,
 } from "@/lib/chat/retention";
@@ -126,7 +127,11 @@ export async function clearChat(schoolId: string) {
     );
     const flagged = await findFlaggedSessionIds(admin, ownerBySession);
     const hide = [...ownerBySession.keys()].filter((id) => flagged.has(id));
-    const wipe = [...ownerBySession.keys()].filter((id) => !flagged.has(id));
+    // Re-check just before deleting: a thumbs-down or an unanswered reply may
+    // have landed since the lookup (see recheckDeletable for what remains).
+    const candidates = [...ownerBySession.keys()].filter((id) => !flagged.has(id));
+    const wipe = await recheckDeletable(admin, candidates, ownerBySession);
+    hide.push(...candidates.filter((id) => !wipe.includes(id)));
 
     if (hide.length > 0) {
       const { error } = await admin
@@ -137,7 +142,12 @@ export async function clearChat(schoolId: string) {
       if (error) throw error;
     }
     if (wipe.length > 0) {
-      const { error } = await admin.from("chat_messages").delete().in("session_id", wipe);
+      const { error } = await admin
+        .from("chat_messages")
+        .delete()
+        .in("session_id", wipe)
+        // In-statement guard: an unanswered reply stays reviewable by staff.
+        .eq("unanswered", false);
       if (error) throw error;
       const { error: titleError } = await admin
         .from("chat_sessions")
