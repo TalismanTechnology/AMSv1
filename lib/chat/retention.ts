@@ -8,14 +8,29 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 // or the owner's thumbs-down (migration 031) — which school staff may review.
 // Those are kept in full and, once idle for 30 minutes, hidden from the
 // parent (hidden_from_parent, migration 037); the parent's next question
-// starts a fresh session.
+// starts a fresh session. A session with activity in the last
+// PURGE_GRACE_MINUTES is left for the next run, and every delete re-checks
+// flags first (recheckDeletable).
 
 export const CHAT_RETENTION_MINUTES = 30;
 const RETENTION_MS = CHAT_RETENTION_MINUTES * 60 * 1000;
 
+/**
+ * The purge leaves a session alone entirely (no expiry, no delete) if it saw
+ * any activity — a message, a rating, a send — this recently, so a
+ * thumbs-down or an unanswered reply landing mid-purge isn't racing it.
+ */
+export const PURGE_GRACE_MINUTES = 2;
+const GRACE_MS = PURGE_GRACE_MINUTES * 60 * 1000;
+
 /** ISO timestamp before which unflagged chat content is expired. */
 export function retentionCutoff(now: Date = new Date()): string {
   return new Date(now.getTime() - RETENTION_MS).toISOString();
+}
+
+/** ISO timestamp since which activity puts a session in the grace window. */
+export function graceCutoff(now: Date = new Date()): string {
+  return new Date(now.getTime() - GRACE_MS).toISOString();
 }
 
 /** Whether a row created at `createdAt` is still inside the window. */
@@ -112,6 +127,80 @@ export async function findFlaggedSessionIds(
   return flaggedSessionIdsFrom({ unansweredSessionIds, downvotes, ownerBySession });
 }
 
+/**
+ * Of `ids`, the sessions with a message or a rating created at/after `since`.
+ * (A rating changed up -> down keeps its created_at; the flag re-check, not
+ * this, covers that.) Throws on query errors.
+ */
+export async function findActiveSessionIds(
+  admin: SupabaseClient,
+  ids: string[],
+  since: string
+): Promise<Set<string>> {
+  const active = new Set<string>();
+  for (const chunk of chunks(ids)) {
+    const { data: messages, error: messagesError } = await admin
+      .from("chat_messages")
+      .select("session_id")
+      .in("session_id", chunk)
+      .gte("created_at", since);
+    if (messagesError) throw messagesError;
+    for (const row of messages ?? []) active.add(row.session_id as string);
+
+    const { data: ratings, error: ratingsError } = await admin
+      .from("chat_feedback")
+      .select("chat_messages!inner(session_id)")
+      .in("chat_messages.session_id", chunk)
+      .gte("created_at", since);
+    if (ratingsError) throw ratingsError;
+    for (const row of ratings ?? []) {
+      const msg = (row as { chat_messages: unknown }).chat_messages as
+        | { session_id: string }
+        | { session_id: string }[]
+        | null;
+      for (const m of Array.isArray(msg) ? msg : msg ? [msg] : []) active.add(m.session_id);
+    }
+  }
+  return active;
+}
+
+/** `ids` minus any session now flagged or recently active, order preserved. */
+export function stillDeletable(
+  ids: string[],
+  { flagged, active }: { flagged: ReadonlySet<string>; active?: ReadonlySet<string> }
+): string[] {
+  return ids.filter((id) => !flagged.has(id) && !active?.has(id));
+}
+
+/**
+ * Re-check a chunk of sessions immediately before deleting from them: drop
+ * any that became flagged (an unanswered reply, the owner's thumbs-down) or,
+ * when `activeSince` is given, saw activity in the grace window since the
+ * plan was made.
+ *
+ * Remaining window: PostgREST can't express "no unanswered message and no
+ * owner thumbs-down anywhere in this session" in a DELETE, so a flag landing
+ * between this re-check and the delete statement (milliseconds, where it
+ * used to be the whole run) can still be lost. In-statement guards narrow
+ * it: message deletes skip unanswered rows, and session deletes require
+ * updated_at to still be past the cutoff (every send touches it). What's
+ * left is a thumbs-down on a message just past the cutoff, or the older
+ * siblings of an unanswered reply, racing that gap. Closing it fully needs a
+ * DB-side function deleting under a row lock (a migration).
+ */
+export async function recheckDeletable(
+  admin: SupabaseClient,
+  ids: string[],
+  ownerBySession: ReadonlyMap<string, string | null>,
+  activeSince?: string
+): Promise<string[]> {
+  if (ids.length === 0) return [];
+  const owners = new Map(ids.map((id) => [id, ownerBySession.get(id) ?? null]));
+  const flagged = await findFlaggedSessionIds(admin, owners);
+  const active = activeSince ? await findActiveSessionIds(admin, ids, activeSince) : undefined;
+  return stillDeletable(ids, { flagged, active });
+}
+
 // --------------------------------------------
 // Purge plan
 // --------------------------------------------
@@ -124,6 +213,11 @@ export interface PurgeCandidate {
   hasRecentMessages: boolean;
   /** Touched by every send, so an in-flight question keeps its session. */
   updated_at: string;
+  /**
+   * A message, rating or send within the grace window (PURGE_GRACE_MINUTES):
+   * skipped this run, whatever its state.
+   */
+  recentlyActive?: boolean;
 }
 
 export interface PurgePlan {
@@ -138,6 +232,7 @@ export interface PurgePlan {
 export function planPurge(candidates: PurgeCandidate[], cutoff: string): PurgePlan {
   const plan: PurgePlan = { expireMessagesIn: [], deleteSessions: [], hide: [] };
   for (const s of candidates) {
+    if (s.recentlyActive) continue;
     const idle = !s.hasRecentMessages && !isWithinRetention(s.updated_at, cutoff);
     if (s.flagged) {
       // Never delete flagged content; just take it out of the parent's view.
@@ -191,6 +286,7 @@ export async function purgeExpiredChats(
   { now = new Date(), scope }: { now?: Date; scope?: { userId: string; schoolId: string } } = {}
 ): Promise<PurgeResult> {
   const cutoff = retentionCutoff(now);
+  const activeSince = graceCutoff(now);
   const result: PurgeResult = {
     sessionsChecked: 0,
     messagesDeleted: 0,
@@ -252,6 +348,7 @@ export async function purgeExpiredChats(
     if (error) throw error;
     for (const row of data ?? []) recent.add(row.session_id as string);
   }
+  const active = await findActiveSessionIds(admin, [...sessions.keys()], activeSince);
 
   const plan = planPurge(
     [...sessions.values()].map((s) => ({
@@ -260,21 +357,40 @@ export async function purgeExpiredChats(
       hidden: s.hidden_from_parent,
       hasRecentMessages: recent.has(s.id),
       updated_at: s.updated_at,
+      recentlyActive: active.has(s.id) || isWithinRetention(s.updated_at, activeSince),
     })),
     cutoff
   );
 
-  for (const ids of chunks(plan.expireMessagesIn)) {
+  // Each delete chunk re-checks flags and grace-window activity first (see
+  // recheckDeletable for the window that remains). A failed re-check skips
+  // the chunk; the next run retries.
+  const recheck = async (chunk: string[], what: string) => {
+    try {
+      return await recheckDeletable(admin, chunk, ownerBySession, activeSince);
+    } catch (err) {
+      console.error(`purgeExpiredChats: ${what} re-check failed:`, err);
+      return [];
+    }
+  };
+
+  for (const chunk of chunks(plan.expireMessagesIn)) {
+    const ids = await recheck(chunk, "message");
+    if (ids.length === 0) continue;
     const { count, error } = await admin
       .from("chat_messages")
       .delete({ count: "exact" })
       .in("session_id", ids)
-      .lt("created_at", cutoff);
+      .lt("created_at", cutoff)
+      // In-statement guard: never an unanswered message, whatever the plan.
+      .eq("unanswered", false);
     if (error) console.error("purgeExpiredChats: message delete failed:", error);
     else result.messagesDeleted += count ?? 0;
   }
 
-  for (const ids of chunks(plan.deleteSessions)) {
+  for (const chunk of chunks(plan.deleteSessions)) {
+    const ids = await recheck(chunk, "session");
+    if (ids.length === 0) continue;
     // Re-checked in the statement: a send since we looked touches updated_at,
     // and must not lose its session (messages cascade with it).
     const { count, error } = await admin

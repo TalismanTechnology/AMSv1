@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { shouldAutoTitle } from "./chat-view";
+import { parentChatHeading, shouldAutoTitle } from "./chat-view";
 
 test("auto-title: a session's first stored question titles it", () => {
   assert.equal(shouldAutoTitle({ title: "New chat", priorMessageCount: 0 }), true);
@@ -20,4 +20,16 @@ test("auto-title: a session with history keeps its title", () => {
 
 test("auto-title: an unknown message count keeps the title", () => {
   assert.equal(shouldAutoTitle({ title: "Lunch menu", priorMessageCount: null }), false);
+});
+
+test("parent chat heading: the school's name, never a session title", () => {
+  assert.equal(parentChatHeading("Collegiate School"), "Collegiate School");
+  assert.equal(parentChatHeading("  Collegiate  "), "Collegiate");
+});
+
+test("parent chat heading: neutral fallback without a real school name", () => {
+  assert.equal(parentChatHeading(""), "Ask about your school");
+  assert.equal(parentChatHeading(null), "Ask about your school");
+  assert.equal(parentChatHeading(undefined), "Ask about your school");
+  assert.equal(parentChatHeading("AskMySchool"), "Ask about your school");
 });

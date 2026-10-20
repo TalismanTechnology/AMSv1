@@ -6,11 +6,14 @@ import {
   CHAT_RETENTION_MINUTES,
   buildModelHistory,
   filterRecent,
+  PURGE_GRACE_MINUTES,
   flaggedSessionIdsFrom,
+  graceCutoff,
   isWithinRetention,
   planPurge,
   purgeExpiredChats,
   retentionCutoff,
+  stillDeletable,
   truncateTitle,
 } from "./retention";
 
@@ -105,6 +108,37 @@ test("purge plan: flagged sessions are never deleted, only hidden once idle", ()
   assert.deepEqual(plan.hide, ["flagged-idle"]);
 });
 
+test("purge plan: recently active sessions are skipped entirely", () => {
+  const cutoff = retentionCutoff(NOW);
+  const plan = planPurge(
+    [
+      // idle by the 30-minute rule, but a rating/reply just landed
+      { id: "rated", flagged: false, hidden: false, hasRecentMessages: false, updated_at: minutesAgo(40), recentlyActive: true },
+      { id: "flagged-rated", flagged: true, hidden: false, hasRecentMessages: false, updated_at: minutesAgo(40), recentlyActive: true },
+      { id: "idle", flagged: false, hidden: false, hasRecentMessages: false, updated_at: minutesAgo(40), recentlyActive: false },
+    ],
+    cutoff
+  );
+  assert.deepEqual(plan.expireMessagesIn, ["idle"]);
+  assert.deepEqual(plan.deleteSessions, ["idle"]);
+  assert.deepEqual(plan.hide, []);
+});
+
+test("grace window is 2 minutes", () => {
+  assert.equal(PURGE_GRACE_MINUTES, 2);
+  assert.equal(graceCutoff(NOW), minutesAgo(2));
+});
+
+test("stillDeletable drops sessions flagged or active since the plan", () => {
+  const ids = ["a", "b", "c", "d"];
+  assert.deepEqual(stillDeletable(ids, { flagged: new Set(["b"]) }), ["a", "c", "d"]);
+  assert.deepEqual(
+    stillDeletable(ids, { flagged: new Set(["b"]), active: new Set(["d", "zz"]) }),
+    ["a", "c"]
+  );
+  assert.deepEqual(stillDeletable([], { flagged: new Set(["a"]) }), []);
+});
+
 test("model history: stored window only, in order, plus the new question", () => {
   const cutoff = retentionCutoff(NOW);
   const latest = { id: "client", role: "user", parts: [{ type: "text", text: "And Friday?" }] };
@@ -191,7 +225,7 @@ test("purgeExpiredChats deletes idle unflagged chats and hides flagged ones", as
   const { client, ops } = fakeAdmin((op) => {
     if (op.action !== "select") return { data: null, error: null, count: 1 };
     if (op.table === "chat_sessions") return { data: sessions, error: null };
-    if (op.table === "chat_feedback") {
+    if (op.table === "chat_feedback" && op.select?.includes("user_id")) {
       return {
         data: [{ user_id: "p2", chat_messages: { session_id: "flagged" } }],
         error: null,
@@ -208,6 +242,7 @@ test("purgeExpiredChats deletes idle unflagged chats and hides flagged ones", as
   assert.deepEqual(msgDelete?.filters, [
     ["in", "session_id", ["idle"]],
     ["lt", "created_at", cutoff],
+    ["eq", "unanswered", false],
   ]);
   const sessionDelete = ops.find((o) => o.table === "chat_sessions" && o.action === "delete");
   assert.deepEqual(sessionDelete?.filters, [
@@ -242,6 +277,55 @@ test("purgeExpiredChats deletes nothing if the flag lookup fails", async () => {
     return { data: [], error: null };
   });
   await assert.rejects(purgeExpiredChats(client, { now: NOW }));
+  assert.deepEqual(
+    ops.filter((o) => o.action !== "select"),
+    []
+  );
+});
+
+test("purgeExpiredChats re-checks flags before deleting: a late flag saves the chat", async () => {
+  const sessions = [
+    { id: "late", user_id: "p1", hidden_from_parent: false, updated_at: minutesAgo(45) },
+  ];
+  let unansweredLookups = 0;
+  const { client, ops } = fakeAdmin((op) => {
+    if (op.action !== "select") return { data: null, error: null, count: 1 };
+    if (op.table === "chat_sessions") return { data: sessions, error: null };
+    const unansweredLookup = op.filters.some(([k, c, v]) => k === "eq" && c === "unanswered" && v === true);
+    if (op.table === "chat_messages" && unansweredLookup) {
+      // Unflagged when planned; an unanswered reply lands before the delete.
+      unansweredLookups++;
+      return { data: unansweredLookups > 1 ? [{ session_id: "late" }] : [], error: null };
+    }
+    return { data: [], error: null };
+  });
+
+  const result = await purgeExpiredChats(client, { now: NOW });
+  assert.ok(unansweredLookups >= 2);
+  assert.deepEqual(
+    ops.filter((o) => o.action === "delete"),
+    []
+  );
+  assert.equal(result.messagesDeleted, 0);
+  assert.equal(result.sessionsDeleted, 0);
+});
+
+test("purgeExpiredChats skips a session rated within the grace window", async () => {
+  const sessions = [
+    { id: "rated", user_id: "p1", hidden_from_parent: false, updated_at: minutesAgo(45) },
+  ];
+  const { client, ops } = fakeAdmin((op) => {
+    if (op.action !== "select") return { data: null, error: null, count: 1 };
+    if (op.table === "chat_sessions") return { data: sessions, error: null };
+    // A thumbs-up (not a flag) left a minute ago.
+    if (op.table === "chat_feedback" && !op.select?.includes("user_id")) {
+      assert.ok(op.filters.some(([k, c, v]) => k === "gte" && c === "created_at" && v === graceCutoff(NOW)));
+      return { data: [{ chat_messages: { session_id: "rated" } }], error: null };
+    }
+    return { data: [], error: null };
+  });
+
+  await purgeExpiredChats(client, { now: NOW });
   assert.deepEqual(
     ops.filter((o) => o.action !== "select"),
     []

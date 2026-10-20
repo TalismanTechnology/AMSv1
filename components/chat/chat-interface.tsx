@@ -37,7 +37,8 @@ interface ChatInterfaceProps {
   onClearChat?: () => Promise<string | null>;
   suggestedQuestions?: string[];
   welcomeMessage?: string | null;
-  sessionTitle?: string;
+  /** Header text; parent chats show the school, not a per-session title. */
+  heading?: string;
   schoolId?: string;
   /**
    * Whether the user has agreed to the current AI-processing notice. When
@@ -54,7 +55,7 @@ export function ChatInterface({
   onClearChat,
   suggestedQuestions,
   welcomeMessage,
-  sessionTitle,
+  heading,
   schoolId,
   aiConsentGiven = false,
 }: ChatInterfaceProps) {
@@ -392,7 +393,7 @@ export function ChatInterface({
           {messages.length > 0 && (
             <div className="flex items-center justify-between px-4 py-2.5">
               <p className="truncate text-sm font-medium text-ink">
-                {sessionTitle || "Conversation"}
+                {heading || "Conversation"}
               </p>
               <div className="flex shrink-0 items-center gap-1">
                 {onClearChat && (
@@ -412,7 +413,7 @@ export function ChatInterface({
                     role: m.role,
                     content: parseFollowUps(getMessageText(m)).content,
                   }))}
-                  sessionTitle={sessionTitle}
+                  sessionTitle={heading}
                 />
               </div>
             </div>
