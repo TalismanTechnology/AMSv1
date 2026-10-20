@@ -7,10 +7,13 @@ import { CHAT_HISTORY_LIMIT } from "@/lib/chat/history-retention";
 
 export default async function ChatPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ chat?: string | string[] }>;
 }) {
   const { slug } = await params;
+  const { chat } = await searchParams;
   const { user, school } = await requireSchoolContext(slug);
 
   const supabase = await createClient();
@@ -57,6 +60,7 @@ export default async function ChatPage({
         schoolId={school.id}
         schoolSlug={slug}
         aiConsentGiven={hasAiConsent(consent)}
+        initialChatId={typeof chat === "string" ? chat : null}
       />
     </Suspense>
   );
