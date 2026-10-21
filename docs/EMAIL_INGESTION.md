@@ -81,6 +81,41 @@ ingested again; it only adds its division to the documents the first copy
 created. If the first copy is still being ingested, the later one gets a 409
 so Resend retries it once the first has finished.
 
+## Manual submissions (raw messages)
+
+`POST /api/inbound-email/manual` runs a raw RFC822 message (for example one a
+scheduled job read from a parent's Gmail) through the same pipeline as the
+webhook — token routing, sender allowlist, Message-ID claim, parsing,
+attachments, division tagging, auto-sort and processing — and logs it in
+**Recent emails**. Nothing is sent or forwarded. The shared code is
+`lib/email/process-inbound.ts`; the endpoint is `lib/email/manual-inbound.ts`.
+
+```bash
+curl -X POST "$APP_URL/api/inbound-email/manual" \
+  -H "Authorization: Bearer $CRON_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{"token":"ams-e8d87e5b8c44","raw":"<base64 RFC822>","dryRun":true,"source":"gmail-intake"}'
+```
+
+| Field | |
+| --- | --- |
+| `token` | Inbound address token (the local part of the school/division address). |
+| `raw` | Base64 or base64url RFC822 message. Must have a Message-ID header. |
+| `dryRun` | Parse, route, gate and check for duplicates; write nothing. Returns from, subject, message_id, a 300-char text preview, attachments and the would-be outcome. |
+| `suppressPush` | Default `true`: the documents are pre-marked in `document_push_queue` so parents get no push. |
+| `redactions` | `[{ "pattern", "flags"?, "replace"? }]` regex replacements applied to the text and HTML before storage (every match; default replacement `[redacted]`). |
+| `source` | Label for the log, e.g. `gmail-intake` → reason "Ingested (manual: gmail-intake)". |
+
+Response: `{ status, documentIds, ingestionId, reason, folders? }`. `status` is
+`accepted`, `duplicate` (same Message-ID already ingested; no new documents),
+`in_progress` (409), `empty`, `error` (500) or a `rejected_*` status.
+
+Differences from the webhook, because there is no Resend copy to fetch later:
+rows have no `email_id`, and when the school has **no allowed sender domains**
+the message is rejected (`rejected_domain`) instead of held for review, since
+"Approve" works by re-fetching from Resend. Auth is the `CRON_SECRET` bearer
+token only (no `?key=`).
+
 ## One-time setup (what you need to do)
 
 ### 1. Run the migrations

@@ -7,6 +7,7 @@ import { requireSchoolAdmin } from "@/lib/auth/require-school-admin";
 import { getResendClient } from "@/lib/email/resend";
 import { parseEmailAddress } from "@/lib/email/inbound";
 import { ingestReceivedEmail } from "@/lib/email/ingest-message";
+import { fetchResendEmail } from "@/lib/email/inbound-content";
 import { logAudit } from "@/lib/audit";
 
 type ReviewResult = { success: true; documents?: number } | { error: string };
@@ -57,11 +58,11 @@ export async function approveHeldEmail(
     return { error: "This email can't be fetched (no email id)." };
   }
 
+  const emailId: string = row.email_id;
   try {
     const documentIds = await ingestReceivedEmail({
-      resend,
       schoolId,
-      emailId: row.email_id,
+      loadContent: () => fetchResendEmail(resend, emailId),
       subject: row.subject,
       fromAddress: parseEmailAddress(row.from_address ?? ""),
       divisionIds: row.division_ids ?? [],
