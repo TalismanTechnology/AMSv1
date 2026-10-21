@@ -76,6 +76,8 @@ export async function GET(request: Request) {
         conflicts: outcome.conflictsFound,
         // Auto-dismissed as different school years, before or after judging.
         differentYear: (outcome.skipped.different_year ?? 0) + (outcome.autoDismissed.different_year ?? 0),
+        // Documents whose candidate search timed out on their own: not scanned.
+        ...(outcome.skipped.timeout ? { timedOut: outcome.skipped.timeout } : {}),
         ...(outcome.error ? { error: outcome.error } : {}),
       });
       if (outcome.error) errors.push(`${id}: ${outcome.error}`);
