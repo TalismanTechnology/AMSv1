@@ -10,6 +10,7 @@ import {
   type SkipReason,
 } from "./candidates";
 import { nearestCrossDocumentPairs, normalizeVector, parseEmbedding, type EmbeddedChunk } from "./knn";
+import { callSplittingOnTimeout, packByChunkCount } from "./batches";
 import { storedExcerpt } from "./quotes";
 import type { ScanRunSummary, ScanTrigger } from "./runs";
 import { JUDGE_BATCH_SIZE, judgePairs, verdictFor, type JudgePair, type Verdict } from "./judge";
@@ -38,8 +39,6 @@ import {
 
 export const DEFAULT_SIMILARITY_THRESHOLD = 0.85;
 export const DEFAULT_MAX_JUDGED = 40;
-/** Documents per find_conflict_candidates call, so each call stays short. */
-const DOCUMENT_BATCH = 20;
 const NEIGHBORS_PER_CHUNK = 8;
 const CANDIDATES_PER_CALL = 300;
 /** Candidates whose text is loaded for filtering, per pair to judge. */
@@ -117,8 +116,12 @@ export interface ScanResult {
   pairsConsidered: number;
   pairsJudged: number;
   conflictsFound: number;
-  /** Candidates not sent to the model, by reason (different_year ones are still stored, auto-dismissed). */
-  skipped: Partial<Record<SkipReason, number>>;
+  /**
+   * Candidates not sent to the model, by reason (different_year ones are still
+   * stored, auto-dismissed) — and timeout: documents whose candidate search
+   * passed the statement timeout even on their own, so were not scanned.
+   */
+  skipped: Partial<Record<SkipReason | "timeout", number>>;
   /** Judged pairs the model called conflicts but that were auto-dismissed, by reason. */
   autoDismissed: Partial<Record<NonNullable<Verdict["reason"]>, number>>;
   /** Judged pairs, then the different_year pairs auto-dismissed before judging. */
@@ -205,9 +208,31 @@ async function readyDocumentIds(supabase: SupabaseClient, schoolId: string): Pro
   return (data ?? []).map((d) => d.id as string);
 }
 
+/** Chunks per document of the school, to size candidate calls (batches.ts). */
+async function chunkCounts(supabase: SupabaseClient, schoolId: string): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+  let lastId: string | null = null;
+  for (;;) {
+    let query = supabase
+      .from("document_chunks")
+      .select("id, document_id")
+      .eq("school_id", schoolId)
+      .order("id", { ascending: true })
+      .limit(PAGE_SIZE);
+    if (lastId) query = query.gt("id", lastId);
+    const { data, error } = await query.returns<{ id: string; document_id: string }[]>();
+    if (error) throw new Error(`Counting chunks failed: ${error.message}`);
+    for (const row of data ?? []) counts.set(row.document_id, (counts.get(row.document_id) ?? 0) + 1);
+    if (!data || data.length < PAGE_SIZE) return counts;
+    lastId = data[data.length - 1].id;
+  }
+}
+
 interface CandidateFetch {
   candidates: CandidatePair[];
   truncated: boolean;
+  /** Documents skipped because their candidate call timed out on its own. */
+  timedOut?: number;
   /** Chunks already read (the in-memory fallback reads them all). */
   chunks?: Map<string, ChunkRow>;
   inMemory?: boolean;
@@ -220,23 +245,45 @@ async function fetchCandidates(
   threshold: number,
   deadline: number
 ): Promise<CandidateFetch> {
+  const counts = await chunkCounts(supabase, schoolId);
   const candidates: CandidatePair[] = [];
-  for (const [i, batch] of chunked(documentIds, DOCUMENT_BATCH).entries()) {
-    if (i > 0 && Date.now() > deadline) return { candidates, truncated: true };
+  let timedOut = 0;
+  const expired = () => Date.now() > deadline;
+  const call = async (ids: string[]) => {
     const { data, error } = await supabase.rpc("find_conflict_candidates", {
       p_school_id: schoolId,
-      p_document_ids: batch,
+      p_document_ids: ids,
       p_threshold: threshold,
       p_neighbors: NEIGHBORS_PER_CHUNK,
       p_limit: CANDIDATES_PER_CALL,
     });
-    if (error) {
-      if (isNotInstalledError(error)) throw new NotInstalled();
-      throw new Error(`Finding candidate pairs failed: ${error.message}`);
+    if (error && isNotInstalledError(error)) throw new NotInstalled();
+    return { data: data as CandidatePair[] | null, error };
+  };
+  for (const [i, batch] of packByChunkCount(documentIds, counts).entries()) {
+    if (i > 0 && expired()) return { candidates, truncated: true, timedOut };
+    let fetched;
+    try {
+      fetched = await callSplittingOnTimeout(batch, call, {
+        expired,
+        onTimeout: (ids) => {
+          const chunks = ids.reduce((n, id) => n + (counts.get(id) ?? 0), 0);
+          console.warn(
+            ids.length === 1
+              ? `[conflicts] Candidate search timed out for document ${ids[0]} (${chunks} chunks) in school ${schoolId}: skipped.`
+              : `[conflicts] Candidate search timed out for ${ids.length} documents (${chunks} chunks) in school ${schoolId}: splitting.`
+          );
+        },
+      });
+    } catch (err) {
+      if (err instanceof NotInstalled) throw err;
+      throw new Error(`Finding candidate pairs failed: ${errorMessage(err)}`);
     }
-    candidates.push(...((data ?? []) as CandidatePair[]));
+    candidates.push(...fetched.rows);
+    timedOut += fetched.timedOut.length;
+    if (fetched.truncated) return { candidates, truncated: true, timedOut };
   }
-  return { candidates, truncated: false };
+  return { candidates, truncated: false, timedOut };
 }
 
 type EmbeddedChunkRow = ChunkRow & { embedding: unknown };
@@ -565,6 +612,7 @@ async function runScan(
   const { candidates, truncated } = fetched;
   result.truncated = truncated;
   result.inMemory = !!fetched.inMemory;
+  if (fetched.timedOut) result.skipped.timeout = fetched.timedOut;
 
   // Best pairs first; only the top of the list is worth loading text for.
   const unique = new Map<string, CandidatePair>();
@@ -616,7 +664,7 @@ async function runScan(
     },
     { limit: maxJudged }
   );
-  result.skipped = Object.fromEntries(Object.entries(skipped).filter(([, n]) => n > 0));
+  Object.assign(result.skipped, Object.fromEntries(Object.entries(skipped).filter(([, n]) => n > 0)));
   if (unique.size > pool.length) {
     result.skipped.over_limit = (result.skipped.over_limit ?? 0) + unique.size - pool.length;
   }
