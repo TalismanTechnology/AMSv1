@@ -1,4 +1,4 @@
-import type { Resend } from "resend";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isBlockedFile } from "@/lib/documents/file-types";
 import {
@@ -7,31 +7,39 @@ import {
   removeIngestedDocuments,
   triggerProcessingHttp,
 } from "@/lib/documents/ingest";
+import { OUTCOMES } from "@/lib/push/document-push";
+import type { InboundContent } from "@/lib/email/inbound-content";
 
 /**
  * Turn one received email into documents: the body as one text document and
  * each real attachment as its own. Shared by the inbound webhook (allowlisted
- * senders) and the admin "Approve" action (mail held for review), so both
- * paths ingest exactly the same way.
+ * senders), the admin "Approve" action (mail held for review) and manual
+ * raw-MIME submissions, so every path ingests exactly the same way.
  *
- * Content is fetched from Resend by email id (Resend keeps received mail for
- * 30 days), so mail held for review is never stored by us until approved.
+ * The content comes from the caller's source: fetched from Resend by email id
+ * (Resend keeps received mail for 30 days, so mail held for review is never
+ * stored by us until approved), or parsed from a raw message. It is loaded
+ * inside the cleanup scope, so a failed fetch is handled like any failure.
  *
  * Returns the new document ids; an empty array means nothing was ingestible.
  * On failure, documents already created are removed and the error rethrown,
  * so a retry starts clean.
  */
 export async function ingestReceivedEmail(params: {
-  resend: Resend;
   schoolId: string;
-  emailId: string;
+  loadContent: () => Promise<InboundContent>;
   subject: string | null;
   fromAddress: string | null;
   divisionIds: string[];
   /** App origin used to kick off document processing. */
   origin: string;
+  /**
+   * Pre-mark the new documents as handled in the push queue so finishing
+   * processing doesn't notify parents (e.g. backfilled mail).
+   */
+  suppressPush?: boolean;
 }): Promise<string[]> {
-  const { resend, schoolId, emailId, fromAddress, divisionIds, origin } = params;
+  const { schoolId, fromAddress, divisionIds, origin } = params;
   const documentIds: string[] = [];
   // Storage keys outside documents.file_url (the original HTML body), which
   // removeIngestedDocuments doesn't know about.
@@ -41,13 +49,9 @@ export async function ingestReceivedEmail(params: {
     const subject = (params.subject ?? "").trim() || "(no subject)";
 
     // Body as one text document.
-    const { data: email, error: emailError } =
-      await resend.emails.receiving.get(emailId);
-    if (emailError) {
-      throw new Error(`Could not fetch email from Resend: ${emailError.message}`);
-    }
+    const email = await params.loadContent();
     const bodyText =
-      email?.text?.trim() || (email?.html ? htmlToText(email.html) : "");
+      email.text?.trim() || (email.html ? htmlToText(email.html) : "");
 
     if (bodyText) {
       const { documentId, error } = await ingestFileAsDocument({
@@ -71,27 +75,23 @@ export async function ingestReceivedEmail(params: {
     }
 
     // Each real attachment as its own document.
-    const { data: attachmentList } =
-      await resend.emails.receiving.attachments.list({ emailId });
-
-    for (const att of attachmentList?.data ?? []) {
+    for (const att of email.attachments) {
       const filename = att.filename || "attachment";
       // Skip inline images and unsupported image types.
-      if (att.content_disposition === "inline") continue;
+      if (att.disposition === "inline") continue;
       if (isBlockedFile(filename)) continue;
 
-      const dl = await fetch(att.download_url);
-      if (!dl.ok) {
+      const buffer = await att.load();
+      if (!buffer) {
         console.warn(`[inbound-email] Download failed for ${filename}`);
         continue;
       }
-      const buffer = Buffer.from(await dl.arrayBuffer());
 
       const { documentId, error } = await ingestFileAsDocument({
         schoolId,
         buffer,
         fileName: filename,
-        contentType: att.content_type,
+        contentType: att.contentType,
         title: filename.replace(/\.[^.]+$/, ""),
         description: `From email: "${subject}"${fromAddress ? ` (${fromAddress})` : ""}`,
       });
@@ -104,6 +104,9 @@ export async function ingestReceivedEmail(params: {
     // Mark the documents with the divisions whose addresses the mail
     // reached. Done before processing so auto-sort can use it.
     await addDocumentDivisions(documentIds, divisionIds);
+
+    // Before processing, which is what queues the push.
+    if (params.suppressPush) await suppressDocumentPushes(schoolId, documentIds);
 
     for (const id of documentIds) {
       await triggerProcessingHttp(id, origin);
@@ -124,9 +127,32 @@ export async function ingestReceivedEmail(params: {
   }
 }
 
-type ReceivedEmail = NonNullable<
-  Awaited<ReturnType<Resend["emails"]["receiving"]["get"]>>["data"]
->;
+/**
+ * Mark documents as already handled in the push queue. enqueueDocumentPush
+ * upserts with ignoreDuplicates, so a processed row makes it a no-op and the
+ * send-document-pushes cron never picks them up. Throws, so the ingest is
+ * undone rather than a suppressed submission notifying parents.
+ */
+export async function suppressDocumentPushes(
+  schoolId: string,
+  documentIds: string[],
+  db: Pick<SupabaseClient, "from"> = createAdminClient()
+): Promise<void> {
+  if (!documentIds.length) return;
+  const now = new Date().toISOString();
+  const { error } = await db
+    .from("document_push_queue")
+    .upsert(
+      documentIds.map((document_id) => ({
+        document_id,
+        school_id: schoolId,
+        processed_at: now,
+        outcome: OUTCOMES.skippedDisabled,
+      })),
+      { onConflict: "document_id", ignoreDuplicates: true }
+    );
+  if (error) throw new Error(`Could not suppress pushes: ${error.message}`);
+}
 
 /**
  * Keep what the source viewer needs to show the email as an email: its
@@ -138,10 +164,9 @@ async function saveEmailSourceMeta(params: {
   schoolId: string;
   documentId: string;
   subject: string;
-  email: ReceivedEmail | null;
+  email: InboundContent;
 }): Promise<string | null> {
   const { schoolId, documentId, subject, email } = params;
-  if (!email) return null;
   let htmlPath: string | null = null;
 
   try {
@@ -163,10 +188,10 @@ async function saveEmailSourceMeta(params: {
       .update({
         email_meta: {
           from: email.from || null,
-          to: email.to ?? [],
-          cc: email.cc ?? [],
-          reply_to: email.reply_to ?? [],
-          date: email.created_at || null,
+          to: email.to,
+          cc: email.cc,
+          reply_to: email.replyTo,
+          date: email.date || null,
           subject: email.subject?.trim() || subject,
           html_path: htmlPath,
         },
@@ -180,7 +205,7 @@ async function saveEmailSourceMeta(params: {
 }
 
 /** Strip HTML tags to a plain-text fallback when no text/plain part exists. */
-function htmlToText(html: string): string {
+export function htmlToText(html: string): string {
   return html
     .replace(/<style[\s\S]*?<\/style>/gi, " ")
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
