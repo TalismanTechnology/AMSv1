@@ -15,11 +15,19 @@ interface SidebarContextType {
   toggle: () => void;
   folders: Folder[];
   setFolders: (folders: Folder[]) => void;
+  /** Counts shown beside nav items, by item key (e.g. open conflicts). */
+  badges: Record<string, number>;
 }
 
 const SidebarContext = createContext<SidebarContextType | null>(null);
 
-export function SidebarProvider({ children }: { children: React.ReactNode }) {
+export function SidebarProvider({
+  children,
+  badges = {},
+}: {
+  children: React.ReactNode;
+  badges?: Record<string, number>;
+}) {
   const [collapsed, setCollapsed] = useState(true);
   const [folders, setFolders] = useState<Folder[]>([]);
 
@@ -40,7 +48,7 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarContext.Provider
-      value={{ collapsed, setCollapsed, toggle, folders, setFolders }}
+      value={{ collapsed, setCollapsed, toggle, folders, setFolders, badges }}
     >
       {children}
     </SidebarContext.Provider>

@@ -32,6 +32,10 @@
     {
       "path": "/api/cron/purge-chats",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/scan-conflicts",
+      "schedule": "45 9 * * *"
     }
   ]
 }

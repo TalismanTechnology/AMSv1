@@ -13,6 +13,7 @@ import {
   PanelRight,
   Eye,
   ExternalLink,
+  BadgeCheck,
 } from "lucide-react";
 import {
   Collapsible,
@@ -41,6 +42,7 @@ const FILE_TYPE_ICONS: Record<string, typeof FileText> = {
 const SOURCE_TYPE_CONFIG = {
   announcement: { icon: Megaphone, label: "Announcement" },
   event: { icon: CalendarDays, label: "Event" },
+  clarification: { icon: BadgeCheck, label: "Clarification" },
 };
 
 interface DocumentPreviewCardProps {
@@ -57,7 +59,7 @@ export function DocumentPreviewCard({
   const sourceType = source.source_type || "document";
 
   // Non-document sources render as a simple card (no expand)
-  if (sourceType === "announcement" || sourceType === "event") {
+  if (sourceType === "announcement" || sourceType === "event" || sourceType === "clarification") {
     const config = SOURCE_TYPE_CONFIG[sourceType];
     const Icon = config.icon;
     return (

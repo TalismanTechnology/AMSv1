@@ -65,12 +65,14 @@ function PanelContent() {
   useEffect(() => {
     if (!documentId) return;
     let cancelled = false;
-    setLoadingDoc(true);
+    setLoadingDoc(isDocument);
     setViewUrl(null);
     setDownloadUrl(null);
     setHasPdf(false);
     setDocxBlob(null);
     setDocxView("original");
+    // Events, announcements and admin clarifications have no file to fetch.
+    if (!isDocument) return;
 
     (async () => {
       const urls = await getDocumentUrls(documentId);
@@ -91,7 +93,7 @@ function PanelContent() {
     return () => {
       cancelled = true;
     };
-  }, [documentId, fileType]);
+  }, [documentId, fileType, isDocument]);
 
   // Render DOCX blob into container
   useEffect(() => {

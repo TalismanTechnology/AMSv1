@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, Globe } from "lucide-react";
+import { BadgeCheck, FileText, Globe } from "lucide-react";
 import { useSourcePanel } from "./source-panel-context";
 import { groupSources } from "@/lib/source-groups";
 import type { ChatSource } from "@/lib/types";
@@ -33,7 +33,9 @@ export function SourceList({
             onClick={() => openSource(group.passages[0])}
             className="flex min-w-0 flex-1 items-center gap-2 text-left focus:outline-none focus-visible:underline"
           >
-            {group.isWebsite ? (
+            {group.passages[0].source_type === "clarification" ? (
+              <BadgeCheck className="size-3.5 shrink-0" />
+            ) : group.isWebsite ? (
               <Globe className="size-3.5 shrink-0" />
             ) : (
               <FileText className="size-3.5 shrink-0" />

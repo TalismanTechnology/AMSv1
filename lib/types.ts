@@ -151,7 +151,11 @@ export interface ChatMessage {
   created_at: string;
 }
 
-export type ChatSourceType = "document" | "announcement" | "event";
+/**
+ * "clarification" is a school admin's written answer to conflicting
+ * documents (Admin > Conflicts): shown as "School clarification", no link.
+ */
+export type ChatSourceType = "document" | "announcement" | "event" | "clarification";
 
 export interface ChatSource {
   document_id: string;

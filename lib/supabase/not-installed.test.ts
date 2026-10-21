@@ -10,6 +10,12 @@ test("missing table / column errors mean the feature isn't installed", () => {
   assert.equal(isNotInstalledError({ message: "Could not find the table 'public.parent_login_codes' in the schema cache" }), true);
 });
 
+test("a missing RPC function means the feature isn't installed", () => {
+  assert.equal(isNotInstalledError({ code: "42883", message: "function public.find_conflict_candidates(uuid) does not exist" }), true);
+  assert.equal(isNotInstalledError({ code: "PGRST202", message: "Could not find the function public.find_conflict_candidates in the schema cache" }), true);
+  assert.equal(isNotInstalledError({ message: "Could not find the function public.find_conflict_candidates(p_school_id) in the schema cache" }), true);
+});
+
 test("every other error is a real error", () => {
   assert.equal(isNotInstalledError(null), false);
   assert.equal(isNotInstalledError(undefined), false);

@@ -5,10 +5,12 @@
 //
 //   42P01     Postgres: relation does not exist
 //   42703     Postgres: column does not exist
+//   42883     Postgres: function does not exist
+//   PGRST202  PostgREST: function not in the schema cache
 //   PGRST204  PostgREST: column not in the schema cache
 //   PGRST205  PostgREST: table not in the schema cache
 
-const NOT_INSTALLED_CODES = new Set(["42P01", "42703", "PGRST204", "PGRST205"]);
+const NOT_INSTALLED_CODES = new Set(["42P01", "42703", "42883", "PGRST202", "PGRST204", "PGRST205"]);
 
 export interface MaybeDbError {
   code?: string | null;
@@ -19,5 +21,5 @@ export function isNotInstalledError(error: MaybeDbError | null | undefined): boo
   if (!error) return false;
   if (error.code && NOT_INSTALLED_CODES.has(error.code)) return true;
   // Some client paths surface only the message.
-  return !error.code && /does not exist|could not find the (table|column)/i.test(error.message ?? "");
+  return !error.code && /does not exist|could not find the (table|column|function)/i.test(error.message ?? "");
 }

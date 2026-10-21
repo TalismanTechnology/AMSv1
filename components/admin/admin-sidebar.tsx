@@ -15,6 +15,7 @@ import {
   MessageSquare,
   ShieldCheck,
   Lightbulb,
+  GitCompareArrows,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,7 @@ function getNavItems(slug: string) {
     { href: `/s/${slug}/admin/analytics`, label: "Analytics", icon: BarChart3 },
     { href: `/s/${slug}/admin/feedback`, label: "Feedback", icon: MessageSquare },
     { href: `/s/${slug}/admin/document-audit`, label: "Doc Audit", icon: ShieldCheck },
+    { href: `/s/${slug}/admin/conflicts`, label: "Conflicts", icon: GitCompareArrows, badgeKey: "conflicts" },
     { href: `/s/${slug}/admin/audit`, label: "Audit Log", icon: ScrollText },
     { href: `/s/${slug}/admin/settings`, label: "Settings", icon: Settings },
   ];
@@ -53,7 +55,7 @@ interface SidebarContentProps {
 
 export function AdminSidebarContent({ onNavigate, forceExpanded }: SidebarContentProps) {
   const pathname = usePathname();
-  const { collapsed: contextCollapsed } = useSidebar();
+  const { collapsed: contextCollapsed, badges } = useSidebar();
   const collapsed = forceExpanded ? false : contextCollapsed;
   const { school, slug, memberships } = useSchool();
   const navItems = getNavItems(slug);
@@ -82,6 +84,8 @@ export function AdminSidebarContent({ onNavigate, forceExpanded }: SidebarConten
             const isActive =
               pathname === item.href ||
               (item.href !== adminBase && pathname.startsWith(item.href));
+            const badge = "badgeKey" in item && item.badgeKey ? (badges[item.badgeKey] ?? 0) : 0;
+            const label = badge > 0 ? `${item.label} (${badge})` : item.label;
 
             const link = (
               <Link
@@ -95,12 +99,28 @@ export function AdminSidebarContent({ onNavigate, forceExpanded }: SidebarConten
                   collapsed && "justify-center px-2"
                 )}
               >
-                <item.icon
-                  strokeWidth={2}
-                  className="h-[18px] w-[18px] shrink-0"
-                />
+                <span className="relative shrink-0">
+                  <item.icon
+                    strokeWidth={2}
+                    className="h-[18px] w-[18px] shrink-0"
+                  />
+                  {collapsed && badge > 0 && (
+                    <span
+                      aria-hidden
+                      className="absolute -right-1 -top-1 size-2 rounded-full bg-primary"
+                    />
+                  )}
+                </span>
                 {!collapsed && (
                   <span className="truncate">{item.label}</span>
+                )}
+                {!collapsed && badge > 0 && (
+                  <span
+                    aria-label={`${badge} open`}
+                    className="ml-auto rounded-full bg-primary/15 px-1.5 py-0.5 text-[0.7rem] font-medium leading-none tabular-nums text-ink"
+                  >
+                    {badge > 99 ? "99+" : badge}
+                  </span>
                 )}
               </Link>
             );
@@ -108,7 +128,7 @@ export function AdminSidebarContent({ onNavigate, forceExpanded }: SidebarConten
             return collapsed ? (
               <Tooltip key={item.href}>
                 <TooltipTrigger asChild>{link}</TooltipTrigger>
-                <TooltipContent side="right">{item.label}</TooltipContent>
+                <TooltipContent side="right">{label}</TooltipContent>
               </Tooltip>
             ) : (
               <div key={item.href}>{link}</div>
