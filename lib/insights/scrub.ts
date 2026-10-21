@@ -3,8 +3,10 @@ import crypto from "node:crypto";
 // Least retention for question analytics (analytics_events, event_type
 // 'question'). A fresh event holds the parent's user_id and question text
 // (metadata.question) so it can be given a generic topic label
-// (lib/insights/topics.ts). Once the chat it came from has expired (30
-// minutes, lib/chat/retention.ts) the purge cron labels it, then "scrubs" it:
+// (lib/insights/topics.ts). Once it is QUESTION_TEXT_MINUTES old (well
+// inside the chat's own 30-day retention, lib/chat/retention.ts — the parent
+// keeps their chat; analytics don't keep the text) the purge cron labels it,
+// then "scrubs" it:
 // the text and anything linking it to a parent or chat is dropped, user_id is
 // nulled, and a keyed hash of (school, user) is kept as metadata.asker so
 // Insights can still count DISTINCT askers for its k-anonymity threshold and
@@ -14,6 +16,14 @@ import crypto from "node:crypto";
 // SCRUB_MAX_AGE_HOURS, so question text never outlives that.
 
 export const SCRUB_MAX_AGE_HOURS = 24;
+
+/** Question events older than this are labeled, then scrubbed. */
+export const QUESTION_TEXT_MINUTES = 30;
+
+/** ISO timestamp before which question events are due for scrubbing. */
+export function questionScrubCutoff(now: Date = new Date()): string {
+  return new Date(now.getTime() - QUESTION_TEXT_MINUTES * 60 * 1000).toISOString();
+}
 const ASKER_HASH_HEX = 32;
 
 /**

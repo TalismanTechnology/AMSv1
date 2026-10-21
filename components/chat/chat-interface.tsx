@@ -3,8 +3,7 @@
 import { useRef, useEffect, useLayoutEffect, useState, useMemo } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { Send, Trash2 } from "lucide-react";
-import { LogoSpinner } from "@/components/logo-spinner";
+import { Send, SquarePen } from "lucide-react";
 import { motion } from "framer-motion";
 import { messageEntrance } from "@/lib/motion";
 import { RetrievalLoadingStrip } from "./retrieval-loading-strip";
@@ -19,25 +18,29 @@ import { SourcePanelProvider } from "./source-panel-context";
 import { ChatExport } from "./chat-export";
 import { AiConsentDialog } from "./ai-consent-dialog";
 import { isAiConsentError } from "@/lib/ai/consent";
-import { createChatSession } from "@/actions/chat";
 import { searchDocumentsByName } from "@/actions/documents";
 import { parseFollowUps } from "@/lib/chat-utils";
 import type { ChatSource, ChatMessage } from "@/lib/types";
 import type { ContactCardData } from "@/lib/contacts/directory";
 
 interface ChatInterfaceProps {
-  sessionId?: string;
-  initialMessages?: ChatMessage[];
-  onSessionCreated?: (sessionId: string) => void;
-  onNewChat?: () => void;
   /**
-   * "Clear chat": resolves to an error message, or null once cleared (the
-   * parent then remounts this component on the fresh chat).
+   * The chat this input sends into; null for a new chat, whose session the
+   * server creates on the first question (and reports via onSessionCreated).
+   * Sent explicitly with every question, so a new chat can never be appended
+   * to an older one.
    */
-  onClearChat?: () => Promise<string | null>;
+  sessionId: string | null;
+  initialMessages?: ChatMessage[];
+  /** The server wrote into this session (a new chat's first question). */
+  onSessionCreated?: (sessionId: string) => void;
+  /** A question was sent (the chat's last activity is now). */
+  onSend?: () => void;
+  /** Shows a "New chat" button in the header on small screens. */
+  onNewChat?: () => void;
   suggestedQuestions?: string[];
   welcomeMessage?: string | null;
-  /** Header text; parent chats show the school, not a per-session title. */
+  /** Header text: the chat's title. */
   heading?: string;
   schoolId?: string;
   /**
@@ -52,7 +55,8 @@ export function ChatInterface({
   sessionId,
   initialMessages: dbMessages,
   onSessionCreated,
-  onClearChat,
+  onSend,
+  onNewChat,
   suggestedQuestions,
   welcomeMessage,
   heading,
@@ -67,24 +71,22 @@ export function ChatInterface({
   // The consent-gate error the parent closed with "Not now" (so it doesn't
   // re-open on every render).
   const [dismissedConsentError, setDismissedConsentError] = useState<Error | undefined>();
-  const [currentSessionId, setCurrentSessionId] = useState(sessionId);
-  const [creatingSession, setCreatingSession] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
-  const [clearing, setClearing] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const pendingMessageRef = useRef<string | null>(null);
   // Track IDs of messages loaded from DB so we can skip their entrance animation
   // (captured once on mount, never updated)
   const [hydratedIds] = useState<Set<string>>(
     () => new Set(dbMessages?.map((m) => m.id) || [])
   );
-  // Keep a ref for sessionId so the transport body function always reads the
-  // latest value. Synced in a layout effect (before any passive effect or
-  // event handler can send) rather than during render.
-  const sessionIdRef = useRef(currentSessionId);
+  // The session the transport sends into: the prop on mount (this component
+  // is remounted per chat), then whatever the server reports writing into.
+  // A ref so the transport body function always reads the latest value;
+  // synced from the prop in a layout effect (before any event handler can
+  // send) rather than during render.
+  const sessionIdRef = useRef<string | null>(sessionId);
   useLayoutEffect(() => {
-    sessionIdRef.current = currentSessionId;
-  }, [currentSessionId]);
+    sessionIdRef.current = sessionId;
+  }, [sessionId]);
 
   // Convert DB messages to UIMessage format for useChat hydration
   const hydratedMessages = useMemo(() => {
@@ -112,19 +114,18 @@ export function ChatInterface({
       // eslint-disable-next-line react-hooks/refs
       new DefaultChatTransport({
         api: "/api/chat",
-        body: () => ({ sessionId: sessionIdRef.current, schoolId }),
+        body: () => ({ sessionId: sessionIdRef.current ?? null, schoolId }),
       }),
     [schoolId]
   );
 
   const { messages, sendMessage, regenerate, status, error, setMessages } = useChat({
     transport,
-    // The server wrote this turn into a different session (the one sent had
-    // expired or been hidden): send the next turn there too.
+    // The server created this turn's session (a new chat, or the one sent
+    // had been deleted or expired): send the next turn there too.
     onData: (part) => {
       if (part.type === "data-session-id" && typeof part.data === "string") {
         sessionIdRef.current = part.data;
-        setCurrentSessionId(part.data);
         onSessionCreated?.(part.data);
       }
     },
@@ -143,20 +144,7 @@ export function ChatInterface({
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const isLoading =
-    status === "streaming" || status === "submitted" || creatingSession || clearing;
-
-  async function handleClearChat() {
-    if (!onClearChat || isLoading) return;
-    setClearing(true);
-    setSendError(null);
-    const clearError = await onClearChat();
-    // On success this component is remounted; only an error lands here.
-    if (clearError) {
-      setSendError(clearError);
-      setClearing(false);
-    }
-  }
+  const isLoading = status === "streaming" || status === "submitted";
 
   // The server refused for missing consent (e.g. it was withdrawn in another
   // tab): show the notice again rather than a raw error.
@@ -176,15 +164,6 @@ export function ChatInterface({
     (acc, m, i) => (m.role === "assistant" ? i : acc),
     -1
   );
-
-  // Send pending message after transport recreates with new sessionId
-  useEffect(() => {
-    if (pendingMessageRef.current && currentSessionId) {
-      const text = pendingMessageRef.current;
-      pendingMessageRef.current = null;
-      sendMessage({ text });
-    }
-  }, [currentSessionId, sendMessage]);
 
   async function handlePreviewCommand(query: string) {
     if (!schoolId) return;
@@ -282,26 +261,8 @@ export function ChatInterface({
       return;
     }
 
-    // Auto-create session on first message if none exists
-    if (!currentSessionId) {
-      setCreatingSession(true);
-      const result = await createChatSession(schoolId!, text);
-      setCreatingSession(false);
-      if (result.error || !result.sessionId) {
-        setSendError(
-          result.error || "Couldn't start the chat session. Please try again."
-        );
-        setInput(text); // restore the message instead of silently dropping it
-        return;
-      }
-      // Queue the message — it will be sent by the useEffect above
-      // after React re-renders with the new transport
-      pendingMessageRef.current = text;
-      setCurrentSessionId(result.sessionId);
-      onSessionCreated?.(result.sessionId);
-      return;
-    }
-
+    // A new chat sends sessionId null; the server creates its session.
+    onSend?.();
     sendMessage({ text });
   }
 
@@ -396,16 +357,15 @@ export function ChatInterface({
                 {heading || "Conversation"}
               </p>
               <div className="flex shrink-0 items-center gap-1">
-                {onClearChat && (
+                {onNewChat && (
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={handleClearChat}
-                    disabled={isLoading}
-                    className="text-muted-foreground"
+                    onClick={onNewChat}
+                    className="text-muted-foreground md:hidden"
                   >
-                    <Trash2 className="size-4" />
-                    Clear chat
+                    <SquarePen className="size-4" />
+                    New chat
                   </Button>
                 )}
                 <ChatExport
@@ -471,13 +431,7 @@ export function ChatInterface({
                   );
                 })
               )}
-              {creatingSession && (
-                <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
-                  <LogoSpinner size={20} />
-                  Starting chat session...
-                </div>
-              )}
-              {isLoading && !creatingSession && (!messages[messages.length - 1] || messages[messages.length - 1].role === "user" || !getMessageText(messages[messages.length - 1])) && (
+              {isLoading && (!messages[messages.length - 1] || messages[messages.length - 1].role === "user" || !getMessageText(messages[messages.length - 1])) && (
                 <RetrievalLoadingStrip />
               )}
               {consentError && !consentDialogOpen && (

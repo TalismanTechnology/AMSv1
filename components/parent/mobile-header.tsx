@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Menu } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   Sheet,
   SheetContent,
@@ -11,10 +12,14 @@ import {
 } from "@/components/ui/sheet";
 import { ParentSidebarContent } from "./parent-sidebar";
 import { useSchool } from "@/components/shared/school-context";
+import { ChatHistoryList } from "@/components/chat/chat-history-sidebar";
+import { useChatHistoryPanel } from "./chat-history-bridge";
 
 export function ParentMobileHeader() {
   const [open, setOpen] = useState(false);
   const { school } = useSchool();
+  // On the chat page, the drawer also lists the parent's chats.
+  const chats = useChatHistoryPanel();
 
   return (
     // env() insets are 0 inside the iOS app shell, which already sits below
@@ -38,13 +43,33 @@ export function ParentMobileHeader() {
         <Menu className="size-6" strokeWidth={2.25} />
       </Button>
       <Sheet open={open} onOpenChange={setOpen}>
+        {/* Padded by the safe-area insets so the drawer's header sits below
+            the notch / status bar. */}
         <SheetContent
           side="left"
-          className="w-64 p-0 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]"
+          className={cn(
+            "p-0 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]",
+            chats ? "w-72" : "w-64"
+          )}
         >
           <SheetTitle className="sr-only">Navigation</SheetTitle>
-          <div className="flex h-full flex-col">
-            <ParentSidebarContent onNavigate={() => setOpen(false)} forceExpanded />
+          <div className="flex h-full min-h-0 flex-col">
+            <ParentSidebarContent onNavigate={() => setOpen(false)} forceExpanded>
+              {chats && (
+                <ChatHistoryList
+                  {...chats}
+                  className="h-full"
+                  onNewChat={() => {
+                    setOpen(false);
+                    chats.onNewChat();
+                  }}
+                  onSelect={(id) => {
+                    setOpen(false);
+                    chats.onSelect(id);
+                  }}
+                />
+              )}
+            </ParentSidebarContent>
           </div>
         </SheetContent>
       </Sheet>

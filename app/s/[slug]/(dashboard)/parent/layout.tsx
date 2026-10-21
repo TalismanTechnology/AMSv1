@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ParentSidebarProvider } from "@/components/parent/sidebar-context";
 import { ParentSidebar } from "@/components/parent/parent-sidebar";
 import { ParentMobileHeader } from "@/components/parent/mobile-header";
+import { ChatHistoryBridgeProvider } from "@/components/parent/chat-history-bridge";
 import { NativePush } from "@/components/native/native-push";
 
 export default async function ParentLayout({
@@ -37,13 +38,15 @@ export default async function ParentLayout({
       userName={profile?.full_name || user.email || ""}
     >
       <TooltipProvider>
-        <div className="flex h-dvh">
-          <ParentSidebar />
-          <div className="flex flex-1 flex-col overflow-hidden">
-            <ParentMobileHeader />
-            <main className="dashboard-cards flex-1 overflow-auto basis-0">{children}</main>
+        <ChatHistoryBridgeProvider>
+          <div className="flex h-dvh">
+            <ParentSidebar />
+            <div className="flex flex-1 flex-col overflow-hidden">
+              <ParentMobileHeader />
+              <main className="dashboard-cards flex-1 overflow-auto basis-0">{children}</main>
+            </div>
           </div>
-        </div>
+        </ChatHistoryBridgeProvider>
         <NativePush />
       </TooltipProvider>
     </ParentSidebarProvider>
