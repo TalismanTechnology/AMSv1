@@ -40,9 +40,11 @@ function getNavItems(slug: string) {
 interface SidebarContentProps {
   onNavigate?: () => void;
   forceExpanded?: boolean;
+  /** Extra section below the nav (the mobile drawer's chat list); takes the free space. */
+  children?: React.ReactNode;
 }
 
-export function ParentSidebarContent({ onNavigate, forceExpanded }: SidebarContentProps) {
+export function ParentSidebarContent({ onNavigate, forceExpanded, children }: SidebarContentProps) {
   const pathname = usePathname();
   const { collapsed: contextCollapsed, userName } = useParentSidebar();
   const collapsed = forceExpanded ? false : contextCollapsed;
@@ -69,7 +71,12 @@ export function ParentSidebarContent({ onNavigate, forceExpanded }: SidebarConte
         </div>
       )}
 
-      <nav className="flex-1 space-y-0.5 overflow-y-auto px-2.5 py-4">
+      <nav
+        className={cn(
+          "space-y-0.5 px-2.5",
+          children ? "shrink-0 py-2" : "flex-1 overflow-y-auto py-4"
+        )}
+      >
         <LayoutGroup id="parent-sidebar">
           {navItems.map((item) => {
             const isActive = pathname.startsWith(item.href);
@@ -104,6 +111,14 @@ export function ParentSidebarContent({ onNavigate, forceExpanded }: SidebarConte
           })}
         </LayoutGroup>
       </nav>
+
+      {children && (
+        <>
+          <div className="mx-2.5 mb-2 h-px bg-border" />
+          <p className="px-5 pb-2 text-xs font-medium text-ink-soft/70">Chats</p>
+          <div className="min-h-0 flex-1">{children}</div>
+        </>
+      )}
 
       <div className="mx-2.5 mt-2 h-px bg-border" />
 

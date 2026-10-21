@@ -3,22 +3,26 @@ import { createClient } from "@/lib/supabase/server";
 import { requireSchoolContext } from "@/lib/school-context";
 import { ChatPageClient } from "./chat-page-client";
 import { hasAiConsent } from "@/lib/ai/consent";
-import { loadCurrentChat } from "@/lib/chat/current-chat";
+import { loadChatPage } from "@/lib/chat/current-chat";
 import { parentChatHeading } from "@/lib/chat/chat-view";
 
 export default async function ChatPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ chat?: string | string[] }>;
 }) {
-  const { slug } = await params;
+  const [{ slug }, query] = await Promise.all([params, searchParams]);
+  const requestedChat = typeof query.chat === "string" ? query.chat : null;
   const { user, school } = await requireSchoolContext(slug);
 
   const supabase = await createClient();
 
-  // The parent's one chat (last 30 minutes), loaded before the chat input
-  // mounts so they can never send into a chat whose history isn't shown.
-  const chatPromise = loadCurrentChat(user.id, school.id);
+  // The parent's chat list, plus the chat ?chat=<id> names (with its
+  // messages, loaded before the chat input mounts so they can never send into
+  // a chat whose history isn't shown). Otherwise the page opens a new chat.
+  const chatPromise = loadChatPage(user.id, school.id, requestedChat);
 
   // Whether to show the one-time AI-processing notice before the first
   // question (the chat API enforces it too).
@@ -49,8 +53,8 @@ export default async function ChatPage({
   return (
     <Suspense>
       <ChatPageClient
-        session={chat.session}
-        messages={chat.messages}
+        chats={chat.chats}
+        openChat={chat.open}
         suggestedQuestions={
           suggestedQuestions && suggestedQuestions.length > 0
             ? suggestedQuestions

@@ -1,37 +1,34 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import {
-  getOrCreateParentSession,
-  purgeExpiredChats,
-  retentionCutoff,
-} from "@/lib/chat/retention";
-import type { ChatMessage, ChatSession } from "@/lib/types";
+import { purgeExpiredChats } from "@/lib/chat/retention";
+import { listParentChats, loadParentChat, type ChatListItem } from "@/lib/chat/history";
+import type { ChatMessage } from "@/lib/types";
 
 /**
- * Server-only: the parent's one chat for the chat page, loaded before the
- * chat input mounts. Runs the 30-minute purge for this parent first (cheap,
- * scoped to their sessions), so a reopened app never shows expired messages
- * and an idle flagged chat is swapped for a fresh one. Callers must have
+ * Server-only: what the parent chat page opens with — the parent's chat list
+ * and, when `requestedId` (?chat=<id>) names one of their visible chats, that
+ * chat with its messages; otherwise a new chat. Runs the retention purge for
+ * this parent first (cheap, scoped to their sessions). Callers must have
  * verified userId's access to schoolId (requireSchoolContext).
  */
-export async function loadCurrentChat(
+export async function loadChatPage(
   userId: string,
-  schoolId: string
-): Promise<{ session: Pick<ChatSession, "id" | "title">; messages: ChatMessage[] }> {
+  schoolId: string,
+  requestedId?: string | null
+): Promise<{
+  chats: ChatListItem[];
+  open: { session: ChatListItem; messages: ChatMessage[] } | null;
+}> {
   const admin = createAdminClient();
   try {
     await purgeExpiredChats(admin, { scope: { userId, schoolId } });
   } catch (err) {
-    // The cron catches up; the read below is filtered to the window anyway.
-    console.error("loadCurrentChat purge failed:", err);
+    // The cron catches up; the reads below skip expired chats anyway.
+    console.error("loadChatPage purge failed:", err);
   }
 
-  const session = await getOrCreateParentSession(admin, userId, schoolId);
-  const { data, error } = await admin
-    .from("chat_messages")
-    .select("id, session_id, role, content, sources, school_id, created_at")
-    .eq("session_id", session.id)
-    .gte("created_at", retentionCutoff())
-    .order("created_at", { ascending: true });
-  if (error) throw new Error(error.message);
-  return { session, messages: (data ?? []) as ChatMessage[] };
+  const [chats, open] = await Promise.all([
+    listParentChats(admin, userId, schoolId),
+    requestedId ? loadParentChat(admin, userId, schoolId, requestedId) : Promise.resolve(null),
+  ]);
+  return { chats, open };
 }
