@@ -330,6 +330,14 @@ export interface CitablePassage {
   category?: string;
   folder?: string;
   divisions?: string[];
+  /**
+   * Set on passages added from an admin's ruling on conflicting documents
+   * (lib/conflicts/resolutions.ts): "winner" quotes the document the admin
+   * chose and cites it; "note" is the admin's own words, not a document.
+   */
+  clarification?: "winner" | "note";
+  /** When the admin ruled (YYYY-MM-DD), for "note" clarifications. */
+  resolved_at?: string;
 }
 
 // How much of each document reaches the model. Deliberately generous: a missed

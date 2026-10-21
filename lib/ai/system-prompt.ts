@@ -55,7 +55,13 @@ export function buildSystemPrompt(
     ROLE,
     todayString,
     formatReferenceMaterial(passages, options),
-    hasMaterial ? answeringRules({ hasDocuments, hasEvents }) : NOTHING_FOUND,
+    hasMaterial
+      ? answeringRules({
+          hasDocuments,
+          hasEvents,
+          hasClarifications: passages.some((p) => p.clarification),
+        })
+      : NOTHING_FOUND,
     // Both rule sets are about applying material; with none they only confuse.
     hasMaterial ? divisionRules(!!childrenContext) : "",
     hasMaterial && childCount > 1 ? multiChildRules(childCount) : "",
@@ -109,6 +115,13 @@ function formatDocuments(passages: CitablePassage[]): string {
 
   return groups
     .map(({ first, items }) => {
+      if (first.clarification === "note") {
+        const body = items
+          .map(({ n, passage }) => `[Source ${n}]\n${passage.content}`)
+          .join("\n\n");
+        const when = first.resolved_at ? `, ${first.resolved_at}` : "";
+        return `Admin clarification (written by the school's administrators to settle conflicting documents${when})\n\n${body}`;
+      }
       const meta: string[] = [];
       if (first.divisions?.length) {
         meta.push(`Division: ${first.divisions.join(", ")}`);
@@ -134,9 +147,11 @@ No school documents, calendar entries, or announcements matched this question. T
 function answeringRules({
   hasDocuments,
   hasEvents,
+  hasClarifications = false,
 }: {
   hasDocuments: boolean;
   hasEvents: boolean;
+  hasClarifications?: boolean;
 }): string {
   const rules = [
     "Lead with the direct answer, then only the detail a parent needs to act on it. Keep it short — most parents read on a phone.",
@@ -150,6 +165,11 @@ function answeringRules({
     "When two sources give different values for the same fact — a different time, deadline, phone number, or cut-off — give both, each with its source, and point out that they differ. Never silently pick one or blend details from both. If one source is clearly newer, say which. Suggest confirming with the school.",
   ];
 
+  if (hasClarifications) {
+    rules.push(
+      'A source that is an "Admin clarification" or starts with "School clarification:" is the school\'s own ruling on documents that disagreed. On that point it is the answer: follow it over any document that says otherwise, don\'t present the other value as an alternative, and cite it like any other source.'
+    );
+  }
   if (hasEvents) {
     rules.push(
       "Compare every date with today's date. If something has already happened this school year, say so plainly rather than describing it as upcoming.",

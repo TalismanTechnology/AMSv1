@@ -4,6 +4,8 @@ import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { MobileHeader } from "@/components/admin/mobile-header";
 import { SidebarProvider } from "@/components/admin/sidebar-context";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { countOpenConflicts } from "@/lib/conflicts/store";
 
 export default async function AdminLayout({
   children,
@@ -13,14 +15,18 @@ export default async function AdminLayout({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const { role, isSuperAdmin } = await requireSchoolContext(slug);
+  const { school, role, isSuperAdmin } = await requireSchoolContext(slug);
 
   if (role !== "admin" && !isSuperAdmin) {
     redirect(`/s/${slug}/parent/chat`);
   }
 
+  // One head-only count for the Conflicts badge; null (no badge) until
+  // migration 046 is applied or if the count fails.
+  const openConflicts = await countOpenConflicts(createAdminClient(), school.id);
+
   return (
-    <SidebarProvider>
+    <SidebarProvider badges={openConflicts ? { conflicts: openConflicts } : undefined}>
       <TooltipProvider>
         <div className="flex h-dvh">
           <AdminSidebar />

@@ -28,6 +28,14 @@ import {
 } from "@/lib/ai/child-privacy";
 import { buildSystemPrompt } from "@/lib/ai/system-prompt";
 import { selectPassages } from "@/lib/ai/source-selection";
+import { loadResolvedConflicts } from "@/lib/conflicts/store";
+import {
+  chunkKey,
+  clarificationPassages,
+  conflictContext,
+  planConflictResolutions,
+  withoutDropped,
+} from "@/lib/conflicts/resolutions";
 import type { ChatSource } from "@/lib/types";
 
 /** The model that writes parent-facing answers. Shared with the eval harness. */
@@ -131,16 +139,36 @@ export async function prepareChatTurn({
   // Document info (titles, divisions…) and the passage text around each hit
   // both depend only on the hits, so fetch them together. Losing the document
   // info drops the vector hits, exactly as a failed searchDocuments would.
-  const [infoResult, knownChunks] = await Promise.all([
+  // Admins' rulings on conflicting documents (lib/conflicts) ride along; that
+  // read never throws and is empty until migration 046 is applied.
+  const [infoResult, knownChunks, resolvedConflicts] = await Promise.all([
     attachDocumentInfo(matchedChunks).then(
       (chunks) => ({ ok: true as const, chunks }),
       (reason: unknown) => ({ ok: false as const, reason })
     ),
     fetchPassageChunks(matchedChunks, keywordHits),
+    loadResolvedConflicts(adminSupabase, schoolId, [
+      ...matchedChunks.map((c) => c.document_id),
+      ...keywordHits.map((h) => h.document_id),
+    ]),
   ]);
   let relevantChunks: RelevantChunk[] = [];
   if (infoResult.ok) relevantChunks = infoResult.chunks;
   else console.error("RAG search failed (continuing without sources):", infoResult.reason);
+
+  // A resolved conflict with a side in reach takes the losing side's chunks
+  // (both sides', for a written answer) out of the passages — matched by
+  // chunk id or by the statement, so rulings survive re-processing. With no
+  // resolved conflicts this changes nothing.
+  const conflictPlan = planConflictResolutions(
+    resolvedConflicts,
+    conflictContext(knownChunks, matchedChunks)
+  );
+  if (conflictPlan.drop.size > 0) {
+    relevantChunks = withoutDropped(relevantChunks, conflictPlan.drop);
+    keywordHits = withoutDropped(keywordHits, conflictPlan.drop);
+    for (const key of conflictPlan.drop) knownChunks.delete(key);
+  }
 
   // Events, announcements and settings were kicked off before the rewrite
   // (all non-fatal — an empty result just means less context)
@@ -157,6 +185,15 @@ export async function prepareChatTurn({
   // selectPassages then drops the weak and the duplicate, so the model isn't
   // handed near-copies it will cite side by side.
   const passages = selectPassages(assemblePassages(relevantChunks, keywordHits, knownChunks));
+  // Then the admin's ruling itself, numbered after the documents: the chosen
+  // statement when its chunk didn't make the cut, and any note the admin
+  // wrote. Only text from the conflict rows — never model output.
+  if (conflictPlan.relevant.length > 0) {
+    const similarityByKey = new Map(
+      matchedChunks.map((c) => [chunkKey(c.document_id, c.chunk_index), c.similarity])
+    );
+    passages.push(...clarificationPassages(conflictPlan.relevant, passages, similarityByKey));
+  }
 
   // The calendar is prompt context, not a citable source — see
   // formatEventsContext. Multi-day events are still collapsed from their
@@ -184,8 +221,10 @@ export async function prepareChatTurn({
     source_url: passage.source_url,
     chunk_index: passage.chunk_index,
     source_number: i + 1,
-    source_type: "document" as const,
-    location: formatChunkLocation(passage.metadata),
+    // An admin's note has no document behind it: it renders as "School
+    // clarification", without a link.
+    source_type: passage.clarification === "note" ? ("clarification" as const) : ("document" as const),
+    location: passage.clarification === "note" ? null : formatChunkLocation(passage.metadata),
   }));
 
   const configured =
