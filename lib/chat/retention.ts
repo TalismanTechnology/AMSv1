@@ -1,19 +1,19 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-// Parent chats are kept for 30 minutes. Each parent has one chat per school
-// (one visible chat_sessions row, reused); the parent sees, and the model is
-// given, only that session's messages from the last 30 minutes. Older
-// messages are deleted by /api/cron/purge-chats (and for the current parent
-// on chat page load), EXCEPT in "flagged" sessions — an unanswered exchange,
-// or the owner's thumbs-down (migration 031) — which school staff may review.
-// Those are kept in full and, once idle for 30 minutes, hidden from the
-// parent (hidden_from_parent, migration 037); the parent's next question
-// starts a fresh session. A session with activity in the last
+// Parent chat history. A parent has any number of chats (chat_sessions rows)
+// per school, each kept for CHAT_RETENTION_DAYS from its last activity
+// (updated_at, touched by every send). A whole chat idle longer than that is
+// deleted by /api/cron/purge-chats (and for the current parent on chat page
+// load), EXCEPT a "flagged" chat — an unanswered exchange, or the owner's
+// thumbs-down (migration 031) — which school staff may review. That is kept
+// in full and, once idle past the window, hidden from the parent
+// (hidden_from_parent, migration 037). A parent deleting a flagged chat
+// hides it the same way. A session with activity in the last
 // PURGE_GRACE_MINUTES is left for the next run, and every delete re-checks
 // flags first (recheckDeletable).
 
-export const CHAT_RETENTION_MINUTES = 30;
-const RETENTION_MS = CHAT_RETENTION_MINUTES * 60 * 1000;
+export const CHAT_RETENTION_DAYS = 30;
+const RETENTION_MS = CHAT_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 
 /**
  * The purge leaves a session alone entirely (no expiry, no delete) if it saw
@@ -23,7 +23,7 @@ const RETENTION_MS = CHAT_RETENTION_MINUTES * 60 * 1000;
 export const PURGE_GRACE_MINUTES = 2;
 const GRACE_MS = PURGE_GRACE_MINUTES * 60 * 1000;
 
-/** ISO timestamp before which unflagged chat content is expired. */
+/** ISO timestamp: a chat last active before this has expired. */
 export function retentionCutoff(now: Date = new Date()): string {
   return new Date(now.getTime() - RETENTION_MS).toISOString();
 }
@@ -37,11 +37,6 @@ export function graceCutoff(now: Date = new Date()): string {
 export function isWithinRetention(createdAt: string, cutoff: string): boolean {
   const t = Date.parse(createdAt);
   return Number.isFinite(t) && t >= Date.parse(cutoff);
-}
-
-/** Rows created at or after the cutoff, order preserved. */
-export function filterRecent<T extends { created_at: string }>(rows: T[], cutoff: string): T[] {
-  return rows.filter((r) => isWithinRetention(r.created_at, cutoff));
 }
 
 export function truncateTitle(text: string, max = 60): string {
@@ -211,7 +206,7 @@ export interface PurgeCandidate {
   hidden: boolean;
   /** Any message created at/after the cutoff. */
   hasRecentMessages: boolean;
-  /** Touched by every send, so an in-flight question keeps its session. */
+  /** Last activity: touched by every send. */
   updated_at: string;
   /**
    * A message, rating or send within the grace window (PURGE_GRACE_MINUTES):
@@ -221,33 +216,30 @@ export interface PurgeCandidate {
 }
 
 export interface PurgePlan {
-  /** Unflagged sessions: delete their messages older than the cutoff. */
-  expireMessagesIn: string[];
-  /** Unflagged sessions with nothing recent: delete the session row. */
+  /** Unflagged chats idle past the window: delete the whole session. */
   deleteSessions: string[];
-  /** Flagged, idle sessions still visible to the parent: hide them. */
+  /** Flagged chats idle past the window, still visible to the parent: hide. */
   hide: string[];
 }
 
 export function planPurge(candidates: PurgeCandidate[], cutoff: string): PurgePlan {
-  const plan: PurgePlan = { expireMessagesIn: [], deleteSessions: [], hide: [] };
+  const plan: PurgePlan = { deleteSessions: [], hide: [] };
   for (const s of candidates) {
     if (s.recentlyActive) continue;
     const idle = !s.hasRecentMessages && !isWithinRetention(s.updated_at, cutoff);
+    if (!idle) continue;
     if (s.flagged) {
       // Never delete flagged content; just take it out of the parent's view.
-      if (!s.hidden && idle) plan.hide.push(s.id);
+      if (!s.hidden) plan.hide.push(s.id);
       continue;
     }
-    plan.expireMessagesIn.push(s.id);
-    if (idle) plan.deleteSessions.push(s.id);
+    plan.deleteSessions.push(s.id);
   }
   return plan;
 }
 
 export interface PurgeResult {
   sessionsChecked: number;
-  messagesDeleted: number;
   sessionsDeleted: number;
   sessionsHidden: number;
 }
@@ -276,7 +268,7 @@ async function pageAll<T>(
 }
 
 /**
- * Apply the 30-minute retention rule — to every parent (cron), or to one
+ * Apply the 30-day retention rule — to every parent (cron), or to one
  * parent's chats in one school (`scope`, run on chat page load). Uses the
  * service-role client. Throws if flags can't be determined (nothing is
  * deleted in that case); callers decide whether to swallow.
@@ -287,17 +279,11 @@ export async function purgeExpiredChats(
 ): Promise<PurgeResult> {
   const cutoff = retentionCutoff(now);
   const activeSince = graceCutoff(now);
-  const result: PurgeResult = {
-    sessionsChecked: 0,
-    messagesDeleted: 0,
-    sessionsDeleted: 0,
-    sessionsHidden: 0,
-  };
+  const result: PurgeResult = { sessionsChecked: 0, sessionsDeleted: 0, sessionsHidden: 0 };
 
-  // Candidates: (a) sessions idle past the cutoff — visible ones (to delete
-  // or hide) and hidden ones (a hidden session whose flag was later removed
-  // loses its exemption); (b) visible sessions still in use but holding
-  // messages older than the cutoff.
+  // Candidates: sessions idle past the cutoff — visible ones (to delete or
+  // hide) and hidden ones (a hidden session whose flag was later removed
+  // loses its exemption).
   const idleSessions = await pageAll<SessionRow>((from, to) => {
     let q = admin
       .from("chat_sessions")
@@ -309,35 +295,15 @@ export async function purgeExpiredChats(
     return q;
   });
 
-  const oldMessageRows = await pageAll<{ chat_sessions: unknown }>((from, to) => {
-    let q = admin
-      .from("chat_messages")
-      .select("session_id, chat_sessions!inner(id, user_id, school_id, hidden_from_parent, updated_at)")
-      .lt("created_at", cutoff)
-      .eq("chat_sessions.hidden_from_parent", false)
-      .gte("chat_sessions.updated_at", cutoff)
-      .order("id")
-      .range(from, to);
-    if (scope) {
-      q = q.eq("chat_sessions.user_id", scope.userId).eq("chat_sessions.school_id", scope.schoolId);
-    }
-    return q;
-  });
-
-  const sessions = new Map<string, SessionRow>();
-  for (const s of idleSessions) sessions.set(s.id, s);
-  for (const row of oldMessageRows) {
-    const joined = row.chat_sessions as SessionRow | SessionRow[] | null;
-    for (const s of Array.isArray(joined) ? joined : joined ? [joined] : []) {
-      sessions.set(s.id, s);
-    }
-  }
+  const sessions = new Map<string, SessionRow>(idleSessions.map((s) => [s.id, s]));
   result.sessionsChecked = sessions.size;
   if (sessions.size === 0) return result;
 
   const ownerBySession = new Map([...sessions.values()].map((s) => [s.id, s.user_id]));
   const flagged = await findFlaggedSessionIds(admin, ownerBySession);
 
+  // A message newer than the cutoff in a session whose updated_at wasn't
+  // touched (a failed background write) still counts as activity.
   const recent = new Set<string>();
   for (const ids of chunks([...sessions.keys()])) {
     const { data, error } = await admin
@@ -365,31 +331,14 @@ export async function purgeExpiredChats(
   // Each delete chunk re-checks flags and grace-window activity first (see
   // recheckDeletable for the window that remains). A failed re-check skips
   // the chunk; the next run retries.
-  const recheck = async (chunk: string[], what: string) => {
-    try {
-      return await recheckDeletable(admin, chunk, ownerBySession, activeSince);
-    } catch (err) {
-      console.error(`purgeExpiredChats: ${what} re-check failed:`, err);
-      return [];
-    }
-  };
-
-  for (const chunk of chunks(plan.expireMessagesIn)) {
-    const ids = await recheck(chunk, "message");
-    if (ids.length === 0) continue;
-    const { count, error } = await admin
-      .from("chat_messages")
-      .delete({ count: "exact" })
-      .in("session_id", ids)
-      .lt("created_at", cutoff)
-      // In-statement guard: never an unanswered message, whatever the plan.
-      .eq("unanswered", false);
-    if (error) console.error("purgeExpiredChats: message delete failed:", error);
-    else result.messagesDeleted += count ?? 0;
-  }
-
   for (const chunk of chunks(plan.deleteSessions)) {
-    const ids = await recheck(chunk, "session");
+    let ids: string[];
+    try {
+      ids = await recheckDeletable(admin, chunk, ownerBySession, activeSince);
+    } catch (err) {
+      console.error("purgeExpiredChats: session re-check failed:", err);
+      continue;
+    }
     if (ids.length === 0) continue;
     // Re-checked in the statement: a send since we looked touches updated_at,
     // and must not lose its session (messages cascade with it).
@@ -416,68 +365,96 @@ export async function purgeExpiredChats(
 }
 
 // --------------------------------------------
-// The parent's one chat
+// Which session a question goes into
 // --------------------------------------------
+//
+// The client always names the chat it is sending into: a session id, or
+// null for a new chat. A new chat must never land in an older one, so there
+// is deliberately no "the parent's latest session" fallback anywhere.
 
-/**
- * The parent's current chat session for a school: the most recent visible
- * one, created if there is none. Inserts with the service role — callers
- * must have authorized userId for schoolId.
- */
-export async function getOrCreateParentSession(
-  admin: SupabaseClient,
-  userId: string,
-  schoolId: string
-): Promise<{ id: string; title: string | null }> {
-  const { data: existing, error } = await admin
-    .from("chat_sessions")
-    .select("id, title")
-    .eq("user_id", userId)
-    .eq("school_id", schoolId)
-    .eq("hidden_from_parent", false)
-    .order("updated_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (error) throw error;
-  if (existing) return existing as { id: string; title: string | null };
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-  const { data: created, error: insertError } = await admin
-    .from("chat_sessions")
-    .insert({ user_id: userId, school_id: schoolId, title: "New chat" })
-    .select("id, title")
-    .single();
-  if (insertError) throw insertError;
-  return created as { id: string; title: string | null };
+export function isSessionId(value: unknown): value is string {
+  return typeof value === "string" && UUID_RE.test(value);
 }
 
 /**
- * The session a chat request writes into. The one the client named if it is
- * still this parent's visible chat for the school — touched (updated_at) in
- * the same statement, so a concurrent purge can't delete it mid-request —
- * otherwise the parent's current chat (created if needed).
+ * The request body's `sessionId`: a session id, or null for a new chat. A
+ * missing or malformed field is rejected rather than guessed at.
+ */
+export function parseRequestedSessionId(
+  body: unknown
+): { ok: true; sessionId: string | null } | { ok: false } {
+  if (!body || typeof body !== "object" || !("sessionId" in body)) return { ok: false };
+  const value = (body as { sessionId: unknown }).sessionId;
+  if (value === null) return { ok: true, sessionId: null };
+  return isSessionId(value) ? { ok: true, sessionId: value } : { ok: false };
+}
+
+/**
+ * Claim `sessionId` for a send: only if it is this parent's chat in this
+ * school, not hidden from them, and not expired. Touched (updated_at) in the
+ * same statement, so a concurrent purge can't delete it mid-request. Null
+ * when it isn't theirs to write to; throws on a query error.
+ */
+export async function claimParentSession(
+  admin: SupabaseClient,
+  userId: string,
+  schoolId: string,
+  sessionId: string,
+  now: Date = new Date()
+): Promise<string | null> {
+  if (!isSessionId(sessionId)) return null;
+  const { data, error } = await admin
+    .from("chat_sessions")
+    .update({ updated_at: now.toISOString() })
+    .eq("id", sessionId)
+    .eq("user_id", userId)
+    .eq("school_id", schoolId)
+    .eq("hidden_from_parent", false)
+    .gte("updated_at", retentionCutoff(now))
+    .select("id")
+    .maybeSingle();
+  if (error) throw error;
+  return data ? (data.id as string) : null;
+}
+
+/**
+ * A new chat session for the parent. Inserts with the service role — callers
+ * must have authorized userId for schoolId.
+ */
+export async function createParentSession(
+  admin: SupabaseClient,
+  userId: string,
+  schoolId: string,
+  title?: string
+): Promise<string> {
+  const { data, error } = await admin
+    .from("chat_sessions")
+    .insert({ user_id: userId, school_id: schoolId, title: title?.trim() || "New chat" })
+    .select("id")
+    .single();
+  if (error) throw error;
+  return data.id as string;
+}
+
+/**
+ * The session a question writes into: the named one if `claimParentSession`
+ * allows it, otherwise (null, someone else's, hidden, expired, deleted) a new
+ * session — never an existing one the client didn't name.
  */
 export async function resolveParentSession(
   admin: SupabaseClient,
   userId: string,
   schoolId: string,
-  requestedId: string | null | undefined
-): Promise<string> {
-  const now = new Date().toISOString();
+  requestedId: string | null,
+  title?: string
+): Promise<{ sessionId: string; created: boolean }> {
   if (requestedId) {
-    const { data } = await admin
-      .from("chat_sessions")
-      .update({ updated_at: now })
-      .eq("id", requestedId)
-      .eq("user_id", userId)
-      .eq("school_id", schoolId)
-      .eq("hidden_from_parent", false)
-      .select("id")
-      .maybeSingle();
-    if (data) return data.id as string;
+    const claimed = await claimParentSession(admin, userId, schoolId, requestedId);
+    if (claimed) return { sessionId: claimed, created: false };
   }
-  const session = await getOrCreateParentSession(admin, userId, schoolId);
-  await admin.from("chat_sessions").update({ updated_at: now }).eq("id", session.id);
-  return session.id;
+  return { sessionId: await createParentSession(admin, userId, schoolId, title), created: true };
 }
 
 // --------------------------------------------
@@ -497,26 +474,29 @@ export interface HistoryMessage {
   parts: { type: "text"; text: string }[];
 }
 
+/** At most this many stored messages (the latest) go to the model. */
+export const MAX_HISTORY_MESSAGES = 40;
+
 /**
- * The conversation the model sees: the session's stored messages from the
- * window (never what the client claims was said) plus the new question. A
- * stored trailing copy of the same question (a retry after a failed answer)
- * is dropped so it isn't sent twice.
+ * The conversation the model sees: the session's latest stored messages
+ * (never what the client claims was said) plus the new question. A stored
+ * trailing copy of the same question (a retry after a failed answer) is
+ * dropped so it isn't sent twice.
  */
 export function buildModelHistory<L>(
   stored: StoredMessage[],
   latest: L,
-  latestText: string,
-  cutoff: string
+  latestText: string
 ): (HistoryMessage | L)[] {
-  const history: HistoryMessage[] = filterRecent(stored, cutoff)
+  const history: HistoryMessage[] = stored
     .filter((m) => (m.role === "user" || m.role === "assistant") && m.content.trim())
     .sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at))
     .map((m) => ({
       id: m.id,
       role: m.role as "user" | "assistant",
       parts: [{ type: "text" as const, text: m.content }],
-    }));
+    }))
+    .slice(-MAX_HISTORY_MESSAGES);
   const tail = history[history.length - 1];
   if (tail?.role === "user" && tail.parts[0].text.trim() === latestText.trim()) history.pop();
   return [...history, latest];

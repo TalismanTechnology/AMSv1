@@ -25,9 +25,12 @@ import {
 import type { ContactCardData } from "@/lib/contacts/directory";
 import { shouldAutoTitle } from "@/lib/chat/chat-view";
 import {
+  MAX_HISTORY_MESSAGES,
   buildModelHistory,
-  resolveParentSession,
-  retentionCutoff,
+  claimParentSession,
+  createParentSession,
+  parseRequestedSessionId,
+  truncateTitle,
   type StoredMessage,
 } from "@/lib/chat/retention";
 
@@ -50,7 +53,18 @@ export async function POST(request: NextRequest) {
       return new Response("Unauthorized", { status: 401 });
     }
 
-    const { messages, sessionId: requestedSessionId, schoolId } = await body;
+    const parsedBody = await body;
+    const { messages, schoolId } = parsedBody;
+    // The chat this question belongs to: an id, or null for a new chat. Never
+    // inferred — a missing field is a client bug, not "the latest chat".
+    const requested = parseRequestedSessionId(parsedBody);
+    if (!requested.ok) {
+      return new Response(
+        JSON.stringify({ error: "sessionId is required (null for a new chat)" }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
+    }
+    const requestedSessionId = requested.sessionId;
     debugLog(`REQUEST: sessionId=${requestedSessionId}, schoolId=${schoolId}, messageCount=${messages?.length}`);
 
     // Every search is scoped to one school; an unscoped request has nothing
@@ -124,34 +138,31 @@ export async function POST(request: NextRequest) {
 
     const adminSupabase = createAdminClient();
 
-    // The parent's one chat: the session the client named if it's still their
-    // visible chat (touched now, so the 30-minute purge can't remove it
-    // mid-request), otherwise their current one. Access is verified above.
-    const sessionId = await resolveParentSession(
-      adminSupabase,
-      user.id,
-      schoolId,
-      requestedSessionId
-    );
-    const sessionMoved = sessionId !== requestedSessionId;
+    // The session the client named, only if it is still this parent's
+    // visible chat in this school (touched now, so the purge can't remove it
+    // mid-request). Otherwise — a new chat (null), or one deleted, hidden,
+    // expired or not theirs — a new session is created below, once the
+    // question is ready to be saved. Never another existing session.
+    const claimedSessionId = requestedSessionId
+      ? await claimParentSession(adminSupabase, user.id, schoolId, requestedSessionId)
+      : null;
 
-    // Model context is the session's stored messages from the last 30
-    // minutes plus this question — never the history the client sent, which
-    // may hold expired (or invented) turns. Read before this turn is saved.
-    const cutoff = retentionCutoff();
-    const { data: storedRows, error: storedError } = await adminSupabase
-      .from("chat_messages")
-      .select("id, role, content, created_at")
-      .eq("session_id", sessionId)
-      .gte("created_at", cutoff)
-      .order("created_at", { ascending: true });
-    if (storedError) throw new Error(storedError.message);
-    const contextMessages = buildModelHistory(
-      (storedRows ?? []) as StoredMessage[],
-      lastMessage,
-      lastMessageText,
-      cutoff
-    );
+    // Model context is the session's latest stored messages plus this
+    // question — never the history the client sent, which may hold deleted
+    // (or invented) turns. Read before this turn is saved.
+    let storedRows: StoredMessage[] = [];
+    if (claimedSessionId) {
+      const { data, error: storedError } = await adminSupabase
+        .from("chat_messages")
+        .select("id, role, content, created_at")
+        .eq("session_id", claimedSessionId)
+        .order("created_at", { ascending: false })
+        // One extra: a stored copy of a retried question is dropped.
+        .limit(MAX_HISTORY_MESSAGES + 1);
+      if (storedError) throw new Error(storedError.message);
+      storedRows = (data ?? []) as StoredMessage[];
+    }
+    const contextMessages = buildModelHistory(storedRows, lastMessage, lastMessageText);
     // The school's approved staff contacts (migration 044), read alongside
     // retrieval and used only if nothing answers the question. Never rejects:
     // a missing table or any error is "no contacts".
@@ -160,17 +171,17 @@ export async function POST(request: NextRequest) {
     // user message is saved, so auto-titling goes by what's in the DB rather
     // than how much history the client happened to send. Never rejects: an
     // unknown state is "don't retitle".
-    const titleCheck: Promise<boolean> = sessionId
+    const titleCheck: Promise<boolean> = claimedSessionId
       ? Promise.all([
           adminSupabase
             .from("chat_sessions")
             .select("title")
-            .eq("id", sessionId)
+            .eq("id", claimedSessionId)
             .maybeSingle(),
           adminSupabase
             .from("chat_messages")
             .select("id", { count: "exact", head: true })
-            .eq("session_id", sessionId),
+            .eq("session_id", claimedSessionId),
         ]).then(
           ([session, prior]) =>
             !session.error &&
@@ -235,6 +246,17 @@ export async function POST(request: NextRequest) {
     // cards, so what the client receives is exactly what [N] can resolve to.
     const allSources: ChatSource[] = sources;
 
+    // A new chat gets its session now, titled from its first question.
+    const sessionId =
+      claimedSessionId ??
+      (await createParentSession(
+        adminSupabase,
+        user.id,
+        schoolId,
+        truncateTitle(lastMessageText)
+      ));
+    const sessionMoved = sessionId !== requestedSessionId;
+
     // Save user message in the background. Each write starts now and never
     // blocks the stream; after() keeps the function alive until it lands.
     if (sessionId) {
@@ -262,9 +284,7 @@ export async function POST(request: NextRequest) {
 
       // Auto-title: only the session's first stored question titles it.
       if (autoTitle) {
-        const title =
-          lastMessageText.slice(0, 60) +
-          (lastMessageText.length > 60 ? "..." : "");
+        const title = truncateTitle(lastMessageText) || "New chat";
         inBackground(adminSupabase
           .from("chat_sessions")
           .update({ title })

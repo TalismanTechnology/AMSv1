@@ -26,7 +26,7 @@ export default function PrivacyPage() {
     <LegalPage
       eyebrow="Legal"
       title="Privacy Policy"
-      lastUpdated="October 19, 2026"
+      lastUpdated="October 20, 2026"
       intro={
         <>
           <p>
@@ -107,11 +107,12 @@ export default function PrivacyPage() {
           <strong>Questions and conversations.</strong> The questions you ask,
           the answers we generate, the documents cited, conversation titles,
           and any thumbs-up/down feedback you give. We also record whether,
-          and when, you agreed to AI processing (see section 5). Your chat
-          shows the last 30 minutes of your conversation, so you can pick it
-          up again on another device, and is then automatically deleted (see
-          section 8). Your conversations are private to you; school staff can
-          see an exchange only if it is flagged, as described in section 6.
+          and when, you agreed to AI processing (see section 5). Your past
+          chats are listed in the app so you can reopen, rename or delete
+          them, including on another device. Each chat is automatically
+          deleted 30 days after its last message (see section 8). Your
+          conversations are private to you; school staff can see an exchange
+          only if it is flagged, as described in section 6.
         </p>
         <p>
           <strong>Usage information.</strong> We record a usage event each time
@@ -321,15 +322,15 @@ export default function PrivacyPage() {
       <LegalSection id="retention" title="8. Retention and deletion">
         <p>
           We keep account data while your account is active so you can use the
-          Service. <strong>Parent chats are automatically deleted after 30
-          minutes.</strong> The exception is a chat flagged for school staff
-          review &mdash; because the assistant couldn&apos;t answer your
-          question, or because you marked an answer unhelpful &mdash; which is
-          kept so your school can review it and improve its information; it no
-          longer appears in your chat once it is 30 minutes old. You can also
-          clear your chat at any time in the app (a flagged chat is then
-          removed from your view but kept for staff), and you can remove
-          children from your profile. Analytics keep only anonymized topic
+          Service. <strong>Parent chats are automatically deleted 30 days
+          after their last message.</strong> The exception is a chat flagged
+          for school staff review &mdash; because the assistant couldn&apos;t
+          answer your question, or because you marked an answer unhelpful
+          &mdash; which is kept so your school can review it and improve its
+          information; it no longer appears in your chat history once it has
+          had no new messages for 30 days. You can also delete any chat at any
+          time in the app (a flagged chat is then removed from your history
+          but kept for staff), and you can remove children from your profile. Analytics keep only anonymized topic
           counts (see section 3), and unanswered questions your school can see
           are kept for staff review.
         </p>
@@ -367,7 +368,7 @@ export default function PrivacyPage() {
 
       <LegalSection id="rights" title="10. Your choices and rights">
         <p>
-          You can view and update your profile and children, clear your chat,
+          You can view and update your profile and children, delete any of your chats,
           withdraw your consent to AI processing, delete your
           account, and turn notifications off in your device settings.
           To access, correct, or delete other information, or to ask a question

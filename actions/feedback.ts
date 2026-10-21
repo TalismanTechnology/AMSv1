@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 
 const MESSAGE_GONE =
-  "This message has expired (chats are kept for 30 minutes), so it can't be rated.";
+  "This message is no longer available (its chat was deleted or expired), so it can't be rated.";
 
 export async function submitFeedback(messageId: string, rating: "up" | "down", schoolId?: string) {
   const supabase = await createClient();
@@ -13,7 +13,7 @@ export async function submitFeedback(messageId: string, rating: "up" | "down", s
 
   if (!user) return { error: "Unauthorized" };
 
-  // The message may have been purged (30-minute retention) since it was
+  // The message may have been deleted (or purged after 30 days) since it was
   // shown. Say so plainly rather than surfacing an FK/RLS error — and for a
   // thumbs-down, which flags the chat for staff, never report success on a
   // message that's gone.

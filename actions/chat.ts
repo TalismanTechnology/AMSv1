@@ -2,47 +2,16 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import {
-  findFlaggedSessionIds,
-  getOrCreateParentSession,
-  recheckDeletable,
-  retentionCutoff,
-  truncateTitle,
-} from "@/lib/chat/retention";
+import { findFlaggedSessionIds, isSessionId, recheckDeletable } from "@/lib/chat/retention";
+import { listParentChats, loadParentChat } from "@/lib/chat/history";
+import { normalizeChatTitle } from "@/lib/chat/chat-view";
 
-// Parents have one chat per school, showing only the last 30 minutes
-// (lib/chat/retention.ts). The page loads it server-side
-// (lib/chat/current-chat.ts); these are the client-callable pieces.
-
-export async function getChatMessages(sessionId: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return { error: "Not authenticated", messages: [] };
-
-  // Only the owner's chat that is still visible to them.
-  const { data: session } = await supabase
-    .from("chat_sessions")
-    .select("id")
-    .eq("id", sessionId)
-    .eq("user_id", user.id)
-    .eq("hidden_from_parent", false)
-    .maybeSingle();
-
-  if (!session) return { error: "Chat not found", messages: [] };
-
-  const { data: messages, error } = await supabase
-    .from("chat_messages")
-    .select("id, session_id, role, content, sources, school_id, created_at")
-    .eq("session_id", sessionId)
-    .gte("created_at", retentionCutoff())
-    .order("created_at", { ascending: true });
-
-  if (error) return { error: error.message, messages: [] };
-  return { messages: messages || [] };
-}
+// Parent chat history (lib/chat/retention.ts): list, open, rename and delete
+// the signed-in parent's own chats. Every query is pinned to the caller's
+// user_id + the school; the service-role client is used because the
+// chat_sessions RLS policy (is_school_member) would otherwise reject super
+// admins, who hold no school_memberships row. New chats are created by
+// /api/chat on their first question.
 
 /** Whether the signed-in user may chat in this school. */
 async function authorizeSchoolChat(schoolId: string) {
@@ -75,92 +44,110 @@ async function authorizeSchoolChat(schoolId: string) {
   return { userId: user.id } as const;
 }
 
-/**
- * The parent's chat session for this school (get-or-create). Used by the chat
- * input when it has no session yet.
- */
-export async function createChatSession(schoolId: string, title?: string) {
+/** The parent's chats in this school, most recently active first. */
+export async function getChatSessions(schoolId: string) {
   const auth = await authorizeSchoolChat(schoolId);
-  if ("error" in auth) return { error: auth.error };
-
-  // Service role: the request is already authorized above, and the
-  // chat_sessions RLS policy (is_school_member) would otherwise reject super
-  // admins, who hold no school_memberships row.
-  const admin = createAdminClient();
+  if ("error" in auth) return { error: auth.error, sessions: [] };
   try {
-    const session = await getOrCreateParentSession(admin, auth.userId, schoolId);
-    const sessionTitle = title && truncateTitle(title);
-    if (sessionTitle && (!session.title || session.title === "New chat")) {
-      await admin.from("chat_sessions").update({ title: sessionTitle }).eq("id", session.id);
-    }
-    return { sessionId: session.id };
+    return { sessions: await listParentChats(createAdminClient(), auth.userId, schoolId) };
   } catch (err) {
-    console.error("createChatSession failed:", err);
-    return { error: "Couldn't start the chat session. Please try again." };
+    console.error("getChatSessions failed:", err);
+    return { error: "Couldn't load your chats.", sessions: [] };
   }
 }
 
+/** One of the parent's chats with all its messages and citations. */
+export async function getChatMessages(sessionId: string, schoolId: string) {
+  const auth = await authorizeSchoolChat(schoolId);
+  if ("error" in auth) return { error: auth.error, messages: [] };
+  try {
+    const chat = await loadParentChat(createAdminClient(), auth.userId, schoolId, sessionId);
+    if (!chat) return { error: "This chat is no longer available.", messages: [] };
+    return { messages: chat.messages };
+  } catch (err) {
+    console.error("getChatMessages failed:", err);
+    return { error: "Please try again.", messages: [] };
+  }
+}
+
+/** Rename one of the parent's chats. Doesn't count as activity. */
+export async function renameChatSession(sessionId: string, schoolId: string, title: string) {
+  const name = normalizeChatTitle(title);
+  if (!name) return { error: "Enter a name for this chat." };
+  if (!isSessionId(sessionId)) return { error: "Chat not found." };
+  const auth = await authorizeSchoolChat(schoolId);
+  if ("error" in auth) return { error: auth.error };
+
+  const { data, error } = await createAdminClient()
+    .from("chat_sessions")
+    .update({ title: name })
+    .eq("id", sessionId)
+    .eq("user_id", auth.userId)
+    .eq("school_id", schoolId)
+    .eq("hidden_from_parent", false)
+    .select("id, title")
+    .maybeSingle();
+  if (error) {
+    console.error("renameChatSession failed:", error);
+    return { error: "Couldn't rename the chat. Please try again." };
+  }
+  if (!data) return { error: "Chat not found." };
+  return { title: data.title as string };
+}
+
 /**
- * "Clear chat": remove the parent's current conversation. An unflagged chat
- * has its messages deleted (the session row is reused). A flagged chat
- * (unanswered, or the parent's thumbs-down) stays reviewable by staff
- * (migration 031), so it is hidden from the parent instead and a fresh
- * session takes its place. Returns the session to continue in.
+ * Delete one of the parent's chats. An unflagged chat is deleted for real
+ * (messages cascade). A flagged chat (unanswered, or the parent's
+ * thumbs-down) stays reviewable by staff (migration 031), so it is hidden
+ * from the parent instead. Flags are re-checked just before deleting.
  */
-export async function clearChat(schoolId: string) {
+export async function deleteChatSession(sessionId: string, schoolId: string) {
+  if (!isSessionId(sessionId)) return { error: "Chat not found." };
   const auth = await authorizeSchoolChat(schoolId);
   if ("error" in auth) return { error: auth.error };
   const userId = auth.userId;
   const admin = createAdminClient();
 
   try {
-    const { data: sessions, error: lookupError } = await admin
+    const { data: session, error: lookupError } = await admin
       .from("chat_sessions")
       .select("id, user_id")
+      .eq("id", sessionId)
       .eq("user_id", userId)
       .eq("school_id", schoolId)
-      .eq("hidden_from_parent", false);
+      .eq("hidden_from_parent", false)
+      .maybeSingle();
     if (lookupError) throw lookupError;
+    if (!session) return { error: "Chat not found." };
 
-    const ownerBySession = new Map(
-      ((sessions ?? []) as { id: string; user_id: string }[]).map((s) => [s.id, s.user_id])
-    );
-    const flagged = await findFlaggedSessionIds(admin, ownerBySession);
-    const hide = [...ownerBySession.keys()].filter((id) => flagged.has(id));
+    const owners = new Map([[sessionId, userId]]);
+    const flagged = await findFlaggedSessionIds(admin, owners);
     // Re-check just before deleting: a thumbs-down or an unanswered reply may
     // have landed since the lookup (see recheckDeletable for what remains).
-    const candidates = [...ownerBySession.keys()].filter((id) => !flagged.has(id));
-    const wipe = await recheckDeletable(admin, candidates, ownerBySession);
-    hide.push(...candidates.filter((id) => !wipe.includes(id)));
+    const deletable = flagged.has(sessionId)
+      ? false
+      : (await recheckDeletable(admin, [sessionId], owners)).includes(sessionId);
 
-    if (hide.length > 0) {
+    if (deletable) {
+      const { error } = await admin
+        .from("chat_sessions")
+        .delete()
+        .eq("id", sessionId)
+        .eq("user_id", userId)
+        .eq("school_id", schoolId);
+      if (error) throw error;
+    } else {
       const { error } = await admin
         .from("chat_sessions")
         .update({ hidden_from_parent: true })
-        .in("id", hide)
-        .eq("user_id", userId);
+        .eq("id", sessionId)
+        .eq("user_id", userId)
+        .eq("school_id", schoolId);
       if (error) throw error;
     }
-    if (wipe.length > 0) {
-      const { error } = await admin
-        .from("chat_messages")
-        .delete()
-        .in("session_id", wipe)
-        // In-statement guard: an unanswered reply stays reviewable by staff.
-        .eq("unanswered", false);
-      if (error) throw error;
-      const { error: titleError } = await admin
-        .from("chat_sessions")
-        .update({ title: "New chat", updated_at: new Date().toISOString() })
-        .in("id", wipe)
-        .eq("user_id", userId);
-      if (titleError) throw titleError;
-    }
-
-    const session = await getOrCreateParentSession(admin, userId, schoolId);
-    return { sessionId: session.id };
+    return { success: true };
   } catch (err) {
-    console.error("clearChat failed:", err);
-    return { error: "Couldn't clear the chat. Please try again." };
+    console.error("deleteChatSession failed:", err);
+    return { error: "Couldn't delete the chat. Please try again." };
   }
 }

@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isCronAuthorized } from "@/lib/blackbaud/cron-auth";
-import { purgeExpiredChats, retentionCutoff } from "@/lib/chat/retention";
+import { purgeExpiredChats } from "@/lib/chat/retention";
 import { scrubExpiredQuestionEvents } from "@/lib/insights/purge-questions";
+import { questionScrubCutoff } from "@/lib/insights/scrub";
 
 export const maxDuration = 300;
 
@@ -15,19 +16,17 @@ function errorMessage(err: unknown): string {
   return typeof message === "string" ? message : String(err);
 }
 
-// 30-minute chat retention. Every 10 minutes:
+// Chat retention and question-analytics scrub. Every 30 minutes:
 //   GET /api/cron/purge-chats
 //   Authorization: Bearer <CRON_SECRET>   (or ?key=<CRON_SECRET>)
 //
-// 1. Chats (lib/chat/retention.ts): in UNFLAGGED sessions, delete messages
-//    older than 30 minutes, and delete sessions with nothing newer (and not
-//    touched) in 30 minutes. FLAGGED sessions (unanswered, or the owner's
-//    thumbs-down) keep everything; once idle for 30 minutes they are hidden
-//    from the parent.
+// 1. Chats (lib/chat/retention.ts): delete UNFLAGGED chats idle (no activity)
+//    for 30 days. FLAGGED chats (unanswered, or the owner's thumbs-down) keep
+//    everything; once idle for 30 days they are hidden from the parent.
 // 2. Question analytics (lib/insights/scrub.ts): label question events older
 //    than 30 minutes with a topic, then strip their text and parent id (kept:
 //    flags, counts and a keyed asker hash). Unlabeled events are scrubbed
-//    anyway after 24 hours.
+//    anyway after 24 hours. This is what keeps the schedule at 30 minutes.
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
 
@@ -54,7 +53,7 @@ export async function GET(request: Request) {
   let questions = null;
   try {
     questions = await scrubExpiredQuestionEvents(supabase, {
-      cutoff: retentionCutoff(now),
+      cutoff: questionScrubCutoff(now),
       now,
       labelDeadline: startedAt + LABEL_BUDGET_MS,
     });
