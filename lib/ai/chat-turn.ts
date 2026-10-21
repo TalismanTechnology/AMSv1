@@ -208,6 +208,7 @@ export async function prepareChatTurn({
     childCount: resolvedChildren.length,
     todayString: getTodayString(now),
     schoolInstructions: settings?.custom_system_prompt ?? undefined,
+    hasHistory: messages.length > 1,
   });
 
   const sources: ChatSource[] = passages.map((passage, i) => ({

@@ -9,11 +9,31 @@ interface ChatMessage {
   content?: string;
 }
 
+// Words and openers that lean on an earlier turn: "what about Wednesdays?",
+// "and my other kid?", "is it the same for 8th grade?".
+const REFERENCE_WORDS =
+  /\b(it|its|it's|that|this|those|these|they|them|their|theirs|he|him|his|she|her|hers|one|ones|other|another|else|same|also|too|again|instead|either|both|then|more)\b/i;
+const FOLLOW_UP_OPENERS = /^\s*(and|but|or|so|also|what about|how about|same|ok|okay)\b/i;
+
+/**
+ * Whether a question reads as a follow-up to an earlier turn rather than a
+ * new, standalone question. One- or two-word questions ("Wednesdays?", "8th grade?") count: on
+ * their own they rarely say what they're about.
+ */
+export function looksLikeFollowUp(text: string): boolean {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  if (words.length <= 2) return true;
+  return FOLLOW_UP_OPENERS.test(text) || REFERENCE_WORDS.test(text.replace(/’/g, "'"));
+}
+
 /**
  * Whether a question needs the LLM rewrite at all. The rewrite only resolves
  * references to earlier turns, so it is skipped — saving a model round trip
  * before retrieval can start — when there are no earlier turns (the first
- * question) or the question is already long enough to stand on its own.
+ * question), the question is already long enough to stand on its own, or it
+ * doesn't refer back at all. A standalone question searched as-is can't pick
+ * up earlier topics: rewriting "what is the soccer ranking?" after questions
+ * about finals and dress-down days retrieved (and answered) all three.
  */
 export function shouldRewriteQuery(
   messages: ChatMessage[],
@@ -27,7 +47,8 @@ export function shouldRewriteQuery(
   // 25 words catches long-but-vague follow-ups ("ok so about that thing
   // you mentioned with the bus schedule on Wednesdays, what time again?")
   // while still skipping rewrite for truly standalone long queries.
-  return lastMessageText.split(" ").length <= 25;
+  if (lastMessageText.split(" ").length > 25) return false;
+  return looksLikeFollowUp(lastMessageText);
 }
 
 /**
@@ -91,7 +112,8 @@ Rules:
 - Return ONLY the rewritten query, nothing else.
 - It must be a complete, self-contained question — never a sentence fragment.
 - Resolve pronouns and references using the conversation.
-- Keep the parent's own wording where it is already specific.${childrenRule}
+- Keep the parent's own wording where it is already specific.
+- Rewrite only the follow-up. Never add topics from earlier questions that the follow-up doesn't refer to; if it already stands on its own, return it unchanged.${childrenRule}
 
 Conversation:
 ${historyText}

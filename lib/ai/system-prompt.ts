@@ -20,10 +20,17 @@ export interface SystemPromptOptions {
   todayString?: string;
   /** The school's own instructions from settings.custom_system_prompt. */
   schoolInstructions?: string;
+  /** Earlier turns precede the parent's latest message. */
+  hasHistory?: boolean;
 }
 
 const ROLE =
   "You are the parent help desk for a school. Parents ask about schedules, policies, contacts, and events, and you answer from the school's own material below — it is the only source of truth you have.";
+
+// With earlier turns in context, the model tended to recap every earlier
+// question before answering the new one.
+const LATEST_MESSAGE_ONLY = `CONVERSATION
+The earlier messages in this conversation have already been answered. Answer only the parent's latest message — don't repeat, summarize, or re-answer earlier questions. Use earlier turns only to understand what the latest message refers to (e.g. "what about Wednesdays?"). The reference material above was looked up for the latest message; ignore any of it that only bears on an earlier question.`;
 
 const FOLLOW_UPS = `FOLLOW-UP QUESTIONS
 After every reply — including when you couldn't find the answer or declined an off-topic request — add exactly 3 short questions this parent might ask next, answerable from the school's material. The app turns them into buttons, so use exactly this format after your answer:
@@ -44,6 +51,7 @@ export function buildSystemPrompt(
     childCount = 0,
     todayString,
     schoolInstructions,
+    hasHistory = false,
   } = options;
 
   const hasDocuments = passages.length > 0;
@@ -67,6 +75,7 @@ export function buildSystemPrompt(
     hasMaterial && childCount > 1 ? multiChildRules(childCount) : "",
     hasDocuments ? citationRules(hasEvents) : "",
     formatSchoolInstructions(schoolInstructions),
+    hasHistory ? LATEST_MESSAGE_ONLY : "",
     FOLLOW_UPS,
   ];
 

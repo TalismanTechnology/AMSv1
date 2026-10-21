@@ -138,23 +138,23 @@ test("stillDeletable drops sessions flagged or active since the plan", () => {
   assert.deepEqual(stillDeletable([], { flagged: new Set(["a"]) }), []);
 });
 
-test("model history: stored messages in order, plus the new question", () => {
+test("model history: stored exchanges in order, plus the new question", () => {
   const latest = { id: "client", role: "user", parts: [{ type: "text", text: "And Friday?" }] };
   const history = buildModelHistory(
     [
       { id: "m2", role: "assistant", content: "Pickup is at 3pm.", created_at: minutesAgo(9) },
-      { id: "m0", role: "user", content: "Earlier question", created_at: daysAgo(3) },
+      { id: "a0", role: "assistant", content: "Lunch is at noon.", created_at: daysAgo(2) },
+      { id: "m0", role: "user", content: "When is lunch?", created_at: daysAgo(3) },
       { id: "m1", role: "user", content: "When is pickup?", created_at: minutesAgo(10) },
       { id: "blank", role: "assistant", content: "  ", created_at: minutesAgo(8) },
     ],
-    latest,
-    "And Friday?"
+    latest
   );
   assert.deepEqual(
     history.map((m) => m.id),
-    ["m0", "m1", "m2", "client"]
+    ["m0", "a0", "m1", "m2", "client"]
   );
-  assert.deepEqual(history[1], {
+  assert.deepEqual(history[2], {
     id: "m1",
     role: "user",
     parts: [{ type: "text", text: "When is pickup?" }],
@@ -168,9 +168,11 @@ test("model history: only the latest MAX_HISTORY_MESSAGES are sent", () => {
     content: `message ${i}`,
     created_at: minutesAgo(1000 - i),
   }));
-  const history = buildModelHistory(stored, { id: "client" }, "new");
+  const history = buildModelHistory(stored, { id: "client" });
   assert.equal(history.length, MAX_HISTORY_MESSAGES + 1);
-  assert.equal(history[0].id, "m5");
+  // m44 is a question with no reply; the latest 20 exchanges are m4..m43.
+  assert.equal(history[0].id, "m4");
+  assert.equal(history[history.length - 2].id, "m43");
   assert.equal(history[history.length - 1].id, "client");
 });
 
@@ -178,10 +180,43 @@ test("model history: a stored copy of the retried question isn't sent twice", ()
   const latest = { id: "client", role: "user" };
   const history = buildModelHistory(
     [{ id: "m1", role: "user", content: "When is pickup? ", created_at: minutesAgo(1) }],
-    latest,
-    "When is pickup?"
+    latest
   );
   assert.deepEqual(history, [latest]);
+});
+
+test("model history: questions without a stored reply are dropped (recap regression)", () => {
+  // The assistant replies to the first two questions never landed: sent as
+  // three unanswered user turns, the model answered all three.
+  const latest = { id: "client", role: "user" };
+  const history = buildModelHistory(
+    [
+      { id: "u1", role: "user", content: "When are finals?", created_at: minutesAgo(5) },
+      { id: "u2", role: "user", content: "Dress down days?", created_at: minutesAgo(3) },
+    ],
+    latest
+  );
+  assert.deepEqual(history, [latest]);
+});
+
+test("model history: strictly alternates user/assistant, ending with the new question", () => {
+  const latest = { id: "client", role: "user" };
+  const history = buildModelHistory(
+    [
+      { id: "a-stray", role: "assistant", content: "Welcome!", created_at: minutesAgo(20) },
+      { id: "u1", role: "user", content: "When are finals?", created_at: minutesAgo(10) },
+      { id: "a1", role: "assistant", content: "Finals are June 2-5.", created_at: minutesAgo(9) },
+      { id: "u2", role: "user", content: "Failed question", created_at: minutesAgo(8) },
+      { id: "u3", role: "user", content: "Dress down days?", created_at: minutesAgo(7) },
+      { id: "a3", role: "assistant", content: "Every Friday.", created_at: minutesAgo(6) },
+      { id: "a3b", role: "assistant", content: "Duplicate reply", created_at: minutesAgo(5) },
+    ],
+    latest
+  );
+  assert.deepEqual(
+    history.map((m) => m.id),
+    ["u1", "a1", "u3", "a3", "client"]
+  );
 });
 
 test("truncateTitle trims, collapses whitespace and truncates at 60", () => {

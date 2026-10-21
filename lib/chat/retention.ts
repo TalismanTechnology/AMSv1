@@ -474,30 +474,41 @@ export interface HistoryMessage {
   parts: { type: "text"; text: string }[];
 }
 
-/** At most this many stored messages (the latest) go to the model. */
+/** At most this many stored messages (the latest) go to the model. Even: whole exchanges. */
 export const MAX_HISTORY_MESSAGES = 40;
 
 /**
- * The conversation the model sees: the session's latest stored messages
- * (never what the client claims was said) plus the new question. A stored
- * trailing copy of the same question (a retry after a failed answer) is
- * dropped so it isn't sent twice.
+ * The conversation the model sees: the session's latest stored exchanges
+ * (never what the client claims was said) plus the new question.
+ *
+ * Only completed exchanges — a user message directly followed by its
+ * assistant reply — are kept. A user message with no stored reply (the answer
+ * failed, its save was lost, or it is a stored copy of the question being
+ * retried) is dropped: handed to the model as a run of unanswered user turns,
+ * the model answers every one of them again before the new question.
  */
 export function buildModelHistory<L>(
   stored: StoredMessage[],
-  latest: L,
-  latestText: string
+  latest: L
 ): (HistoryMessage | L)[] {
-  const history: HistoryMessage[] = stored
+  const ordered = stored
     .filter((m) => (m.role === "user" || m.role === "assistant") && m.content.trim())
-    .sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at))
-    .map((m) => ({
-      id: m.id,
-      role: m.role as "user" | "assistant",
-      parts: [{ type: "text" as const, text: m.content }],
-    }))
-    .slice(-MAX_HISTORY_MESSAGES);
-  const tail = history[history.length - 1];
-  if (tail?.role === "user" && tail.parts[0].text.trim() === latestText.trim()) history.pop();
-  return [...history, latest];
+    .sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at));
+  const history: HistoryMessage[] = [];
+  for (let i = 0; i < ordered.length - 1; i++) {
+    const question = ordered[i];
+    const answer = ordered[i + 1];
+    if (question.role !== "user" || answer.role !== "assistant") continue;
+    history.push(toHistoryMessage(question), toHistoryMessage(answer));
+    i++;
+  }
+  return [...history.slice(-MAX_HISTORY_MESSAGES), latest];
+}
+
+function toHistoryMessage(m: StoredMessage): HistoryMessage {
+  return {
+    id: m.id,
+    role: m.role as "user" | "assistant",
+    parts: [{ type: "text" as const, text: m.content }],
+  };
 }
