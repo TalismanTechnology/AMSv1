@@ -157,12 +157,13 @@ export async function POST(request: NextRequest) {
         .select("id, role, content, created_at")
         .eq("session_id", claimedSessionId)
         .order("created_at", { ascending: false })
-        // One extra: a stored copy of a retried question is dropped.
+        // One extra: a retried question's stored copy, or an assistant
+        // reply whose question fell outside the limit, is dropped.
         .limit(MAX_HISTORY_MESSAGES + 1);
       if (storedError) throw new Error(storedError.message);
       storedRows = (data ?? []) as StoredMessage[];
     }
-    const contextMessages = buildModelHistory(storedRows, lastMessage, lastMessageText);
+    const contextMessages = buildModelHistory(storedRows, lastMessage);
     // The school's approved staff contacts (migration 044), read alongside
     // retrieval and used only if nothing answers the question. Never rejects:
     // a missing table or any error is "no contacts".
@@ -367,21 +368,36 @@ export async function POST(request: NextRequest) {
     // Pre-generate the assistant message ID so we can send it to the client for feedback
     const assistantMessageId = crypto.randomUUID();
 
-    // Stream the response, save assistant message on finish
+    // Stream the response, save assistant message on finish. The next turn's
+    // model history is read from the DB, so this save must land before the
+    // parent can ask again: onFinish runs in the stream's flush, after the
+    // client already has the finish event, and an un-awaited write there is
+    // also not kept alive past the response. Awaiting it holds the stream
+    // open until the row is written; after() (registered here, in the request
+    // scope) covers a client that disconnects. Settled on every outcome so
+    // after() never waits out the function timeout.
+    let assistantSaved!: () => void;
+    inBackground(new Promise<void>((resolve) => { assistantSaved = resolve; }));
     const result = streamText({
       model: google(CHAT_MODEL_ID),
       system: answerSystemPrompt,
       messages: modelMessages,
       temperature,
       maxRetries: 5,
+      onError: ({ error }) => {
+        console.error("Chat stream error:", error);
+        assistantSaved();
+      },
+      onAbort: () => assistantSaved(),
       onFinish: async ({ text }) => {
-        if (sessionId && text.trim()) {
+        try {
+          if (!sessionId || !text.trim()) return;
           // Strip follow-up markers before saving to DB
           const cleanText = parseFollowUps(text).content;
           // Only document sources are persisted — the calendar is scanned for
           // every question but is never a citable card.
           const savedSources: ChatSource[] = sources;
-          adminSupabase
+          const { error } = await adminSupabase
             .from("chat_messages")
             .insert({
               id: assistantMessageId,
@@ -391,11 +407,16 @@ export async function POST(request: NextRequest) {
               sources: savedSources,
               school_id: schoolId,
               unanswered: sources.length === 0,
-            })
-            .then(({ error }) => { if (error) console.error("Failed to save assistant message:", error); });
+            });
+          if (error) console.error("Failed to save assistant message:", error);
+        } finally {
+          assistantSaved();
         }
       },
     });
+    // Read to the end even if the client goes away, so onFinish (and the
+    // save) always runs and the after() above always settles.
+    void result.consumeStream();
 
     // Use createUIMessageStream so we can send sources as a data part
     // alongside the streamed text (DefaultChatTransport parses these on the client)
