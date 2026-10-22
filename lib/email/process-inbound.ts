@@ -8,8 +8,13 @@ import {
   type SenderGateDecision,
 } from "@/lib/email/inbound";
 import { addDocumentDivisions } from "@/lib/documents/ingest";
-import { ingestReceivedEmail } from "@/lib/email/ingest-message";
-import type { InboundContent } from "@/lib/email/inbound-content";
+import { ingestReceivedEmail, type IngestedEmail } from "@/lib/email/ingest-message";
+import { emailBodyText, type InboundContent } from "@/lib/email/inbound-content";
+import {
+  describeDuplicates,
+  findContentDuplicates,
+  type ContentDuplicates,
+} from "@/lib/email/content-dedupe";
 
 // The one inbound-email pipeline: route to a school by address token, gate on
 // the sender allowlist, claim the message so it is ingested once, ingest, and
@@ -56,6 +61,14 @@ export interface ProcessInboundParams {
   /** Appended to every logged reason, e.g. " (manual: gmail-intake)". */
   reasonSuffix?: string;
   suppressPush?: boolean;
+  /**
+   * Also skip content already in the school's library under another
+   * Message-ID or none (lib/email/content-dedupe.ts). A message with nothing
+   * new is logged as 'duplicate' with the matched documents.
+   */
+  contentDedupe?: boolean;
+  /** Epoch ms: wait for processing until then (see ingestReceivedEmail). */
+  processingDeadline?: number;
   /** Route, gate and check for duplicates, but write nothing. */
   dryRun?: boolean;
 }
@@ -77,6 +90,8 @@ export interface ProcessInboundResult {
   gate?: SenderGateDecision;
   /** Dry run only: whether the message is already held, claimed or ingested. */
   duplicate?: boolean;
+  /** Parts already in the library (with contentDedupe). */
+  contentDuplicates?: IngestedEmail["duplicates"];
   dryRun?: boolean;
 }
 
@@ -86,13 +101,40 @@ export interface ProcessInboundDeps {
   db: () => Db;
   ingest: typeof ingestReceivedEmail;
   addDivisions: typeof addDocumentDivisions;
+  findDuplicates: typeof findContentDuplicates;
 }
 
 const defaultDeps: ProcessInboundDeps = {
   db: createAdminClient,
   ingest: ingestReceivedEmail,
   addDivisions: addDocumentDivisions,
+  findDuplicates: findContentDuplicates,
 };
+
+/** The matched parts of a content check, and whether anything new is left. */
+function contentPlan(
+  content: InboundContent,
+  found: ContentDuplicates
+): { duplicates: IngestedEmail["duplicates"]; newParts: number } {
+  const duplicates: IngestedEmail["duplicates"] = [];
+  let newParts = 0;
+  if (emailBodyText(content)) {
+    if (found.body) duplicates.push({ part: "body", match: found.body });
+    else newParts++;
+  }
+  for (const { filename, match } of found.attachments) {
+    if (match) duplicates.push({ part: filename, match });
+    else newParts++;
+  }
+  return { duplicates, newParts };
+}
+
+const duplicateIds = (duplicates: IngestedEmail["duplicates"]) => [
+  ...new Set(duplicates.map((d) => d.match.documentId)),
+];
+
+const alreadyInLibrary = (duplicates: IngestedEmail["duplicates"]) =>
+  `Already in the library: ${describeDuplicates(duplicates)}`;
 
 export async function processInboundEmail(
   params: ProcessInboundParams,
@@ -224,10 +266,27 @@ export async function processInboundEmail(
   }
 
   if (dryRun) {
+    // Past the Message-ID check: what the content check would make of it.
+    const wouldIngest = async (reason: string) => {
+      if (!params.contentDedupe) return result("accepted", reason, { duplicate: false });
+      const content = await params.loadContent();
+      const found = await deps.findDuplicates({ schoolId, subject: meta.subject, content });
+      const { duplicates, newParts } = contentPlan(content, found);
+      if (!newParts && duplicates.length) {
+        return result("duplicate", alreadyInLibrary(duplicates) + suffix, {
+          duplicate: true,
+          documentIds: duplicateIds(duplicates),
+          contentDuplicates: duplicates,
+        });
+      }
+      return result(
+        "accepted",
+        duplicates.length ? `${reason}; ${alreadyInLibrary(duplicates)}` : reason,
+        { duplicate: false, contentDuplicates: duplicates }
+      );
+    };
     if (!meta.messageId) {
-      return result("accepted", "Would ingest (no message id, so no duplicate check)", {
-        duplicate: false,
-      });
+      return wouldIngest("Would ingest (no message id, so no Message-ID duplicate check)");
     }
     const { data: holder } = await supabase
       .from("email_ingestions")
@@ -237,7 +296,7 @@ export async function processInboundEmail(
       .in("status", ["processing", "accepted", "pending_review"])
       .maybeSingle();
     if (!holder || (holder.status === "processing" && isStaleClaim(holder.created_at))) {
-      return result("accepted", "Would ingest", { duplicate: false });
+      return wouldIngest("Would ingest");
     }
     return holder.status === "accepted"
       ? result("duplicate", "Already ingested", {
@@ -292,7 +351,7 @@ export async function processInboundEmail(
   }
 
   const finish = async (
-    status: "accepted" | "error",
+    status: "accepted" | "duplicate" | "error",
     reason: string,
     ids: string[] = []
   ): Promise<string | null> => {
@@ -310,7 +369,7 @@ export async function processInboundEmail(
   // 4. Load content + attachments, ingest, tag divisions and kick off
   // processing. Partial ingests are undone inside ingestReceivedEmail.
   try {
-    const documentIds = await deps.ingest({
+    const { documentIds, duplicates } = await deps.ingest({
       schoolId,
       loadContent: params.loadContent,
       subject: meta.subject,
@@ -318,15 +377,31 @@ export async function processInboundEmail(
       divisionIds: route.divisionIds,
       origin: params.origin,
       suppressPush: params.suppressPush ?? false,
+      dedupe: params.contentDedupe ?? false,
+      processingDeadline: params.processingDeadline,
     });
+    const contentDuplicates = duplicates.length ? { contentDuplicates: duplicates } : {};
+
+    if (!documentIds.length && duplicates.length) {
+      // Nothing new: logged with the documents it duplicates.
+      const reason = alreadyInLibrary(duplicates);
+      const matched = duplicateIds(duplicates);
+      const ingestionId = await finish("duplicate", reason, matched);
+      return result("duplicate", reason + suffix, {
+        documentIds: matched,
+        ingestionId,
+        ...contentDuplicates,
+      });
+    }
 
     if (!documentIds.length) {
       const ingestionId = await finish("error", "No ingestible content found");
       return result("empty", "No ingestible content found" + suffix, { ingestionId });
     }
 
-    const ingestionId = await finish("accepted", "Ingested", documentIds);
-    return result("accepted", "Ingested" + suffix, { documentIds, ingestionId });
+    const reason = duplicates.length ? `Ingested; ${alreadyInLibrary(duplicates)}` : "Ingested";
+    const ingestionId = await finish("accepted", reason, documentIds);
+    return result("accepted", reason + suffix, { documentIds, ingestionId, ...contentDuplicates });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("[inbound-email] Ingestion failed:", message);

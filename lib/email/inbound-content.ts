@@ -1,5 +1,6 @@
 import PostalMime from "postal-mime";
 import type { Resend } from "resend";
+import { isBlockedFile } from "@/lib/documents/file-types";
 
 // Where an inbound email's content comes from. The webhook fetches it from
 // Resend by email id; a manual submission hands us the raw RFC822 message.
@@ -67,6 +68,8 @@ export interface ParsedRawEmail {
   /** The From header as "Name <addr>" (or just the address). */
   from: string | null;
   subject: string | null;
+  /** Delivered-To / X-Original-To addresses (the mailbox it was read from). */
+  deliveredTo: string[];
   content: InboundContent;
 }
 
@@ -100,10 +103,16 @@ export async function parseRawEmail(raw: Buffer): Promise<ParsedRawEmail> {
   const from = formatAddress(parsed.from as MimeAddress | undefined);
   const subject = parsed.subject ?? null;
 
+  const deliveredTo = (parsed.headers ?? [])
+    .filter((h) => h.key === "delivered-to" || h.key === "x-original-to")
+    .map((h) => h.value.trim())
+    .filter(Boolean);
+
   return {
     messageId: parsed.messageId?.trim() || null,
     from,
     subject,
+    deliveredTo: [...new Set(deliveredTo)],
     content: {
       subject,
       from,
@@ -173,4 +182,25 @@ export function applyRedactions(
   const redact = (s: string | null) =>
     s == null ? s : rules.reduce((acc, { re, replace }) => acc.replace(re, replace), s);
   return { ...content, text: redact(content.text), html: redact(content.html) };
+}
+
+/** Strip HTML tags to a plain-text fallback when no text/plain part exists. */
+export function htmlToText(html: string): string {
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** The text an email's body document is made of ("" when there is none). */
+export function emailBodyText(content: Pick<InboundContent, "text" | "html">): string {
+  return content.text?.trim() || (content.html ? htmlToText(content.html) : "");
+}
+
+/** Whether an attachment becomes its own document: not inline, not a blocked type. */
+export function isIngestibleAttachment(att: Pick<InboundAttachment, "filename" | "disposition">): boolean {
+  return att.disposition !== "inline" && !isBlockedFile(att.filename || "attachment");
 }

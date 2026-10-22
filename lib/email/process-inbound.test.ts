@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parseRawEmail, compileRedactions, applyRedactions } from "./inbound-content";
-import { suppressDocumentPushes } from "./ingest-message";
+import { suppressDocumentPushes, type IngestedEmail } from "./ingest-message";
 import {
   processInboundEmail,
   type ProcessInboundDeps,
@@ -89,7 +89,11 @@ function schoolDb(opts: {
   });
 }
 
-function deps(db: FakeDb, ingested: string[] = ["doc-1", "doc-2"]) {
+function deps(
+  db: FakeDb,
+  ingested: string[] = ["doc-1", "doc-2"],
+  duplicates: IngestedEmail["duplicates"] = []
+) {
   const calls: { ingest: Parameters<ProcessInboundDeps["ingest"]>[0][]; divisions: unknown[][] } = {
     ingest: [],
     divisions: [],
@@ -98,11 +102,12 @@ function deps(db: FakeDb, ingested: string[] = ["doc-1", "doc-2"]) {
     db: () => db as never,
     ingest: async (params) => {
       calls.ingest.push(params);
-      return ingested;
+      return { documentIds: ingested, duplicates };
     },
     addDivisions: async (docs, divisions) => {
       calls.divisions.push([docs, divisions]);
     },
+    findDuplicates: async () => assert.fail("content check not expected"),
   };
   return { d, calls };
 }

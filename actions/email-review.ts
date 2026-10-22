@@ -60,7 +60,7 @@ export async function approveHeldEmail(
 
   const emailId: string = row.email_id;
   try {
-    const documentIds = await ingestReceivedEmail({
+    const { documentIds } = await ingestReceivedEmail({
       schoolId,
       loadContent: () => fetchResendEmail(resend, emailId),
       subject: row.subject,
