@@ -8,7 +8,9 @@ export const maxDuration = 300;
 //   POST /api/inbound-email/manual
 //   Authorization: Bearer <CRON_SECRET>
 //   { "token": "ams-…", "raw": "<base64 RFC822>", "dryRun"?, "suppressPush"?,
-//     "redactions"?: [{ "pattern", "flags"?, "replace"? }], "source"? }
+//     "redactions"?: [{ "pattern", "flags"?, "replace"? }], "source"?,
+//     "sanitize"?, "forbiddenTokens"?: string[], "contentDedupe"?, "ensureFolder"? }
+// maxDuration covers waiting for processing and folder sorting (ensureFolder).
 export async function POST(request: NextRequest) {
   const { status, body } = await handleManualInbound(request, {
     secret: process.env.CRON_SECRET,

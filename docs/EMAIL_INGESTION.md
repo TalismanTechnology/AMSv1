@@ -105,10 +105,39 @@ curl -X POST "$APP_URL/api/inbound-email/manual" \
 | `suppressPush` | Default `true`: the documents are pre-marked in `document_push_queue` so parents get no push. |
 | `redactions` | `[{ "pattern", "flags"?, "replace"? }]` regex replacements applied to the text and HTML before storage (every match; default replacement `[redacted]`). |
 | `source` | Label for the log, e.g. `gmail-intake` → reason "Ingested (manual: gmail-intake)". |
+| `sanitize` | Default `true`, for mail read from a recipient's own mailbox: removes open-tracking pixels, per-recipient tracked links (eNotify `/c/` redirects; the link text is kept), unsubscribe and "view online" lines, and the recipient addresses (To, Cc, Delivered-To); `email_meta.to`/`cc` are saved empty. eNotify's `<!-- placeholder -->` text part is replaced by text from the HTML. |
+| `forbiddenTokens` | Words (case-insensitive substrings) that must never be stored. Checked after sanitizing and redactions on everything that would be saved. Any hit → **422** `{ status: "rejected_personal", tokens }`, and nothing is written, not even a Recent emails row, since the row would itself put the subject and sender in the school's log. Applies to dry runs too. |
+| `contentDedupe` | Default `true`: also skip content the school's library already has, whatever route it came by (see below). |
+| `ensureFolder` | Default `true`: process the new documents concurrently, wait for them (up to ~230 s), fail the ingest if one ends in `error` or with no chunks (its documents are removed so a retry starts clean), then file each one auto-sort left unfiled into an **existing** folder (never Website/Responses or below; only an empty `folder_id`). |
 
-Response: `{ status, documentIds, ingestionId, reason, folders? }`. `status` is
-`accepted`, `duplicate` (same Message-ID already ingested; no new documents),
-`in_progress` (409), `empty`, `error` (500) or a `rejected_*` status.
+Response: `{ status, documentIds, ingestionId, reason, folders?, ready?, contentDuplicates? }`.
+`status` is `accepted`, `duplicate` (no new documents: same Message-ID already
+ingested, or all content already in the library), `in_progress` (409),
+`empty`, `error` (500), a `rejected_*` status, or `rejected_personal` (422).
+With `ensureFolder`, `folders` lists each new document's `status`, `chunks`,
+`folderId`/`folder` and a `note` when it was left unfiled or is still
+processing, and `ready` is true when every one is `ready` with chunks. For a
+`duplicate`, `documentIds` and `folders` are the existing documents it matched.
+
+### Content duplicates
+
+The Message-ID claim only knows mail this pipeline ingested. With
+`contentDedupe` (`lib/email/content-dedupe.ts`), before anything is written:
+
+- the **body** is a duplicate of a document whose `email_meta` has the same
+  normalized subject (no `Re:`/`Fwd:`, case and punctuation ignored) on the
+  same day (or either date unknown); or whose title/file name is the subject,
+  unless that document is an email from another day (a recurring "Weekly
+  Update" is a new email each week); or whose chunks contain two distinctive
+  four-word runs of the body (catches it saved as a PDF under another title);
+- each **attachment** is a duplicate of a document whose title or file name is
+  its normalized file name.
+
+Duplicate parts are skipped. If nothing new is left, the attempt is logged as
+`duplicate` with reason `Already in the library: body = "<title>" (<why>)` and
+`document_ids` = the matched documents. Otherwise the new parts are ingested
+and the skipped ones are named in the `accepted` reason. Dry runs report the
+same (`contentDuplicates`). The webhook doesn't run this check.
 
 Differences from the webhook, because there is no Resend copy to fetch later:
 rows have no `email_id`, and when the school has **no allowed sender domains**

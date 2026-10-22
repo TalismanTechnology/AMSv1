@@ -1,6 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isBlockedFile } from "@/lib/documents/file-types";
 import {
   addDocumentDivisions,
   ingestFileAsDocument,
@@ -8,7 +7,24 @@ import {
   triggerProcessingHttp,
 } from "@/lib/documents/ingest";
 import { OUTCOMES } from "@/lib/push/document-push";
-import type { InboundContent } from "@/lib/email/inbound-content";
+import {
+  emailBodyText,
+  isIngestibleAttachment,
+  type InboundContent,
+} from "@/lib/email/inbound-content";
+import {
+  findContentDuplicates,
+  type ContentDuplicates,
+  type DuplicateMatch,
+} from "@/lib/email/content-dedupe";
+import { isProcessed, waitForProcessing } from "@/lib/email/post-process";
+
+export interface IngestedEmail {
+  /** Documents created; empty when nothing new was ingestible. */
+  documentIds: string[];
+  /** Parts skipped because the library already has them ("body" or a file name). */
+  duplicates: { part: string; match: DuplicateMatch }[];
+}
 
 /**
  * Turn one received email into documents: the body as one text document and
@@ -21,9 +37,14 @@ import type { InboundContent } from "@/lib/email/inbound-content";
  * stored by us until approved), or parsed from a raw message. It is loaded
  * inside the cleanup scope, so a failed fetch is handled like any failure.
  *
- * Returns the new document ids; an empty array means nothing was ingestible.
- * On failure, documents already created are removed and the error rethrown,
- * so a retry starts clean.
+ * With `dedupe`, the body and each attachment already in the school's
+ * library (lib/email/content-dedupe.ts) are skipped and reported instead.
+ * With `processingDeadline`, it waits for processing to finish and fails if a
+ * document ends in error or with no chunks.
+ *
+ * Returns the new document ids; an empty array means nothing new was
+ * ingestible. On failure, documents already created are removed and the
+ * error rethrown, so a retry starts clean.
  */
 export async function ingestReceivedEmail(params: {
   schoolId: string;
@@ -38,9 +59,18 @@ export async function ingestReceivedEmail(params: {
    * processing doesn't notify parents (e.g. backfilled mail).
    */
   suppressPush?: boolean;
-}): Promise<string[]> {
+  /** Skip parts already in the school's library. */
+  dedupe?: boolean;
+  /**
+   * Epoch ms. When set, process the documents concurrently and wait (until
+   * then) for them to finish; a document that fails processing fails the
+   * ingest. One still processing at the deadline is left to finish.
+   */
+  processingDeadline?: number;
+}): Promise<IngestedEmail> {
   const { schoolId, fromAddress, divisionIds, origin } = params;
   const documentIds: string[] = [];
+  const duplicates: IngestedEmail["duplicates"] = [];
   // Storage keys outside documents.file_url (the original HTML body), which
   // removeIngestedDocuments doesn't know about.
   const extraPaths: string[] = [];
@@ -48,12 +78,18 @@ export async function ingestReceivedEmail(params: {
   try {
     const subject = (params.subject ?? "").trim() || "(no subject)";
 
-    // Body as one text document.
     const email = await params.loadContent();
-    const bodyText =
-      email.text?.trim() || (email.html ? htmlToText(email.html) : "");
+    const bodyText = emailBodyText(email);
 
-    if (bodyText) {
+    // Read-only; done before anything is written.
+    const known: ContentDuplicates | null = params.dedupe
+      ? await findContentDuplicates({ schoolId, subject: params.subject, content: email })
+      : null;
+
+    // Body as one text document.
+    if (bodyText && known?.body) {
+      duplicates.push({ part: "body", match: known.body });
+    } else if (bodyText) {
       const { documentId, error } = await ingestFileAsDocument({
         schoolId,
         buffer: Buffer.from(bodyText, "utf-8"),
@@ -74,12 +110,16 @@ export async function ingestReceivedEmail(params: {
       } else console.warn(`[inbound-email] Body ingest skipped: ${error}`);
     }
 
-    // Each real attachment as its own document.
-    for (const att of email.attachments) {
+    // Each real attachment as its own document; inline images and
+    // unsupported types are skipped.
+    const attachments = email.attachments.filter(isIngestibleAttachment);
+    for (const [i, att] of attachments.entries()) {
       const filename = att.filename || "attachment";
-      // Skip inline images and unsupported image types.
-      if (att.disposition === "inline") continue;
-      if (isBlockedFile(filename)) continue;
+      const match = known?.attachments[i]?.match;
+      if (match) {
+        duplicates.push({ part: filename, match });
+        continue;
+      }
 
       const buffer = await att.load();
       if (!buffer) {
@@ -99,7 +139,7 @@ export async function ingestReceivedEmail(params: {
       else console.warn(`[inbound-email] Attachment ingest skipped: ${error}`);
     }
 
-    if (!documentIds.length) return [];
+    if (!documentIds.length) return { documentIds, duplicates };
 
     // Mark the documents with the divisions whose addresses the mail
     // reached. Done before processing so auto-sort can use it.
@@ -108,11 +148,24 @@ export async function ingestReceivedEmail(params: {
     // Before processing, which is what queues the push.
     if (params.suppressPush) await suppressDocumentPushes(schoolId, documentIds);
 
-    for (const id of documentIds) {
-      await triggerProcessingHttp(id, origin);
+    if (params.processingDeadline === undefined) {
+      for (const id of documentIds) {
+        await triggerProcessingHttp(id, origin);
+      }
+      return { documentIds, duplicates };
     }
 
-    return documentIds;
+    await Promise.all(documentIds.map((id) => triggerProcessingHttp(id, origin)));
+    const states = await waitForProcessing(documentIds, params.processingDeadline);
+    const failed = states.filter((s) => s.status !== "processing" && !isProcessed(s));
+    if (failed.length) {
+      throw new Error(
+        `Processing failed: ${failed
+          .map((s) => `${s.documentId} status=${s.status} chunks=${s.chunks}${s.error ? ` (${s.error})` : ""}`)
+          .join("; ")}`
+      );
+    }
+    return { documentIds, duplicates };
   } catch (err) {
     // Undo the partial ingest so a retry starts clean.
     await removeIngestedDocuments(documentIds);
@@ -202,15 +255,4 @@ async function saveEmailSourceMeta(params: {
     console.warn("[inbound-email] Saving email source failed:", err);
   }
   return htmlPath;
-}
-
-/** Strip HTML tags to a plain-text fallback when no text/plain part exists. */
-export function htmlToText(html: string): string {
-  return html
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/\s+/g, " ")
-    .trim();
 }
