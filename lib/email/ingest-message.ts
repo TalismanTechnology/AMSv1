@@ -4,6 +4,7 @@ import {
   addDocumentDivisions,
   ingestFileAsDocument,
   removeIngestedDocuments,
+  processDocumentInProcess,
   triggerProcessingHttp,
 } from "@/lib/documents/ingest";
 import { OUTCOMES } from "@/lib/push/document-push";
@@ -13,6 +14,7 @@ import {
   type InboundContent,
 } from "@/lib/email/inbound-content";
 import {
+  bodyHash,
   findContentDuplicates,
   type ContentDuplicates,
   type DuplicateMatch,
@@ -67,6 +69,11 @@ export async function ingestReceivedEmail(params: {
    * ingest. One still processing at the deadline is left to finish.
    */
   processingDeadline?: number;
+  /**
+   * Run processDocument here and await it instead of calling
+   * /api/process-document (which needs PROCESS_DOCUMENT_SECRET).
+   */
+  processInline?: boolean;
 }): Promise<IngestedEmail> {
   const { schoolId, fromAddress, divisionIds, origin } = params;
   const documentIds: string[] = [];
@@ -105,6 +112,7 @@ export async function ingestReceivedEmail(params: {
           documentId,
           subject,
           email,
+          bodyText,
         });
         if (htmlPath) extraPaths.push(htmlPath);
       } else console.warn(`[inbound-email] Body ingest skipped: ${error}`);
@@ -148,14 +156,17 @@ export async function ingestReceivedEmail(params: {
     // Before processing, which is what queues the push.
     if (params.suppressPush) await suppressDocumentPushes(schoolId, documentIds);
 
+    const processOne = params.processInline
+      ? processDocumentInProcess
+      : (id: string) => triggerProcessingHttp(id, origin);
     if (params.processingDeadline === undefined) {
       for (const id of documentIds) {
-        await triggerProcessingHttp(id, origin);
+        await processOne(id);
       }
       return { documentIds, duplicates };
     }
 
-    await Promise.all(documentIds.map((id) => triggerProcessingHttp(id, origin)));
+    await Promise.all(documentIds.map(processOne));
     const states = await waitForProcessing(documentIds, params.processingDeadline);
     const failed = states.filter((s) => s.status !== "processing" && !isProcessed(s));
     if (failed.length) {
@@ -218,8 +229,9 @@ async function saveEmailSourceMeta(params: {
   documentId: string;
   subject: string;
   email: InboundContent;
+  bodyText: string;
 }): Promise<string | null> {
-  const { schoolId, documentId, subject, email } = params;
+  const { schoolId, documentId, subject, email, bodyText } = params;
   let htmlPath: string | null = null;
 
   try {
@@ -247,6 +259,8 @@ async function saveEmailSourceMeta(params: {
           date: email.date || null,
           subject: email.subject?.trim() || subject,
           html_path: htmlPath,
+          // For the content duplicate check (lib/email/content-dedupe.ts).
+          body_hash_v1: bodyHash(bodyText),
         },
       })
       .eq("id", documentId);

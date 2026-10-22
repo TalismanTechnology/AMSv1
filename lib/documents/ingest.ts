@@ -132,6 +132,22 @@ export async function removeIngestedDocuments(ids: string[]): Promise<void> {
 }
 
 /**
+ * Process a document in this process, as /api/process-document does in
+ * production, and wait for it. For callers that can't reach that route (the
+ * manual intake runs where PROCESS_DOCUMENT_SECRET isn't available). A
+ * failure is logged, not thrown: processDocument has already marked the
+ * document as errored, which the caller reads back.
+ */
+export async function processDocumentInProcess(documentId: string): Promise<void> {
+  try {
+    const { processDocument } = await import("@/lib/documents/processor");
+    await processDocument(documentId);
+  } catch (err) {
+    console.error(`[ingest] Processing ${documentId} failed:`, err);
+  }
+}
+
+/**
  * Kick off async processing for an ingested document by calling the internal
  * process-document route, which handles the dev (child process) vs prod
  * (inline) split. Fire-and-forget: failures are logged, not thrown.

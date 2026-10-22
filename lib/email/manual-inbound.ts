@@ -41,7 +41,9 @@ import {
 //     (contentDedupe), the body is sanitized for having been read from a
 //     recipient's mailbox (sanitize), and the request waits for processing
 //     and makes sure each new document is in a folder (ensureFolder), so the
-//     caller can confirm the result from the response alone.
+//     caller can confirm the result from the response alone;
+//   - documents are processed in this process (processDocument), awaited,
+//     rather than through /api/process-document.
 //
 // forbiddenTokens: a message whose stored content would contain any of them
 // is refused with 422 { status: "rejected_personal" } and nothing is written,
@@ -68,7 +70,10 @@ export interface ManualInboundBody {
   sanitize?: boolean;
   /** Case-insensitive words that must not be stored; any hit refuses the message (422). */
   forbiddenTokens?: string[];
-  /** Default true: skip content the school's library already has. */
+  /**
+   * Default true: skip content the school's library already has
+   * (lib/email/content-dedupe.ts; the webhook runs the same check).
+   */
   contentDedupe?: boolean;
   /**
    * Default true: wait for processing, then file each new document into an
@@ -226,6 +231,8 @@ export async function handleManualInbound(
         suppressPush: input.suppressPush !== false,
         contentDedupe: input.contentDedupe !== false,
         processingDeadline: ensureFolder ? started + PROCESSING_BUDGET_MS : undefined,
+        // Here, not over HTTP: the intake box has no PROCESS_DOCUMENT_SECRET.
+        processInline: true,
         dryRun,
       },
       deps.processDeps
@@ -340,8 +347,8 @@ async function finalizeDocuments(
 }
 
 /**
- * The library folder each new document was sorted into. Processing runs
- * inline in production, so auto-sort has usually finished by now; a document
+ * The library folder each new document was sorted into. Processing was
+ * awaited in-process, so auto-sort has usually finished by now; a document
  * still processing reports no folder. Best-effort: never throws.
  */
 async function lookupFolders(documentIds: string[]): Promise<DocumentFolder[]> {

@@ -89,6 +89,9 @@ export async function POST(request: NextRequest) {
     loadContent: () => fetchResendEmail(resend, data.email_id),
     origin: process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin,
     onReview: "hold",
+    // The same content check as manual submissions: a native copy of mail
+    // already added another way is logged as a duplicate of it.
+    contentDedupe: true,
   });
 
   const body = outcome.error

@@ -21,8 +21,8 @@ const POLL_MS = 2000;
 
 /**
  * Wait until none of the documents is still processing, or the deadline
- * (epoch ms) passes. In production triggerProcessingHttp already waits for
- * the process-document function, so this usually returns on the first read.
+ * (epoch ms) passes. Ingestion has already awaited processing (in-process,
+ * or the process-document function), so this usually returns on the first read.
  */
 export async function waitForProcessing(
   documentIds: string[],

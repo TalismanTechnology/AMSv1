@@ -2,12 +2,13 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { InboundContent } from "./inbound-content";
 import {
-  bodyProbes,
+  bodyHash,
+  bodyOverlap,
   findContentDuplicates,
   matchAttachment,
-  matchBodyByChunks,
-  matchBodyByMeta,
+  matchBody,
   normalizeTitle,
+  subjectKey,
   type ExistingDoc,
 } from "./content-dedupe";
 import {
@@ -55,7 +56,7 @@ class FakeDb {
           .then(() => handler(op))
           .then(resolve, reject),
     };
-    for (const name of ["select", "eq", "in", "is", "neq", "ilike", "limit", "order", "range", "single", "maybeSingle"]) {
+    for (const name of ["select", "eq", "in", "is", "neq", "ilike", "gte", "lte", "or", "limit", "order", "range", "single", "maybeSingle"]) {
       builder[name] = chain(name);
     }
     return builder;
@@ -89,101 +90,215 @@ const doc = (over: Partial<ExistingDoc>): ExistingDoc => ({
   ...over,
 });
 
-test("normalizeTitle drops Re:/Fwd:, extensions and punctuation", () => {
+// Two weekly digests: the calendar section (most of the lines) carries over
+// from week to week, the news at the top is new.
+const CALENDAR = [
+  "Upcoming Events",
+  "Mon Oct 27 - Varsity Soccer vs. St. Christopher's, 4:30 PM, Main Field",
+  "Tue Oct 28 - Middle School Picture Retakes, 8:00 AM, Gym",
+  "Wed Oct 29 - Upper School Parent Coffee, 8:15 AM, Library",
+  "Thu Oct 30 - Fall Play Opening Night, 7:00 PM, Oates Theater",
+  "Fri Oct 31 - Halloween Parade, Lower School, 2:00 PM",
+  "Sat Nov 1 - SAT Testing, 7:45 AM, Upper School",
+  "Mon Nov 3 - Board of Trustees Meeting, 6:00 PM",
+  "Tue Nov 4 - Election Day, No Classes",
+  "Thu Nov 6 - Lower School Book Fair, all day, Commons",
+  "Fri Nov 7 - Grandparents Day, 9:00 AM",
+];
+const digest = (news: string[], calendarLines: string[]) =>
+  [
+    "View this email in your browser: https://collegiate.myenotice.com/v/abc",
+    ...news,
+    ...calendarLines,
+    "You are receiving this because you are on the Parents list. Unsubscribe: https://x.example/u/1",
+  ].join("\n");
+const OCT15 = digest(
+  [
+    "Weekly Digest - October 15",
+    "Homecoming recap: thanks to the 400 families who joined us on the Quad for the bonfire.",
+    "Flu shot clinic sign-ups close Friday; forms are in the nurse's office.",
+    "The robotics team placed second at regionals and heads to state in December.",
+    "Reminder that Upper School exam schedules are posted on the portal.",
+  ],
+  CALENDAR.slice(0, 8)
+);
+const OCT22 = digest(
+  [
+    "Weekly Digest - October 22",
+    "Fall conferences are next week; book a slot with each advisor by Monday.",
+    "Lost and found will be donated on November 1, so check the bins by the gym.",
+    "Congratulations to the cross country team on the conference title.",
+  ],
+  CALENDAR.slice(2)
+);
+const OCT15_DOC = doc({
+  id: "oct15",
+  title: "Weekly Digest - October 15",
+  email_meta: { subject: "Weekly Digest - October 15", date: "2026-10-15T12:00:00Z" },
+});
+
+test("subjectKey keeps prefixes; normalizeTitle drops Re:/Fwd: and extensions", () => {
+  assert.equal(subjectKey("  Weekly Digest — October 22! "), "weekly digest october 22");
+  assert.notEqual(subjectKey("Reminder: Curriculum Night"), subjectKey("Curriculum Night"));
+  assert.notEqual(subjectKey("Fwd: Curriculum Night"), subjectKey("Curriculum Night"));
   assert.equal(normalizeTitle("Fwd: Curriculum Night — Schedule.pdf"), "curriculum night schedule");
   assert.equal(normalizeTitle("RE: Bus_Update.docx"), "bus update");
   assert.equal(normalizeTitle(null), "");
 });
 
-test("matchBodyByMeta: same email subject+date, or same title", () => {
-  const docs = [
-    doc({ id: "e1", title: "Curriculum Night", email_meta: { subject: "Curriculum Night", date: "2026-10-19T09:00:00Z" } }),
-    doc({ id: "p1", title: "Bus Update", file_name: "bus_update.pdf" }),
-  ];
-  assert.deepEqual(matchBodyByMeta(docs, { subject: "Re: curriculum night", date: "2026-10-19T20:00:00Z" }), {
-    documentId: "e1",
-    title: "Curriculum Night",
-    why: "same email subject and date",
-  });
-  assert.equal(matchBodyByMeta(docs, { subject: "Bus update", date: null })?.documentId, "p1");
-  assert.equal(matchBodyByMeta(docs, { subject: "Something else", date: null }), null);
-  assert.equal(matchBodyByMeta(docs, { subject: "", date: null }), null);
+test("bodyHash ignores case, spacing, URLs, addresses and unsubscribe/view-online lines", () => {
+  const a = "View online: https://x.myenotice.com/v/1\nCurriculum Night is THIS Thursday at 6:30.\nSent to parent.person@gmail.com\nUnsubscribe";
+  const b = "Curriculum night is this  Thursday at 6:30!\n\nhttps://collegiate.org/calendar";
+  assert.equal(bodyHash(a), bodyHash(b));
+  assert.notEqual(bodyHash(a), bodyHash("Curriculum Night is this Friday at 6:30."));
+  assert.equal(bodyHash("hi"), null, "too short to compare");
 });
 
-test("matchBodyByMeta: a recurring subject on another day is a new email", () => {
-  const docs = [doc({ id: "w1", title: "Weekly Update", email_meta: { subject: "Weekly Update", date: "2026-10-12T12:00:00Z" } })];
-  assert.equal(matchBodyByMeta(docs, { subject: "Weekly Update", date: "2026-10-19T12:00:00Z" }), null);
-  // An undated copy can't be told apart, so it still matches.
-  assert.equal(matchBodyByMeta(docs, { subject: "Weekly Update", date: null })?.documentId, "w1");
+test("regression: Weekly Digest Oct 22 is not a duplicate of Oct 15 despite the shared calendar", () => {
+  const { jaccard, containment } = bodyOverlap(OCT22, OCT15);
+  assert.ok(jaccard < 0.9 && containment < 0.95, `overlap ${jaccard} / ${containment}`);
+  assert.ok(containment > 0.3, "the fixtures really do share most of the calendar");
+  assert.equal(
+    matchBody([{ doc: OCT15_DOC, text: OCT15 }], {
+      subject: "Weekly Digest - October 22",
+      date: "2026-10-22T12:00:00Z",
+      text: OCT22,
+    }),
+    null
+  );
 });
 
-test("matchAttachment matches title or file name", () => {
-  const docs = [doc({ id: "a1", title: "Permission Slip", file_name: "permission_slip.pdf" })];
-  assert.equal(matchAttachment(docs, "Permission Slip.pdf")?.documentId, "a1");
-  assert.equal(matchAttachment(docs, "permission_slip.PDF")?.documentId, "a1");
-  assert.equal(matchAttachment(docs, "Other.pdf"), null);
+test("an exact resend under a new Message-ID (other subject line, other day) is a duplicate", () => {
+  const resent = OCT15.replace("https://collegiate.myenotice.com/v/abc", "https://collegiate.myenotice.com/v/zzz");
+  assert.deepEqual(
+    matchBody([{ doc: OCT15_DOC, text: OCT15 }], { subject: "Fwd: Weekly Digest", date: "2026-10-20T08:00:00Z", text: resent }),
+    { documentId: "oct15", title: "Weekly Digest - October 15", why: "same body text" }
+  );
+  // A stored hash is used without the text.
+  const hashed = doc({ ...OCT15_DOC, email_meta: { ...OCT15_DOC.email_meta, body_hash_v1: bodyHash(OCT15) } });
+  assert.equal(matchBody([{ doc: hashed, text: null }], { subject: "x", date: null, text: OCT15 })?.documentId, "oct15");
 });
 
-const LONG_BODY = Array.from({ length: 60 }, (_, i) => `word${"abcdefghij"[i % 10]}${"klmnopqrst"[Math.floor(i / 10)]}`)
-  .map((w) => w.replace(/\d/g, ""))
-  .join(" ");
-
-test("bodyProbes needs 30 words of 4+ letters and takes runs at 30% and 60%", () => {
-  assert.equal(bodyProbes("too short to fingerprint"), null);
-  const probes = bodyProbes(LONG_BODY);
-  assert.ok(probes);
-  const words = LONG_BODY.split(" ");
-  assert.deepEqual(probes[0], words.slice(18, 22));
-  assert.deepEqual(probes[1], words.slice(36, 40));
+test('"Reminder: X" with different text is not a duplicate of "X", even on the same day', () => {
+  const x = doc({ id: "x", title: "Curriculum Night", email_meta: { subject: "Curriculum Night", date: "2026-10-19T09:00:00Z" } });
+  const original = "Curriculum Night is Thursday at 6:30 in the theater. Meet your child's teachers and hear about the year.";
+  const reminder = "Don't forget: Curriculum Night is tonight. Parking is in the North lot; the theater doors open at 6.";
+  assert.equal(
+    matchBody([{ doc: x, text: original }], { subject: "Reminder: Curriculum Night", date: "2026-10-19T15:00:00Z", text: reminder }),
+    null
+  );
 });
 
-test("matchBodyByChunks needs both probes to agree in one document", async () => {
-  const both = new FakeDb((op) => {
-    if (arg(op, "eq")) return ok([{ document_id: "c1" }, { document_id: "c2" }]);
-    assert.deepEqual(arg(op, "in"), ["in", "document_id", ["c1", "c2"]]);
-    return ok([{ document_id: "c2" }]);
-  });
-  const hit = await matchBodyByChunks(both as never, "s1", LONG_BODY, [doc({ id: "c2", title: "Newsletter.pdf" })]);
-  assert.deepEqual(hit, { documentId: "c2", title: "Newsletter.pdf", why: "same body text already indexed" });
-  const pattern = String(arg(both.ops[0], "ilike")?.[2]);
-  assert.match(pattern, /^%[A-Za-z]+%[A-Za-z]+%[A-Za-z]+%[A-Za-z]+%$/);
+test("same subject: >= 0.9 overlap or the same day is a duplicate; otherwise new", () => {
+  const prior = doc({ id: "w1", title: "Weekly Update", email_meta: { subject: "Weekly Update", date: "2026-10-12T12:00:00Z" } });
+  const near = OCT15 + "\nP.S. Picture day photos are online.";
+  const hit = matchBody([{ doc: prior, text: OCT15 }], { subject: "weekly update", date: "2026-10-19T12:00:00Z", text: near });
+  assert.equal(hit?.documentId, "w1");
+  assert.match(hit!.why, /^same subject, \d+% same text$/);
 
-  const one = new FakeDb((op) => ok(arg(op, "eq") ? [{ document_id: "c1" }] : []));
-  assert.equal(await matchBodyByChunks(one as never, "s1", LONG_BODY, []), null);
-
-  const failing = new FakeDb(() => ({ data: null, error: { message: "statement timeout" } }));
-  assert.equal(await matchBodyByChunks(failing as never, "s1", LONG_BODY, []), null, "fails open");
+  // A recurring subject with new content on another day is new.
+  assert.equal(matchBody([{ doc: prior, text: OCT15 }], { subject: "Weekly Update", date: "2026-10-19T12:00:00Z", text: OCT22 }), null);
+  // Same subject and same day (e.g. the Gmail copy and the native copy, reformatted).
+  assert.equal(
+    matchBody([{ doc: prior, text: null }], { subject: "Weekly Update", date: "2026-10-12T18:00:00Z", text: OCT22 })?.why,
+    "same subject and date"
+  );
+  // An undated message can't be matched on the date alone.
+  assert.equal(matchBody([{ doc: prior, text: null }], { subject: "Weekly Update", date: null, text: OCT22 }), null);
 });
 
-test("findContentDuplicates pages through documents and checks each ingestible attachment", async () => {
-  const page1 = Array.from({ length: 1000 }, (_, i) => doc({ id: `x${i}`, title: `Doc ${i}` }));
-  const db = new FakeDb((op) => {
-    if (op.table === "documents") {
-      const [, from] = arg(op, "range") as [string, number, number];
-      return ok(from === 0 ? page1 : [doc({ id: "slip", title: "Permission Slip" })]);
-    }
-    return ok([]);
-  });
-  const att = (filename: string, disposition = "attachment") => ({
-    filename,
-    contentType: "application/pdf",
-    disposition,
-    load: async () => Buffer.from("x"),
+/** FakeDb with a storage bucket of path -> contents. */
+function dbWithFiles(handler: (op: Op) => Reply, files: Record<string, string>) {
+  const db = new FakeDb(handler) as FakeDb & { storage: unknown; downloads: string[] };
+  db.downloads = [];
+  db.storage = {
+    from: () => ({
+      download: async (path: string) => {
+        db.downloads.push(path);
+        const f = files[path];
+        return f === undefined ? { data: null, error: { message: "not found" } } : { data: new Blob([f]), error: null };
+      },
+    }),
+  };
+  return db;
+}
+
+const att = (filename: string, bytes: string, disposition = "attachment") => ({
+  filename,
+  contentType: "application/pdf",
+  disposition,
+  load: async () => Buffer.from(bytes),
+});
+
+test("findContentDuplicates: bounded email candidates, stored text compared, digests kept apart", async () => {
+  const oct15 = { ...OCT15_DOC, file_url: "s1/email/oct15.txt", created_at: "2026-10-15T12:05:00Z" };
+  const db = dbWithFiles((op) => (op.table === "documents" ? ok([oct15]) : ok([])), { "s1/email/oct15.txt": OCT15 });
+
+  const found = await findContentDuplicates(
+    { schoolId: "s1", subject: "Weekly Digest - October 22", content: content({ subject: "Weekly Digest - October 22", date: "2026-10-22T12:00:00Z", text: OCT22 }) },
+    db as never
+  );
+  assert.equal(found.body, null);
+  const queries = db.ops.filter((o) => o.table === "documents");
+  assert.equal(queries.length, 3);
+  for (const q of queries) {
+    assert.deepEqual(q.calls.filter((c) => c[0] === "eq"), [["eq", "school_id", "s1"], ["eq", "source", "email"]]);
+    assert.ok(arg(q, "limit"));
+  }
+  assert.deepEqual(arg(queries[0], "gte"), ["gte", "created_at", "2026-08-23T12:00:00.000Z"]);
+  assert.deepEqual(arg(queries[2], "ilike"), ["ilike", "email_meta->>subject", "%weekly%digest%october%22%"]);
+  assert.deepEqual(db.downloads, ["s1/email/oct15.txt"]);
+
+  const again = await findContentDuplicates(
+    { schoolId: "s1", subject: "Weekly Digest - October 15", content: content({ subject: "Weekly Digest - October 15", date: "2026-10-15T12:00:00Z", text: OCT15 }) },
+    db as never
+  );
+  assert.equal(again.body?.documentId, "oct15");
+});
+
+test("attachments: duplicate only with the same name AND the same bytes", async () => {
+  const slip = doc({ id: "slip", title: "Permission Slip", file_name: "Permission_Slip.pdf", file_url: "s1/email/slip.pdf" });
+  const db = dbWithFiles((op) => (op.table === "documents" ? ok(arg(op, "or") ? [slip] : []) : ok([])), {
+    "s1/email/slip.pdf": "%PDF same bytes",
   });
   const found = await findContentDuplicates(
     {
       schoolId: "s1",
-      subject: "Curriculum Night",
-      content: content({ attachments: [att("Permission Slip.pdf"), att("logo.png", "inline"), att("New.pdf")] }),
+      subject: "Field trip",
+      content: content({
+        text: null,
+        attachments: [att("Permission Slip.pdf", "%PDF same bytes"), att("logo.png", "x", "inline"), att("permission_slip.PDF", "%PDF new version")],
+      }),
     },
     db as never
   );
-  assert.equal(db.ops.filter((o) => o.table === "documents").length, 2);
-  assert.equal(found.body, null);
   assert.deepEqual(
-    found.attachments.map((a) => [a.filename, a.match?.documentId ?? null]),
-    [["Permission Slip.pdf", "slip"], ["New.pdf", null]]
+    found.attachments.map((a) => [a.filename, a.match?.documentId ?? null, a.match?.why ?? null]),
+    [["Permission Slip.pdf", "slip", "same file name and content"], ["permission_slip.PDF", null, null]]
   );
+  assert.equal(String(arg(db.ops[0], "or")?.[1]), "title.ilike.%permission%slip%,file_name.ilike.%permission%slip%");
+
+  // Same bytes under another name is not matched by name, and isn't looked up.
+  const other = dbWithFiles(() => ok([]), {});
+  assert.equal((await matchAttachment(other as never, "s1", att("Other.pdf", "%PDF same bytes"))), null);
+  assert.equal(other.downloads.length, 0);
+});
+
+test("findContentDuplicates fails on an unreadable document list; an unreadable stored text is no match", async () => {
+  const failing = dbWithFiles(() => ({ data: null, error: { message: "timeout" } }), {});
+  await assert.rejects(
+    findContentDuplicates({ schoolId: "s1", subject: "x", content: content({ text: OCT15 }) }, failing as never),
+    /Duplicate check failed: timeout/
+  );
+  const missing = dbWithFiles(
+    (op) => ok(op.table === "documents" ? [{ ...OCT15_DOC, file_url: "gone.txt" }] : []),
+    {}
+  );
+  const found = await findContentDuplicates(
+    { schoolId: "s1", subject: "x", content: content({ subject: "Something else", date: "2026-10-16T00:00:00Z", text: OCT15 }) },
+    missing as never
+  );
+  assert.equal(found.body, null);
 });
 
 // ── Sanitizing ────────────────────────────────────────────────────────
@@ -363,6 +478,42 @@ test("content already in the library settles the claim as duplicate with the mat
   });
 });
 
+test("webhook: a native copy of content already added adds its divisions to the matched docs", async () => {
+  const db = new FakeDb((op) => {
+    if (op.table === "email_ingestion_addresses") return ok([{ token: "ams-ls", school_id: "s1", division_id: "lower" }]);
+    if (op.table === "schools") return ok({ id: "s1", email_ingestion_enabled: true, allowed_sender_domains: ["collegiateschool.org"] });
+    if (op.action === "insert") return ok({ id: "row-processing" });
+    return ok(null);
+  });
+  const added: [string[], string[]][] = [];
+  const { d, calls } = pipelineDeps(db, { documentIds: [], duplicates: [{ part: "body", match: MATCH }] });
+  d.addDivisions = async (docs, divs) => void added.push([docs, divs]);
+  const r = await processInboundEmail(
+    params({
+      routing: { recipients: ["ams-ls@in.example"], inboundDomain: "in.example" },
+      meta: { emailId: "re_1", messageId: "<native@x>", from: "office@collegiateschool.org", subject: "Curriculum Night" },
+      onReview: "hold",
+      reasonSuffix: undefined,
+    }),
+    d
+  );
+  assert.equal(calls[0].dedupe, true);
+  assert.equal(calls[0].processInline, undefined, "the webhook keeps the HTTP trigger");
+  assert.equal(r.status, "duplicate");
+  assert.equal(r.httpStatus, 200);
+  assert.deepEqual(added, [[["old-1"], ["lower"]]]);
+
+  // A failure to tag answers 500 so Resend retries.
+  d.addDivisions = async () => {
+    throw new Error("db down");
+  };
+  const failed = await processInboundEmail(
+    params({ routing: { recipients: ["ams-ls@in.example"], inboundDomain: "in.example" }, onReview: "hold" }),
+    d
+  );
+  assert.equal(failed.httpStatus, 500);
+});
+
 test("new parts are ingested and the skipped duplicates named in the reason", async () => {
   const db = schoolDb();
   const slip = { documentId: "old-2", title: "Permission Slip", why: "same title" };
@@ -468,6 +619,7 @@ test("manual: sanitizes, content-checks, waits for processing and files by defau
 
   const ingest = m.calls[0];
   assert.equal(ingest.dedupe, true);
+  assert.equal(ingest.processInline, true, "processed here, no PROCESS_DOCUMENT_SECRET needed");
   assert.ok(ingest.processingDeadline! >= before + 200_000 && ingest.processingDeadline! <= Date.now() + 240_000);
   assert.equal(m.finalized[0][1], ingest.processingDeadline);
   const stored = await ingest.loadContent();

@@ -64,11 +64,14 @@ export interface ProcessInboundParams {
   /**
    * Also skip content already in the school's library under another
    * Message-ID or none (lib/email/content-dedupe.ts). A message with nothing
-   * new is logged as 'duplicate' with the matched documents.
+   * new is logged as 'duplicate' with the matched documents, which get the
+   * divisions this copy reached.
    */
   contentDedupe?: boolean;
   /** Epoch ms: wait for processing until then (see ingestReceivedEmail). */
   processingDeadline?: number;
+  /** Process the documents in this process instead of via /api/process-document. */
+  processInline?: boolean;
   /** Route, gate and check for duplicates, but write nothing. */
   dryRun?: boolean;
 }
@@ -379,8 +382,16 @@ export async function processInboundEmail(
       suppressPush: params.suppressPush ?? false,
       dedupe: params.contentDedupe ?? false,
       processingDeadline: params.processingDeadline,
+      processInline: params.processInline,
     });
     const contentDuplicates = duplicates.length ? { contentDuplicates: duplicates } : {};
+
+    // Like a second delivery of the same Message-ID: the copy already in the
+    // library is also for the divisions this one reached. Throws into the
+    // catch below, so the webhook answers 500 and Resend retries.
+    if (duplicates.length && route.divisionIds.length) {
+      await deps.addDivisions(duplicateIds(duplicates), route.divisionIds);
+    }
 
     if (!documentIds.length && duplicates.length) {
       // Nothing new: logged with the documents it duplicates.
