@@ -41,6 +41,7 @@ import { toast } from "sonner";
 import type { Document, EventCalendar } from "@/lib/types";
 import { TimeAgo } from "@/components/ui/time-ago";
 import { calendarColorClasses } from "@/lib/event-calendars";
+import { stripMarkdown } from "@/lib/markdown/normalize";
 
 function EmailedBadge() {
   return (
@@ -97,7 +98,7 @@ function DocumentSummary({ summary }: { summary: string }) {
         ref={ref}
         className={`whitespace-normal text-xs text-muted-foreground/80 ${expanded ? "" : "line-clamp-2"}`}
       >
-        {summary}
+        {stripMarkdown(summary, { singleLine: true })}
       </p>
       {(truncated || expanded) && (
         <button

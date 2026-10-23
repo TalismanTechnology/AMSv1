@@ -1,3 +1,5 @@
+import { stripMarkdown } from "@/lib/markdown/normalize";
+
 const FOLLOW_UP_MARKER = "---FOLLOW_UPS---";
 
 interface ParsedContent {
@@ -16,7 +18,10 @@ export function parseFollowUps(rawContent: string): ParsedContent {
 
   const followUps = followUpBlock
     .split("\n")
-    .map((line) => line.replace(/^\d+[\.\)]\s*/, "").trim())
+    // Chips are plain text and become the parent's next question.
+    .map((line) =>
+      stripMarkdown(line.replace(/^\s*(?:\d+[.)]|[-*•])\s*/, ""), { singleLine: true })
+    )
     .filter((line) => line.length > 0)
     .slice(0, 3);
 

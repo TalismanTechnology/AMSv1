@@ -1,6 +1,7 @@
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
 import type { QuestionCluster } from "./clustering";
+import { stripMarkdown } from "@/lib/markdown/normalize";
 
 /**
  * Generate human-friendly topic labels for question clusters.
@@ -44,7 +45,8 @@ Respond with one label per line, in order. Just the labels, no numbering or extr
   const labels = text
     .trim()
     .split("\n")
-    .map((l) => l.trim())
+    // Labels are shown and emailed as plain text.
+    .map((l) => stripMarkdown(l.replace(/^\s*(?:\d+[.)]|[-*•])\s+/, ""), { singleLine: true }))
     .filter(Boolean);
 
   let labelIdx = 0;

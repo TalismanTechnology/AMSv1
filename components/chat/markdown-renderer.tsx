@@ -2,9 +2,11 @@
 
 import { Children, Fragment, useEffect, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { type Options } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ChatSource } from "@/lib/types";
+import { prepareMarkdown } from "@/lib/markdown/normalize";
+import { remarkRepairEmphasis } from "@/lib/markdown/remark-repair-emphasis";
 
 interface MarkdownRendererProps {
   content: string;
@@ -12,7 +14,15 @@ interface MarkdownRendererProps {
   onSourceClick?: (source: ChatSource) => void;
   messageId?: string;
   skipCitationAnimation?: boolean;
+  /** The answer is still arriving: hide/close its unfinished markdown. */
+  streaming?: boolean;
 }
+
+// Single ~ is everyday text ("~5 minutes"), not strikethrough.
+const REMARK_PLUGINS: Options["remarkPlugins"] = [
+  [remarkGfm, { singleTilde: false }],
+  remarkRepairEmphasis,
+];
 
 const CITATION_RE = /\[(\d+)\]/g;
 
@@ -132,9 +142,9 @@ export function MarkdownRenderer({
   onSourceClick,
   messageId,
   skipCitationAnimation,
+  streaming,
 }: MarkdownRendererProps) {
-  // Also strip the older `[Source N]` form in case any cached responses include it
-  const processedContent = content.replace(/\[Source\s+(\d+)\]/gi, "[$1]");
+  const processedContent = prepareMarkdown(content, { streaming });
   const withCites = (children: ReactNode) =>
     renderWithCitations(
       children,
@@ -146,7 +156,7 @@ export function MarkdownRenderer({
 
   return (
     <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
+      remarkPlugins={REMARK_PLUGINS}
       components={{
         p: ({ children }) => (
           <p className="mb-2 last:mb-0">{withCites(children)}</p>
@@ -189,13 +199,13 @@ export function MarkdownRenderer({
           );
         },
         h1: ({ children }) => (
-          <h1 className="text-lg font-bold mb-2 mt-3">{children}</h1>
+          <h1 className="text-lg font-bold mb-2 mt-3">{withCites(children)}</h1>
         ),
         h2: ({ children }) => (
-          <h2 className="text-base font-bold mb-2 mt-3">{children}</h2>
+          <h2 className="text-base font-bold mb-2 mt-3">{withCites(children)}</h2>
         ),
         h3: ({ children }) => (
-          <h3 className="text-sm font-bold mb-1 mt-2">{children}</h3>
+          <h3 className="text-sm font-bold mb-1 mt-2">{withCites(children)}</h3>
         ),
         blockquote: ({ children }) => (
           <blockquote className="border-l-2 border-primary/30 pl-3 italic text-muted-foreground mb-2">
@@ -211,7 +221,7 @@ export function MarkdownRenderer({
         ),
         th: ({ children }) => (
           <th className="border border-border px-2 py-1 bg-muted font-medium text-left">
-            {children}
+            {withCites(children)}
           </th>
         ),
         td: ({ children }) => (

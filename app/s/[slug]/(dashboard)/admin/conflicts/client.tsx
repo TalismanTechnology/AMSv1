@@ -28,6 +28,7 @@ import {
 import type { HighlightedExcerpt } from "@/lib/conflicts/quotes";
 import { isRunActive, type ScanRunSummary } from "@/lib/conflicts/runs";
 import { cn } from "@/lib/utils";
+import { stripMarkdown } from "@/lib/markdown/normalize";
 
 const DocumentViewer = dynamic(
   () => import("@/components/shared/document-viewer").then((m) => m.DocumentViewer),
@@ -271,9 +272,9 @@ function ConflictCard({
     <div className="rounded-lg border border-border bg-card p-4 sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0 space-y-1">
-          <p className="text-sm font-medium text-ink">{conflict.topic || "Conflicting documents"}</p>
+          <p className="text-sm font-medium text-ink">{stripMarkdown(conflict.topic, { singleLine: true }) || "Conflicting documents"}</p>
           {conflict.description && (
-            <p className="text-sm text-ink-soft">{conflict.description}</p>
+            <p className="text-sm text-ink-soft">{stripMarkdown(conflict.description)}</p>
           )}
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-1.5">

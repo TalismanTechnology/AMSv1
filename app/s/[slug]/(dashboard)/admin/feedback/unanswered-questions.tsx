@@ -26,6 +26,7 @@ import {
   type UnansweredQuestionGroup,
 } from "@/actions/unanswered-questions";
 import { useRouter } from "next/navigation";
+import { stripMarkdown } from "@/lib/markdown/normalize";
 
 export function UnansweredQuestionsSection({
   groups,
@@ -183,7 +184,7 @@ export function UnansweredQuestionsSection({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 min-w-0">
                     <h3 className="truncate text-base font-semibold text-ink tracking-[-0.01em]">
-                      {group.label}
+                      {stripMarkdown(group.label, { singleLine: true })}
                     </h3>
                     <Badge variant="outline" className="shrink-0">
                       {group.count}

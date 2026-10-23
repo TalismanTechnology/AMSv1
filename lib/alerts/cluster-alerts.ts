@@ -1,6 +1,7 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { sendEmail } from "@/lib/email/resend";
 import { labelClusters } from "@/lib/ai/label-clusters";
+import { stripMarkdown } from "@/lib/markdown/normalize";
 
 /**
  * Send in-app + email alerts to all school admins when a question cluster
@@ -27,7 +28,7 @@ export async function sendClusterAlert(
   }
 
   // 2. Get cluster label (generate if missing)
-  let label = updated.label;
+  let label = updated.label ? stripMarkdown(updated.label, { singleLine: true }) : updated.label;
   if (!label) {
     const { data: questions } = await adminSupabase
       .from("unanswered_questions")

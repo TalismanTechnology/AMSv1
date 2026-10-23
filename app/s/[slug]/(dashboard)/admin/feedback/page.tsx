@@ -13,6 +13,7 @@ import { ThumbsUp, ThumbsDown, Flag } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { getUnansweredQuestions } from "@/actions/unanswered-questions";
 import { UnansweredQuestionsSection } from "./unanswered-questions";
+import { stripMarkdown } from "@/lib/markdown/normalize";
 
 type FlagReason = "unanswered" | "unhelpful";
 
@@ -201,12 +202,12 @@ export default async function FeedbackPage({
                     <TableCell className="max-w-md space-y-1 py-4">
                       {x.question && (
                         <p className="truncate text-sm font-medium text-ink">
-                          Q: {x.question.slice(0, 160)}
+                          Q: {stripMarkdown(x.question, { singleLine: true, maxLength: 160 })}
                         </p>
                       )}
                       {x.answer && (
                         <p className="truncate text-sm text-muted-foreground">
-                          A: {x.answer.slice(0, 160)}
+                          A: {stripMarkdown(x.answer, { singleLine: true, maxLength: 160 })}
                         </p>
                       )}
                     </TableCell>

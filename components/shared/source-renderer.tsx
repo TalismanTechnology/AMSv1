@@ -14,6 +14,7 @@ import {
   parseInline,
   type Block,
 } from "@/lib/sources/format-text";
+import { decodeHtmlEntities } from "@/lib/markdown/normalize";
 
 type SourceKind = "pdf" | "docx" | "image" | "email" | "website" | "text";
 
@@ -267,13 +268,13 @@ function Inline({ text }: { text: string }) {
               title={seg.href.startsWith("mailto:") ? undefined : seg.href}
               className="font-medium text-primary underline decoration-primary/30 underline-offset-2 hover:decoration-primary"
             >
-              {seg.text}
+              {decodeHtmlEntities(seg.text)}
             </a>
           );
         }
         const Wrap = seg.emphasis === "strong" ? "strong" : seg.emphasis === "em" ? "em" : Fragment;
         const wrapProps = seg.emphasis === "strong" ? { className: "font-semibold text-ink" } : {};
-        return <Wrap key={i} {...wrapProps}>{seg.text}</Wrap>;
+        return <Wrap key={i} {...wrapProps}>{decodeHtmlEntities(seg.text)}</Wrap>;
       })}
     </>
   );
