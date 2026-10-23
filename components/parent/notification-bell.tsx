@@ -17,6 +17,7 @@ import {
 import { TimeAgo } from "@/components/ui/time-ago";
 import { cn } from "@/lib/utils";
 import { useSchool } from "@/components/shared/school-context";
+import { stripMarkdown } from "@/lib/markdown/normalize";
 
 interface Notification {
   id: string;
@@ -122,10 +123,10 @@ export function NotificationBell() {
                     )}
                   />
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-ink">{n.title}</p>
+                    <p className="text-sm font-medium text-ink">{stripMarkdown(n.title, { singleLine: true })}</p>
                     {n.body && (
                       <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
-                        {n.body}
+                        {stripMarkdown(n.body, { singleLine: true })}
                       </p>
                     )}
                     <p className="mt-1 text-[11px] text-muted-foreground/60">

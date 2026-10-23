@@ -1,22 +1,9 @@
 import type { ChatSource } from "@/lib/types";
+import { stripMarkdown } from "@/lib/markdown/normalize";
 
 // Plain-text version of a chat answer for the share sheet / clipboard:
 // markdown and [n] citation markers removed, the cited documents listed
 // underneath so whoever receives it knows where the answer came from.
-
-function plainText(markdown: string): string {
-  return markdown
-    .replace(/\s?\[\d+\](?!\()/g, "") // citation markers like [2]
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1") // [label](url) -> label
-    .replace(/^#{1,6}\s+/gm, "") // headings
-    .replace(/(\*\*|__)(.+?)\1/g, "$2") // bold
-    .replace(/(^|[^*])\*(?!\s)([^*]+?)\*/g, "$1$2") // italics
-    .replace(/`([^`]+)`/g, "$1") // inline code
-    .replace(/^[ \t]*[-*+][ \t]+\[[ xX]\][ \t]+/gm, "• ") // task list items
-    .replace(/^[ \t]*[-*+][ \t]+/gm, "• ") // bullets
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
 
 export function shareableAnswer(
   content: string,
@@ -33,7 +20,7 @@ export function shareableAnswer(
     if (!titles.includes(label)) titles.push(label);
   });
 
-  const parts = [plainText(content)];
+  const parts = [stripMarkdown(content)];
   if (titles.length > 0) {
     parts.push(`Sources:\n${titles.map((title) => `• ${title}`).join("\n")}`);
   }

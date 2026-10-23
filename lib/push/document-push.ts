@@ -1,4 +1,5 @@
 import { truncateBody, type PushMessage } from "./messages";
+import { stripMarkdown } from "@/lib/markdown/normalize";
 
 // Pure pieces of the "new documents" push: which documents qualify, when a
 // school's batch is due, and what the notification says. The database side is
@@ -101,7 +102,7 @@ export function buildDocumentPushMessage(params: {
   titles: string[];
 }): PushMessage {
   const school = params.schoolName?.trim() || null;
-  const titles = params.titles.map((t) => t.replace(/\s+/g, " ").trim()).filter(Boolean);
+  const titles = params.titles.map((t) => stripMarkdown(t, { singleLine: true })).filter(Boolean);
   const count = Math.max(params.titles.length, 1);
   const url = documentPushPath(params.schoolSlug);
 

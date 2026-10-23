@@ -36,6 +36,7 @@ export function TypewriterText({
         onSourceClick={onSourceClick}
         messageId={messageId}
         skipCitationAnimation={skipCitationAnimation}
+        streaming
       />
       {isTyping && (
         <span className="caret-glow ml-0.5 inline-block h-4 w-0.5 align-text-bottom" />

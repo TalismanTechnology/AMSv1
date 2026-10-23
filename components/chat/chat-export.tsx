@@ -8,6 +8,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { stripMarkdown } from "@/lib/markdown/normalize";
+
+const escapeHtml = (text: string) =>
+  text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 interface ChatExportProps {
   messages: { role: string; content: string }[];
@@ -15,10 +19,14 @@ interface ChatExportProps {
 }
 
 export function ChatExport({ messages, sessionTitle }: ChatExportProps) {
+  // Exports are plain text: answers lose their markdown, keep their [n] cites.
+  const plain = (content: string) => stripMarkdown(content, { citations: false });
+  const titleText = stripMarkdown(sessionTitle, { singleLine: true }) || "Chat Export";
+
   function exportAsText() {
-    const title = sessionTitle || "Chat Export";
+    const title = titleText;
     const lines = messages.map(
-      (m) => `${m.role === "user" ? "You" : "Assistant"}:\n${m.content}\n`
+      (m) => `${m.role === "user" ? "You" : "Assistant"}:\n${plain(m.content)}\n`
     );
     const text = `${title}\n${"=".repeat(title.length)}\n\n${lines.join("\n---\n\n")}`;
 
@@ -32,7 +40,7 @@ export function ChatExport({ messages, sessionTitle }: ChatExportProps) {
   }
 
   function exportAsPrint() {
-    const title = sessionTitle || "Chat Export";
+    const title = escapeHtml(titleText);
     const html = `
       <html><head><title>${title}</title>
       <style>
@@ -47,7 +55,7 @@ export function ChatExport({ messages, sessionTitle }: ChatExportProps) {
       ${messages
         .map(
           (m) =>
-            `<div class="msg"><div class="role">${m.role === "user" ? "You" : "Assistant"}</div><div class="content">${m.content.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div></div><hr/>`
+            `<div class="msg"><div class="role">${m.role === "user" ? "You" : "Assistant"}</div><div class="content">${escapeHtml(plain(m.content))}</div></div><hr/>`
         )
         .join("")}
       </body></html>`;

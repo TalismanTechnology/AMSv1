@@ -41,6 +41,7 @@ import {
   useCategoryLabels,
 } from "@/components/admin/category-select-items";
 import type { Category, EventCalendar, Folder } from "@/lib/types";
+import { stripMarkdown } from "@/lib/markdown/normalize";
 
 // Both lists come from lib/documents/file-types so the browser allowlist and
 // the server's type mapping stay in step. They were previously hand-copied
@@ -321,7 +322,7 @@ export function DocumentUpload({
                     )}
                     {item.status === "ready" && item.summary && (
                       <p className="line-clamp-2 text-xs italic text-muted-foreground">
-                        {item.summary}
+                        {stripMarkdown(item.summary, { singleLine: true })}
                       </p>
                     )}
                   </div>

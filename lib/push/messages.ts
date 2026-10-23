@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { stripMarkdown } from "@/lib/markdown/normalize";
 
 // Pure pieces of push delivery: payload shapes, the APNs token, and telling a
 // dead device token from a temporary failure. Network code is in apns.ts and
@@ -14,7 +15,8 @@ export interface PushMessage {
 const MAX_BODY_LENGTH = 180;
 
 export function truncateBody(body: string, max = MAX_BODY_LENGTH): string {
-  const flat = body.replace(/\s+/g, " ").trim();
+  // Lock screens show plain text: no markdown, no HTML entities.
+  const flat = stripMarkdown(body, { singleLine: true });
   if (flat.length <= max) return flat;
 
   const cut = flat.slice(0, max - 1);
@@ -22,10 +24,12 @@ export function truncateBody(body: string, max = MAX_BODY_LENGTH): string {
   return `${(lastSpace > max / 2 ? cut.slice(0, lastSpace) : cut).trimEnd()}…`;
 }
 
+const plainTitle = (title: string) => stripMarkdown(title, { singleLine: true });
+
 export function apnsPayload(message: PushMessage) {
   return {
     aps: {
-      alert: { title: message.title, body: message.body },
+      alert: { title: plainTitle(message.title), body: message.body },
       sound: "default",
     },
     url: message.url,
@@ -35,7 +39,7 @@ export function apnsPayload(message: PushMessage) {
 export function fcmMessage(token: string, message: PushMessage) {
   return {
     token,
-    notification: { title: message.title, body: message.body },
+    notification: { title: plainTitle(message.title), body: message.body },
     data: { url: message.url },
     android: { priority: "high" as const },
   };

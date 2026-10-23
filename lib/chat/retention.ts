@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { stripMarkdown } from "@/lib/markdown/normalize";
 
 // Parent chat history. A parent has any number of chats (chat_sessions rows)
 // per school, each kept for CHAT_RETENTION_DAYS from its last activity
@@ -40,7 +41,7 @@ export function isWithinRetention(createdAt: string, cutoff: string): boolean {
 }
 
 export function truncateTitle(text: string, max = 60): string {
-  const clean = text.trim().replace(/\s+/g, " ");
+  const clean = stripMarkdown(text, { singleLine: true });
   return clean.length > max ? clean.slice(0, max) + "..." : clean;
 }
 

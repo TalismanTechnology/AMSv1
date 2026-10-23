@@ -1,5 +1,6 @@
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
+import { stripMarkdown } from "@/lib/markdown/normalize";
 
 const SUMMARY_MAX_CHARS = 8000;
 
@@ -21,7 +22,7 @@ Document title: "${documentTitle}"
 Document content:
 ${truncated}
 
-Write a 2-3 sentence summary of what this document contains and why it would be useful to parents. Be specific and factual. Do not use phrases like "This document..." or "This text...".`,
+Write a 2-3 sentence summary of what this document contains and why it would be useful to parents. Be specific and factual. Do not use phrases like "This document..." or "This text...". Plain text only: no markdown, bullets or bold.`,
     maxOutputTokens: 150,
     temperature: 0.3,
     // Gemini 2.5 charges thinking tokens against maxOutputTokens. Left on,
@@ -31,5 +32,6 @@ Write a 2-3 sentence summary of what this document contains and why it would be 
     providerOptions: { google: { thinkingConfig: { thinkingBudget: 0 } } },
   });
 
-  return summary.trim();
+  // Shown as plain text wherever summaries appear.
+  return stripMarkdown(summary, { singleLine: true });
 }

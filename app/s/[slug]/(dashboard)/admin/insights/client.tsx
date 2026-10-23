@@ -25,6 +25,7 @@ import {
   RANGE_DAYS,
   type RangeDays,
 } from "@/lib/insights/aggregate";
+import { stripMarkdown } from "@/lib/markdown/normalize";
 
 interface InsightsClientProps {
   data: InsightsData;
@@ -129,7 +130,7 @@ export function InsightsClient({ data: initialData, schoolId, schoolSlug }: Insi
                 {data.topics.map((topic) => (
                   <li key={topic.label}>
                     <div className="flex items-baseline justify-between gap-3">
-                      <span className="truncate text-sm text-ink">{topic.label}</span>
+                      <span className="truncate text-sm text-ink">{stripMarkdown(topic.label, { singleLine: true })}</span>
                       <span className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground">
                         {topic.count}
                       </span>

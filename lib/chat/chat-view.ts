@@ -2,6 +2,7 @@
 // titling for /api/chat.
 
 import { resolveSchoolName } from "../school-display-name";
+import { stripMarkdown } from "../markdown/normalize";
 
 // --------------------------------------------
 // The open chat
@@ -151,7 +152,7 @@ export function normalizeChatTitle(input: string): string | null {
 
 /** What the list and header show for a chat. */
 export function chatDisplayTitle(title: string | null | undefined): string {
-  return title?.trim() || "New chat";
+  return stripMarkdown(title, { singleLine: true }) || "New chat";
 }
 
 // --------------------------------------------

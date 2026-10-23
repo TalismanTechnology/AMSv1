@@ -8,6 +8,7 @@ import type { PreviewResult, ContentSearchResult } from "@/lib/types";
 import { isBlockedFile, fileTypeFromName } from "@/lib/documents/file-types";
 import { enqueueDocumentPush } from "@/lib/push/document-push-runner";
 import { APPROVAL_MAX_AGE_MS } from "@/lib/push/document-push";
+import { stripMarkdown } from "@/lib/markdown/normalize";
 
 function triggerProcessing(documentId: string) {
   // Use after() so processing runs after the response is sent.
@@ -474,7 +475,7 @@ export async function searchDocumentContent(
     (row: { document_id: string; document_title: string; content: string; chunk_index: number; rank: number }) => ({
       document_id: row.document_id,
       document_title: row.document_title,
-      snippet: row.content.slice(0, 300),
+      snippet: stripMarkdown(row.content.slice(0, 400), { singleLine: true, maxLength: 300 }),
       chunk_index: row.chunk_index,
       rank: row.rank,
     })

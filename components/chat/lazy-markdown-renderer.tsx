@@ -2,6 +2,7 @@
 
 import { lazy, Suspense, type ComponentProps } from "react";
 import type { MarkdownRenderer as MarkdownRendererType } from "./markdown-renderer";
+import { stripMarkdown } from "@/lib/markdown/normalize";
 
 // react-markdown + remark-gfm are a large share of the chat route's JS, and no
 // message is on screen at first paint (history loads after mount), so the
@@ -35,10 +36,14 @@ export function MarkdownRenderer(
   props: ComponentProps<typeof MarkdownRendererType>
 ) {
   return (
-    // Until the chunk arrives, show the raw text in the same paragraph style
-    // so the bubble keeps roughly its final size.
+    // Until the chunk arrives, show the text (markdown stripped) in the same
+    // paragraph style so the bubble keeps roughly its final size.
     <Suspense
-      fallback={<p className="mb-2 last:mb-0 whitespace-pre-wrap">{props.content}</p>}
+      fallback={
+        <p className="mb-2 last:mb-0 whitespace-pre-wrap">
+          {stripMarkdown(props.content)}
+        </p>
+      }
     >
       <LazyMarkdownRenderer {...props} />
     </Suspense>
