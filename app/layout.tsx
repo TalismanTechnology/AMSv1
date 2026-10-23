@@ -34,6 +34,14 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: "AskMySchool",
+  // Home-screen name/icon. Child pages only override title/description, and
+  // Next merges metadata per key, so these apply on every route (incl. /s/*).
+  applicationName: "AskMySchool",
+  appleWebApp: {
+    title: "AskMySchool",
+    capable: true,
+    statusBarStyle: "default",
+  },
   description:
     "AI-powered school document search. Parents can ask questions and get instant answers from school documents.",
 };
