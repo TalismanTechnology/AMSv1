@@ -10,7 +10,6 @@ export interface School {
   domain: string | null;
   join_code: string | null;
   inbound_email_token: string | null;
-  allowed_sender_domains: string[] | null;
   email_ingestion_enabled: boolean | null;
   auto_sort_enabled: boolean | null;
   blackbaud_verification_enabled: boolean | null;

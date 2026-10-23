@@ -4,7 +4,6 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { logAudit } from "@/lib/audit";
 import { ensureInboundAddresses, type InboundAddresses } from "@/lib/email/addresses";
-import { normalizeSenderDomain } from "@/lib/email/inbound";
 import { isValidRollover } from "@/lib/grades";
 
 export async function updateSettings(
@@ -93,7 +92,6 @@ export async function updateEmailIngestion(
   data: {
     enabled: boolean;
     autoSort: boolean;
-    allowedDomains: string[];
   }
 ): Promise<{ error?: string; addresses?: InboundAddresses; success?: boolean }> {
   const supabase = await createClient();
@@ -101,16 +99,6 @@ export async function updateEmailIngestion(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
-
-  // Validate + dedupe domains.
-  const normalized = new Set<string>();
-  for (const raw of data.allowedDomains) {
-    if (!raw.trim()) continue;
-    const domain = normalizeSenderDomain(raw);
-    if (!domain) return { error: `Invalid domain: "${raw}"` };
-    normalized.add(domain);
-  }
-  const allowedDomains = [...normalized];
 
   // Once ingestion is on, the school has all its addresses: the whole
   // school's and one per division.
@@ -128,7 +116,6 @@ export async function updateEmailIngestion(
     .update({
       email_ingestion_enabled: data.enabled,
       auto_sort_enabled: data.autoSort,
-      allowed_sender_domains: allowedDomains,
       updated_at: new Date().toISOString(),
     })
     .eq("id", schoolId);
@@ -140,7 +127,7 @@ export async function updateEmailIngestion(
     "update_email_ingestion",
     "settings",
     undefined,
-    { enabled: data.enabled, autoSort: data.autoSort, domains: allowedDomains },
+    { enabled: data.enabled, autoSort: data.autoSort },
     schoolId
   );
 

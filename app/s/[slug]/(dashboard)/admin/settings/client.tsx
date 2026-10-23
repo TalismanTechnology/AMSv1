@@ -80,7 +80,6 @@ export interface EmailIngestionLogEntry {
 interface EmailIngestionConfig extends InboundAddresses {
   enabled: boolean;
   autoSort: boolean;
-  allowedDomains: string[];
   /** Set when the addresses couldn't be loaded, saying why. */
   addressesError: string | null;
   inboundDomain: string | null;
@@ -881,36 +880,18 @@ function EmailIngestionSection({
 }) {
   const [enabled, setEnabled] = useState(config.enabled);
   const [autoSort, setAutoSort] = useState(config.autoSort);
-  const [domains, setDomains] = useState<string[]>(config.allowedDomains);
   const [addresses, setAddresses] = useState<InboundAddresses>(config);
-  const [newDomain, setNewDomain] = useState("");
   const [saving, setSaving] = useState(false);
 
   const addressFor = (t: string | null) =>
     t && config.inboundDomain ? `${t}@${config.inboundDomain}` : null;
   const inboundAddress = addressFor(addresses.wholeSchoolToken);
 
-  function addDomain() {
-    const value = newDomain.trim().toLowerCase().replace(/^[@*]+\.?/, "");
-    if (!value) return;
-    if (domains.includes(value)) {
-      setNewDomain("");
-      return;
-    }
-    setDomains((prev) => [...prev, value]);
-    setNewDomain("");
-  }
-
-  function removeDomain(index: number) {
-    setDomains((prev) => prev.filter((_, i) => i !== index));
-  }
-
   async function handleSave() {
     setSaving(true);
     const result = await updateEmailIngestion(schoolId, {
       enabled,
       autoSort,
-      allowedDomains: domains,
     });
     setSaving(false);
 
@@ -952,10 +933,8 @@ function EmailIngestionSection({
               <Label>Where to send emails</Label>
               <p className="text-xs text-muted-foreground">
                 Forward or send school emails to these addresses. Each one
-                files what it receives into its own division.{" "}
-                {domains.length
-                  ? "Only senders from the allowed domains below are accepted."
-                  : "With no allowed domains, every email is held under Recent emails until you approve it."}
+                files what it receives into its own division. Mail from any
+                sender is accepted.
               </p>
             </div>
             {config.addressesError ? (
@@ -1003,60 +982,6 @@ function EmailIngestionSection({
             )}
           </div>
         )}
-
-        <div className="space-y-2">
-          <Label>Allowed sender domains</Label>
-          <div className="space-y-2">
-            {domains.map((domain, i) => (
-              <div key={domain} className="flex items-center gap-2">
-                <span className="flex-1 rounded-full border border-border px-3.5 py-1.5 text-sm text-ink font-mono">
-                  @{domain}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 w-7 shrink-0 p-0"
-                  onClick={() => removeDomain(i)}
-                >
-                  <X className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            ))}
-            {domains.length === 0 && (
-              <p className="text-xs text-muted-foreground">
-                No domains: every email is held for your review below before
-                parents can see it. Add one (e.g. lincolnhigh.org) to accept
-                your school&apos;s staff automatically.
-              </p>
-            )}
-          </div>
-          <div className="flex gap-2">
-            <Input
-              value={newDomain}
-              onChange={(e) => setNewDomain(e.target.value)}
-              placeholder="lincolnhigh.org"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  addDomain();
-                }
-              }}
-            />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={addDomain}
-              disabled={!newDomain.trim()}
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            When set, emails whose sender address ends with one of these
-            domains are added automatically and all others are turned away.
-            Subdomains are matched too.
-          </p>
-        </div>
 
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
