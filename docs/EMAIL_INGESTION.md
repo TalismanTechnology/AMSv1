@@ -20,14 +20,10 @@ is about.
    signature, or 500 if the secret isn't configured. It then finds which of
    our addresses the mail reached, checking `to`, `cc`, `bcc`, and
    `received_for`. That decides the school and the divisions.
-4. The sender gate (secure by default):
-   - **Allowed domains set:** mail is ingested only when the sender's address
-     ends with one of them; everything else is rejected (`rejected_domain`).
-   - **No allowed domains:** nothing is ingested automatically. The email is
-     logged as `pending_review` and held until a school admin approves or
-     rejects it (see *Reviewing held emails*). Only the metadata (sender,
-     subject, Resend email id, divisions) is stored; the content stays in
-     Resend until approval.
+4. Any sender is accepted. There is no sender allowlist and nothing is held
+   for review: if the school has ingestion enabled, the mail is ingested. (The
+   old `schools.allowed_sender_domains` column is still in the database but
+   unused, and there is no setting for it.)
 5. Every attachment becomes its own document; the email body becomes one text
    document. Image attachments and inline images are skipped.
 6. Mail that reached a division's address marks its documents for that
@@ -41,19 +37,20 @@ is about.
    that division's categories, landing in its "Other" when nothing else fits,
    and a document's division always follows its category.
 
-Every attempt (accepted / held / rejected / error) is logged in the
+Every attempt (accepted / duplicate / rejected / error) is logged in the
 `email_ingestions` table. The latest 20, plus every email still waiting for
 review, are shown to admins under
 **Admin → Settings → Email Ingestion → Recent emails**.
 
-## Reviewing held emails
+## Reviewing held emails (older rows only)
 
-When a school has no allowed sender domains, each incoming email shows up in
-**Recent emails** as **Needs review** with **Approve** / **Reject** buttons.
-Parents see nothing from it until it is approved.
+New mail is never held. Emails held before the sender restriction was removed
+(when a school had no allowed sender domains) still show up in **Recent
+emails** as **Needs review** with **Approve** / **Reject** buttons, and older
+`rejected_domain` rows are still listed.
 
 - **Approve** fetches the email from Resend by its id and ingests it exactly
-  like an allowlisted email (body + attachments, divisions, processing). The
+  like any other email (body + attachments, divisions, processing). The
   row moves `pending_review → processing → accepted`; the conditional update
   means two admins approving at once can't ingest it twice. If fetching
   fails, the email goes back to **Needs review** with the error as its
@@ -61,11 +58,8 @@ Parents see nothing from it until it is approved.
   window.
 - **Reject** marks it `rejected_review`. Nothing was ingested.
 - Both record `reviewed_by` / `reviewed_at` and write an audit log entry.
-- Copies of a held email reaching other division addresses merge their
-  divisions into the held row.
-
-The recommended setup is still to set allowed domains, so school staff mail
-is added without review and strangers are turned away.
+- A held email still occupies its Message-ID, so a new copy of it is
+  reported as in progress rather than ingested a second time.
 
 Before creating any documents, the webhook claims the message with a
 `processing` row. A second delivery of the same email (a Resend retry, or two
@@ -85,7 +79,7 @@ so Resend retries it once the first has finished.
 
 `POST /api/inbound-email/manual` runs a raw RFC822 message (for example one a
 scheduled job read from a parent's Gmail) through the same pipeline as the
-webhook — token routing, sender allowlist, Message-ID claim, parsing,
+webhook — token routing, Message-ID claim, parsing,
 attachments, division tagging, auto-sort and processing — and logs it in
 **Recent emails**. Nothing is sent or forwarded. The shared code is
 `lib/email/process-inbound.ts`; the endpoint is `lib/email/manual-inbound.ts`.
@@ -101,7 +95,7 @@ curl -X POST "$APP_URL/api/inbound-email/manual" \
 | --- | --- |
 | `token` | Inbound address token (the local part of the school/division address). |
 | `raw` | Base64 or base64url RFC822 message. Must have a Message-ID header. |
-| `dryRun` | Parse, route, gate and check for duplicates; write nothing. Returns from, subject, message_id, a 300-char text preview, attachments and the would-be outcome. |
+| `dryRun` | Parse, route and check for duplicates; write nothing. Returns from, subject, message_id, a 300-char text preview, attachments and the would-be outcome. |
 | `suppressPush` | Default `true`: the documents are pre-marked in `document_push_queue` so parents get no push. |
 | `redactions` | `[{ "pattern", "flags"?, "replace"? }]` regex replacements applied to the text and HTML before storage (every match; default replacement `[redacted]`). |
 | `source` | Label for the log, e.g. `gmail-intake` → reason "Ingested (manual: gmail-intake)". |
@@ -140,9 +134,7 @@ and the skipped ones are named in the `accepted` reason. Dry runs report the
 same (`contentDuplicates`). The webhook doesn't run this check.
 
 Differences from the webhook, because there is no Resend copy to fetch later:
-rows have no `email_id`, and when the school has **no allowed sender domains**
-the message is rejected (`rejected_domain`) instead of held for review, since
-"Approve" works by re-fetching from Resend. Auth is the `CRON_SECRET` bearer
+rows have no `email_id`. Like the webhook, any sender is accepted. Auth is the `CRON_SECRET` bearer
 token only (no `?key=`).
 
 ## One-time setup (what you need to do)
@@ -154,9 +146,7 @@ Apply `supabase/migrations/019_email_ingestion.sql`,
 `supabase/migrations/028_division_email_addresses.sql`,
 `supabase/migrations/029_division_categories.sql` and
 `supabase/migrations/032_email_ingestion_review.sql` to your database.
-032 adds the review statuses and columns. Until it is applied, mail to a
-school without allowed domains fails closed: nothing is ingested, and the
-webhook returns 500 so Resend retries for up to 24 hours.
+032 adds the review statuses and columns (now used only by older held rows).
 028 copies each school's existing address into `email_ingestion_addresses`,
 so addresses already in use keep working. Apply it before deploying the code
 that reads that table.
@@ -194,25 +184,20 @@ Each school admin, under **Admin → Settings → Email Ingestion**:
 
 1. Toggle **Enable email ingestion** and save (this generates the
    whole-school address).
-2. Add **allowed sender domains** (e.g. `lincolnhigh.org`). Subdomains like
-   `mail.lincolnhigh.org` are matched automatically. With the list empty,
-   every email is held under **Recent emails** for an admin to approve.
-3. Copy the **inbound address** and forward school emails to it.
-4. Optionally pick a division under **Your inbound addresses** to give it its
+2. Copy the **inbound address** and forward school emails to it.
+3. Optionally pick a division under **Your inbound addresses** to give it its
    own address, e.g. one each for Lower, Middle and Upper School, and forward
    that division's emails there. Divisions are the ones set up for the
    calendar under **Events**. Removing a division's address makes mail to it
    be turned away; documents it already added keep their division.
-5. Optionally toggle **Auto-sort** (on by default).
+4. Optionally toggle **Auto-sort** (on by default).
 
 ## Notes
 
-- The random address token is always required. Allowed domains are the second
-  gate; without them, every email waits for admin approval, so someone who
-  learns the address can't add documents parents see.
-- Sender domains come from the `From` header, which can be spoofed. Together
-  with the private address it is a reasonable gate, but SPF/DKIM checks are
-  not enforced here.
+- The random address token is required, and the school must have ingestion
+  enabled. Beyond that there is deliberately no sender restriction: anyone
+  who sends to the address adds documents parents can see, so treat the
+  address as private.
 - Auto-sort runs for **any** unsorted document (emailed or manually uploaded)
   when the school has it enabled; it never overwrites a category/folder that was
   set manually, and never invents new categories/folders.

@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
 
   const { data } = event;
 
-  // Routing, the sender gate, claiming, ingest and logging are shared with
+  // Routing, the enabled check, claiming, ingest and logging are shared with
   // manual submissions (lib/email/process-inbound.ts). Forwarded, CC'd and
   // BCC'd copies can carry our address outside "to", so every recipient list
   // is checked.
@@ -88,7 +88,6 @@ export async function POST(request: NextRequest) {
     },
     loadContent: () => fetchResendEmail(resend, data.email_id),
     origin: process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin,
-    onReview: "hold",
     // The same content check as manual submissions: a native copy of mail
     // already added another way is logged as a duplicate of it.
     contentDedupe: true,

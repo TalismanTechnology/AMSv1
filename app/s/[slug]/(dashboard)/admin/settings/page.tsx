@@ -400,7 +400,6 @@ export default async function SettingsPage({
         emailIngestion={{
           enabled: school.email_ingestion_enabled ?? false,
           autoSort: school.auto_sort_enabled ?? true,
-          allowedDomains: school.allowed_sender_domains ?? [],
           ...inboundAddresses,
           inboundDomain: process.env.INBOUND_EMAIL_DOMAIN ?? null,
           recent: recentEmails,

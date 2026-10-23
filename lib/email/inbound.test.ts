@@ -2,12 +2,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   parseEmailAddress,
-  senderDomainAllowed,
   extractInboundTokens,
   routeInboundMessage,
-  normalizeSenderDomain,
   isStaleClaim,
-  senderGate,
   type InboundAddress,
 } from "./inbound";
 
@@ -23,41 +20,6 @@ test("parseEmailAddress extracts bare address from display form", () => {
 test("parseEmailAddress returns null for garbage", () => {
   assert.equal(parseEmailAddress(""), null);
   assert.equal(parseEmailAddress("not-an-email"), null);
-});
-
-test("senderDomainAllowed matches exact domain", () => {
-  assert.equal(
-    senderDomainAllowed("a@lincolnhigh.org", ["lincolnhigh.org"]),
-    true
-  );
-});
-
-test("senderDomainAllowed matches subdomains", () => {
-  assert.equal(
-    senderDomainAllowed("a@mail.lincolnhigh.org", ["lincolnhigh.org"]),
-    true
-  );
-});
-
-test("senderDomainAllowed rejects lookalike / non-suffix", () => {
-  assert.equal(
-    senderDomainAllowed("a@notlincolnhigh.org", ["lincolnhigh.org"]),
-    false
-  );
-  assert.equal(
-    senderDomainAllowed("a@lincolnhigh.org.evil.com", ["lincolnhigh.org"]),
-    false
-  );
-  assert.equal(senderDomainAllowed("a@gmail.com", ["lincolnhigh.org"]), false);
-});
-
-test("senderDomainAllowed tolerates a leading @ in the allowlist entry", () => {
-  assert.equal(senderDomainAllowed("a@lincolnhigh.org", ["@lincolnhigh.org"]), true);
-});
-
-test("senderDomainAllowed is false for null address or empty list", () => {
-  assert.equal(senderDomainAllowed(null, ["lincolnhigh.org"]), false);
-  assert.equal(senderDomainAllowed("a@lincolnhigh.org", []), false);
 });
 
 test("extractInboundTokens pulls the local part for the inbound domain", () => {
@@ -83,20 +45,6 @@ test("extractInboundTokens keeps every inbound address once, in order", () => {
     ),
     ["ams-upper", "ams-lower"]
   );
-});
-
-test("normalizeSenderDomain accepts valid domains and strips prefixes", () => {
-  assert.equal(normalizeSenderDomain("lincolnhigh.org"), "lincolnhigh.org");
-  assert.equal(normalizeSenderDomain("@lincolnhigh.org"), "lincolnhigh.org");
-  assert.equal(normalizeSenderDomain("*.lincolnhigh.org"), "lincolnhigh.org");
-  assert.equal(normalizeSenderDomain("  Mail.Lincolnhigh.ORG "), "mail.lincolnhigh.org");
-});
-
-test("normalizeSenderDomain rejects invalid input", () => {
-  assert.equal(normalizeSenderDomain("not a domain"), null);
-  assert.equal(normalizeSenderDomain("localhost"), null);
-  assert.equal(normalizeSenderDomain("a@b.com"), null);
-  assert.equal(normalizeSenderDomain(""), null);
 });
 
 test("extractInboundTokens ignores addresses on other domains", () => {
@@ -161,20 +109,4 @@ test("isStaleClaim keeps a fresh claim and expires an old one", () => {
 
 test("isStaleClaim treats an unreadable timestamp as stale", () => {
   assert.equal(isStaleClaim("not-a-date"), true);
-});
-
-test("senderGate holds mail for review when no allowlist is set", () => {
-  assert.equal(senderGate("a@anywhere.com", []), "review");
-  assert.equal(senderGate("a@anywhere.com", null), "review");
-  assert.equal(senderGate("a@anywhere.com", undefined), "review");
-  assert.equal(senderGate("a@anywhere.com", ["  "]), "review");
-  assert.equal(senderGate(null, []), "review");
-});
-
-test("senderGate allows allowlisted senders and rejects others", () => {
-  assert.equal(senderGate("office@lincolnhigh.org", ["lincolnhigh.org"]), "allow");
-  assert.equal(senderGate("a@mail.lincolnhigh.org", ["lincolnhigh.org"]), "allow");
-  assert.equal(senderGate("a@evil.com", ["lincolnhigh.org"]), "reject");
-  assert.equal(senderGate("a@notlincolnhigh.org", ["lincolnhigh.org"]), "reject");
-  assert.equal(senderGate(null, ["lincolnhigh.org"]), "reject");
 });

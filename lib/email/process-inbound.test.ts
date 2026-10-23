@@ -58,9 +58,12 @@ const SCHOOL = "school-1";
 const DIVISION = "division-upper";
 const ok = (data: unknown): Reply => ({ data, error: null });
 
-/** A school reachable at token "ams-abc" (Upper School address). */
+/**
+ * A school reachable at token "ams-abc" (Upper School address). `legacyAllowed`
+ * fills the unused schools.allowed_sender_domains column, which must be ignored.
+ */
 function schoolDb(opts: {
-  allowed?: readonly string[];
+  legacyAllowed?: readonly string[];
   enabled?: boolean;
   claim?: (op: Op) => Reply;
   holder?: unknown;
@@ -73,7 +76,7 @@ function schoolDb(opts: {
       return ok({
         id: SCHOOL,
         email_ingestion_enabled: opts.enabled ?? true,
-        allowed_sender_domains: opts.allowed ? [...opts.allowed] : ["school.org"],
+        ...(opts.legacyAllowed ? { allowed_sender_domains: [...opts.legacyAllowed] } : {}),
       });
     }
     if (op.table === "email_ingestions") {
@@ -124,7 +127,6 @@ const baseParams = (over: Partial<ProcessInboundParams> = {}): ProcessInboundPar
     throw new Error("content not expected");
   },
   origin: "https://example.test",
-  onReview: "reject",
   reasonSuffix: " (manual: gmail-intake)",
   suppressPush: true,
   ...over,
@@ -209,15 +211,14 @@ test("redactions replace every match in text and html; bad patterns are reported
   assert.ok("error" in compileRedactions([{ pattern: "" }]));
 });
 
-// ── Gate, routing, claiming ───────────────────────────────────────────
+// ── Routing, claiming ───────────────────────────────────────────
 
-test("allowlisted sender is claimed, ingested with push suppression and settled", async () => {
+test("a message is claimed, ingested with push suppression and settled", async () => {
   const db = schoolDb({});
   const { d, calls } = deps(db);
   const r = await processInboundEmail(baseParams(), d);
 
   assert.equal(r.status, "accepted");
-  assert.equal(r.gate, "allow");
   assert.deepEqual(r.documentIds, ["doc-1", "doc-2"]);
   assert.equal(r.ingestionId, "row-processing");
   assert.equal(r.reason, "Ingested (manual: gmail-intake)");
@@ -249,7 +250,6 @@ test("webhook defaults leave pushes alone", async () => {
   await processInboundEmail(
     baseParams({
       routing: { recipients: ["ams-abc@in.example.test"], inboundDomain: "in.example.test" },
-      onReview: "hold",
       reasonSuffix: undefined,
       suppressPush: undefined,
     }),
@@ -259,37 +259,54 @@ test("webhook defaults leave pushes alone", async () => {
   assert.equal((db.writes[1].payload as { reason: string }).reason, "Ingested");
 });
 
-test("sender outside the allowlist is logged as rejected_domain", async () => {
-  const db = schoolDb({});
+// Any sender is accepted: there is no allowlist and no hold for review, on
+// either path, whatever the old allowed_sender_domains column still holds.
+const STRANGER = "Someone <someone@unknown-domain.example>";
+
+for (const legacyAllowed of [undefined, [], ["school.org"]] as const) {
+  const label = legacyAllowed ? `legacy column ${JSON.stringify(legacyAllowed)}` : "no column";
+  test(`unknown sender domain on the webhook path is ingested, not held (${label})`, async () => {
+    const db = schoolDb({ legacyAllowed });
+    const { d, calls } = deps(db);
+    const r = await processInboundEmail(
+      baseParams({
+        routing: { recipients: ["ams-abc@in.example.test"], inboundDomain: "in.example.test" },
+        meta: { ...baseParams().meta, emailId: "re_1", from: STRANGER },
+        reasonSuffix: undefined,
+        suppressPush: undefined,
+      }),
+      d
+    );
+    assert.equal(r.status, "accepted");
+    assert.equal(r.httpStatus, 200);
+    assert.deepEqual(r.documentIds, ["doc-1", "doc-2"]);
+    assert.equal(calls.ingest.length, 1);
+    assert.equal(calls.ingest[0].fromAddress, "someone@unknown-domain.example");
+    const statuses = db.writes.map((w) => (w.payload as { status: string }).status);
+    assert.deepEqual(statuses, ["processing", "accepted"]);
+  });
+}
+
+test("unknown sender domain on the manual path is ingested, not rejected", async () => {
+  const db = schoolDb({ legacyAllowed: ["school.org"] });
   const { d, calls } = deps(db);
-  const r = await processInboundEmail(
-    baseParams({ meta: { ...baseParams().meta, from: "x@evil.com" } }),
-    d
+  const r = await handleManualInbound(
+    manualRequest({
+      token: "ams-abc",
+      raw: rawMessage({ from: STRANGER }).toString("base64"),
+      source: "gmail-intake",
+      contentDedupe: false,
+      ensureFolder: false,
+    }),
+    { secret: SECRET, origin: "x" },
+    { process: processInboundEmail, processDeps: d, folders: async () => [] }
   );
-  assert.equal(r.status, "rejected_domain");
-  assert.equal(r.gate, "reject");
-  assert.equal(calls.ingest.length, 0);
-  assert.equal(db.writes.length, 1);
-  assert.equal((db.writes[0].payload as { status: string }).status, "rejected_domain");
-});
-
-test("empty allowlist: manual mail is rejected, webhook mail is held", async () => {
-  const manualDb = schoolDb({ allowed: [] });
-  const manual = await processInboundEmail(baseParams(), deps(manualDb).d);
-  assert.equal(manual.status, "rejected_domain");
-  assert.equal(manual.gate, "review");
-  assert.match(manual.reason, /can't be held for review \(manual: gmail-intake\)$/);
-
-  const hookDb = schoolDb({ allowed: [] });
-  const hook = await processInboundEmail(
-    baseParams({ onReview: "hold", meta: { ...baseParams().meta, emailId: "re_1" } }),
-    deps(hookDb).d
-  );
-  assert.equal(hook.status, "pending_review");
-  const held = hookDb.writes[0].payload as Record<string, unknown>;
-  assert.equal(held.status, "pending_review");
-  assert.equal(held.email_id, "re_1");
-  assert.deepEqual(held.division_ids, [DIVISION]);
+  assert.equal(r.status, 200);
+  assert.equal(r.body.status, "accepted");
+  assert.deepEqual(r.body.documentIds, ["doc-1", "doc-2"]);
+  assert.equal(calls.ingest[0].fromAddress, "someone@unknown-domain.example");
+  const statuses = db.writes.map((w) => (w.payload as { status: string }).status);
+  assert.ok(!statuses.includes("pending_review") && !statuses.includes("rejected_domain"));
 });
 
 test("unknown token and disabled school are logged and nothing is ingested", async () => {
@@ -351,7 +368,7 @@ test("dry run reports the decision and writes nothing", async () => {
   for (const [opts, expected] of [
     [{}, { status: "accepted", duplicate: false }],
     [{ holder: { id: "row-old", status: "accepted", created_at: new Date().toISOString(), document_ids: ["d"] } }, { status: "duplicate", duplicate: true }],
-    [{ allowed: [] }, { status: "rejected_domain" }],
+    [{ legacyAllowed: [] }, { status: "accepted", duplicate: false }],
     [{ enabled: false }, { status: "rejected_disabled" }],
   ] as const) {
     const db = schoolDb(opts);
@@ -508,7 +525,7 @@ test("manual endpoint: dry run previews the message and writes nothing", async (
   assert.equal(r.body.status, "dry_run");
   assert.equal(r.body.outcome, "duplicate");
   assert.equal(r.body.duplicate, true);
-  assert.equal(r.body.gate, "allow");
+  assert.equal("gate" in r.body, false);
   assert.equal(r.body.message_id, "<m1@school.org>");
   assert.equal(r.body.subject, "Field trip on Friday");
   assert.match(String(r.body.text_preview), /^The bus leaves at 8am/);

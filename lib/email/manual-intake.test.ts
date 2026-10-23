@@ -425,7 +425,7 @@ test("ensureDocumentFolder never files into Responses (or below) and leaves file
 function schoolDb() {
   return new FakeDb((op) => {
     if (op.table === "email_ingestion_addresses") return ok([{ token: "ams-abc", school_id: "s1", division_id: null }]);
-    if (op.table === "schools") return ok({ id: "s1", email_ingestion_enabled: true, allowed_sender_domains: ["collegiateschool.org", "collegiateschoolorg.myenotice.com"] });
+    if (op.table === "schools") return ok({ id: "s1", email_ingestion_enabled: true });
     if (op.table === "email_ingestions") {
       if (op.action === "insert") return ok({ id: `row-${(op.payload as { status: string }).status}` });
       return ok(null);
@@ -452,7 +452,6 @@ const params = (over: Partial<ProcessInboundParams> = {}): ProcessInboundParams 
   meta: { emailId: null, messageId: "<m1@collegiateschool.org>", from: "office@collegiateschool.org", subject: "Curriculum Night" },
   loadContent: async () => content(),
   origin: "https://example.test",
-  onReview: "reject",
   reasonSuffix: " (manual: gmail-intake)",
   contentDedupe: true,
   ...over,
@@ -481,7 +480,7 @@ test("content already in the library settles the claim as duplicate with the mat
 test("webhook: a native copy of content already added adds its divisions to the matched docs", async () => {
   const db = new FakeDb((op) => {
     if (op.table === "email_ingestion_addresses") return ok([{ token: "ams-ls", school_id: "s1", division_id: "lower" }]);
-    if (op.table === "schools") return ok({ id: "s1", email_ingestion_enabled: true, allowed_sender_domains: ["collegiateschool.org"] });
+    if (op.table === "schools") return ok({ id: "s1", email_ingestion_enabled: true });
     if (op.action === "insert") return ok({ id: "row-processing" });
     return ok(null);
   });
@@ -492,7 +491,6 @@ test("webhook: a native copy of content already added adds its divisions to the 
     params({
       routing: { recipients: ["ams-ls@in.example"], inboundDomain: "in.example" },
       meta: { emailId: "re_1", messageId: "<native@x>", from: "office@collegiateschool.org", subject: "Curriculum Night" },
-      onReview: "hold",
       reasonSuffix: undefined,
     }),
     d
@@ -508,7 +506,7 @@ test("webhook: a native copy of content already added adds its divisions to the 
     throw new Error("db down");
   };
   const failed = await processInboundEmail(
-    params({ routing: { recipients: ["ams-ls@in.example"], inboundDomain: "in.example" }, onReview: "hold" }),
+    params({ routing: { recipients: ["ams-ls@in.example"], inboundDomain: "in.example" } }),
     d
   );
   assert.equal(failed.httpStatus, 500);

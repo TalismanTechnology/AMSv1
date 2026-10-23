@@ -1,18 +1,6 @@
 // Pure helpers for inbound-email ingestion. Kept side-effect free so they
 // can be unit tested without a mail provider or database.
 
-const DOMAIN_RE =
-  /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
-
-/**
- * Normalize + validate a sender domain (strips a leading "@" or "*.").
- * Returns null when the input is not a syntactically valid domain.
- */
-export function normalizeSenderDomain(input: string): string | null {
-  const domain = input.trim().toLowerCase().replace(/^[@*]+\.?/, "");
-  return DOMAIN_RE.test(domain) ? domain : null;
-}
-
 /**
  * Extract a bare, lowercased email address from a header value that may be
  * "Display Name <addr@example.com>" or just "addr@example.com".
@@ -22,27 +10,6 @@ export function parseEmailAddress(from: string): string | null {
   const angle = from.match(/<([^>]+)>/);
   const raw = (angle ? angle[1] : from).trim().toLowerCase();
   return raw.includes("@") ? raw : null;
-}
-
-/**
- * True when the sender's address ends with one of the allowed domain
- * suffixes. Matches the exact domain and any subdomain of it:
- *   allowed "lincolnhigh.org" matches a@lincolnhigh.org and a@mail.lincolnhigh.org.
- * A leading "@" on an allowed entry is tolerated.
- */
-export function senderDomainAllowed(
-  fromAddress: string | null,
-  allowedDomains: string[]
-): boolean {
-  if (!fromAddress) return false;
-  const addr = fromAddress.trim().toLowerCase();
-  if (!addr.includes("@")) return false;
-
-  return allowedDomains.some((entry) => {
-    const suffix = entry.trim().toLowerCase().replace(/^@+/, "");
-    if (!suffix) return false;
-    return addr.endsWith("@" + suffix) || addr.endsWith("." + suffix);
-  });
 }
 
 /**
@@ -116,25 +83,4 @@ export function routeInboundMessage(
     }
   }
   return { schoolId, divisionIds };
-}
-
-/**
- * What to do with a message from this sender, given the school's allowed
- * sender domains:
- *   - "allow":  the sender matches the allowlist; ingest it.
- *   - "reject": an allowlist is set and the sender isn't on it.
- *   - "review": no allowlist is set. The private address is then the only
- *               thing standing between a stranger and documents parents see,
- *               so the message is held for an admin to approve or reject.
- * Secure by default: an empty allowlist never ingests on its own.
- */
-export type SenderGateDecision = "allow" | "reject" | "review";
-
-export function senderGate(
-  fromAddress: string | null,
-  allowedDomains: string[] | null | undefined
-): SenderGateDecision {
-  const domains = (allowedDomains ?? []).filter((d) => d.trim() !== "");
-  if (domains.length === 0) return "review";
-  return senderDomainAllowed(fromAddress, domains) ? "allow" : "reject";
 }

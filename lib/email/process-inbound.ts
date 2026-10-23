@@ -1,11 +1,9 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   parseEmailAddress,
-  senderGate,
   extractInboundTokens,
   routeInboundMessage,
   isStaleClaim,
-  type SenderGateDecision,
 } from "@/lib/email/inbound";
 import { addDocumentDivisions } from "@/lib/documents/ingest";
 import { ingestReceivedEmail, type IngestedEmail } from "@/lib/email/ingest-message";
@@ -16,18 +14,20 @@ import {
   type ContentDuplicates,
 } from "@/lib/email/content-dedupe";
 
-// The one inbound-email pipeline: route to a school by address token, gate on
-// the sender allowlist, claim the message so it is ingested once, ingest, and
-// log every attempt in email_ingestions (the admin's "Recent emails"). The
+// The one inbound-email pipeline: route to a school by address token, check
+// the school has ingestion on, claim the message so it is ingested once,
+// ingest, and log every attempt in email_ingestions (the admin's "Recent emails"). The
 // Resend webhook and manual raw-MIME submissions both run through here; they
 // differ only in where the content comes from and how a result is reported.
+//
+// Mail from any sender is accepted: there is no sender allowlist and no hold
+// for review. (schools.allowed_sender_domains is left in the database,
+// unused; 'pending_review' / 'rejected_domain' rows are from before.)
 
 export type IngestStatus =
   | "processing"
   | "accepted"
-  | "pending_review"
   | "rejected_disabled"
-  | "rejected_domain"
   | "rejected_unknown"
   | "duplicate"
   | "error";
@@ -52,12 +52,6 @@ export interface ProcessInboundParams {
   loadContent: () => Promise<InboundContent>;
   /** App origin used to kick off document processing. */
   origin: string;
-  /**
-   * What to do with mail when the school has no allowlist. "hold" logs it as
-   * pending_review for an admin to approve, which re-fetches it from Resend;
-   * "reject" logs it as rejected_domain (for content that can't be re-fetched).
-   */
-  onReview: "hold" | "reject";
   /** Appended to every logged reason, e.g. " (manual: gmail-intake)". */
   reasonSuffix?: string;
   suppressPush?: boolean;
@@ -72,7 +66,7 @@ export interface ProcessInboundParams {
   processingDeadline?: number;
   /** Process the documents in this process instead of via /api/process-document. */
   processInline?: boolean;
-  /** Route, gate and check for duplicates, but write nothing. */
+  /** Route and check for duplicates, but write nothing. */
   dryRun?: boolean;
 }
 
@@ -90,7 +84,6 @@ export interface ProcessInboundResult {
   ingestionId: string | null;
   schoolId: string | null;
   divisionIds: string[];
-  gate?: SenderGateDecision;
   /** Dry run only: whether the message is already held, claimed or ingested. */
   duplicate?: boolean;
   /** Parts already in the library (with contentDedupe). */
@@ -148,11 +141,10 @@ export async function processInboundEmail(
   const supabase = deps.db();
 
   // What is known so far, reported with every outcome.
-  const known: {
-    schoolId: string | null;
-    divisionIds: string[];
-    gate?: SenderGateDecision;
-  } = { schoolId: null, divisionIds: [] };
+  const known: { schoolId: string | null; divisionIds: string[] } = {
+    schoolId: null,
+    divisionIds: [],
+  };
 
   const result = (
     status: InboundOutcomeStatus,
@@ -225,7 +217,7 @@ export async function processInboundEmail(
 
   const { data: school } = await supabase
     .from("schools")
-    .select("id, email_ingestion_enabled, allowed_sender_domains")
+    .select("id, email_ingestion_enabled")
     .eq("id", route.schoolId)
     .single();
 
@@ -236,37 +228,11 @@ export async function processInboundEmail(
   known.schoolId = schoolId;
   known.divisionIds = route.divisionIds;
 
-  // 2. Gate on enabled + sender domain allowlist.
+  // 2. The school must have ingestion on. Any sender is accepted.
   if (!school.email_ingestion_enabled) {
     return record("rejected_disabled", "Ingestion disabled");
   }
-
-  // Secure by default: with no allowlist, the private address token would be
-  // the only gate between a stranger and documents parents read, so the
-  // message is held for an admin to approve instead of being ingested.
   const fromAddress = parseEmailAddress(meta.from ?? "");
-  const gate = senderGate(fromAddress, school.allowed_sender_domains);
-  known.gate = gate;
-  if (gate === "reject") {
-    return record("rejected_domain", `Sender ${fromAddress ?? "?"} not in allowlist`);
-  }
-  if (gate === "review") {
-    if (params.onReview === "reject") {
-      return record(
-        "rejected_domain",
-        "No allowed sender domains are set, and this submission can't be held for review"
-      );
-    }
-    if (dryRun) {
-      return result("pending_review", "Would hold for review: no allowed sender domains are set");
-    }
-    return holdForReview(
-      supabase,
-      deps,
-      { ...meta, schoolId, divisionIds: route.divisionIds },
-      result
-    );
-  }
 
   if (dryRun) {
     // Past the Message-ID check: what the content check would make of it.
@@ -481,95 +447,4 @@ async function claimMessage(
   }
 
   return { skip: "in_progress" };
-}
-
-/**
- * Hold a message from an unvetted sender for admin review instead of
- * ingesting it. Nothing is fetched or stored but the metadata; an admin's
- * "Approve" later pulls the content from Resend by email id.
- *
- * A held message takes the same per-message slot as a claim (032's unique
- * index covers 'pending_review'), so a copy of the same email reaching a
- * second division address just adds that division to the held row, and a
- * copy of an email that was already approved adds its division to the
- * documents that approval created.
- */
-async function holdForReview(
-  supabase: Db,
-  deps: ProcessInboundDeps,
-  data: InboundMeta & { schoolId: string; divisionIds: string[] },
-  result: (
-    status: InboundOutcomeStatus,
-    reason: string,
-    extra?: Partial<ProcessInboundResult>
-  ) => ProcessInboundResult
-): Promise<ProcessInboundResult> {
-  const { schoolId, divisionIds } = data;
-  const reason = "Held for review: no allowed sender domains are set";
-
-  const { data: row, error } = await supabase
-    .from("email_ingestions")
-    .insert({
-      school_id: schoolId,
-      email_id: data.emailId,
-      message_id: data.messageId,
-      from_address: data.from,
-      subject: data.subject,
-      status: "pending_review" as const,
-      reason,
-      division_ids: divisionIds,
-    })
-    .select("id")
-    .single();
-  if (!error) return result("pending_review", reason, { ingestionId: row?.id ?? null });
-  if (error.code !== "23505" || !data.messageId) {
-    console.error("[inbound-email] Could not hold message for review:", error.message);
-    return result("error", "Could not hold message", {
-      httpStatus: 500,
-      error: "Could not hold message",
-    });
-  }
-
-  const { data: holder } = await supabase
-    .from("email_ingestions")
-    .select("id, status, division_ids, document_ids")
-    .eq("school_id", schoolId)
-    .eq("message_id", data.messageId)
-    .in("status", ["pending_review", "processing", "accepted"])
-    .maybeSingle();
-
-  if (!holder) {
-    // Released between our insert and this read; let Resend retry.
-    return result("in_progress", "Retry later", { httpStatus: 409, error: "Retry later" });
-  }
-
-  if (holder.status === "pending_review") {
-    const merged = [...new Set([...(holder.division_ids ?? []), ...divisionIds])];
-    await supabase
-      .from("email_ingestions")
-      .update({ division_ids: merged })
-      .eq("id", holder.id)
-      .eq("status", "pending_review");
-    return result("pending_review", reason, { ingestionId: holder.id });
-  }
-
-  if (holder.status === "accepted") {
-    try {
-      await deps.addDivisions(holder.document_ids ?? [], divisionIds);
-    } catch (err) {
-      console.error("[inbound-email] Adding divisions to a duplicate failed:", err);
-      return result("error", "Adding divisions to a duplicate failed", {
-        httpStatus: 500,
-        error: "Retry later",
-      });
-    }
-    return result("duplicate", "Already ingested", { ingestionId: holder.id });
-  }
-
-  // Being ingested right now (an admin just approved it). Retry later so
-  // this copy's divisions land on the finished documents.
-  return result("in_progress", "Already being ingested", {
-    httpStatus: divisionIds.length ? 409 : 200,
-    ingestionId: holder.id,
-  });
 }

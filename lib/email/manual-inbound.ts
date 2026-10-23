@@ -27,15 +27,12 @@ import {
 
 // Manual submissions: a raw RFC822 message (e.g. read from a parent's Gmail by
 // a scheduled job) run through the same pipeline as the Resend webhook, so it
-// is routed, gated, de-duplicated, ingested and logged exactly like mail that
+// is routed, de-duplicated, ingested and logged exactly like mail that
 // reached the inbound address. Nothing is sent or forwarded.
 //
 // Differences from the webhook, all because there is no Resend copy to fetch
 // later:
 //   - email_id is null on the logged rows;
-//   - with no allowlist the message is rejected (rejected_domain), not held
-//     for review: an admin's "Approve" re-fetches from Resend, which can't
-//     work for manual mail;
 //   - a Message-ID header is required (the claim key);
 //   - by default the content is also checked against the school's library
 //     (contentDedupe), the body is sanitized for having been read from a
@@ -226,7 +223,6 @@ export async function handleManualInbound(
         },
         loadContent: async () => content,
         origin: opts.origin,
-        onReview: "reject",
         reasonSuffix: ` (manual: ${source})`,
         suppressPush: input.suppressPush !== false,
         contentDedupe: input.contentDedupe !== false,
@@ -251,7 +247,6 @@ export async function handleManualInbound(
         status: "dry_run",
         outcome: outcome.status,
         reason: outcome.reason,
-        gate: outcome.gate ?? null,
         duplicate: outcome.duplicate ?? false,
         contentDuplicates: outcome.contentDuplicates ?? [],
         documentIds: outcome.documentIds,

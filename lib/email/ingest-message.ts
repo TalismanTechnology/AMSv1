@@ -30,8 +30,8 @@ export interface IngestedEmail {
 
 /**
  * Turn one received email into documents: the body as one text document and
- * each real attachment as its own. Shared by the inbound webhook (allowlisted
- * senders), the admin "Approve" action (mail held for review) and manual
+ * each real attachment as its own. Shared by the inbound webhook, the admin
+ * "Approve" action (older mail held for review) and manual
  * raw-MIME submissions, so every path ingests exactly the same way.
  *
  * The content comes from the caller's source: fetched from Resend by email id
