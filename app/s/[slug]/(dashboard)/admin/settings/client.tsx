@@ -15,6 +15,7 @@ import {
   Globe,
   KeyRound,
   Contact,
+  type LucideIcon,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { LogoSpinner } from "@/components/logo-spinner";
@@ -63,6 +64,13 @@ import {
   schoolYearStart,
 } from "@/lib/grades";
 import { cn } from "@/lib/utils";
+import {
+  SETTINGS_TABS,
+  SETTINGS_TAB_LABELS,
+  isSettingsTab,
+  settingsTabUrl,
+  type SettingsTab,
+} from "@/lib/settings/tabs";
 import { toast } from "sonner";
 import type { EventCalendar, Settings } from "@/lib/types";
 import type { InboundAddresses } from "@/lib/email/addresses";
@@ -107,16 +115,19 @@ export interface BlackbaudConfig {
   eventCalendars: EventCalendar[];
 }
 
-const SETTINGS_TABS = ["general", "assistant", "contacts", "email", "website", "sign-in", "blackbaud"] as const;
-type SettingsTab = (typeof SETTINGS_TABS)[number];
+const SETTINGS_TAB_ICONS: Record<SettingsTab, LucideIcon> = {
+  general: School,
+  assistant: Sparkles,
+  contacts: Contact,
+  email: Mail,
+  website: Globe,
+  "sign-in": KeyRound,
+  blackbaud: Plug,
+};
 
 // Tabs whose fields are saved by the header's save button. Email has its own
 // save button; Contacts, Website, Sign-in and Blackbaud save as you go.
 const SAVED_BY_HEADER: readonly SettingsTab[] = ["general", "assistant"];
-
-function isSettingsTab(value: string | null | undefined): value is SettingsTab {
-  return SETTINGS_TABS.includes(value as SettingsTab);
-}
 
 interface SettingsClientProps {
   settings: Settings;
@@ -240,10 +251,7 @@ export function SettingsClient({
   function changeTab(value: string) {
     if (!isSettingsTab(value)) return;
     setTab(value);
-    const url = new URL(window.location.href);
-    if (value === "general") url.searchParams.delete("tab");
-    else url.searchParams.set("tab", value);
-    window.history.replaceState(null, "", url.toString());
+    window.history.replaceState(null, "", settingsTabUrl(window.location.href, value));
   }
 
   return (
@@ -266,38 +274,37 @@ export function SettingsClient({
       </div>
 
       <Tabs value={tab} onValueChange={changeTab} className="gap-8">
-        <div className="overflow-x-auto border-b border-border">
-          <TabsList variant="line" className="h-10">
-            <TabsTrigger value="general" className="px-3">
-              <School />
-              General
-            </TabsTrigger>
-            <TabsTrigger value="assistant" className="px-3">
-              <Sparkles />
-              Assistant
-            </TabsTrigger>
-            <TabsTrigger value="contacts" className="px-3">
-              <Contact />
-              Contacts
-            </TabsTrigger>
-            <TabsTrigger value="email" className="px-3">
-              <Mail />
-              Email
-            </TabsTrigger>
-            <TabsTrigger value="website" className="px-3">
-              <Globe />
-              Website
-            </TabsTrigger>
-            <TabsTrigger value="sign-in" className="px-3">
-              <KeyRound />
-              Sign-in
-            </TabsTrigger>
-            <TabsTrigger value="blackbaud" className="px-3">
-              <Plug />
-              Blackbaud
-            </TabsTrigger>
-          </TabsList>
+        {/* Phones: a dropdown showing the current tab. Wider screens: every
+            tab as a pill, wrapping onto a second row rather than scrolling. */}
+        <div className="sm:hidden">
+          <Select value={tab} onValueChange={changeTab}>
+            <SelectTrigger aria-label="Settings section" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SETTINGS_TABS.map((value) => {
+                const Icon = SETTINGS_TAB_ICONS[value];
+                return (
+                  <SelectItem key={value} value={value}>
+                    <Icon />
+                    {SETTINGS_TAB_LABELS[value]}
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
         </div>
+        <TabsList className="hidden w-full flex-wrap justify-start gap-0 group-data-[orientation=horizontal]/tabs:h-auto sm:flex">
+          {SETTINGS_TABS.map((value) => {
+            const Icon = SETTINGS_TAB_ICONS[value];
+            return (
+              <TabsTrigger key={value} value={value} className="h-8 flex-none gap-1 px-2">
+                <Icon />
+                {SETTINGS_TAB_LABELS[value]}
+              </TabsTrigger>
+            );
+          })}
+        </TabsList>
 
         {/* forceMount keeps each tab's unsaved edits when switching away. */}
         <TabsContent
