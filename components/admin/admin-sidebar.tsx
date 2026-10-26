@@ -41,7 +41,7 @@ import { useSchool } from "@/components/shared/school-context";
 import { SchoolSwitcher } from "@/components/shared/school-switcher";
 import { motion, LayoutGroup } from "framer-motion";
 import { sidebarVariants } from "@/lib/motion";
-import { DevPanelTrigger } from "@/components/dev-panel/dev-panel-trigger";
+import { SuperAdminLogo } from "@/components/admin/super-admin-logo";
 import {
   ADMIN_NAV,
   activeNavChild,
@@ -83,7 +83,7 @@ export function AdminSidebarContent({ onNavigate, forceExpanded }: SidebarConten
   return (
     <>
       <div className="flex items-center gap-2.5 px-3 py-4 overflow-hidden">
-        <DevPanelTrigger collapsed={collapsed} />
+        <SuperAdminLogo collapsed={collapsed} />
         {!collapsed && (
           <span className="font-serif-display truncate text-[15px] font-semibold tracking-[-0.02em] text-sidebar-foreground">
             {school.name}
