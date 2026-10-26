@@ -117,9 +117,15 @@ export function ParentSignInSettings({
         </div>
       ) : (
         <div className="space-y-5">
-          <ProviderCard schoolId={schoolId} config={config} isSuperAdmin={isSuperAdmin} />
-          <RosterCard schoolId={schoolId} config={config} />
-          <GateCard schoolId={schoolId} config={config} isSuperAdmin={isSuperAdmin} />
+          <div id="setting-sign-in-provider" className="scroll-mt-6">
+            <ProviderCard schoolId={schoolId} config={config} isSuperAdmin={isSuperAdmin} />
+          </div>
+          <div id="setting-parent-roster" className="scroll-mt-6">
+            <RosterCard schoolId={schoolId} config={config} />
+          </div>
+          <div id="setting-roster-gate" className="scroll-mt-6">
+            <GateCard schoolId={schoolId} config={config} isSuperAdmin={isSuperAdmin} />
+          </div>
         </div>
       )}
     </section>

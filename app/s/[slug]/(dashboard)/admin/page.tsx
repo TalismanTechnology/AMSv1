@@ -163,7 +163,7 @@ export default async function AdminDashboard({
         </section>
 
         {/* Pending Approvals */}
-        <section>
+        <section id="pending-approvals" className="scroll-mt-6">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-ink">Pending Approvals</h2>
             <Button variant="ghost" size="sm" asChild>

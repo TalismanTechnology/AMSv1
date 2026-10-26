@@ -108,7 +108,7 @@ export function WebsiteSources({
   }
 
   return (
-    <section className="space-y-4">
+    <section id="setting-website-sources" className="scroll-mt-6 space-y-4">
       <div className="flex items-end justify-between gap-4">
         <div className="space-y-1">
           <h2 className="text-base font-semibold text-ink">Website sources</h2>

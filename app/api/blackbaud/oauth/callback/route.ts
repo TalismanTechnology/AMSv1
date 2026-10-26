@@ -29,7 +29,7 @@ export async function GET(request: Request) {
     );
   }
 
-  const settingsUrl = `${origin}/s/${verified.schoolSlug}/admin/settings`;
+  const settingsUrl = `${origin}/s/${verified.schoolSlug}/admin/settings/blackbaud`;
 
   // Single-use: consumed here so a captured state can't be replayed inside its
   // TTL window, even from the original browser.

@@ -141,7 +141,7 @@ export function ContactsDirectory({
 
   return (
     <div className="space-y-12">
-      <section className="space-y-4">
+      <section id="setting-staff-contacts" className="scroll-mt-6 space-y-4">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="space-y-1">
             <h2 className="text-base font-semibold text-ink">Staff contacts</h2>
@@ -203,7 +203,7 @@ export function ContactsDirectory({
         </div>
       </section>
 
-      <section className="space-y-4">
+      <section id="setting-suggested-contacts" className="scroll-mt-6 space-y-4">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="space-y-1">
             <h2 className="text-base font-semibold text-ink">Suggested</h2>

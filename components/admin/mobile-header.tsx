@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Menu } from "lucide-react";
+import { Menu, Search } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,12 +10,14 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { AdminSidebarContent } from "./admin-sidebar";
+import { useCommandPalette } from "./command-palette";
 import { useSchool } from "@/components/shared/school-context";
 import { NotificationBell } from "@/components/parent/notification-bell";
 
 export function MobileHeader() {
   const [open, setOpen] = useState(false);
   const { school } = useSchool();
+  const { open: openSearch } = useCommandPalette();
 
   return (
     // env() insets are 0 inside the iOS app shell, which already sits below
@@ -28,6 +30,15 @@ export function MobileHeader() {
         </span>
       </div>
       <div className="flex items-center gap-1">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={openSearch}
+          aria-label="Search pages and settings"
+          className="size-11 shrink-0 rounded-xl text-ink hover:bg-secondary/70 hover:text-ink"
+        >
+          <Search className="size-5" strokeWidth={2.25} />
+        </Button>
         <NotificationBell />
         <Button
           variant="ghost"
