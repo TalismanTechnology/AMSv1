@@ -26,6 +26,18 @@ test("indexes every admin page, settings section and setting", () => {
   }
   assert.ok(hrefs.has("/s/demo/admin/documents?view=map"));
   assert.ok(hrefs.has("/s/demo/admin/events/blackbaud"));
+  assert.ok(hrefs.has("/s/demo/admin/email-intake"));
+  assert.ok(hrefs.has("/s/demo/admin/contacts"));
+  assert.ok(![...hrefs].some((h) => /\/settings\/(email|contacts)/.test(h)));
+});
+
+test("moved settings point at their new pages", () => {
+  const byId = (id: string) => admin.find((e) => e.id === id)!;
+  assert.equal(byId("setting-auto-sort").href, "/s/demo/admin/email-intake#setting-auto-sort");
+  assert.equal(byId("setting-auto-sort").context, "Email intake");
+  assert.equal(byId("setting-staff-contacts").href, "/s/demo/admin/contacts#setting-staff-contacts");
+  assert.equal(byId("setting-staff-contacts").context, "Contacts");
+  assert.equal(byId("setting-roster-gate").context, "Settings › Parent sign-in");
 });
 
 test("entry ids are unique", () => {
@@ -62,7 +74,8 @@ test("finds settings by label and keywords", () => {
   assert.equal(top("flagged"), "feature-flagged");
   assert.equal(top("auto folder"), "feature-auto-folder");
   assert.equal(top("sorting map"), "page-documents-map");
-  assert.equal(top("email intake"), "settings-email");
+  assert.equal(top("email intake"), "page-email-intake");
+  assert.equal(top("contacts"), "page-contacts");
   assert.equal(top("temp"), "setting-temperature");
   assert.equal(top("conflicts"), "page-conflicts");
 });

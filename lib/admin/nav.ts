@@ -2,7 +2,12 @@
 // Paths are relative to /s/<slug>/admin. Icons are attached by the sidebar, by
 // key, so this file stays plain data the search index and tests can use.
 
-import { SETTINGS_SECTIONS, SETTINGS_SECTION_INFO } from "@/lib/settings/sections";
+import {
+  CONTENT_PAGES,
+  CONTENT_PAGE_INFO,
+  SETTINGS_SECTIONS,
+  SETTINGS_SECTION_INFO,
+} from "@/lib/settings/sections";
 
 export interface AdminNavChild {
   key: string;
@@ -61,6 +66,13 @@ export const ADMIN_NAV: readonly AdminNavGroup[] = [
           { key: "events-blackbaud", label: "Blackbaud review", path: "/events/blackbaud", prefix: true },
         ],
       },
+      ...CONTENT_PAGES.map((page) => ({
+        key: page,
+        label: CONTENT_PAGE_INFO[page].label,
+        path: CONTENT_PAGE_INFO[page].path,
+        prefix: true,
+        keywords: CONTENT_PAGE_INFO[page].keywords,
+      })),
     ],
   },
   {

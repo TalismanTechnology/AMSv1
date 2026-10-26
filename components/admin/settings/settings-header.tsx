@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import {
+  CONTENT_PAGE_INFO,
   SETTINGS_SECTION_INFO,
   settingsHref,
+  type ContentPage,
   type SettingsSection,
 } from "@/lib/settings/sections";
 
@@ -53,6 +55,19 @@ export function SettingsPageHeader({
       ) : (
         <h1 className="sr-only">{info.label}</h1>
       )}
+    </header>
+  );
+}
+
+/** The header of a former Settings section that's now its own page (Content). */
+export function ContentPageHeader({ page }: { page: ContentPage }) {
+  const info = CONTENT_PAGE_INFO[page];
+  return (
+    <header>
+      <h1 className="text-2xl font-semibold text-ink tracking-[-0.01em]">
+        {info.label}
+      </h1>
+      <p className="mt-1 text-sm text-muted-foreground">{info.description}</p>
     </header>
   );
 }

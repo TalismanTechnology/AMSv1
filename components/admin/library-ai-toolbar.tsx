@@ -65,7 +65,7 @@ export function LibraryAiToolbar({
     <div className="flex flex-wrap items-center gap-2">
       <Link
         href={settingsHref}
-        title={`${SORT_HELP} When on, new documents are auto-sorted as they arrive. Change this in Settings.`}
+        title={`${SORT_HELP} When on, new documents are auto-sorted as they arrive. Change this in Email intake.`}
         className={PILL}
       >
         <Sparkles aria-hidden />

@@ -4,6 +4,7 @@ import { ChevronRight } from "lucide-react";
 import { requireSchoolContext } from "@/lib/school-context";
 import { PageTransition } from "@/components/motion";
 import {
+  CONTENT_PAGE_INFO,
   SETTINGS_SECTIONS,
   SETTINGS_SECTION_INFO,
   legacySettingsRedirect,
@@ -13,7 +14,8 @@ import { SETTINGS_SECTION_ICONS } from "@/components/admin/settings/section-icon
 import { LegacySettingsHashRedirect } from "./legacy-hash-redirect";
 
 // The Settings landing page: one card per section. Settings used to be a
-// single page with ?tab=; those links are sent on to the matching section.
+// single page with ?tab=; those links are sent on to the matching section
+// (Email intake and Contacts now live under Content in the sidebar).
 export default async function SettingsPage({
   params,
   searchParams,
@@ -65,6 +67,24 @@ export default async function SettingsPage({
             );
           })}
         </ul>
+
+        <p className="text-xs text-muted-foreground">
+          Looking for{" "}
+          <Link
+            href={settingsHref(slug, "email-intake")}
+            className="text-ink underline-offset-2 hover:underline"
+          >
+            {CONTENT_PAGE_INFO["email-intake"].label}
+          </Link>{" "}
+          or{" "}
+          <Link
+            href={settingsHref(slug, "contacts")}
+            className="text-ink underline-offset-2 hover:underline"
+          >
+            {CONTENT_PAGE_INFO.contacts.label}
+          </Link>
+          ? They&apos;re now under Content in the sidebar.
+        </p>
       </div>
     </PageTransition>
   );

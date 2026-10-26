@@ -40,7 +40,7 @@ test("dashboard is active only on the dashboard", () => {
 });
 
 test("sections stay active on their sub-pages", () => {
-  assert.equal(isNavItemActive(item("settings"), "/settings/email"), true);
+  assert.equal(isNavItemActive(item("settings"), "/settings/sign-in"), true);
   assert.equal(isNavItemActive(item("events"), "/events/blackbaud"), true);
   assert.equal(isNavItemActive(item("documents"), "/document-audit"), false);
 });
@@ -53,4 +53,19 @@ test("the active sub-item follows the path and ?view=", () => {
   assert.equal(activeNavChild(item("settings"), "/settings/sign-in", q())?.key, "settings-sign-in");
   // The landing page belongs to Settings but to none of its sections.
   assert.equal(activeNavChild(item("settings"), "/settings", q()), null);
+});
+
+test("Email intake and Contacts are top-level Content items, not Settings children", () => {
+  const content = ADMIN_NAV.find((g) => g.key === "content")!;
+  assert.deepEqual(
+    content.items.map((i) => i.label),
+    ["Documents", "Events", "Email intake", "Contacts"]
+  );
+  assert.equal(item("email-intake").path, "/email-intake");
+  assert.equal(item("contacts").path, "/contacts");
+  const settingsChildren = (item("settings").children ?? []).map((c) => c.path);
+  assert.ok(!settingsChildren.includes("/settings/email"));
+  assert.ok(!settingsChildren.includes("/settings/contacts"));
+  assert.equal(isNavItemActive(item("contacts"), "/contacts"), true);
+  assert.equal(isNavItemActive(item("settings"), "/contacts"), false);
 });

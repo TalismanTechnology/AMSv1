@@ -1,14 +1,14 @@
 // The admin Settings sections, each its own page under /admin/settings/<section>,
-// and the individual settings on them (with the anchor ids the command palette
-// jumps to). Also maps the old one-page Settings URLs (?tab=, #field) onto the
-// new pages, so bookmarks and older links keep working.
+// the former sections that are now their own admin pages (Email intake,
+// Contacts), and the individual settings on them (with the anchor ids the
+// command palette jumps to). Also maps the old Settings URLs (?tab=, #field,
+// /settings/email, /settings/contacts) onto the new pages, so bookmarks and
+// older links keep working.
 
 export const SETTINGS_SECTIONS = [
   "school",
   "app",
   "assistant",
-  "contacts",
-  "email",
   "website",
   "sign-in",
   "blackbaud",
@@ -24,7 +24,7 @@ export interface SettingsSectionInfo {
 export const SETTINGS_SECTION_INFO: Record<SettingsSection, SettingsSectionInfo> = {
   school: {
     label: "School",
-    description: "Your school's name, contact details, and when grades move up.",
+    description: "Your school's name and when grades move up.",
     keywords: ["general", "school year", "profile"],
   },
   app: {
@@ -36,16 +36,6 @@ export const SETTINGS_SECTION_INFO: Record<SettingsSection, SettingsSectionInfo>
     label: "Assistant",
     description: "How the AI answers parents, the welcome message, and suggested questions.",
     keywords: ["ai", "chat", "prompt"],
-  },
-  contacts: {
-    label: "Staff contacts",
-    description: "Who parents are pointed to when the assistant can't answer.",
-    keywords: ["contacts", "directory", "staff", "people"],
-  },
-  email: {
-    label: "Email intake",
-    description: "Forward school emails to become documents, and review held emails.",
-    keywords: ["email", "ingestion", "inbound", "forward", "intake"],
   },
   website: {
     label: "Website",
@@ -68,18 +58,50 @@ export function isSettingsSection(value: string | null | undefined): value is Se
   return SETTINGS_SECTIONS.includes(value as SettingsSection);
 }
 
+/** Former Settings sections, now top-level admin pages (sidebar › Content). */
+export const CONTENT_PAGES = ["email-intake", "contacts"] as const;
+export type ContentPage = (typeof CONTENT_PAGES)[number];
+
+export const CONTENT_PAGE_INFO: Record<ContentPage, SettingsSectionInfo & { path: string }> = {
+  "email-intake": {
+    label: "Email intake",
+    path: "/email-intake",
+    description: "Forward school emails to become documents, and review held emails.",
+    keywords: ["email", "ingestion", "inbound", "forward", "intake"],
+  },
+  contacts: {
+    label: "Contacts",
+    path: "/contacts",
+    description: "Who parents are pointed to when the assistant can't answer.",
+    keywords: ["staff contacts", "directory", "staff", "people"],
+  },
+};
+
+/** A page that holds settings: a Settings section or a Content page. */
+export type SettingsLocation = SettingsSection | ContentPage;
+
+function isContentPage(value: string): value is ContentPage {
+  return CONTENT_PAGES.includes(value as ContentPage);
+}
+
+/** The label of a settings location, with "Settings ›" for Settings sections. */
+export function settingsLocationContext(location: SettingsLocation): string {
+  return isContentPage(location)
+    ? CONTENT_PAGE_INFO[location].label
+    : `Settings › ${SETTINGS_SECTION_INFO[location].label}`;
+}
+
 /** One setting (or group of settings) with a stable anchor on its page. */
 export interface SettingEntry {
   /** Element id on the section page, without the leading "#". */
   anchor: string;
-  section: SettingsSection;
+  section: SettingsLocation;
   label: string;
   keywords: string[];
 }
 
 export const SETTING_ENTRIES: readonly SettingEntry[] = [
   { anchor: "setting-school-name", section: "school", label: "School name", keywords: ["name", "title"] },
-  { anchor: "setting-contact-info", section: "school", label: "Contact information", keywords: ["phone", "address", "office"] },
   { anchor: "setting-grade-rollover", section: "school", label: "Grades move up on", keywords: ["grade rollover", "school year", "graduate", "promotion"] },
   { anchor: "setting-disable-animations", section: "app", label: "Disable animations", keywords: ["appearance", "motion", "transitions"] },
   { anchor: "setting-new-document-push", section: "app", label: "Notify parents about new documents", keywords: ["push", "notifications", "alerts"] },
@@ -89,10 +111,10 @@ export const SETTING_ENTRIES: readonly SettingEntry[] = [
   { anchor: "setting-suggested-questions", section: "assistant", label: "Suggested questions", keywords: ["starter", "prompts", "chat"] },
   { anchor: "setting-staff-contacts", section: "contacts", label: "Staff contacts", keywords: ["directory", "add contact", "main office"] },
   { anchor: "setting-suggested-contacts", section: "contacts", label: "Suggested contacts", keywords: ["approve all", "review", "suggest from documents"] },
-  { anchor: "setting-email-ingestion", section: "email", label: "Enable email ingestion", keywords: ["inbound", "forward", "email"] },
-  { anchor: "setting-inbound-addresses", section: "email", label: "Intake email addresses", keywords: ["inbound address", "forward to", "division email", "copy"] },
-  { anchor: "setting-auto-sort", section: "email", label: "Auto-sort into categories & folders", keywords: ["auto sort", "ai", "library", "organize"] },
-  { anchor: "setting-recent-emails", section: "email", label: "Recent emails", keywords: ["held", "needs review", "approve", "reject", "email log"] },
+  { anchor: "setting-email-ingestion", section: "email-intake", label: "Enable email ingestion", keywords: ["inbound", "forward", "email"] },
+  { anchor: "setting-inbound-addresses", section: "email-intake", label: "Intake email addresses", keywords: ["inbound address", "forward to", "division email", "copy"] },
+  { anchor: "setting-auto-sort", section: "email-intake", label: "Auto-sort into categories & folders", keywords: ["auto sort", "ai", "library", "organize"] },
+  { anchor: "setting-recent-emails", section: "email-intake", label: "Recent emails", keywords: ["held", "needs review", "approve", "reject", "email log"] },
   { anchor: "setting-website-sources", section: "website", label: "Website sources", keywords: ["crawl", "sync now", "pages", "url"] },
   { anchor: "setting-sign-in-provider", section: "sign-in", label: "Sign-in method", keywords: ["provider", "login", "veracross", "blackbaud", "roster sign-in"] },
   { anchor: "setting-parent-roster", section: "sign-in", label: "Parent roster", keywords: ["csv", "upload", "allowed parents", "list"] },
@@ -101,26 +123,36 @@ export const SETTING_ENTRIES: readonly SettingEntry[] = [
   { anchor: "setting-blackbaud-feeds", section: "blackbaud", label: "Blackbaud calendar feeds", keywords: ["ical", "events", "subscription", "calendar"] },
 ];
 
-/** /s/<slug>/admin/settings, or a section page, optionally at an anchor. */
-export function settingsHref(slug: string, section?: SettingsSection, anchor?: string): string {
+/**
+ * /s/<slug>/admin/settings, a section page, or a Content page that used to be
+ * a section (/admin/email-intake, /admin/contacts), optionally at an anchor.
+ */
+export function settingsHref(slug: string, section?: SettingsLocation, anchor?: string): string {
+  const hash = anchor ? `#${anchor}` : "";
+  if (section && isContentPage(section)) {
+    return `/s/${slug}/admin${CONTENT_PAGE_INFO[section].path}${hash}`;
+  }
   const base = `/s/${slug}/admin/settings`;
   if (!section) return base;
-  return `${base}/${section}${anchor ? `#${anchor}` : ""}`;
+  return `${base}/${section}${hash}`;
 }
 
 // Old ?tab= values on the one-page Settings.
-const LEGACY_TABS: Record<string, SettingsSection> = {
+const LEGACY_TABS: Record<string, SettingsLocation> = {
   general: "school",
   assistant: "assistant",
   contacts: "contacts",
-  email: "email",
+  email: "email-intake",
   website: "website",
   "sign-in": "sign-in",
   blackbaud: "blackbaud",
 };
 
-/** Other names a section might be reached by (/admin/settings/<alias>). */
-const SECTION_ALIASES: Record<string, SettingsSection> = {
+/**
+ * Other names a section might be reached by (/admin/settings/<alias>),
+ * including the old /settings/email and /settings/contacts pages.
+ */
+const SECTION_ALIASES: Record<string, SettingsLocation> = {
   ...LEGACY_TABS,
   general: "school",
   "school-year": "school",
@@ -129,16 +161,16 @@ const SECTION_ALIASES: Record<string, SettingsSection> = {
   ai: "assistant",
   chat: "assistant",
   "staff-contacts": "contacts",
-  "email-ingestion": "email",
-  intake: "email",
-  "email-intake": "email",
+  "email-ingestion": "email-intake",
+  intake: "email-intake",
+  "email-intake": "email-intake",
   signin: "sign-in",
   login: "sign-in",
   roster: "sign-in",
 };
 
 /** The section a path segment like "general" or "ai" refers to, if any. */
-export function resolveSectionAlias(value: string): SettingsSection | null {
+export function resolveSectionAlias(value: string): SettingsLocation | null {
   const key = value.toLowerCase();
   return isSettingsSection(key) ? key : (SECTION_ALIASES[key] ?? null);
 }
@@ -157,7 +189,7 @@ export function legacySettingsRedirect(
   const blackbaud = first(searchParams.blackbaud);
 
   // Returning from Blackbaud's consent screen always shows the Blackbaud page.
-  const section: SettingsSection | null = blackbaud
+  const section: SettingsLocation | null = blackbaud
     ? "blackbaud"
     : tab
       ? (LEGACY_TABS[tab] ?? null)
@@ -174,16 +206,19 @@ export function legacySettingsRedirect(
 }
 
 // Element ids from the old one-page Settings that someone may have linked to.
-const LEGACY_FIELD_IDS: Record<string, { section: SettingsSection; anchor: string }> = {
+const LEGACY_FIELD_IDS: Record<string, { section: SettingsLocation; anchor: string }> = {
   "school-name": { section: "school", anchor: "setting-school-name" },
-  "contact-info": { section: "school", anchor: "setting-contact-info" },
+  // The school-wide Contact information field was removed; staff contacts
+  // are who parents are pointed to now.
+  "contact-info": { section: "contacts", anchor: "setting-staff-contacts" },
+  "setting-contact-info": { section: "contacts", anchor: "setting-staff-contacts" },
   "grade-rollover-month": { section: "school", anchor: "setting-grade-rollover" },
   "disable-animations": { section: "app", anchor: "setting-disable-animations" },
   "new-document-push": { section: "app", anchor: "setting-new-document-push" },
   "custom-prompt": { section: "assistant", anchor: "setting-custom-prompt" },
   "welcome-msg": { section: "assistant", anchor: "setting-welcome-message" },
-  "email-ingestion-enabled": { section: "email", anchor: "setting-email-ingestion" },
-  "auto-sort": { section: "email", anchor: "setting-auto-sort" },
+  "email-ingestion-enabled": { section: "email-intake", anchor: "setting-email-ingestion" },
+  "auto-sort": { section: "email-intake", anchor: "setting-auto-sort" },
   "require-roster-match": { section: "sign-in", anchor: "setting-roster-gate" },
 };
 

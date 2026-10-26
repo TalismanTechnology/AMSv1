@@ -268,7 +268,7 @@ export function DocumentsClient({
           folders={folders}
           schoolId={schoolId}
           autoSortEnabled={autoSortEnabled}
-          settingsHref={settingsHref(schoolSlug, "email", "setting-auto-sort")}
+          settingsHref={settingsHref(schoolSlug, "email-intake", "setting-auto-sort")}
           sortingIds={sorting}
           onSortDocuments={sortDocuments}
         />

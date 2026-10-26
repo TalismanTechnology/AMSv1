@@ -8,6 +8,7 @@ import {
   SETTINGS_SECTION_INFO,
   SETTING_ENTRIES,
   settingsHref,
+  settingsLocationContext,
 } from "@/lib/settings/sections";
 
 /** "admin": any school admin (the whole admin area). "superAdmin": platform staff only. */
@@ -19,7 +20,7 @@ export interface AdminSearchEntry {
   id: string;
   label: string;
   group: SearchGroup;
-  /** Where it lives, shown beside the label (e.g. "Settings › Email intake"). */
+  /** Where it lives, shown beside the label (e.g. "Settings › Parent sign-in"). */
   context?: string;
   href: string;
   /** Element id to scroll to and highlight after navigating. */
@@ -106,7 +107,7 @@ export function buildAdminSearchIndex(slug: string, viewer: AdminViewer): AdminS
       id: setting.anchor,
       label: setting.label,
       group: "Settings",
-      context: `Settings › ${SETTINGS_SECTION_INFO[setting.section].label}`,
+      context: settingsLocationContext(setting.section),
       href: settingsHref(slug, setting.section, setting.anchor),
       anchor: setting.anchor,
       keywords: setting.keywords,

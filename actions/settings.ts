@@ -11,7 +11,6 @@ export async function updateSettings(
   data: {
     school_name?: string;
     logo_url?: string | null;
-    contact_info?: string | null;
     custom_system_prompt?: string | null;
     ai_temperature?: number;
     suggested_questions?: string[];

@@ -62,7 +62,6 @@ function useSaveSettings(schoolId: string) {
 
 export function SchoolSettings({ settings, schoolId, schoolSlug }: SettingsFormProps) {
   const [schoolName, setSchoolName] = useState(settings.school_name);
-  const [contactInfo, setContactInfo] = useState(settings.contact_info || "");
   const [rolloverMonth, setRolloverMonth] = useState(settings.grade_rollover_month);
   const [rolloverDay, setRolloverDay] = useState(settings.grade_rollover_day);
   // Fixed at mount, so the render stays pure; only the date part matters.
@@ -94,7 +93,6 @@ export function SchoolSettings({ settings, schoolId, schoolSlug }: SettingsFormP
     }
     await save({
       school_name: schoolName.trim() || "AskMySchool",
-      contact_info: contactInfo.trim() || null,
       // Only sent when changed, so saving still works before migration 043.
       ...(rolloverChanged
         ? { grade_rollover_month: rolloverMonth, grade_rollover_day: rolloverDay }
@@ -127,16 +125,6 @@ export function SchoolSettings({ settings, schoolId, schoolSlug }: SettingsFormP
                 value={schoolName}
                 onChange={(e) => setSchoolName(e.target.value)}
                 placeholder="AskMySchool"
-              />
-            </div>
-            <div id="setting-contact-info" className="scroll-mt-6 space-y-2">
-              <Label htmlFor="contact-info">Contact Information</Label>
-              <Textarea
-                id="contact-info"
-                value={contactInfo}
-                onChange={(e) => setContactInfo(e.target.value)}
-                rows={2}
-                placeholder="Phone, email, or address..."
               />
             </div>
           </div>
