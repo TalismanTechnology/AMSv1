@@ -49,9 +49,13 @@ export function DebugTab({ schoolId }: DebugTabProps) {
     setLoading(false);
   }, [schoolId]);
 
+  // First load: `loading` already starts true.
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    getDebugInfo(schoolId).then((info) => {
+      setData(info as DebugData);
+      setLoading(false);
+    });
+  }, [schoolId]);
 
   if (loading && !data) {
     return (

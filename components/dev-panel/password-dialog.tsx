@@ -24,12 +24,20 @@ export function PasswordDialog({ open, onClose, onSubmit }: PasswordDialogProps)
   const [error, setError] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
+  // Reset each time it opens (adjusting state while rendering, not in an effect).
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
     if (open) {
       setPassword("");
       setError(false);
-      setTimeout(() => inputRef.current?.focus(), 100);
     }
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    const timer = setTimeout(() => inputRef.current?.focus(), 100);
+    return () => clearTimeout(timer);
   }, [open]);
 
   const handleSubmit = (e: React.FormEvent) => {

@@ -1,4 +1,5 @@
 import { formatChunkLocation, type CitablePassage } from "./rag";
+import { NOT_FOUND_MARKER } from "@/lib/chat-utils";
 
 /**
  * The parent-facing assistant's system prompt.
@@ -40,6 +41,12 @@ After every reply — including when you couldn't find the answer or declined an
 2. Second follow-up question?
 3. Third follow-up question?`;
 
+// Asked for only when no documents matched. The calendar and announcements
+// are in every prompt, so only the model knows whether it answered from them
+// or came up empty; the app shows a "Search the web" link only on this line.
+const NOT_FOUND_FLAG = `NOT-FOUND FLAG
+If, and only if, your reply tells the parent you couldn't find the answer to a genuine question about the school in the school's information, put the line ${NOT_FOUND_MARKER} on its own line directly after ---FOLLOW_UPS---, before the numbered questions. Leave it out when you answered from the calendar or announcements, for greetings, thanks, or small talk, and when the question isn't about the school. Never write ${NOT_FOUND_MARKER} anywhere else.`;
+
 export function buildSystemPrompt(
   passages: CitablePassage[],
   options: SystemPromptOptions = {}
@@ -77,6 +84,7 @@ export function buildSystemPrompt(
     formatSchoolInstructions(schoolInstructions),
     hasHistory ? LATEST_MESSAGE_ONLY : "",
     FOLLOW_UPS,
+    hasDocuments ? "" : NOT_FOUND_FLAG,
   ];
 
   return sections.filter(Boolean).join("\n\n");

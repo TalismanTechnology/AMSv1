@@ -3,8 +3,8 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { FolderTree as FolderTreeIcon, Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { AutoFolderDialog } from "@/components/admin/auto-folder-dialog";
+import { TOOLBAR_PILL as PILL } from "@/components/admin/toolbar-pill";
 import { autoSortFolderCandidates } from "@/lib/documents/folders";
 import type { Category, Document, Folder } from "@/lib/types";
 
@@ -66,28 +66,30 @@ export function LibraryAiToolbar({
       <Link
         href={settingsHref}
         title={`${SORT_HELP} When on, new documents are auto-sorted as they arrive. Change this in Settings.`}
-        className="flex h-9 items-center gap-1.5 rounded-full border border-border px-3 text-xs text-ink-soft transition-colors hover:bg-muted/60 hover:text-ink"
+        className={PILL}
       >
-        <Sparkles className="size-3" />
+        <Sparkles aria-hidden />
         Auto-sort {autoSortEnabled ? "on" : "off"}
       </Link>
-      <Button
-        variant="outline"
+      <button
+        type="button"
+        className={PILL}
         onClick={() => onSortDocuments(pending)}
         disabled={pending.length === 0}
         title={SORT_HELP}
       >
-        <Sparkles className="mr-2 h-4 w-4" />
+        <Sparkles aria-hidden />
         {sortable.length > 0 ? `Auto-sort ${sortable.length} now` : "Nothing to auto-sort"}
-      </Button>
-      <Button
-        variant="outline"
+      </button>
+      <button
+        type="button"
+        className={PILL}
         onClick={() => setAutoFolderOpen(true)}
         title={FOLDER_HELP}
       >
-        <FolderTreeIcon className="mr-2 h-4 w-4" />
-        Auto-folder…
-      </Button>
+        <FolderTreeIcon aria-hidden />
+        Auto-folder
+      </button>
 
       <AutoFolderDialog
         open={autoFolderOpen}

@@ -1,30 +1,26 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 
 const SESSION_KEY = "dev-panel-auth";
 
 export function useDevPanel() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
 
-  useEffect(() => {
-    setIsAuthenticated(sessionStorage.getItem(SESSION_KEY) === "1");
-  }, []);
-
+  // Read when needed rather than mirrored into state on mount: the password
+  // submit below writes the same key.
   const handleLongPress = useCallback(() => {
-    if (isAuthenticated) {
+    if (sessionStorage.getItem(SESSION_KEY) === "1") {
       setIsDrawerOpen(true);
     } else {
       setShowPasswordDialog(true);
     }
-  }, [isAuthenticated]);
+  }, []);
 
   const handlePasswordSubmit = useCallback((password: string): boolean => {
     if (password === "Orchestra") {
       sessionStorage.setItem(SESSION_KEY, "1");
-      setIsAuthenticated(true);
       setShowPasswordDialog(false);
       setIsDrawerOpen(true);
       return true;
@@ -36,7 +32,6 @@ export function useDevPanel() {
   const closePasswordDialog = useCallback(() => setShowPasswordDialog(false), []);
 
   return {
-    isAuthenticated,
     isDrawerOpen,
     showPasswordDialog,
     handleLongPress,

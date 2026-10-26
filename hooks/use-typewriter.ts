@@ -3,10 +3,15 @@
 import { useState, useEffect, useRef } from "react";
 
 interface UseTypewriterOptions {
-  /** Milliseconds per character during streaming (default 20) */
+  /** Milliseconds per character during streaming (default 8) */
   speed?: number;
-  /** Milliseconds per character when flushing remaining buffer (default 5) */
+  /** Milliseconds per tick when flushing remaining buffer (default 5) */
   flushSpeed?: number;
+  /**
+   * Characters revealed per tick when flushing (default 3). Timers can't
+   * usefully fire faster than ~4ms, so a faster flush reveals more per tick.
+   */
+  flushStep?: number;
   /** Called once when all text has been revealed and streaming is done */
   onComplete?: () => void;
 }
@@ -15,13 +20,14 @@ interface UseTypewriterOptions {
  * Reveals `text` letter-by-letter with a buffered typewriter effect.
  * While the source text is still growing (streaming), characters are
  * revealed at `speed` ms each. Once streaming stops (text unchanged
- * for 300ms), remaining buffer is flushed at `flushSpeed` ms each.
+ * for 300ms), remaining buffer is flushed `flushStep` characters every
+ * `flushSpeed` ms.
  */
 export function useTypewriter(
   text: string,
   options: UseTypewriterOptions = {}
 ) {
-  const { speed = 20, flushSpeed = 5, onComplete } = options;
+  const { speed = 8, flushSpeed = 5, flushStep = 3, onComplete } = options;
   const [displayText, setDisplayText] = useState("");
   const [isTyping, setIsTyping] = useState(false);
 
@@ -42,7 +48,6 @@ export function useTypewriter(
 
     if (text.length > displayIndexRef.current) {
       streamingRef.current = true;
-      setIsTyping(true);
     }
 
     // After 300ms of no text growth, mark streaming as done
@@ -60,10 +65,12 @@ export function useTypewriter(
   useEffect(() => {
     if (timerRef.current) clearInterval(timerRef.current);
 
+    const streaming = streamingRef.current;
+    const step = streaming ? 1 : flushStep;
     const tick = () => {
       const current = textRef.current;
       if (displayIndexRef.current < current.length) {
-        displayIndexRef.current += 1;
+        displayIndexRef.current = Math.min(current.length, displayIndexRef.current + step);
         setDisplayText(current.slice(0, displayIndexRef.current));
         setIsTyping(true);
       } else if (!streamingRef.current) {
@@ -75,13 +82,15 @@ export function useTypewriter(
       }
     };
 
-    const currentSpeed = streamingRef.current ? speed : flushSpeed;
+    const currentSpeed = streaming ? speed : flushSpeed;
     timerRef.current = setInterval(tick, currentSpeed);
 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [text, speed, flushSpeed]);
+  }, [text, speed, flushSpeed, flushStep]);
 
-  return { displayText, isTyping };
+  // Text not yet revealed counts as typing from the moment it arrives (the
+  // caret shows before the first tick).
+  return { displayText, isTyping: isTyping || text.length > displayText.length };
 }

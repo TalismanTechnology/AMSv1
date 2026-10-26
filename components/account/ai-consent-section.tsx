@@ -5,6 +5,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { TermsAssentCheckbox } from "@/components/legal/terms-assent-checkbox";
 import { grantAiConsent, revokeAiConsent } from "@/actions/ai-consent";
 
 interface AiConsentSectionProps {
@@ -23,6 +24,7 @@ export function AiConsentSection({ consented: initial, consentedAt }: AiConsentS
   const [consented, setConsented] = useState(initial);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   async function handleRevoke() {
     setSaving(true);
@@ -34,12 +36,14 @@ export function AiConsentSection({ consented: initial, consentedAt }: AiConsentS
       return;
     }
     setConsented(false);
+    setAcceptedTerms(false);
     toast.success("AI processing turned off");
   }
 
   async function handleGrant() {
+    if (!acceptedTerms) return;
     setSaving(true);
-    const result = await grantAiConsent();
+    const result = await grantAiConsent({ acceptedTerms });
     setSaving(false);
     if ("error" in result && result.error) {
       toast.error(result.error);
@@ -71,6 +75,13 @@ export function AiConsentSection({ consented: initial, consentedAt }: AiConsentS
           </Link>
           .
         </p>
+        {!consented && (
+          <TermsAssentCheckbox
+            checked={acceptedTerms}
+            onCheckedChange={setAcceptedTerms}
+            disabled={saving}
+          />
+        )}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-ink">
             {consented ? (
@@ -105,7 +116,7 @@ export function AiConsentSection({ consented: initial, consentedAt }: AiConsentS
               Withdraw consent
             </Button>
           ) : (
-            <Button size="sm" onClick={handleGrant} disabled={saving}>
+            <Button size="sm" onClick={handleGrant} disabled={saving || !acceptedTerms}>
               Agree
             </Button>
           )}

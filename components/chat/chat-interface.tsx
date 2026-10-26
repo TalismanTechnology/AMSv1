@@ -336,6 +336,18 @@ export function ChatInterface({
       : undefined;
   }
 
+  function isUnanswered(message: (typeof messages)[number]): boolean {
+    return message.parts.some((p) => p.type === "data-unanswered");
+  }
+
+  /** The parent's question an assistant message answers (the user turn before it). */
+  function getQuestionFor(index: number): string | undefined {
+    for (let i = index - 1; i >= 0; i--) {
+      if (messages[i].role === "user") return getMessageText(messages[i]);
+    }
+    return undefined;
+  }
+
   function getDbMessageId(
     message: (typeof messages)[number]
   ): string | undefined {
@@ -417,6 +429,11 @@ export function ChatInterface({
                             ? getMessageContact(message)
                             : undefined
                         }
+                        webSearchQuery={
+                          message.role === "assistant" && isUnanswered(message)
+                            ? getQuestionFor(index)
+                            : undefined
+                        }
                         isLastAssistant={index === lastAssistantIndex && !isLoading}
                         isStreaming={
                           index === lastAssistantIndex &&
@@ -435,13 +452,13 @@ export function ChatInterface({
                 <RetrievalLoadingStrip />
               )}
               {consentError && !consentDialogOpen && (
-                <div className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm text-ink-soft">
+                <div className="rounded-xl border border-border bg-muted/40 px-5 py-4 text-sm leading-relaxed text-ink-soft">
                   To get answers, agree to AI processing — send your question
                   again to see the notice.
                 </div>
               )}
               {((error && !consentError) || sendError) && (
-                <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-5 py-4 text-sm leading-relaxed text-destructive">
                   Something went wrong: {error?.message || sendError}
                 </div>
               )}

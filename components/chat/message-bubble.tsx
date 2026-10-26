@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { Search } from "lucide-react";
 import { MarkdownRenderer } from "./lazy-markdown-renderer";
 import { TypewriterText } from "./typewriter-text";
 import { FollowUpChips } from "./follow-up-chips";
@@ -21,6 +22,14 @@ interface MessageBubbleProps {
   sources?: ChatSource[];
   /** The staff contact an unanswered question was routed to. */
   contact?: ContactCardData;
+  /**
+   * Set when no school documents matched: the parent's question. Offered as a
+   * Google search under the answer only if the model also flagged its reply
+   * as a genuine "couldn't find it" (the NOT_FOUND line in the follow-up
+   * block) — not a greeting, an off-topic reply, or a calendar answer. The AI
+   * itself still answers only from school material.
+   */
+  webSearchQuery?: string;
   isLastAssistant?: boolean;
   isStreaming?: boolean;
   skipAnimations?: boolean;
@@ -34,6 +43,7 @@ export function MessageBubble({
   schoolId,
   sources,
   contact,
+  webSearchQuery,
   isLastAssistant,
   isStreaming,
   skipAnimations,
@@ -60,15 +70,15 @@ export function MessageBubble({
 
   const showTypewriter = isStreaming || typewriterActive;
 
-  const { content: displayContent, followUps } = !isUser
+  const { content: displayContent, followUps, notFound } = !isUser
     ? parseFollowUps(content)
-    : { content, followUps: [] };
+    : { content, followUps: [], notFound: false };
 
   if (isUser) {
     return (
       <div className="flex justify-end">
         {/* Subtle warm-sand bubble, right-aligned */}
-        <div className="max-w-[80%] rounded-2xl bg-secondary px-4 py-2.5 text-sm leading-relaxed text-ink">
+        <div className="max-w-[80%] rounded-2xl bg-secondary px-5 py-3 text-sm leading-relaxed text-ink">
           <div className="whitespace-pre-wrap">{content}</div>
         </div>
       </div>
@@ -108,6 +118,18 @@ export function MessageBubble({
 
       {/* Shown once the answer that points to it has finished arriving. */}
       {contact && !showTypewriter && <ContactCard contact={contact} />}
+
+      {webSearchQuery?.trim() && notFound && !showTypewriter && (
+        <a
+          href={`https://www.google.com/search?q=${encodeURIComponent(webSearchQuery.trim())}`}
+          target="_blank"
+          rel="noopener"
+          className="inline-flex w-fit items-center gap-1.5 text-sm font-medium text-ink-soft underline-offset-4 hover:text-ink hover:underline"
+        >
+          <Search className="size-3.5" aria-hidden />
+          Search the web
+        </a>
+      )}
 
       {sources && sources.length > 0 && (
         <SourceList sources={sources} citedNumbers={citedNumbers} />

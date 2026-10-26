@@ -43,7 +43,10 @@ export function IntroOverlay({ onComplete }: IntroOverlayProps) {
   }, [onComplete]);
 
   useEffect(() => {
+    // Mount-time read of sessionStorage / matchMedia: it can't run during the
+    // server render or hydration, so it stays an effect.
     if (sessionStorage.getItem(SESSION_KEY) === "true") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSkipAnimation(true);
       setDismissed(true);
       onComplete?.();
@@ -73,6 +76,9 @@ export function IntroOverlay({ onComplete }: IntroOverlayProps) {
     const flash = flashRef.current;
     if (!overlay || !head || !body || !svg || !wavesContainer || !flash) {
       sessionStorage.setItem(SESSION_KEY, "true");
+      // Nothing to animate: dismiss straight away (the elements are only
+      // known after mount).
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       handleComplete();
       return;
     }
