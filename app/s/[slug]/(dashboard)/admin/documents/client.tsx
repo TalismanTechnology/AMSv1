@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import dynamic from "next/dynamic";
+import { useSearchParams } from "next/navigation";
+import { settingsHref } from "@/lib/settings/sections";
 import {
   Plus,
   Tags,
@@ -103,8 +105,16 @@ export function DocumentsClient({
   initialUploadOpen = false,
 }: DocumentsClientProps) {
   // Map mode hides the list's filters, which keep their values, and puts the
-  // map where the folder tree and table were.
-  const [view, setView] = useState<"list" | "map">("list");
+  // map where the folder tree and table were. Kept in ?view=map so the
+  // sidebar's "Sorting map" link opens it and shows as active.
+  const searchParams = useSearchParams();
+  const view: "list" | "map" = searchParams.get("view") === "map" ? "map" : "list";
+  const setView = useCallback((next: "list" | "map") => {
+    const url = new URL(window.location.href);
+    if (next === "map") url.searchParams.set("view", "map");
+    else url.searchParams.delete("view");
+    window.history.replaceState(null, "", url.toString());
+  }, []);
   const [uploadOpen, setUploadOpen] = useState(initialUploadOpen);
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState<Document | null>(null);
@@ -196,7 +206,7 @@ export function DocumentsClient({
     requestAnimationFrame(() =>
       document.getElementById("documents-view-list")?.focus()
     );
-  }, []);
+  }, [setView]);
 
   // Only ready documents can be viewed; the rest open for editing.
   const openFromMap = useCallback((doc: Document) => {
@@ -235,7 +245,11 @@ export function DocumentsClient({
               { value: "map", label: "Map", icon: <Network /> },
             ]}
           />
-          <Button variant="outline" onClick={() => setCategoryOpen(true)}>
+          <Button
+            id="manage-categories"
+            variant="outline"
+            onClick={() => setCategoryOpen(true)}
+          >
             <Tags className="mr-2 h-4 w-4" />
             Manage Categories
           </Button>
@@ -247,14 +261,14 @@ export function DocumentsClient({
       </header>
 
       {/* Auto-sort and Auto-folder, the same in the list and the map. */}
-      <div className="relative mb-4">
+      <div id="library-ai-toolbar" className="relative mb-4 scroll-mt-6">
         <LibraryAiToolbar
           documents={documents}
           categories={categories}
           folders={folders}
           schoolId={schoolId}
           autoSortEnabled={autoSortEnabled}
-          settingsHref={`/s/${schoolSlug}/admin/settings`}
+          settingsHref={settingsHref(schoolSlug, "email", "setting-auto-sort")}
           sortingIds={sorting}
           onSortDocuments={sortDocuments}
         />
@@ -378,7 +392,7 @@ export function DocumentsClient({
       {view === "list" ? (
         <div className="relative flex gap-4">
           <div className="hidden md:block">
-            <div className="rounded-xl border border-border p-3">
+            <div id="document-folders" className="scroll-mt-6 rounded-xl border border-border p-3">
               <FolderTree
                 folders={folders}
                 counts={folderCounts}

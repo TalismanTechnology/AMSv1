@@ -1887,3 +1887,27 @@ textarea:focus,
     stroke-dasharray: none;
   }
 }
+
+/* A setting the admin command palette jumped to: a brief ring and wash so the
+   eye finds it after the scroll. Removed by script once it has played. */
+@keyframes setting-highlight {
+  0%,
+  45% {
+    box-shadow: 0 0 0 6px color-mix(in oklab, var(--ring) 30%, transparent);
+    background-color: color-mix(in oklab, var(--ring) 7%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 6px transparent;
+    background-color: transparent;
+  }
+}
+.setting-highlight {
+  border-radius: 0.75rem;
+  animation: setting-highlight 2.2s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .setting-highlight {
+    animation: none;
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 40%, transparent);
+  }
+}

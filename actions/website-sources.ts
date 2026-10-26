@@ -25,7 +25,7 @@ export interface WebsiteSourceInput {
 const MAX_PAGES_LIMIT = 2000;
 
 // "Sync now" crawls for this long after responding; the */10 cron carries on
-// from there. Kept under the settings page's maxDuration (300s).
+// from there. Kept under the website settings page's maxDuration (300s).
 const SYNC_NOW_BUDGET_MS = 240_000;
 
 function cleanPatterns(patterns: string[]): string[] {

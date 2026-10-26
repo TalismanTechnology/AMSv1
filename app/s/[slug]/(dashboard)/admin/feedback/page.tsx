@@ -155,7 +155,7 @@ export default async function FeedbackPage({
       </div>
 
       {/* Flagged conversations */}
-      <div className="relative space-y-4">
+      <div id="flagged-conversations" className="relative scroll-mt-6 space-y-4">
         <div className="flex items-center gap-2">
           <Flag className="h-4 w-4 text-muted-foreground" />
           <h2 className="text-lg font-semibold text-ink tracking-[-0.01em]">

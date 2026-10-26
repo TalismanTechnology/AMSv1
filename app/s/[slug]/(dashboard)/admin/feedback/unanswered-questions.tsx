@@ -123,7 +123,7 @@ export function UnansweredQuestionsSection({
   }
 
   return (
-    <div className="space-y-4">
+    <div id="unanswered-questions" className="scroll-mt-6 space-y-4">
       <div className="flex items-center gap-2">
         <HelpCircle className="h-4 w-4 text-muted-foreground" />
         <h2 className="text-lg font-semibold text-ink tracking-[-0.01em]">
