@@ -6,12 +6,7 @@ import { LogoSpinner } from "@/components/logo-spinner";
 import { Button } from "@/components/ui/button";
 import { TimeAgo } from "@/components/ui/time-ago";
 import { syncBlackbaudRoster } from "@/actions/blackbaud";
-import {
-  BlackbaudCalendarFeeds,
-  type FeedWithMapping,
-} from "@/components/admin/blackbaud-calendar-feeds";
 import { toast } from "sonner";
-import type { EventCalendar } from "@/lib/types";
 
 export type BlackbaudCallbackResult = "connected" | "denied" | "error" | null;
 
@@ -26,11 +21,6 @@ export interface BlackbaudConfig {
   verificationEnabled: boolean;
   rosterCount: number;
   connection: BlackbaudConnection | null;
-  // Calendar feeds are independent of the OAuth connection above: Blackbaud
-  // exposes school calendars as iCal subscriptions, not through the SKY API,
-  // so a school can sync events without authorizing the app at all.
-  calendarFeeds: FeedWithMapping[];
-  eventCalendars: EventCalendar[];
 }
 
 const CALLBACK_MESSAGES: Record<
@@ -264,12 +254,22 @@ export function BlackbaudSection({
           mark as parents can get in.
         </p>
 
-        <BlackbaudCalendarFeeds
-          schoolId={schoolId}
-          schoolSlug={schoolSlug}
-          feeds={config.calendarFeeds}
-          calendars={config.eventCalendars}
-        />
+        {/* Calendars are independent of the OAuth connection above:
+            Blackbaud publishes them as iCal links, not through the SKY API,
+            and each link lives on a label on the Events page. */}
+        <a
+          id="setting-blackbaud-feeds"
+          href={`/s/${schoolSlug}/admin/events`}
+          className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-3 transition-colors hover:bg-secondary"
+        >
+          <span className="space-y-0.5">
+            <span className="block text-sm font-medium text-ink">Calendar links</span>
+            <span className="block text-xs text-muted-foreground">
+              Blackbaud calendar iCal links are managed as labels on the Events page.
+            </span>
+          </span>
+          <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </a>
       </div>
     </section>
   );

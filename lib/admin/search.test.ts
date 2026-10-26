@@ -25,7 +25,7 @@ test("indexes every admin page, settings section and setting", () => {
     assert.ok(entry.href.endsWith(`#${setting.anchor}`));
   }
   assert.ok(hrefs.has("/s/demo/admin/documents?view=map"));
-  assert.ok(hrefs.has("/s/demo/admin/events/blackbaud"));
+  assert.ok(hrefs.has("/s/demo/admin/events"));
   assert.ok(hrefs.has("/s/demo/admin/email-intake"));
   assert.ok(hrefs.has("/s/demo/admin/contacts"));
   assert.ok(![...hrefs].some((h) => /\/settings\/(email|contacts)/.test(h)));

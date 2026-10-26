@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireSchoolContext } from "@/lib/school-context";
 import { ParentEventsClient } from "./client";
 import { PageTransition } from "@/components/motion";
+import { LABEL_COLUMNS } from "@/lib/calendar-labels";
 
 export default async function ParentEventsPage({
   params,
@@ -19,19 +20,17 @@ export default async function ParentEventsPage({
   const oneYearAhead = new Date();
   oneYearAhead.setFullYear(oneYearAhead.getFullYear() + 1);
 
-  const [{ data: events }, { data: eventCalendars }] = await Promise.all([
+  const [{ data: events }, { data: labels }] = await Promise.all([
     supabase
       .from("events")
-      .select(
-        "*, calendars:event_calendars(id, school_id, kind, name, color, sort_order, created_at)"
-      )
+      .select("*")
       .eq("school_id", school.id)
       .gte("date", threeMonthsAgo.toISOString().split("T")[0])
       .lte("date", oneYearAhead.toISOString().split("T")[0])
       .order("date", { ascending: true }),
     supabase
-      .from("event_calendars")
-      .select("*")
+      .from("calendar_labels")
+      .select(LABEL_COLUMNS)
       .eq("school_id", school.id)
       .order("sort_order", { ascending: true }),
   ]);
@@ -40,7 +39,7 @@ export default async function ParentEventsPage({
     <PageTransition>
       <ParentEventsClient
         events={events || []}
-        eventCalendars={eventCalendars || []}
+        labels={labels || []}
       />
     </PageTransition>
   );

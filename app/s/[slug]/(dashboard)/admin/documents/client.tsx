@@ -1,5 +1,6 @@
 "use client";
 
+import { ManageCalendarsPopover } from "@/components/admin/manage-calendars-popover";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
@@ -245,6 +246,7 @@ export function DocumentsClient({
               { value: "map", label: "Map", icon: <Network /> },
             ]}
           />
+          <ManageCalendarsPopover calendars={divisions} schoolId={schoolId} />
           <Button
             id="manage-categories"
             variant="outline"

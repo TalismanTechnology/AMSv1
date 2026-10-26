@@ -230,6 +230,18 @@ export interface EventCalendar {
   created_at: string;
 }
 
+// A name and color an event is filed under. A label may carry one iCal link
+// (BlackbaudCalendarFeed.label_id) whose events sync in under it.
+export interface CalendarLabel {
+  id: string;
+  school_id: string;
+  name: string;
+  /** Palette name from lib/event-calendars.ts. */
+  color: string;
+  sort_order: number;
+  created_at: string;
+}
+
 /** Where an event came from. Blackbaud events arrive via a synced iCal feed. */
 export type EventSource = "manual" | "import" | "blackbaud";
 
@@ -248,9 +260,11 @@ export interface SchoolEvent {
   blackbaud_event_id: string | null;
   created_at: string;
   updated_at: string;
-  // Divisions + categories this event is tagged with.
-  // Populated when fetched with the event_calendars embed.
+  // Divisions + categories this event was tagged with before labels. No
+  // longer shown on the calendar; populated only by the event_calendars embed.
   calendars?: EventCalendar[];
+  /** The label it's filed under, which sets its color on the calendar. */
+  label_id: string | null;
 }
 
 export type AnnouncementPriority = "normal" | "important" | "urgent";
@@ -294,6 +308,8 @@ export interface Settings {
 export interface BlackbaudCalendarFeed {
   id: string;
   school_id: string;
+  /** The calendar label its events are filed under. */
+  label_id: string | null;
   label: string;
   url: string;
   timezone: string;

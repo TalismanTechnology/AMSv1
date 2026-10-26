@@ -29,7 +29,7 @@ export function ManageCalendarsPopover({
   calendars,
   schoolId,
 }: ManageCalendarsPopoverProps) {
-  const { divisions, categories } = splitCalendars(calendars);
+  const { divisions } = splitCalendars(calendars);
   const [createKind, setCreateKind] = useState<EventCalendarKind | null>(null);
   const [editing, setEditing] = useState<EventCalendar | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<EventCalendar | null>(null);
@@ -110,9 +110,9 @@ export function ManageCalendarsPopover({
     <>
       <Popover>
         <PopoverTrigger asChild>
-          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs">
-            <Settings2 className="mr-1 h-3.5 w-3.5" />
-            Manage tags
+          <Button variant="outline">
+            <Settings2 className="mr-2 h-4 w-4" />
+            Manage divisions
           </Button>
         </PopoverTrigger>
         <PopoverContent
@@ -121,14 +121,14 @@ export function ManageCalendarsPopover({
         >
           <div className="space-y-1 border-b border-border pb-3">
             <h3 className="text-base font-semibold tracking-[-0.01em] text-ink">
-              Manage calendars
+              Divisions
             </h3>
             <p className="text-xs text-muted-foreground">
-              Divisions and categories parents can filter by.
+              Divisions documents are sorted into, and that school mailboxes
+              route email to.
             </p>
           </div>
           {renderSection("division", divisions)}
-          {renderSection("category", categories)}
         </PopoverContent>
       </Popover>
 
@@ -163,7 +163,7 @@ export function ManageCalendarsPopover({
         title={`Delete ${
           deleteTarget ? KIND_LABELS[deleteTarget.kind].singular.toLowerCase() : ""
         }`}
-        description="Events keep their other tags — this only removes this calendar and untags it from any events. This cannot be undone."
+        description="Documents filed under this division lose it, and its school mailbox addresses are removed. This cannot be undone."
         confirmLabel="Delete"
         variant="destructive"
         loading={deleting}

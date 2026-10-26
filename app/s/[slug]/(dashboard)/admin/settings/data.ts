@@ -9,10 +9,9 @@ import type {
   BlackbaudCallbackResult,
 } from "@/components/admin/settings/blackbaud-settings";
 import type { EmailIngestionLogEntry } from "@/components/admin/settings/email-ingestion";
-import type { BlackbaudCalendarFeed, EventCalendar } from "@/lib/types";
 import type { WebsiteSourceView } from "@/components/admin/website-sources";
 import type { ParentSignInConfig } from "@/components/admin/parent-sign-in-settings";
-import type { School } from "@/lib/types";
+import type { EventCalendar, School } from "@/lib/types";
 import { resolveAuthProvider } from "@/lib/auth/provider";
 import { getRosterSummary } from "@/lib/roster/store";
 import { isRosterMatchRequired } from "@/lib/roster/gate";
@@ -44,14 +43,7 @@ export async function loadBlackbaudConfig(
 ): Promise<BlackbaudConfig> {
   const supabase = await createClient();
 
-  const [
-    { data: connection },
-    { count },
-    { data: feeds },
-    { data: mappings },
-    { data: eventCalendars },
-    { data: pending },
-  ] = await Promise.all([
+  const [{ data: connection }, { count }] = await Promise.all([
     supabase
       .from("blackbaud_connection_status")
       .select("status, last_synced_at, last_error, environment_id")
@@ -62,42 +54,7 @@ export async function loadBlackbaudConfig(
       .select("id", { count: "exact", head: true })
       .eq("school_id", schoolId)
       .eq("is_active", true),
-    supabase
-      .from("blackbaud_calendar_feeds")
-      .select("*")
-      .eq("school_id", schoolId)
-      .order("created_at", { ascending: true }),
-    supabase
-      .from("blackbaud_calendar_mappings")
-      .select("source_value, calendar_id")
-      .eq("school_id", schoolId)
-      .eq("source_kind", "feed"),
-    supabase
-      .from("event_calendars")
-      .select("*")
-      .eq("school_id", schoolId)
-      .order("sort_order", { ascending: true }),
-    supabase
-      .from("blackbaud_events")
-      .select("feed_id")
-      .eq("school_id", schoolId)
-      .eq("status", "pending"),
   ]);
-
-  const mappedByFeed = new Map<string, string[]>();
-  for (const row of mappings ?? []) {
-    const feedId = row.source_value as string;
-    mappedByFeed.set(feedId, [
-      ...(mappedByFeed.get(feedId) ?? []),
-      row.calendar_id as string,
-    ]);
-  }
-
-  const pendingByFeed = new Map<string, number>();
-  for (const row of pending ?? []) {
-    const feedId = row.feed_id as string;
-    pendingByFeed.set(feedId, (pendingByFeed.get(feedId) ?? 0) + 1);
-  }
 
   return {
     verificationEnabled,
@@ -110,12 +67,6 @@ export async function loadBlackbaudConfig(
           environmentId: connection.environment_id,
         }
       : null,
-    calendarFeeds: (feeds ?? []).map((feed) => ({
-      ...(feed as BlackbaudCalendarFeed),
-      mappedCalendarIds: mappedByFeed.get(feed.id as string) ?? [],
-      pendingCount: pendingByFeed.get(feed.id as string) ?? 0,
-    })),
-    eventCalendars: (eventCalendars ?? []) as EventCalendar[],
   };
 }
 

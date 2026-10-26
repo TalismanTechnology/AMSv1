@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 import {
   startOfMonth,
   endOfMonth,
@@ -28,68 +28,28 @@ import {
   Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { ManageCalendarsPopover } from "@/components/admin/manage-calendars-popover";
 import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/hooks/use-media-query";
-import { calendarColorClasses, KIND_LABELS } from "@/lib/event-calendars";
-import type { SchoolEvent, EventType, EventCalendar } from "@/lib/types";
+import { calendarColorClasses, UNLABELED_CLASSES } from "@/lib/event-calendars";
+import { isEventVisible, usedLabels, UNLABELED_FILTER_ID } from "@/lib/event-filters";
+import type { CalendarLabel, SchoolEvent } from "@/lib/types";
 
-// ─── Color maps ───────────────────────────────────────────
+/** The school's labels by id. An event takes its color from its label. */
+const LabelsContext = createContext<Map<string, CalendarLabel>>(new Map());
 
-const TYPE_BADGE_COLORS: Record<EventType, string> = {
-  general: "bg-secondary text-secondary-foreground",
-  academic: "bg-chart-1/15 text-chart-1",
-  sports: "bg-success/15 text-success",
-  arts: "bg-chart-2/15 text-chart-2",
-  meeting: "bg-chart-3/15 text-chart-3",
-  holiday: "bg-destructive/15 text-destructive",
-  other: "bg-secondary text-secondary-foreground",
-};
+function useEventLabel(event: SchoolEvent): CalendarLabel | null {
+  const labels = useContext(LabelsContext);
+  return event.label_id ? labels.get(event.label_id) ?? null : null;
+}
 
-const TYPE_PILL_COLORS: Record<EventType, string> = {
-  general: "bg-muted-foreground/20 text-muted-foreground border-l-muted-foreground",
-  academic: "bg-chart-1/15 text-chart-1 border-l-chart-1",
-  sports: "bg-success/15 text-success border-l-success",
-  arts: "bg-chart-2/15 text-chart-2 border-l-chart-2",
-  meeting: "bg-chart-3/15 text-chart-3 border-l-chart-3",
-  holiday: "bg-destructive/15 text-destructive border-l-destructive",
-  other: "bg-muted-foreground/20 text-muted-foreground border-l-muted-foreground",
-};
-
-const TYPE_BLOCK_COLORS: Record<EventType, string> = {
-  general: "bg-muted-foreground/15 border-l-muted-foreground",
-  academic: "bg-chart-1/10 border-l-chart-1",
-  sports: "bg-success/10 border-l-success",
-  arts: "bg-chart-2/10 border-l-chart-2",
-  meeting: "bg-chart-3/10 border-l-chart-3",
-  holiday: "bg-destructive/10 border-l-destructive",
-  other: "bg-muted-foreground/15 border-l-muted-foreground",
-};
-
-// Phone month cells are too narrow for pills, so each event becomes a dot.
-const TYPE_DOT_COLORS: Record<EventType, string> = {
-  general: "bg-muted-foreground/60",
-  academic: "bg-chart-1",
-  sports: "bg-success",
-  arts: "bg-chart-2",
-  meeting: "bg-chart-3",
-  holiday: "bg-destructive",
-  other: "bg-muted-foreground/60",
-};
-
-// Division color matches the filter legend; fall back to the event type.
-function dotColor(event: SchoolEvent) {
-  const division = event.calendars?.find((c) => c.kind === "division");
-  if (division) return calendarColorClasses(division.color).dot;
-  return (
-    TYPE_DOT_COLORS[event.event_type as EventType] || TYPE_DOT_COLORS.general
-  );
+function useEventColors(event: SchoolEvent) {
+  const label = useEventLabel(event);
+  return label ? calendarColorClasses(label.color) : UNLABELED_CLASSES;
 }
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -143,28 +103,57 @@ function hourLabel(hour: number) {
   return `${hour - 12} PM`;
 }
 
-// ─── Calendar tag chips ───────────────────────────────────
+// ─── Label chip ───────────────────────────────────────────
 
-function CalendarChips({ event }: { event: SchoolEvent }) {
-  if (!event.calendars || event.calendars.length === 0) return null;
+function LabelChip({ event }: { event: SchoolEvent }) {
+  const label = useEventLabel(event);
+  if (!label) return null;
+  const colors = calendarColorClasses(label.color);
   return (
-    <div className="flex flex-wrap gap-1">
-      {event.calendars.map((cal) => {
-        const colors = calendarColorClasses(cal.color);
-        return (
-          <span
-            key={cal.id}
-            className={cn(
-              "flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium",
-              colors.chip
-            )}
-          >
-            <span className={cn("h-1.5 w-1.5 rounded-full", colors.dot)} />
-            {cal.name}
-          </span>
-        );
-      })}
-    </div>
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium",
+        colors.chip
+      )}
+    >
+      <span className={cn("h-1.5 w-1.5 rounded-full", colors.dot)} />
+      {label.name}
+    </span>
+  );
+}
+
+// Each colored event shape is its own component so it can read the label.
+
+function EventDot({ event }: { event: SchoolEvent }) {
+  const colors = useEventColors(event);
+  return <span className={cn("h-1.5 w-1.5 rounded-full", colors.dot)} />;
+}
+
+function EventPill({
+  event,
+  className,
+  children,
+  ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & { event: SchoolEvent }) {
+  const colors = useEventColors(event);
+  return (
+    <button {...props} className={cn(className, colors.pill)}>
+      {children}
+    </button>
+  );
+}
+
+function EventBlock({
+  event,
+  className,
+  children,
+  ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & { event: SchoolEvent }) {
+  const colors = useEventColors(event);
+  return (
+    <button {...props} className={cn(className, colors.block)}>
+      {children}
+    </button>
   );
 }
 
@@ -195,15 +184,7 @@ function EventPopover({
       >
         <div className="flex items-start justify-between gap-2">
           <p className="font-medium text-sm">{event.title}</p>
-          <Badge
-            className={cn(
-              "shrink-0 text-[10px]",
-              TYPE_BADGE_COLORS[event.event_type as EventType] ||
-                TYPE_BADGE_COLORS.general
-            )}
-          >
-            {event.event_type}
-          </Badge>
+          <LabelChip event={event} />
         </div>
         <div className="space-y-1 text-xs text-muted-foreground">
           {event.start_time && (
@@ -225,7 +206,6 @@ function EventPopover({
             </p>
           )}
         </div>
-        <CalendarChips event={event} />
         {(onEdit || onDelete) && (
           <div className="flex items-center gap-1 pt-1 border-t">
             {onEdit && (
@@ -351,10 +331,7 @@ function MonthView({
                   )}
                 >
                   {visible.map((event) => (
-                    <span
-                      key={event.id}
-                      className={cn("h-1.5 w-1.5 rounded-full", dotColor(event))}
-                    />
+                    <EventDot key={event.id} event={event} />
                   ))}
                   {overflow > 0 && (
                     <span className="text-[9px] font-semibold leading-none text-muted-foreground">
@@ -372,13 +349,10 @@ function MonthView({
                     onEdit={onEditEvent}
                     onDelete={onDeleteEvent}
                   >
-                    <button
+                    <EventPill
+                      event={event}
                       onClick={(e) => e.stopPropagation()}
-                      className={cn(
-                        "w-full truncate rounded px-1.5 py-0.5 text-left text-[11px] font-medium leading-tight border-l-2 transition-opacity hover:opacity-80",
-                        TYPE_PILL_COLORS[event.event_type as EventType] ||
-                          TYPE_PILL_COLORS.general
-                      )}
+                      className="w-full truncate rounded px-1.5 py-0.5 text-left text-[11px] font-medium leading-tight border-l-2 transition-opacity hover:opacity-80"
                     >
                       {event.start_time && (
                         <span className="opacity-60 mr-0.5">
@@ -386,7 +360,7 @@ function MonthView({
                         </span>
                       )}
                       {event.title}
-                    </button>
+                    </EventPill>
                   </EventPopover>
                 ))}
                 {overflow > 0 && (
@@ -481,15 +455,12 @@ function TimeGrid({
                     onEdit={onEditEvent}
                     onDelete={onDeleteEvent}
                   >
-                    <button
-                      className={cn(
-                        "w-full truncate rounded px-1 py-0.5 text-[10px] font-medium border-l-2",
-                        TYPE_PILL_COLORS[event.event_type as EventType] ||
-                          TYPE_PILL_COLORS.general
-                      )}
+                    <EventPill
+                      event={event}
+                      className="w-full truncate rounded px-1 py-0.5 text-[10px] font-medium border-l-2"
                     >
                       {event.title}
-                    </button>
+                    </EventPill>
                   </EventPopover>
                 ))}
               </div>
@@ -574,13 +545,9 @@ function TimeGrid({
                         onEdit={onEditEvent}
                         onDelete={onDeleteEvent}
                       >
-                        <button
-                          className={cn(
-                            "w-full h-full rounded px-1.5 py-0.5 text-left overflow-hidden border-l-[3px] text-[11px] leading-tight",
-                            TYPE_BLOCK_COLORS[
-                              event.event_type as EventType
-                            ] || TYPE_BLOCK_COLORS.general
-                          )}
+                        <EventBlock
+                          event={event}
+                          className="w-full h-full rounded px-1.5 py-0.5 text-left overflow-hidden border-l-[3px] text-[11px] leading-tight"
                         >
                           <span className="font-medium block truncate">
                             {event.title}
@@ -590,7 +557,7 @@ function TimeGrid({
                             {event.end_time &&
                               ` – ${formatTimeShort(event.end_time)}`}
                           </span>
-                        </button>
+                        </EventBlock>
                       </EventPopover>
                     </div>
                   );
@@ -612,11 +579,8 @@ interface CalendarViewProps {
   onCreateEventOnDate?: (date: string, startTime?: string) => void;
   onEditEvent?: (event: SchoolEvent) => void;
   onDeleteEvent?: (event: SchoolEvent) => void;
-  eventCalendars?: EventCalendar[];
-  // Set by admin callers to enable inline CRUD of divisions /
-  // categories from the filter strip. Requires schoolId.
-  manageCalendars?: boolean;
-  schoolId?: string;
+  /** The school's labels. Each event is colored by its own. */
+  labels?: CalendarLabel[];
 }
 
 export function CalendarView({
@@ -625,19 +589,15 @@ export function CalendarView({
   onCreateEventOnDate,
   onEditEvent,
   onDeleteEvent,
-  eventCalendars,
-  manageCalendars,
-  schoolId,
+  labels = [],
 }: CalendarViewProps) {
   const [view, setView] = useState<ViewMode>("month");
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [hiddenCalendarIds, setHiddenCalendarIds] = useState<Set<string>>(
-    new Set()
-  );
+  const [hiddenLabelIds, setHiddenLabelIds] = useState<Set<string>>(new Set());
 
-  function toggleCalendar(id: string) {
-    setHiddenCalendarIds((prev) => {
+  function toggleLabel(id: string) {
+    setHiddenLabelIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -645,22 +605,19 @@ export function CalendarView({
     });
   }
 
-  // An event passes a dimension's filter if it has no tag
-  // of that kind (universal / all-school) or at least one
-  // of its tags of that kind is still visible.
-  const filteredEvents = useMemo(() => {
-    if (hiddenCalendarIds.size === 0) return events;
-    return events.filter((event) => {
-      const cals = event.calendars ?? [];
-      const divs = cals.filter((c) => c.kind === "division");
-      const cats = cals.filter((c) => c.kind === "category");
-      const divOk =
-        divs.length === 0 || divs.some((c) => !hiddenCalendarIds.has(c.id));
-      const catOk =
-        cats.length === 0 || cats.some((c) => !hiddenCalendarIds.has(c.id));
-      return divOk && catOk;
-    });
-  }, [events, hiddenCalendarIds]);
+  const labelsById = useMemo(
+    () => new Map(labels.map((label) => [label.id, label])),
+    [labels]
+  );
+
+  const filteredEvents = useMemo(
+    () => events.filter((event) => isEventVisible(event, hiddenLabelIds)),
+    [events, hiddenLabelIds]
+  );
+
+  // A chip per label some event uses, plus one for unlabeled events.
+  const filterChips = useMemo(() => usedLabels(events, labels), [events, labels]);
+  const chipCount = filterChips.labels.length + (filterChips.hasUnlabeled ? 1 : 0);
 
   const eventsByDate = useMemo(
     () => groupEventsByDate(filteredEvents),
@@ -725,6 +682,7 @@ export function CalendarView({
   const dayColumns = useMemo(() => [selectedDate], [selectedDate]);
 
   return (
+    <LabelsContext.Provider value={labelsById}>
     <div className="space-y-4 sm:space-y-5 sm:pt-2">
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -797,67 +755,30 @@ export function CalendarView({
         </div>
       </div>
 
-      {/* Calendar filters — divisions + categories */}
-      {((eventCalendars && eventCalendars.length > 0) ||
-        (manageCalendars && schoolId)) && (
-        <div className="space-y-2.5 rounded-lg border bg-card/60 p-3 metallic-card sm:space-y-2">
-          {(["division", "category"] as const).map((kind) => {
-            const items = (eventCalendars ?? [])
-              .filter((c) => c.kind === kind)
-              .sort(
-                (a, b) =>
-                  a.sort_order - b.sort_order || a.name.localeCompare(b.name)
-              );
-            const isFirst = kind === "division";
-            const showManageHere =
-              isFirst && manageCalendars && schoolId;
-            if (items.length === 0 && !showManageHere) return null;
-            return (
-              // One swipeable row per kind on phones; wraps from sm up.
-              <div
-                key={kind}
-                className="-mx-3 flex items-center gap-1.5 overflow-x-auto px-3 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden"
-              >
-                <span className="mr-1 shrink-0 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground sm:mr-0 sm:w-[68px]">
-                  {KIND_LABELS[kind].plural}
-                </span>
-                {items.map((cal) => {
-                  const on = !hiddenCalendarIds.has(cal.id);
-                  const colors = calendarColorClasses(cal.color);
-                  return (
-                    <button
-                      key={cal.id}
-                      type="button"
-                      onClick={() => toggleCalendar(cal.id)}
-                      aria-pressed={on}
-                      className={cn(
-                        "flex min-h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-medium transition-all sm:min-h-0 sm:px-2.5",
-                        on
-                          ? cn(colors.chip, "border-transparent")
-                          : "border-border text-muted-foreground/50"
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "h-2 w-2 rounded-full",
-                          on ? colors.dot : "bg-muted-foreground/30"
-                        )}
-                      />
-                      {cal.name}
-                    </button>
-                  );
-                })}
-                {showManageHere && (
-                  <div className="ml-auto shrink-0">
-                    <ManageCalendarsPopover
-                      calendars={eventCalendars ?? []}
-                      schoolId={schoolId!}
-                    />
-                  </div>
-                )}
-              </div>
-            );
-          })}
+      {/* Label filters — only worth showing when there's a choice to make */}
+      {chipCount > 1 && (
+        <div className="rounded-lg border bg-card/60 p-3 metallic-card">
+          <FilterRow label="Labels">
+            {filterChips.labels.map((label) => (
+              <FilterChip
+                key={label.id}
+                name={label.name}
+                isOn={!hiddenLabelIds.has(label.id)}
+                onToggle={() => toggleLabel(label.id)}
+                dotClass={calendarColorClasses(label.color).dot}
+                chipClass={calendarColorClasses(label.color).chip}
+              />
+            ))}
+            {filterChips.hasUnlabeled && (
+              <FilterChip
+                name="No label"
+                isOn={!hiddenLabelIds.has(UNLABELED_FILTER_ID)}
+                onToggle={() => toggleLabel(UNLABELED_FILTER_ID)}
+                dotClass={UNLABELED_CLASSES.dot}
+                chipClass={UNLABELED_CLASSES.chip}
+              />
+            )}
+          </FilterRow>
         </div>
       )}
 
@@ -983,16 +904,7 @@ export function CalendarView({
                       <p className="font-medium text-sm sm:truncate">
                         {event.title}
                       </p>
-                      <Badge
-                        className={cn(
-                          "shrink-0 text-[10px]",
-                          TYPE_BADGE_COLORS[
-                            event.event_type as EventType
-                          ] || TYPE_BADGE_COLORS.general
-                        )}
-                      >
-                        {event.event_type}
-                      </Badge>
+                      <LabelChip event={event} />
                     </div>
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                       {event.start_time && (
@@ -1015,7 +927,6 @@ export function CalendarView({
                         {event.description}
                       </p>
                     )}
-                    <CalendarChips event={event} />
                   </div>
                   {(onEditEvent || onDeleteEvent) && (
                     <div className="-my-1 -mr-1 ml-2 flex shrink-0 items-center gap-0.5 sm:m-0 sm:ml-2 sm:gap-1">
@@ -1050,5 +961,52 @@ export function CalendarView({
         </div>
       )}
     </div>
+    </LabelsContext.Provider>
+  );
+}
+
+// ─── Filter strip ─────────────────────────────────────────
+
+/** One swipeable row of filter chips on phones; wraps from sm up. */
+function FilterRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="-mx-3 flex items-center gap-1.5 overflow-x-auto px-3 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden">
+      <span className="mr-1 shrink-0 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground sm:mr-0 sm:w-[84px]">
+        {label}
+      </span>
+      {children}
+    </div>
+  );
+}
+
+/** A show/hide toggle, tinted in its label's color while on. */
+function FilterChip({
+  name,
+  isOn,
+  onToggle,
+  dotClass,
+  chipClass,
+}: {
+  name: string;
+  isOn: boolean;
+  onToggle: () => void;
+  dotClass: string;
+  chipClass: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={isOn}
+      className={cn(
+        "flex min-h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-medium transition-all sm:min-h-0 sm:px-2.5",
+        isOn
+          ? cn("border-transparent", chipClass)
+          : "border-border text-muted-foreground/50"
+      )}
+    >
+      <span className={cn("h-2 w-2 rounded-full", isOn ? dotClass : "bg-muted-foreground/30")} />
+      {name}
+    </button>
   );
 }

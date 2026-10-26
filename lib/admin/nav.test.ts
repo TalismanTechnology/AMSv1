@@ -41,15 +41,13 @@ test("dashboard is active only on the dashboard", () => {
 
 test("sections stay active on their sub-pages", () => {
   assert.equal(isNavItemActive(item("settings"), "/settings/sign-in"), true);
-  assert.equal(isNavItemActive(item("events"), "/events/blackbaud"), true);
+  assert.equal(isNavItemActive(item("events"), "/events"), true);
   assert.equal(isNavItemActive(item("documents"), "/document-audit"), false);
 });
 
 test("the active sub-item follows the path and ?view=", () => {
   assert.equal(activeNavChild(item("documents"), "/documents", q())?.key, "documents-list");
   assert.equal(activeNavChild(item("documents"), "/documents", q("view=map"))?.key, "documents-map");
-  assert.equal(activeNavChild(item("events"), "/events", q())?.key, "events-calendar");
-  assert.equal(activeNavChild(item("events"), "/events/blackbaud", q())?.key, "events-blackbaud");
   assert.equal(activeNavChild(item("settings"), "/settings/sign-in", q())?.key, "settings-sign-in");
   // The landing page belongs to Settings but to none of its sections.
   assert.equal(activeNavChild(item("settings"), "/settings", q()), null);

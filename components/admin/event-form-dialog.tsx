@@ -21,16 +21,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { createEvent, updateEvent } from "@/actions/events";
-import { CalendarFormDialog } from "@/components/admin/calendar-form-dialog";
-import { CalendarChipSelect } from "@/components/admin/calendar-chip-select";
-import { splitCalendars, KIND_LABELS } from "@/lib/event-calendars";
+import { LabelSelect } from "@/components/admin/label-select";
 import { toast } from "sonner";
-import type {
-  SchoolEvent,
-  EventType,
-  EventCalendar,
-  EventCalendarKind,
-} from "@/lib/types";
+import type { CalendarLabel, SchoolEvent, EventType } from "@/lib/types";
 
 const EVENT_TYPES: { value: EventType; label: string }[] = [
   { value: "general", label: "General" },
@@ -49,7 +42,7 @@ interface EventFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   schoolId: string;
-  eventCalendars: EventCalendar[];
+  labels: CalendarLabel[];
 }
 
 export function EventFormDialog({
@@ -59,7 +52,7 @@ export function EventFormDialog({
   open,
   onOpenChange,
   schoolId,
-  eventCalendars,
+  labels,
 }: EventFormDialogProps) {
   const isEditing = !!event;
   const [title, setTitle] = useState(event?.title || "");
@@ -77,20 +70,8 @@ export function EventFormDialog({
   const [recurrenceEnd, setRecurrenceEnd] = useState(
     (event as SchoolEvent & { recurrence_end?: string })?.recurrence_end || ""
   );
-  const [selectedCalendarIds, setSelectedCalendarIds] = useState<string[]>(
-    event?.calendars?.map((c) => c.id) ?? []
-  );
+  const [labelId, setLabelId] = useState<string | null>(event?.label_id ?? null);
   const [saving, setSaving] = useState(false);
-  const [createCalendarKind, setCreateCalendarKind] =
-    useState<EventCalendarKind | null>(null);
-
-  const { divisions, categories } = splitCalendars(eventCalendars);
-
-  function toggleCalendar(id: string) {
-    setSelectedCalendarIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
-  }
 
   // Reset form when dialog opens so it picks up new defaultDate/defaultTime.
   // Adjusted while rendering rather than in an effect; prevOpen starts false
@@ -109,7 +90,7 @@ export function EventFormDialog({
       setEventType("general");
       setRecurrence("none");
       setRecurrenceEnd("");
-      setSelectedCalendarIds([]);
+      setLabelId(null);
     }
     if (open && isEditing && event) {
       setTitle(event.title || "");
@@ -119,7 +100,7 @@ export function EventFormDialog({
       setEndTime(event.end_time || "");
       setLocation(event.location || "");
       setEventType(event.event_type || "general");
-      setSelectedCalendarIds(event.calendars?.map((c) => c.id) ?? []);
+      setLabelId(event.label_id ?? null);
     }
   }
 
@@ -136,7 +117,7 @@ export function EventFormDialog({
         end_time: endTime || null,
         location: location || null,
         event_type: eventType,
-        calendar_ids: selectedCalendarIds,
+        label_id: labelId,
       });
       if (result.error) toast.error(result.error);
       else {
@@ -154,7 +135,7 @@ export function EventFormDialog({
       formData.set("event_type", eventType);
       formData.set("recurrence", recurrence);
       formData.set("recurrence_end", recurrenceEnd);
-      formData.set("calendar_ids", JSON.stringify(selectedCalendarIds));
+      if (labelId) formData.set("label_id", labelId);
       const result = await createEvent(schoolId, formData);
       if (result.error) toast.error(result.error);
       else {
@@ -166,7 +147,7 @@ export function EventFormDialog({
         setEndTime("");
         setLocation("");
         setEventType("general");
-        setSelectedCalendarIds([]);
+        setLabelId(null);
         onOpenChange(false);
       }
     }
@@ -273,27 +254,17 @@ export function EventFormDialog({
             />
           </div>
 
-          <div className="space-y-4 rounded-xl border border-border p-4">
-            <div className="space-y-1.5">
-              <Label className="text-ink-soft">{KIND_LABELS.division.plural}</Label>
-              <CalendarChipSelect
-                items={divisions}
-                kind="division"
-                selected={selectedCalendarIds}
-                onToggle={toggleCalendar}
-                onCreateNew={() => setCreateCalendarKind("division")}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-ink-soft">{KIND_LABELS.category.plural}</Label>
-              <CalendarChipSelect
-                items={categories}
-                kind="category"
-                selected={selectedCalendarIds}
-                onToggle={toggleCalendar}
-                onCreateNew={() => setCreateCalendarKind("category")}
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="event-label" className="text-ink-soft">
+              Label
+            </Label>
+            <LabelSelect id="event-label" labels={labels} value={labelId} onChange={setLabelId} />
+            {isEditing && event.source === "blackbaud" && (
+              <p className="text-xs text-muted-foreground">
+                Synced from an iCal link. If this event changes in the source
+                calendar, the next sync replaces your edits.
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -347,22 +318,6 @@ export function EventFormDialog({
         </div>
       </DialogContent>
     </Dialog>
-
-    {createCalendarKind && (
-      <CalendarFormDialog
-        kind={createCalendarKind}
-        open={!!createCalendarKind}
-        onOpenChange={(o) => {
-          if (!o) setCreateCalendarKind(null);
-        }}
-        schoolId={schoolId}
-        onCreated={(cal) =>
-          setSelectedCalendarIds((prev) =>
-            prev.includes(cal.id) ? prev : [...prev, cal.id]
-          )
-        }
-      />
-    )}
     </>
   );
 }

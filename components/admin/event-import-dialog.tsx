@@ -24,17 +24,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { CalendarChipSelect } from "@/components/admin/calendar-chip-select";
+import { LabelSelect } from "@/components/admin/label-select";
 import {
   extractEventsFromDocument,
   createEventsBulk,
   type BulkEventInput,
 } from "@/actions/event-import";
 import type { ExtractedEvent } from "@/lib/ai/event-extraction";
-import { splitCalendars, KIND_LABELS } from "@/lib/event-calendars";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import type { EventCalendar, EventType } from "@/lib/types";
+import type { CalendarLabel, EventType } from "@/lib/types";
 
 const EVENT_TYPES: { value: EventType; label: string }[] = [
   { value: "general", label: "General" },
@@ -64,14 +63,14 @@ interface ReviewRow {
   location: string;
   eventType: EventType;
   description: string;
-  calendarIds: string[];
+  labelId: string | null;
 }
 
 interface EventImportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   documents: ImportableDocument[];
-  eventCalendars: EventCalendar[];
+  labels: CalendarLabel[];
   schoolId: string;
 }
 
@@ -79,21 +78,21 @@ export function EventImportDialog({
   open,
   onOpenChange,
   documents,
-  eventCalendars,
+  labels,
   schoolId,
 }: EventImportDialogProps) {
   const [selectedDocId, setSelectedDocId] = useState("");
   const [extracting, setExtracting] = useState(false);
   const [rows, setRows] = useState<ReviewRow[] | null>(null);
   const [saving, setSaving] = useState(false);
-
-  const { divisions, categories } = splitCalendars(eventCalendars);
+  const [labelForAll, setLabelForAll] = useState<string | null>(null);
 
   function reset() {
     setSelectedDocId("");
     setExtracting(false);
     setRows(null);
     setSaving(false);
+    setLabelForAll(null);
   }
 
   function handleOpenChange(next: boolean) {
@@ -110,7 +109,7 @@ export function EventImportDialog({
       toast.error(result.error || "Extraction failed");
       return;
     }
-    setRows(result.events.map((ev, i) => toRow(ev, i, eventCalendars)));
+    setRows(result.events.map((ev, i) => toRow(ev, i, labelForAll)));
   }
 
   function updateRow(key: string, patch: Partial<ReviewRow>) {
@@ -141,7 +140,7 @@ export function EventImportDialog({
         location: r.location || null,
         eventType: r.eventType,
         description: r.description || null,
-        calendarIds: r.calendarIds,
+        labelId: r.labelId,
       }));
 
     if (payload.length === 0) {
@@ -228,10 +227,26 @@ export function EventImportDialog({
           </div>
         ) : (
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              <span className="text-ink font-medium">{includedCount}</span> of{" "}
-              {rows.length} event{rows.length === 1 ? "" : "s"} selected.
-            </p>
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <p className="text-sm text-muted-foreground">
+                <span className="text-ink font-medium">{includedCount}</span> of{" "}
+                {rows.length} event{rows.length === 1 ? "" : "s"} selected.
+              </p>
+              <div className="w-full space-y-1.5 sm:w-56">
+                <Label htmlFor="import-label-all" className="text-xs text-ink-soft">
+                  Label all events
+                </Label>
+                <LabelSelect
+                  id="import-label-all"
+                  labels={labels}
+                  value={labelForAll}
+                  onChange={(labelId) => {
+                    setLabelForAll(labelId);
+                    setRows((prev) => prev?.map((r) => ({ ...r, labelId })) ?? prev);
+                  }}
+                />
+              </div>
+            </div>
 
             <ScrollArea className="h-[52vh] pr-3">
               <div className="space-y-3">
@@ -239,8 +254,7 @@ export function EventImportDialog({
                   <ReviewRowCard
                     key={row.key}
                     row={row}
-                    divisions={divisions}
-                    categories={categories}
+                    labels={labels}
                     onChange={(patch) => updateRow(row.key, patch)}
                     onRemove={() => removeRow(row.key)}
                   />
@@ -276,25 +290,15 @@ export function EventImportDialog({
 
 function ReviewRowCard({
   row,
-  divisions,
-  categories,
+  labels,
   onChange,
   onRemove,
 }: {
   row: ReviewRow;
-  divisions: EventCalendar[];
-  categories: EventCalendar[];
+  labels: CalendarLabel[];
   onChange: (patch: Partial<ReviewRow>) => void;
   onRemove: () => void;
 }) {
-  function toggleCalendar(id: string) {
-    onChange({
-      calendarIds: row.calendarIds.includes(id)
-        ? row.calendarIds.filter((x) => x !== id)
-        : [...row.calendarIds, id],
-    });
-  }
-
   return (
     <div
       className={cn(
@@ -399,33 +403,13 @@ function ReviewRowCard({
             </div>
           )}
 
-          <div className="flex flex-wrap gap-x-6 gap-y-2">
-            {divisions.length > 0 && (
-              <div className="space-y-1.5">
-                <Label className="text-xs text-ink-soft">
-                  {KIND_LABELS.division.plural}
-                </Label>
-                <CalendarChipSelect
-                  items={divisions}
-                  kind="division"
-                  selected={row.calendarIds}
-                  onToggle={toggleCalendar}
-                />
-              </div>
-            )}
-            {categories.length > 0 && (
-              <div className="space-y-1.5">
-                <Label className="text-xs text-ink-soft">
-                  {KIND_LABELS.category.plural}
-                </Label>
-                <CalendarChipSelect
-                  items={categories}
-                  kind="category"
-                  selected={row.calendarIds}
-                  onToggle={toggleCalendar}
-                />
-              </div>
-            )}
+          <div className="space-y-1.5 sm:max-w-xs">
+            <Label className="text-xs text-ink-soft">Label</Label>
+            <LabelSelect
+              labels={labels}
+              value={row.labelId}
+              onChange={(labelId) => onChange({ labelId })}
+            />
           </div>
         </div>
       </div>
@@ -435,25 +419,7 @@ function ReviewRowCard({
 
 // ── Helpers ──────────────────────────────────────────
 
-function toRow(
-  ev: ExtractedEvent,
-  index: number,
-  calendars: EventCalendar[]
-): ReviewRow {
-  const matchName = (name: string | null, kind: EventCalendar["kind"]) =>
-    name
-      ? calendars.find(
-          (c) =>
-            c.kind === kind &&
-            c.name.toLowerCase() === name.toLowerCase()
-        )?.id
-      : undefined;
-
-  const calendarIds = [
-    matchName(ev.suggestedDivision, "division"),
-    matchName(ev.suggestedCategory, "category"),
-  ].filter((id): id is string => Boolean(id));
-
+function toRow(ev: ExtractedEvent, index: number, labelId: string | null): ReviewRow {
   return {
     key: `${index}-${ev.title}`,
     include: true,
@@ -466,6 +432,6 @@ function toRow(
     location: ev.location ?? "",
     eventType: ev.eventType,
     description: ev.description ?? "",
-    calendarIds,
+    labelId,
   };
 }

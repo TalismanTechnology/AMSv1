@@ -49,7 +49,7 @@ export const SETTINGS_SECTION_INFO: Record<SettingsSection, SettingsSectionInfo>
   },
   blackbaud: {
     label: "Blackbaud",
-    description: "Blackbaud connection, roster sync, and calendar feeds.",
+    description: "Blackbaud connection, roster sync, and where calendar links live.",
     keywords: ["blackbaud", "sky", "integration", "calendar"],
   },
 };
@@ -120,7 +120,7 @@ export const SETTING_ENTRIES: readonly SettingEntry[] = [
   { anchor: "setting-parent-roster", section: "sign-in", label: "Parent roster", keywords: ["csv", "upload", "allowed parents", "list"] },
   { anchor: "setting-roster-gate", section: "sign-in", label: "Require roster match", keywords: ["gate", "restrict", "only roster"] },
   { anchor: "setting-blackbaud-connection", section: "blackbaud", label: "Blackbaud connection", keywords: ["connect", "reconnect", "sync now", "roster", "oauth"] },
-  { anchor: "setting-blackbaud-feeds", section: "blackbaud", label: "Blackbaud calendar feeds", keywords: ["ical", "events", "subscription", "calendar"] },
+  { anchor: "setting-blackbaud-feeds", section: "blackbaud", label: "Blackbaud calendar links", keywords: ["ical", "events", "subscription", "calendar", "labels", "feeds"] },
 ];
 
 /**

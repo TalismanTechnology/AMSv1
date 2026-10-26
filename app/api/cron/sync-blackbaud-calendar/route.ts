@@ -5,7 +5,7 @@ import { isCronAuthorized } from "@/lib/blackbaud/cron-auth";
 
 export const maxDuration = 300;
 
-// Refresh every school's Blackbaud calendar feeds into the review queue.
+// Sync every school's labeled iCal links onto its calendar.
 //   GET /api/cron/sync-blackbaud-calendar
 //   Authorization: Bearer <CRON_SECRET>   (or ?key=<CRON_SECRET>)
 //
@@ -55,8 +55,8 @@ export async function GET(request: Request) {
       const message =
         caught instanceof Error ? caught.message : "Unknown sync failure";
 
-      // One school's failure must not abort the rest; the previous staging
-      // state stays put so the review queue keeps working.
+      // One school's failure must not abort the rest; its calendar stays as
+      // the last successful sync left it.
       results.push({ schoolId, ok: false, error: message });
     }
   }

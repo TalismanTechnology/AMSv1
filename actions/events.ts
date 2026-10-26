@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { logAudit } from "@/lib/audit";
+import { schoolLabelId } from "@/lib/calendar-labels";
 
 export async function createEvent(schoolId: string, formData: FormData) {
   const supabase = await createClient();
@@ -21,9 +22,17 @@ export async function createEvent(schoolId: string, formData: FormData) {
   const event_type = formData.get("event_type") as string;
   const recurrence = (formData.get("recurrence") as string) || "none";
   const recurrence_end = formData.get("recurrence_end") as string;
-  const calendarIds = parseCalendarIds(formData.get("calendar_ids"));
+  const rawLabelId = (formData.get("label_id") as string | null) || null;
 
   if (!title || !date) return { error: "Title and date are required" };
+
+  let labelId: string | null;
+  try {
+    labelId = await schoolLabelId(supabase, schoolId, rawLabelId);
+  } catch (err) {
+    console.error("[events] Failed to check label:", err);
+    return { error: "Couldn't check the label. Please try again." };
+  }
 
   // Generate recurring event dates if needed
   const dates = generateRecurrenceDates(date, recurrence, recurrence_end);
@@ -40,25 +49,12 @@ export async function createEvent(schoolId: string, formData: FormData) {
     recurrence_end: recurrence_end || null,
     created_by: user.id,
     school_id: schoolId,
+    label_id: labelId,
   }));
 
-  const { data: inserted, error } = await supabase
-    .from("events")
-    .insert(rows)
-    .select("id");
+  const { error } = await supabase.from("events").insert(rows);
 
   if (error) return { error: error.message };
-
-  // Tag every generated occurrence with the chosen calendars.
-  if (calendarIds.length > 0 && inserted) {
-    const links = inserted.flatMap((e) =>
-      calendarIds.map((calendar_id) => ({ event_id: e.id, calendar_id }))
-    );
-    const { error: linkError } = await supabase
-      .from("event_calendar_links")
-      .insert(links);
-    if (linkError) return { error: linkError.message };
-  }
 
   logAudit(user.id, "create_event", "event", undefined, {
     title,
@@ -68,20 +64,6 @@ export async function createEvent(schoolId: string, formData: FormData) {
 
   revalidatePath("/", "layout");
   return { success: true };
-}
-
-// The event form serializes selected calendar ids as a
-// JSON array string in the "calendar_ids" form field.
-function parseCalendarIds(raw: FormDataEntryValue | null): string[] {
-  if (typeof raw !== "string" || !raw) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed)
-      ? parsed.filter((x): x is string => typeof x === "string")
-      : [];
-  } catch {
-    return [];
-  }
 }
 
 function generateRecurrenceDates(
@@ -132,7 +114,8 @@ export async function updateEvent(
     end_time?: string | null;
     location?: string | null;
     event_type?: string;
-    calendar_ids?: string[];
+    /** The label it's filed under, or null for none. */
+    label_id?: string | null;
   }
 ) {
   const supabase = await createClient();
@@ -140,31 +123,29 @@ export async function updateEvent(
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { calendar_ids, ...eventFields } = data;
+  const { label_id, ...eventFields } = data;
+
+  let labelId: string | null = null;
+  if (label_id !== undefined) {
+    try {
+      labelId = await schoolLabelId(supabase, schoolId, label_id);
+    } catch (err) {
+      console.error("[events] Failed to check label:", err);
+      return { error: "Couldn't check the label. Please try again." };
+    }
+  }
 
   const { error } = await supabase
     .from("events")
-    .update({ ...eventFields, updated_at: new Date().toISOString() })
+    .update({
+      ...eventFields,
+      ...(label_id !== undefined ? { label_id: labelId } : {}),
+      updated_at: new Date().toISOString(),
+    })
     .eq("id", eventId)
     .eq("school_id", schoolId);
 
   if (error) return { error: error.message };
-
-  // Replace the calendar tag set when the caller supplied one.
-  if (calendar_ids !== undefined) {
-    await supabase
-      .from("event_calendar_links")
-      .delete()
-      .eq("event_id", eventId);
-    if (calendar_ids.length > 0) {
-      const { error: linkError } = await supabase
-        .from("event_calendar_links")
-        .insert(
-          calendar_ids.map((calendar_id) => ({ event_id: eventId, calendar_id }))
-        );
-      if (linkError) return { error: linkError.message };
-    }
-  }
 
   if (user) logAudit(user.id, "update_event", "event", eventId, data, schoolId);
 

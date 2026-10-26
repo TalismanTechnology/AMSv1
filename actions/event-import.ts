@@ -36,15 +36,10 @@ export async function extractEventsFromDocument(
   const text = await getDocumentText(supabase, doc);
   if (!text) return { error: "Couldn't read any text from this document." };
 
-  const { data: calendars } = await supabase
-    .from("event_calendars")
-    .select("kind, name")
-    .eq("school_id", schoolId);
-
+  // Events are filed under labels now, which the admin picks while
+  // reviewing, so the model isn't asked to suggest divisions or categories.
   try {
-    const events = await extractCalendarEvents(text, {
-      calendars: (calendars ?? []) as { kind: "division" | "category"; name: string }[],
-    });
+    const events = await extractCalendarEvents(text, { calendars: [] });
     if (events.length === 0)
       return { error: "No calendar events were found in this document." };
     return { events };
@@ -77,7 +72,7 @@ const BulkEventSchema = z.object({
     "other",
   ]),
   description: z.string().nullable(),
-  calendarIds: z.array(z.string()),
+  labelId: z.string().uuid().nullable(),
 });
 
 export type BulkEventInput = z.infer<typeof BulkEventSchema>;
@@ -112,12 +107,19 @@ export async function createEventsBulk(
   if (!parsed.success) return { error: "Some events are invalid." };
   if (parsed.data.length === 0) return { error: "No events selected." };
 
-  // Flatten each reviewed event into one row per day, keeping
-  // its calendar tags alongside so we can link them post-insert.
+  // Only this school's labels are kept.
+  const { data: schoolLabels, error: labelError } = await supabase
+    .from("calendar_labels")
+    .select("id")
+    .eq("school_id", schoolId);
+  if (labelError) return { error: "Couldn't check the labels. Please try again." };
+  const labelIds = new Set((schoolLabels ?? []).map((l) => l.id as string));
+
+  // Flatten each reviewed event into one row per day.
   const rows: Record<string, unknown>[] = [];
-  const rowCalendarIds: string[][] = [];
 
   for (const ev of parsed.data) {
+    const labelId = ev.labelId && labelIds.has(ev.labelId) ? ev.labelId : null;
     for (const date of expandDates(ev.date, ev.endDate)) {
       rows.push({
         title: ev.title.trim(),
@@ -129,29 +131,14 @@ export async function createEventsBulk(
         event_type: ev.eventType,
         created_by: user.id,
         school_id: schoolId,
+        label_id: labelId,
       });
-      rowCalendarIds.push(ev.calendarIds);
     }
   }
 
-  const { data: inserted, error } = await supabase
-    .from("events")
-    .insert(rows)
-    .select("id");
+  const { error } = await supabase.from("events").insert(rows);
 
   if (error) return { error: error.message };
-
-  // insert().select() preserves input order, so inserted[i]
-  // maps to rowCalendarIds[i].
-  const links = (inserted ?? []).flatMap((e, i) =>
-    rowCalendarIds[i].map((calendar_id) => ({ event_id: e.id, calendar_id }))
-  );
-  if (links.length > 0) {
-    const { error: linkError } = await supabase
-      .from("event_calendar_links")
-      .insert(links);
-    if (linkError) return { error: linkError.message };
-  }
 
   logAudit(
     user.id,

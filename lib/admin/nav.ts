@@ -60,11 +60,7 @@ export const ADMIN_NAV: readonly AdminNavGroup[] = [
         label: "Events",
         path: "/events",
         prefix: true,
-        keywords: ["calendar", "schedule"],
-        children: [
-          { key: "events-calendar", label: "Calendar", path: "/events" },
-          { key: "events-blackbaud", label: "Blackbaud review", path: "/events/blackbaud", prefix: true },
-        ],
+        keywords: ["calendar", "schedule", "labels", "ical"],
       },
       ...CONTENT_PAGES.map((page) => ({
         key: page,
@@ -135,7 +131,7 @@ export function adminRelativePath(pathname: string, adminBase: string): string {
  * The active child of an item: among children whose path matches, one whose
  * required query matches wins; otherwise the match without a query (so
  * "Library" is active on /documents and "Sorting map" on /documents?view=map).
- * The most specific path wins, so /events/blackbaud isn't also "Calendar".
+ * When child paths nest, the most specific one wins.
  */
 export function activeNavChild(
   item: AdminNavItem,

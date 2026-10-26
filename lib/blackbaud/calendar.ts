@@ -1,15 +1,15 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchFeedText } from "./safe-fetch";
 import { parseFeed, type NormalizedEvent } from "./ical";
-import {
-  tagEvents,
-  type CalendarRow,
-  type MappingRow,
-  type TagResult,
-} from "./tagging";
+import { inferEventType } from "./tagging";
+import { publishStagedEvents, unpublishStagedEvents } from "./publish";
+import { matchOccurrences, type StagedOccurrence } from "./match";
+import { selectAll } from "@/lib/supabase/select-all";
 
-// Fetch -> parse -> tag -> stage. Nothing here writes to public.events; staged
-// rows wait in blackbaud_events until an admin approves them.
+// Fetch -> parse -> stage -> publish. Every occurrence is staged in
+// blackbaud_events (which is what lets a sync tell new, changed and cancelled
+// events apart), then published straight onto the calendar under the feed's
+// label. There is no review step: the label's iCal link is the source of truth.
 
 // How far either side of today we keep occurrences. Back far enough that a
 // mid-year connection still shows recent history, forward far enough to cover
@@ -18,6 +18,7 @@ const WINDOW_BACK_DAYS = 30;
 const WINDOW_FORWARD_DAYS = 400;
 
 const UPSERT_CHUNK = 500;
+const TOUCH_CHUNK = 200;
 
 export interface FeedSyncResult {
   feedId: string;
@@ -26,23 +27,16 @@ export interface FeedSyncResult {
   created: number;
   updated: number;
   superseded: number;
-  autoTagged: number;
+  published: number;
 }
 
 interface FeedRow {
   id: string;
   school_id: string;
+  label_id: string | null;
   label: string;
   url: string;
   timezone: string;
-}
-
-interface StagedRow {
-  id: string;
-  external_uid: string;
-  occurrence_start: string;
-  content_hash: string;
-  status: string;
 }
 
 function chunk<T>(items: T[], size: number): T[][] {
@@ -53,16 +47,12 @@ function chunk<T>(items: T[], size: number): T[][] {
   return out;
 }
 
-function occurrenceKey(uid: string, start: string): string {
-  return `${uid}\u0000${new Date(start).toISOString()}`;
-}
-
 /**
  * Sync one feed.
  *
  * Everything is fetched and parsed before any write, so a feed that fails
- * halfway leaves the previous staging state untouched rather than superseding
- * events whose pages never arrived.
+ * halfway leaves the calendar untouched rather than removing events whose
+ * pages never arrived.
  */
 export async function syncFeed(feed: FeedRow): Promise<FeedSyncResult> {
   const supabase = createAdminClient();
@@ -78,84 +68,75 @@ export async function syncFeed(feed: FeedRow): Promise<FeedSyncResult> {
     windowEnd,
   });
 
-  const { data: calendarData } = await supabase
-    .from("event_calendars")
-    .select("id, kind, name")
-    .eq("school_id", feed.school_id);
-
-  const { data: mappingData } = await supabase
-    .from("blackbaud_calendar_mappings")
-    .select("source_kind, source_value, calendar_id")
-    .eq("school_id", feed.school_id);
-
-  const calendars = (calendarData ?? []) as CalendarRow[];
-  const mappings = (mappingData ?? []) as MappingRow[];
-
-  const tags = await tagEvents(parsed, feed.id, calendars, mappings);
-
-  const { data: existingData } = await supabase
-    .from("blackbaud_events")
-    .select("id, external_uid, occurrence_start, content_hash, status")
-    .eq("feed_id", feed.id);
-
-  const existing = new Map<string, StagedRow>(
-    ((existingData ?? []) as StagedRow[]).map((row) => [
-      occurrenceKey(row.external_uid, row.occurrence_start),
-      row,
-    ])
-  );
-
-  const syncedAt = now.toISOString();
-  const toWrite: Record<string, unknown>[] = [];
-  const unchanged: string[] = [];
-  const retagged: Array<{ key: string; tag: TagResult }> = [];
-
-  let created = 0;
-  let updated = 0;
-
-  parsed.forEach((event, index) => {
-    const key = occurrenceKey(event.uid, event.occurrenceStart.toISOString());
-    const previous = existing.get(key);
-
-    // Byte-identical to what we already staged. Touch last_seen_at so it
-    // survives the supersede sweep, and leave status and tags alone — an
-    // admin's decision must not be undone by a sync that changed nothing.
-    if (previous && previous.content_hash === event.contentHash) {
-      unchanged.push(previous.id);
-      return;
-    }
-
-    if (previous) {
-      updated++;
-    } else {
-      created++;
-    }
-
-    toWrite.push(buildRow(feed, event, tags[index], syncedAt));
-    retagged.push({ key, tag: tags[index] });
-  });
-
-  for (const batch of chunk(toWrite, UPSERT_CHUNK)) {
-    const { error } = await supabase
-      .from("blackbaud_events")
-      .upsert(batch, {
-        onConflict: "school_id,feed_id,external_uid,occurrence_start",
-      });
-
-    if (error) {
-      throw new Error(`Staging calendar events failed: ${error.message}`);
-    }
+  let existing: StagedOccurrence[];
+  try {
+    existing = await selectAll<StagedOccurrence>((from, to) =>
+      supabase
+        .from("blackbaud_events")
+        .select("id, title, occurrence_start, content_hash, status, last_seen_at")
+        .eq("feed_id", feed.id)
+        .order("id")
+        .range(from, to)
+    );
+  } catch (caught: unknown) {
+    const message = caught instanceof Error ? caught.message : "unknown error";
+    throw new Error(`Could not load synced events: ${message}`);
   }
 
-  for (const batch of chunk(unchanged, UPSERT_CHUNK)) {
-    await supabase
+  // A feed that suddenly lists nothing is far more likely a broken link or an
+  // upstream outage than a school cancelling its whole calendar. Refuse rather
+  // than wipe every event off the parent calendar.
+  if (parsed.length === 0 && existing.length > 0) {
+    throw new Error(
+      "The link returned no events, so nothing was changed. Check the link still works in Blackbaud."
+    );
+  }
+
+  // Unchanged rows are only touched — an event an admin deleted from the
+  // calendar stays deleted until it changes upstream. Changed rows are
+  // rewritten in place (new UID included) and go back to pending.
+  const match = matchOccurrences(parsed, existing);
+  const syncedAt = now.toISOString();
+  const unchanged = match.unchanged.map(({ staged }) => staged.id);
+
+  const replacements = match.changed.map(({ parsed: event, staged }) => ({
+    id: staged.id,
+    ...buildRow(feed, event, syncedAt),
+  }));
+  const additions = match.added.map((event) => buildRow(feed, event, syncedAt));
+
+  // Kept as two batches: PostgREST rejects a bulk write whose rows don't all
+  // carry the same keys, and only replacements carry an id.
+  for (const batch of chunk(replacements, UPSERT_CHUNK)) {
+    const { error } = await supabase.from("blackbaud_events").upsert(batch, { onConflict: "id" });
+    if (error) throw new Error(`Updating calendar events failed: ${error.message}`);
+  }
+
+  for (const batch of chunk(additions, UPSERT_CHUNK)) {
+    const { error } = await supabase
+      .from("blackbaud_events")
+      .upsert(batch, { onConflict: "school_id,feed_id,external_uid,occurrence_start" });
+    if (error) throw new Error(`Staging calendar events failed: ${error.message}`);
+  }
+
+  // Ids travel in the request URL, so these batches stay small. A failed touch
+  // must stop the sync: supersedeMissing would read those rows as cancelled
+  // and take live events off the calendar.
+  for (const batch of chunk(unchanged, TOUCH_CHUNK)) {
+    const { error } = await supabase
       .from("blackbaud_events")
       .update({ last_seen_at: syncedAt })
       .in("id", batch);
+
+    if (error) {
+      throw new Error(`Recording synced events failed: ${error.message}`);
+    }
   }
 
-  await replaceSuggestions(feed, retagged);
+  // Copies go before publishing, or pending copies would go live.
+  const duplicates = await retireDuplicates(match.duplicates.map((row) => row.id));
   const superseded = await supersedeMissing(feed, syncedAt);
+  const published = await publishPending(feed);
 
   await supabase
     .from("blackbaud_calendar_feeds")
@@ -170,17 +151,41 @@ export async function syncFeed(feed: FeedRow): Promise<FeedSyncResult> {
     feedId: feed.id,
     label: feed.label,
     seen: parsed.length,
-    created,
-    updated,
-    superseded,
-    autoTagged: tags.filter((tag) => tag.calendarIds.length > 0).length,
+    created: additions.length,
+    updated: replacements.length,
+    superseded: superseded + duplicates,
+    published,
   };
+}
+
+/**
+ * Publish every staged row of this feed that isn't on the calendar yet: what
+ * this sync created or changed, plus anything left pending from before syncs
+ * published directly.
+ */
+async function publishPending(feed: FeedRow): Promise<number> {
+  const supabase = createAdminClient();
+
+  const rows = await selectAll<{ id: string }>((from, to) =>
+    supabase
+      .from("blackbaud_events")
+      .select("id")
+      .eq("feed_id", feed.id)
+      .eq("status", "pending")
+      .order("id")
+      .range(from, to)
+  );
+
+  const ids = rows.map((row) => row.id);
+  if (ids.length === 0) return 0;
+
+  const result = await publishStagedEvents(feed.school_id, ids, feed.label_id);
+  return result.staged;
 }
 
 function buildRow(
   feed: FeedRow,
   event: NormalizedEvent,
-  tag: TagResult,
   syncedAt: string
 ): Record<string, unknown> {
   return {
@@ -197,14 +202,14 @@ function buildRow(
     local_start_time: event.localStartTime,
     local_end_time: event.localEndTime,
     raw_categories: event.categories,
-    suggested_event_type: tag.eventType,
-    tag_source: tag.source,
-    tag_confidence: tag.confidence,
+    suggested_event_type: inferEventType(event),
+    suggested_category_id: null,
+    tag_source: "none",
+    tag_confidence: null,
     content_hash: event.contentHash,
-    // The upstream event genuinely changed, so a previous approve or reject no
-    // longer describes what this row now says. Back to pending for a fresh look.
-    // Any already-published events stay linked via events.blackbaud_event_id and
-    // are replaced when an admin re-approves.
+    // New or changed upstream, so it goes back to pending and publishPending
+    // (re)publishes it. Rows it published before stay linked through
+    // events.blackbaud_event_id and are replaced, not duplicated.
     //
     // Every key here must be present on every row of the batch — PostgREST
     // rejects a bulk insert with ragged keys.
@@ -215,61 +220,32 @@ function buildRow(
   };
 }
 
-/** Rewrite suggested tags for the rows this sync changed. */
-async function replaceSuggestions(
-  feed: FeedRow,
-  retagged: Array<{ key: string; tag: TagResult }>
-): Promise<void> {
-  if (retagged.length === 0) return;
-
+/**
+ * Retire staged copies of an occurrence the feed still lists, and take their
+ * published rows off the calendar. Past dates included: unlike a vanished
+ * event, a copy is never the real thing.
+ */
+async function retireDuplicates(ids: string[]): Promise<number> {
+  if (ids.length === 0) return 0;
   const supabase = createAdminClient();
 
-  const { data: rows } = await supabase
-    .from("blackbaud_events")
-    .select("id, external_uid, occurrence_start")
-    .eq("feed_id", feed.id);
-
-  const idByKey = new Map(
-    (rows ?? []).map((row) => [
-      occurrenceKey(row.external_uid as string, row.occurrence_start as string),
-      row.id as string,
-    ])
-  );
-
-  const ids: string[] = [];
-  const links: Array<{ blackbaud_event_id: string; calendar_id: string }> = [];
-
-  for (const { key, tag } of retagged) {
-    const id = idByKey.get(key);
-    if (!id) continue;
-
-    ids.push(id);
-    for (const calendarId of tag.calendarIds) {
-      links.push({ blackbaud_event_id: id, calendar_id: calendarId });
-    }
+  for (const batch of chunk(ids, TOUCH_CHUNK)) {
+    const { error } = await supabase
+      .from("blackbaud_events")
+      .update({ status: "superseded" })
+      .in("id", batch);
+    if (error) throw new Error(`Could not retire duplicate events: ${error.message}`);
   }
 
-  for (const batch of chunk(ids, UPSERT_CHUNK)) {
-    await supabase
-      .from("blackbaud_event_calendar_suggestions")
-      .delete()
-      .in("blackbaud_event_id", batch);
-  }
-
-  for (const batch of chunk(links, UPSERT_CHUNK)) {
-    await supabase
-      .from("blackbaud_event_calendar_suggestions")
-      .upsert(batch, { onConflict: "blackbaud_event_id,calendar_id" });
-  }
+  await unpublishStagedEvents(ids);
+  return ids.length;
 }
 
 /**
- * Flag occurrences that vanished from the feed.
+ * Take occurrences that vanished from the feed off the calendar.
  *
  * Only forward-looking rows: an event dropping off the back of the window is
- * ordinary ageing, not a cancellation. Approved rows are flagged too but their
- * published event is left in place — silently deleting from the parent calendar
- * on the strength of one sync is not a call this should make on its own.
+ * ordinary ageing, not a cancellation, so past events stay put.
  */
 async function supersedeMissing(
   feed: FeedRow,
@@ -278,16 +254,31 @@ async function supersedeMissing(
   const supabase = createAdminClient();
   const today = new Date().toISOString().split("T")[0];
 
-  const { data } = await supabase
-    .from("blackbaud_events")
-    .update({ status: "superseded" })
-    .eq("feed_id", feed.id)
-    .in("status", ["pending", "approved"])
-    .gte("local_date", today)
-    .lt("last_seen_at", syncedAt)
-    .select("id");
+  // Ids first, then the update: a returned representation is row-capped like
+  // any other response, and a missed id would leave its event published.
+  const rows = await selectAll<{ id: string }>((from, to) =>
+    supabase
+      .from("blackbaud_events")
+      .select("id")
+      .eq("feed_id", feed.id)
+      .in("status", ["pending", "approved"])
+      .gte("local_date", today)
+      .lt("last_seen_at", syncedAt)
+      .order("id")
+      .range(from, to)
+  );
+  const ids = rows.map((row) => row.id);
 
-  return data?.length ?? 0;
+  for (const batch of chunk(ids, TOUCH_CHUNK)) {
+    const { error } = await supabase
+      .from("blackbaud_events")
+      .update({ status: "superseded" })
+      .in("id", batch);
+    if (error) throw new Error(`Could not mark cancelled events: ${error.message}`);
+  }
+
+  await unpublishStagedEvents(ids);
+  return ids.length;
 }
 
 export interface SchoolSyncSummary {
@@ -303,7 +294,7 @@ export async function syncSchoolCalendars(
 
   const { data: feeds, error } = await supabase
     .from("blackbaud_calendar_feeds")
-    .select("id, school_id, label, url, timezone")
+    .select("id, school_id, label_id, label, url, timezone")
     .eq("school_id", schoolId)
     .eq("is_active", true);
 

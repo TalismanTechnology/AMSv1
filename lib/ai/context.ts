@@ -15,6 +15,8 @@ export interface EventContext {
   end_time: string | null;
   location: string | null;
   event_type: string;
+  /** Name of the calendar label it's filed under, e.g. "Athletics". */
+  label?: string | null;
 }
 
 export interface AnnouncementContext {
@@ -42,7 +44,7 @@ export async function fetchEventsForContext(
   const { data, error, count } = await supabase
     .from("events")
     .select(
-      "id, title, description, date, start_time, end_time, location, event_type",
+      "id, title, description, date, start_time, end_time, location, event_type, label:calendar_labels(name)",
       { count: "exact" }
     )
     .eq("school_id", schoolId)
@@ -60,7 +62,13 @@ export async function fetchEventsForContext(
     );
   }
 
-  return (data || []).slice().reverse();
+  return (data || [])
+    .map(({ label, ...event }) => {
+      // A to-one embed; typed loosely by supabase-js, so read it defensively.
+      const embedded = (Array.isArray(label) ? label[0] : label) as { name?: string } | null;
+      return { ...event, label: embedded?.name ?? null };
+    })
+    .reverse();
 }
 
 /**
@@ -106,6 +114,7 @@ export interface CalendarEntry {
   end_time: string | null;
   location: string | null;
   event_type: string;
+  label?: string | null;
 }
 
 const MS_PER_DAY = 86_400_000;
@@ -187,6 +196,7 @@ export function groupEventOccurrences(events: EventContext[]): CalendarEntry[] {
       end_time: event.end_time,
       location: event.location,
       event_type: event.event_type,
+      label: event.label ?? null,
     };
     entries.push(entry);
     descriptions.set(entry, new Set(event.description ? [event.description] : []));
@@ -218,7 +228,7 @@ function formatEventLine(e: CalendarEntry): string {
     if (e.end_time) parts.push(`to ${e.end_time}`);
   }
   if (e.location) parts.push(`at ${e.location}`);
-  parts.push(`(${e.event_type})`);
+  parts.push(e.label ? `(${e.event_type}; ${e.label})` : `(${e.event_type})`);
   if (e.description) parts.push(`— ${e.description}`);
   return parts.join(" ");
 }

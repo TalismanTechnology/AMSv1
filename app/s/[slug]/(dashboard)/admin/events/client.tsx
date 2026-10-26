@@ -10,14 +10,18 @@ import {
   type ImportableDocument,
 } from "@/components/admin/event-import-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import {
+  CalendarLabelsPanel,
+  type LabelWithLink,
+} from "@/components/admin/calendar-labels-panel";
 import { Button } from "@/components/ui/button";
 import { deleteEvent } from "@/actions/events";
 import { toast } from "sonner";
-import type { SchoolEvent, EventCalendar } from "@/lib/types";
+import type { SchoolEvent } from "@/lib/types";
 
 interface EventsClientProps {
   events: SchoolEvent[];
-  eventCalendars: EventCalendar[];
+  labels: LabelWithLink[];
   documents: ImportableDocument[];
   schoolId: string;
   schoolSlug: string;
@@ -25,7 +29,7 @@ interface EventsClientProps {
 
 export function EventsClient({
   events,
-  eventCalendars,
+  labels,
   documents,
   schoolId,
 }: EventsClientProps) {
@@ -61,21 +65,19 @@ export function EventsClient({
             event{eventCount !== 1 ? "s" : ""} scheduled across your calendars.
           </p>
         </div>
-        <Button
-          variant="outline"
-          onClick={() => setImportOpen(true)}
-          className="shrink-0"
-        >
-          <Sparkles className="mr-2 h-4 w-4" />
-          Import from document
-        </Button>
+        <div className="flex shrink-0 flex-wrap justify-end gap-2">
+          <Button variant="outline" onClick={() => setImportOpen(true)}>
+            <Sparkles className="mr-2 h-4 w-4" />
+            Import from document
+          </Button>
+        </div>
       </header>
+
+      <CalendarLabelsPanel labels={labels} events={events} schoolId={schoolId} />
 
       <CalendarView
         events={events}
-        eventCalendars={eventCalendars}
-        manageCalendars
-        schoolId={schoolId}
+        labels={labels}
         onCreateEvent={() => {
           setDefaultDate(format(new Date(), "yyyy-MM-dd"));
           setDefaultTime(undefined);
@@ -96,14 +98,14 @@ export function EventsClient({
         defaultDate={defaultDate}
         defaultTime={defaultTime}
         schoolId={schoolId}
-        eventCalendars={eventCalendars}
+        labels={labels}
       />
 
       <EventImportDialog
         open={importOpen}
         onOpenChange={setImportOpen}
         documents={documents}
-        eventCalendars={eventCalendars}
+        labels={labels}
         schoolId={schoolId}
       />
 
@@ -115,7 +117,7 @@ export function EventsClient({
             if (!open) setEditingEvent(null);
           }}
           schoolId={schoolId}
-          eventCalendars={eventCalendars}
+          labels={labels}
         />
       )}
 

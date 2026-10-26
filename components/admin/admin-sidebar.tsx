@@ -42,7 +42,6 @@ import { SchoolSwitcher } from "@/components/shared/school-switcher";
 import { motion, LayoutGroup } from "framer-motion";
 import { sidebarVariants } from "@/lib/motion";
 import { DevPanelTrigger } from "@/components/dev-panel/dev-panel-trigger";
-import { NotificationBell } from "@/components/parent/notification-bell";
 import {
   ADMIN_NAV,
   activeNavChild,
@@ -133,12 +132,6 @@ export function AdminSidebarContent({ onNavigate, forceExpanded }: SidebarConten
           ))}
         </LayoutGroup>
       </nav>
-
-      <div className="px-2 py-1.5">
-        <div className="flex items-center justify-center gap-1">
-          <NotificationBell />
-        </div>
-      </div>
 
       <div className="px-2 py-2">
         <form action={logout}>
