@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, FileText, Mail, Pencil, Phone, Plus, Sparkles, Trash2, X } from "lucide-react";
+import { Check, CheckCheck, FileText, Mail, Pencil, Phone, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { LogoSpinner } from "@/components/logo-spinner";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { TOOLBAR_PILL } from "@/components/admin/toolbar-pill";
 import {
+  approveAllSuggestedContacts,
   createContact,
   deleteContact,
   setContactStatus,
@@ -69,6 +71,8 @@ export function ContactsDirectory({
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [suggesting, setSuggesting] = useState(false);
+  const [approveAllOpen, setApproveAllOpen] = useState(false);
+  const [approvingAll, setApprovingAll] = useState(false);
 
   const approved = data.contacts.filter((c) => c.status === "approved");
   const suggested = data.contacts.filter((c) => c.status === "suggested");
@@ -99,6 +103,23 @@ export function ContactsDirectory({
     }
     toast.success("Contact deleted");
     setDeleting(null);
+    router.refresh();
+  }
+
+  async function handleApproveAll() {
+    setApprovingAll(true);
+    const result = await approveAllSuggestedContacts(
+      schoolId,
+      suggested.map((c) => c.id)
+    );
+    setApprovingAll(false);
+    if (result.error) {
+      toast.error(result.error);
+      return;
+    }
+    setApproveAllOpen(false);
+    const n = result.approved ?? 0;
+    toast.success(`Approved ${n} contact${n === 1 ? "" : "s"}`);
     router.refresh();
   }
 
@@ -191,14 +212,28 @@ export function ContactsDirectory({
               until you approve it.
             </p>
           </div>
-          <Button variant="outline" onClick={handleSuggest} disabled={disabled || suggesting}>
-            {suggesting ? (
-              <LogoSpinner className="mr-2" />
-            ) : (
-              <Sparkles className="mr-2 h-4 w-4" />
+          <div className="flex flex-wrap items-center gap-2">
+            {suggested.length > 0 && (
+              <button
+                type="button"
+                className={TOOLBAR_PILL}
+                onClick={() => setApproveAllOpen(true)}
+                disabled={disabled || approvingAll || busyId !== null}
+              >
+                <CheckCheck aria-hidden />
+                Approve all
+              </button>
             )}
-            {suggesting ? "Reading documents…" : "Suggest contacts from documents"}
-          </Button>
+            <button
+              type="button"
+              className={TOOLBAR_PILL}
+              onClick={handleSuggest}
+              disabled={disabled || suggesting}
+            >
+              {suggesting ? <LogoSpinner /> : <Sparkles aria-hidden />}
+              {suggesting ? "Reading documents…" : "Suggest contacts from documents"}
+            </button>
+          </div>
         </div>
 
         {suggested.length === 0 ? (
@@ -247,6 +282,19 @@ export function ContactsDirectory({
           </div>
         )}
       </section>
+
+      <ConfirmDialog
+        open={approveAllOpen}
+        onOpenChange={(open) => {
+          if (!approvingAll) setApproveAllOpen(open);
+        }}
+        title={`Approve ${suggested.length} suggested contact${suggested.length === 1 ? "" : "s"}?`}
+        description="They'll be added to your staff contacts, and the assistant can show them to parents. You can still edit or delete any of them afterwards."
+        confirmLabel={`Approve ${suggested.length}`}
+        variant="default"
+        loading={approvingAll}
+        onConfirm={handleApproveAll}
+      />
 
       {editing && (
         <ContactDialog

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { LogoSpinner } from "@/components/logo-spinner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -92,8 +92,12 @@ export function EventFormDialog({
     );
   }
 
-  // Reset form when dialog opens so it picks up new defaultDate/defaultTime
-  useEffect(() => {
+  // Reset form when dialog opens so it picks up new defaultDate/defaultTime.
+  // Adjusted while rendering rather than in an effect; prevOpen starts false
+  // so a dialog mounted already open is reset too, as the effect did.
+  const [prevOpen, setPrevOpen] = useState(false);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
     if (open && !isEditing) {
       const today = new Date().toISOString().split("T")[0];
       setTitle("");
@@ -117,7 +121,7 @@ export function EventFormDialog({
       setEventType(event.event_type || "general");
       setSelectedCalendarIds(event.calendars?.map((c) => c.id) ?? []);
     }
-  }, [open]);
+  }
 
   async function handleSubmit() {
     if (!title.trim() || !date) return;

@@ -14,7 +14,7 @@ export function ContactCard({ contact }: { contact: ContactCardData }) {
   const subtitle = [contact.role, contact.division].filter(Boolean).join(" · ");
 
   return (
-    <div className="max-w-md rounded-2xl border border-border bg-card p-4">
+    <div className="max-w-md rounded-2xl border border-border bg-card p-5">
       <div className="flex items-start gap-3">
         <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-secondary text-ink-soft">
           <UserRound className="size-5" aria-hidden />
@@ -37,7 +37,7 @@ export function ContactCard({ contact }: { contact: ContactCardData }) {
           {email && (
             <a
               href={email}
-              className="flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-xl border border-border bg-background px-3.5 py-2 text-sm text-ink transition-colors hover:bg-secondary active:bg-secondary"
+              className="flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-xl border border-border bg-background px-4 py-2 text-sm text-ink transition-colors hover:bg-secondary active:bg-secondary"
             >
               <Mail className="size-4 shrink-0 text-muted-foreground" aria-hidden />
               <span className="truncate">{contact.email}</span>
@@ -46,7 +46,7 @@ export function ContactCard({ contact }: { contact: ContactCardData }) {
           {phone && (
             <a
               href={phone}
-              className="flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-xl border border-border bg-background px-3.5 py-2 text-sm text-ink transition-colors hover:bg-secondary active:bg-secondary"
+              className="flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-xl border border-border bg-background px-4 py-2 text-sm text-ink transition-colors hover:bg-secondary active:bg-secondary"
             >
               <Phone className="size-4 shrink-0 text-muted-foreground" aria-hidden />
               <span className="truncate">{contact.phone}</span>

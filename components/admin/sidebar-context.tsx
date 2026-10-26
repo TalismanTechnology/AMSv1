@@ -32,9 +32,9 @@ export function SidebarProvider({
   const [folders, setFolders] = useState<Folder[]>([]);
 
   useEffect(() => {
-    // Auto-collapse on mobile
+    // Auto-collapse on mobile. It already starts collapsed, so only a later
+    // switch to a narrow viewport needs handling.
     const mq = window.matchMedia("(max-width: 768px)");
-    if (mq.matches) setCollapsed(true);
     const handler = (e: MediaQueryListEvent) => {
       if (e.matches) setCollapsed(true);
     };

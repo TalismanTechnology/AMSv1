@@ -11,17 +11,28 @@
  * Bump AI_CONSENT_VERSION whenever the notice's substance changes (a new AI
  * provider, new data sent): every user is asked again on their next question.
  *
+ * Since 2026-10-25 the notice also carries a required "I have read and agree
+ * to AskMySchool's Terms of Service and Privacy Policy" checkbox, and the
+ * server action refuses to record consent without it. So a stored
+ * ai_consent_version of 2026-10-25 or later also records that the user
+ * assented to the Terms and Privacy Policy at ai_consent_at — no extra
+ * column needed.
+ *
  * Kept free of server/Supabase imports so the client dialog, the server
  * action, the API route, and the tests all share it.
  */
 
-export const AI_CONSENT_VERSION = "2026-10-09";
+export const AI_CONSENT_VERSION = "2026-10-25";
 
 /** Machine-readable code the chat client matches to re-open the dialog. */
 export const AI_CONSENT_REQUIRED_CODE = "ai_consent_required";
 
 export const AI_CONSENT_REQUIRED_MESSAGE =
-  "Before you can ask questions, please agree to AI processing: your questions and relevant school document excerpts are sent to Google's Gemini AI to generate answers. You can review this in your Profile.";
+  "Before you can ask questions, please agree to AI processing and to AskMySchool's Terms of Service and Privacy Policy: your questions and relevant school document excerpts are sent to Google's Gemini AI to generate answers. You can review this in your Profile.";
+
+/** Returned by the server action when the Terms/Privacy box wasn't ticked. */
+export const TERMS_ASSENT_REQUIRED_MESSAGE =
+  "Please confirm you've read and agree to AskMySchool's Terms of Service and Privacy Policy.";
 
 export interface AiConsentFields {
   ai_consent_at?: string | null;

@@ -16,7 +16,7 @@ interface TypewriterTextProps {
 
 export function TypewriterText({
   content,
-  speed = 20,
+  speed = 8,
   sources,
   onSourceClick,
   onComplete,

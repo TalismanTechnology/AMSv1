@@ -214,6 +214,51 @@ export function detectDivision(
   return hits.size === 1 ? [...hits][0] : null;
 }
 
+// ── The answer prompt's directory ──────────────────────────────────
+
+/** Contacts listed in the answer prompt at most (approved, reachable ones). */
+export const MAX_PROMPT_CONTACTS = 40;
+
+type PromptContact = Pick<
+  SchoolContact,
+  "name" | "role" | "email" | "phone" | "division_id" | "topics" | "status"
+>;
+
+/**
+ * The school's approved staff contacts as a <staff_contacts> block for the
+ * answer prompt, so an answer that sends the parent to a person or office can
+ * give that contact's real email / phone. Only approved rows with an email or
+ * phone; "" when there are none (the prompt is then exactly as before).
+ */
+export function formatContactDirectory(
+  contacts: readonly PromptContact[],
+  divisions: readonly { id: string; name: string }[] = []
+): string {
+  const lines = contacts
+    .filter((c) => c.status === "approved" && reachable(c))
+    .slice(0, MAX_PROMPT_CONTACTS)
+    .map((c) => {
+      const who = [c.name?.trim(), c.role?.trim()].filter(Boolean).join(" — ");
+      const division = divisions.find((d) => d.id === c.division_id)?.name;
+      const topics = cleanTopics(c.topics).map((t) => CONTACT_TOPIC_LABELS[t]);
+      const fields = [
+        division ? `Division: ${division}` : "",
+        topics.length ? `Handles: ${topics.join(", ")}` : "",
+        c.email?.trim() ? `Email: ${c.email.trim()}` : "",
+        c.phone?.trim() ? `Phone: ${c.phone.trim()}` : "",
+      ].filter(Boolean);
+      return `- ${who}${fields.length ? ` | ${fields.join(" | ")}` : ""}`;
+    });
+  if (lines.length === 0) return "";
+
+  return `<staff_contacts>
+${lines.join("\n")}
+</staff_contacts>
+
+STAFF CONTACTS
+The list above is the school's approved staff directory. Whenever your answer tells the parent to contact a person or office (including "contact the school office"), pick the matching entry and include its email and/or phone exactly as listed. Prefer the parent's division when an entry names one. Never invent, guess, complete, or reformat an email address or phone number: use only details that appear verbatim in this list or in the reference material. If no entry matches, name who to contact without contact details. Don't list contacts the parent doesn't need, and don't cite this list with a source number.`;
+}
+
 // ── Links ──────────────────────────────────────────────────────────
 
 /** A tel: href with only what dialers accept (digits, leading +, extension). */

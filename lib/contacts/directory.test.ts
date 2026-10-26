@@ -6,6 +6,7 @@ import {
   dedupeContacts,
   detectDivision,
   emailAppearsVerbatim,
+  formatContactDirectory,
   hasSpecialistContacts,
   isMissingTableError,
   mailtoHref,
@@ -298,4 +299,24 @@ test("windows are capped and empty when there are no contact details", () => {
   const many = Array.from({ length: 50 }, (_, i) => `x${i}@school.org`).join(" ".repeat(400));
   const total = contactWindows(many, { maxChars: 1000 }).reduce((s, w) => s + w.length, 0);
   assert.ok(total <= 1000);
+});
+
+test("formatContactDirectory: approved, reachable contacts only, details verbatim", () => {
+  const base = { division_id: null, topics: ["health"], status: "approved" as const };
+  const out = formatContactDirectory(
+    [
+      { ...base, name: "Ann Lee", role: "School Nurse", email: "nurse@school.org", phone: "(212) 555-0100", division_id: LOWER },
+      { ...base, name: "No Way", role: "Ghost", email: null, phone: null },
+      { ...base, name: "Pending Pat", role: "Coach", email: "pat@school.org", phone: null, status: "suggested" as const },
+    ],
+    [{ id: LOWER, name: "Lower School" }]
+  );
+  assert.match(out, /<staff_contacts>/);
+  assert.match(out, /Ann Lee — School Nurse \| Division: Lower School \| Handles: Health & nurse \| Email: nurse@school\.org \| Phone: \(212\) 555-0100/);
+  assert.doesNotMatch(out, /No Way|Pending Pat/);
+  assert.match(out, /Never invent/);
+});
+
+test("formatContactDirectory: nothing usable → empty string", () => {
+  assert.equal(formatContactDirectory([]), "");
 });

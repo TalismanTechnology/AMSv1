@@ -116,18 +116,22 @@ function UserManagementSection({ schoolId }: { schoolId: string }) {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  const fetchUsers = useCallback(async () => {
-    setLoading(true);
-    const result = await getTableData("school_memberships", schoolId, 50);
+  const applyUsers = useCallback((result: { data?: unknown[] | null }) => {
     if (result.data) {
       setUsers(result.data as UserRow[]);
     }
     setLoading(false);
-  }, [schoolId]);
+  }, []);
 
+  const fetchUsers = useCallback(async () => {
+    setLoading(true);
+    applyUsers(await getTableData("school_memberships", schoolId, 50));
+  }, [schoolId, applyUsers]);
+
+  // First load: `loading` already starts true.
   useEffect(() => {
-    fetchUsers();
-  }, [fetchUsers]);
+    getTableData("school_memberships", schoolId, 50).then(applyUsers);
+  }, [schoolId, applyUsers]);
 
   const handleToggleApproval = async (userId: string) => {
     setActionLoading(userId);

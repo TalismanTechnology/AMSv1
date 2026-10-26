@@ -51,9 +51,13 @@ export function CleanupTab({ schoolId }: CleanupTabProps) {
     setLoading(false);
   }, [schoolId]);
 
+  // First load: `loading` already starts true.
   useEffect(() => {
-    fetchCounts();
-  }, [fetchCounts]);
+    getDebugInfo(schoolId).then((info) => {
+      setCounts(info.tableCounts);
+      setLoading(false);
+    });
+  }, [schoolId]);
 
   const handleClear = async (tableName: string) => {
     setClearing(tableName);

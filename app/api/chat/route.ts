@@ -19,6 +19,7 @@ import { parseFollowUps } from "@/lib/chat-utils";
 import type { ChatSource } from "@/lib/types";
 import {
   contactCardPrompt,
+  contactDirectoryPrompt,
   loadApprovedContacts,
   routeUnansweredQuestion,
 } from "@/lib/contacts/route-contact";
@@ -168,6 +169,12 @@ export async function POST(request: NextRequest) {
     // retrieval and used only if nothing answers the question. Never rejects:
     // a missing table or any error is "no contacts".
     const approvedContacts = loadApprovedContacts(adminSupabase, schoolId);
+    // The same contacts as a directory in the answer prompt, so an answer
+    // that sends the parent to someone gives their real email / phone. Built
+    // alongside retrieval; never rejects ("" = prompt unchanged).
+    const contactDirectory = approvedContacts.then((contacts) =>
+      contactDirectoryPrompt(adminSupabase, schoolId, contacts)
+    );
     // The session's stored title and message count, read before this turn's
     // user message is saved, so auto-titling goes by what's in the DB rather
     // than how much history the client happened to send. Never rejects: an
@@ -241,6 +248,12 @@ export async function POST(request: NextRequest) {
       } catch (err) {
         debugLog(`Contact routing failed (continuing without a card): ${err}`);
       }
+    }
+    // No card: list the approved directory instead. (With a card, the model
+    // is told not to write contact details — the card shows them.)
+    if (!contactCard) {
+      const directory = await contactDirectory;
+      if (directory) answerSystemPrompt = `${answerSystemPrompt}\n\n${directory}`;
     }
 
     // Documents are the only citable sources; the calendar never produces
@@ -431,6 +444,12 @@ export async function POST(request: NextRequest) {
         // Contact details come only from the approved row, never the model.
         if (contactCard) {
           writer.write({ type: "data-contact", data: contactCard });
+        }
+        // No school documents matched (the same condition that flags it for
+        // staff). The client offers a web search link only if the model's
+        // reply also carries the NOT_FOUND flag (lib/chat-utils.ts).
+        if (sources.length === 0) {
+          writer.write({ type: "data-unanswered", data: true });
         }
         writer.write({ type: "data-message-id", data: assistantMessageId });
         writer.merge(result.toUIMessageStream());

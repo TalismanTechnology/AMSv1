@@ -6,6 +6,7 @@ import {
   CONTACT_TOPICS,
   CONTACT_TOPIC_LABELS,
   detectDivision,
+  formatContactDirectory,
   hasSpecialistContacts,
   isMissingTableError,
   isContactTopic,
@@ -155,6 +156,28 @@ async function loadDivisions(
     return [];
   }
   return data ?? [];
+}
+
+/**
+ * The approved directory for the answer prompt (formatContactDirectory), with
+ * division names when any contact belongs to a division. Never rejects: any
+ * failure, no contacts, or no table yet is "" (the prompt is unchanged).
+ */
+export async function contactDirectoryPrompt(
+  supabase: SupabaseClient,
+  schoolId: string,
+  contacts: ApprovedContact[]
+): Promise<string> {
+  try {
+    if (contacts.length === 0) return "";
+    const divisions = contacts.some((c) => c.division_id)
+      ? await loadDivisions(supabase, schoolId)
+      : [];
+    return formatContactDirectory(contacts, divisions);
+  } catch (err) {
+    console.error("[contacts] Building the contact directory failed:", err);
+    return "";
+  }
 }
 
 /**

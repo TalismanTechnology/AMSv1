@@ -13,6 +13,7 @@ import {
   normalizePhone,
 } from "@/lib/contacts/directory";
 import { suggestContactsFromDocuments } from "@/lib/contacts/suggest";
+import { approveSuggestedContacts } from "@/lib/contacts/approve";
 
 // Server actions behind the "Contacts" tab in admin settings. Every entry
 // point re-authorizes against the specific school id it was handed, and every
@@ -158,6 +159,28 @@ export async function setContactStatus(
   logAudit(auth.userId, status === "approved" ? "contact.approve" : "contact.reject", "school_contact", contactId, undefined, schoolId);
   revalidate();
   return {};
+}
+
+/**
+ * "Approve all": approve the suggested contacts the admin confirmed, in one
+ * update. Authorized for this school first; the update only touches this
+ * school's rows that are still suggested (lib/contacts/approve.ts).
+ */
+export async function approveAllSuggestedContacts(
+  schoolId: string,
+  contactIds: string[]
+): Promise<{ error?: string; approved?: number }> {
+  const auth = await requireSchoolAdmin(schoolId);
+  if ("error" in auth) return { error: auth.error };
+  if (!Array.isArray(contactIds)) return { error: "Invalid request." };
+
+  const supabase = await createClient();
+  const result = await approveSuggestedContacts(supabase, schoolId, contactIds);
+  if (result.error) return { error: friendlyDbError(result.error) };
+
+  logAudit(auth.userId, "contact.approve_all", "school_contact", undefined, { approved: result.approved }, schoolId);
+  revalidate();
+  return { approved: result.approved };
 }
 
 export async function deleteContact(
