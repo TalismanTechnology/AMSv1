@@ -1,5 +1,6 @@
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
+import { reportAiFailure } from "@/lib/alerts/ai-failure-alert";
 import { labelChildren } from "./child-privacy";
 import type { ChildContext } from "./context";
 
@@ -144,8 +145,9 @@ Standalone query:`,
     }
     return rewritten;
   } catch (error) {
-    // Non-fatal — fall back to original query
-    console.warn("[rewrite-query] Failed, using original:", error);
+    // Non-fatal — fall back to original query (logged, and alerted on if
+    // the provider is failing)
+    reportAiFailure(error, { source: "chat.rewrite-query" });
     return lastMessageText;
   }
 }

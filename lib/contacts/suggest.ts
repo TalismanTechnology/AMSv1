@@ -13,6 +13,7 @@ import {
   verifyExtractedContact,
   type ExtractedContact,
 } from "./directory";
+import { reportAiFailure } from "@/lib/alerts/ai-failure-alert";
 
 // "Suggest contacts from documents": read the school's ready documents, ask
 // Gemini for the staff contacts they list, keep only those whose email or
@@ -212,7 +213,7 @@ ${body}`,
     });
     return object.contacts;
   } catch (err) {
-    console.error("[contacts] Contact extraction failed:", err instanceof Error ? err.message : err);
+    reportAiFailure(err, { source: "contacts.extract" });
     return [];
   }
 }

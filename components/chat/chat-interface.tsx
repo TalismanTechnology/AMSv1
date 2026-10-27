@@ -18,6 +18,7 @@ import { SourcePanelProvider } from "./source-panel-context";
 import { ChatExport } from "./chat-export";
 import { AiConsentDialog } from "./ai-consent-dialog";
 import { isAiConsentError } from "@/lib/ai/consent";
+import { PARENT_AI_ERROR_MESSAGE } from "@/lib/ai/provider-errors";
 import { searchDocumentsByName } from "@/actions/documents";
 import { parseFollowUps } from "@/lib/chat-utils";
 import type { ChatSource, ChatMessage } from "@/lib/types";
@@ -459,7 +460,9 @@ export function ChatInterface({
               )}
               {((error && !consentError) || sendError) && (
                 <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-5 py-4 text-sm leading-relaxed text-destructive">
-                  Something went wrong: {error?.message || sendError}
+                  {/* Never the error's own text: it can be the AI provider's
+                      (billing, quota…) or a server message. */}
+                  {PARENT_AI_ERROR_MESSAGE}
                 </div>
               )}
             </div>

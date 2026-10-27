@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { redactChildNames, type NamedChild } from "@/lib/ai/child-privacy";
 import { FALLBACK_TOPIC, matchExistingTopic, sanitizeTopic } from "./aggregate";
 import { chunk, daysAgoISO, fetchAllPages } from "./queries";
+import { reportAiFailure } from "@/lib/alerts/ai-failure-alert";
 
 /**
  * Give each recent parent question a short, generic topic label ("Lunch
@@ -139,7 +140,7 @@ export async function labelPendingQuestions(
         labeled += await saveTopics(supabase, schoolId, topics);
       } catch (err) {
         // Leave this batch unlabeled; the next run retries it.
-        console.error(`[insights] topic labeling batch failed for school ${schoolId}:`, err);
+        reportAiFailure(err, { source: "insights.topic-labeling", schoolId });
       }
     }
   } catch (err) {

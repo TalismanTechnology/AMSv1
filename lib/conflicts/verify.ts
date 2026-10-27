@@ -2,6 +2,7 @@ import { generateObject } from "ai";
 import { google } from "@ai-sdk/google";
 import { z } from "zod";
 import { describeSide, JUDGE_MODEL_ID, MIN_CONFLICT_CONFIDENCE, type JudgePair, type Verdict } from "./judge";
+import { reportAiFailure } from "@/lib/alerts/ai-failure-alert";
 
 // A second, skeptical look at every conflict the judge kept open. The judge
 // over-calls (opinion vs fact, recurring events, newsletter issues, redacted
@@ -62,7 +63,7 @@ export async function verifyConflict(pair: JudgePair, claim: Verdict["judgment"]
     });
     return object;
   } catch (err) {
-    console.error("[conflicts] Verifying failed:", err instanceof Error ? err.message : err);
+    reportAiFailure(err, { source: "conflicts.verify" });
     return null;
   }
 }

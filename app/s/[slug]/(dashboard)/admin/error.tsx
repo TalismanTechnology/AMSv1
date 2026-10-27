@@ -1,6 +1,7 @@
 "use client";
 
 import { AlertTriangle } from "lucide-react";
+import { adminAiErrorMessage, classifyAiError, isAiProviderError } from "@/lib/ai/provider-errors";
 
 export default function AdminError({
   error,
@@ -20,7 +21,10 @@ export default function AdminError({
           Something went wrong
         </h2>
         <p className="mb-6 text-sm text-muted-foreground">
-          {error.message || "An unexpected error occurred."}
+          {/* An AI provider's own message (billing, keys…) is never shown. */}
+          {isAiProviderError(error)
+            ? adminAiErrorMessage(classifyAiError(error))
+            : error.message || "An unexpected error occurred."}
         </p>
         <button
           onClick={reset}

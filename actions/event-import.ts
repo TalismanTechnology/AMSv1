@@ -9,6 +9,7 @@ import {
   extractCalendarEvents,
   type ExtractedEvent,
 } from "@/lib/ai/event-extraction";
+import { adminSafeErrorMessage } from "@/lib/alerts/ai-failure-alert";
 
 // ── Extract events from an uploaded document ─────────
 
@@ -44,8 +45,9 @@ export async function extractEventsFromDocument(
       return { error: "No calendar events were found in this document." };
     return { events };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Extraction failed";
-    return { error: message };
+    return {
+      error: adminSafeErrorMessage(error, { source: "events.extract", schoolId }, "Extraction failed"),
+    };
   }
 }
 

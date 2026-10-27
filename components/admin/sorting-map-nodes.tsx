@@ -48,6 +48,7 @@ import {
   type TreeNode,
 } from "@/lib/documents/sorting-map";
 import type { Document } from "@/lib/types";
+import { adminSafeStoredError } from "@/lib/ai/provider-errors";
 
 // Boxes are drawn to NODE_WIDTH × NODE_HEIGHT (200 × 36) and list rows to ROW_HEIGHT (30) in
 // lib/documents/sorting-map.ts, which places them before they are measured.
@@ -392,7 +393,7 @@ function statusOf(doc: Document): string {
     case "pending":
       return "Waiting for approval";
     case "error":
-      return doc.error_message ? `Error: ${doc.error_message}` : "Error";
+      return doc.error_message ? `Error: ${adminSafeStoredError(doc.error_message)}` : "Error";
     default:
       return "Ready";
   }

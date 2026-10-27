@@ -14,6 +14,7 @@ import {
 import { enqueueDocumentPush } from "@/lib/push/document-push-runner";
 import { ENQUEUE_MAX_AGE_MS } from "@/lib/push/document-push";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { adminSafeErrorMessage, reportAiFailure } from "@/lib/alerts/ai-failure-alert";
 
 const BATCH_SIZE = 5;
 
@@ -56,7 +57,7 @@ async function maybeAutoSort(
     if (!school?.auto_sort_enabled) return {};
     return await chooseSorting(supabase, doc, content);
   } catch (err) {
-    console.warn(`[processor] Auto-sort failed:`, err);
+    reportAiFailure(err, { source: "documents.auto-sort", schoolId: doc.school_id });
     return {};
   }
 }
@@ -70,6 +71,8 @@ function logMem(label: string) {
 
 export async function processDocument(documentId: string) {
   const supabase = createAdminClient();
+  // For the owner alert, once known.
+  let schoolId: string | null = null;
 
   try {
     logMem(`Starting: ${documentId}`);
@@ -84,6 +87,7 @@ export async function processDocument(documentId: string) {
     if (docError || !doc) {
       throw new Error(`Document not found: ${docError?.message}`);
     }
+    schoolId = doc.school_id ?? null;
 
     logMem("Doc record fetched");
 
@@ -202,7 +206,7 @@ export async function processDocument(documentId: string) {
       summary = await generateSummary(text, doc.title);
       logMem("Summary generated");
     } catch (err) {
-      console.warn(`[processor] Summary generation failed:`, err);
+      reportAiFailure(err, { source: "documents.summary", schoolId });
     }
 
     // 8b. Website-synced documents go into the school's "Website" folder
@@ -246,9 +250,14 @@ export async function processDocument(documentId: string) {
     logMem(`Done: ${documentId} (${totalInserted} chunks)`);
     return { success: true, chunkCount: totalInserted };
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Unknown error occurred";
-    console.error(`[processor] Failed: ${documentId}:`, message);
+    console.error(`[processor] Failed: ${documentId}:`, error instanceof Error ? error.message : error);
+    // Shown to admins: an AI provider failure (e.g. embeddings) becomes its
+    // category message, never the provider's text.
+    const message = adminSafeErrorMessage(
+      error,
+      { source: "documents.process", schoolId },
+      "Unknown error occurred"
+    );
 
     await supabase
       .from("documents")

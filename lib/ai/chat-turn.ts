@@ -21,6 +21,7 @@ import {
   type ChildContext,
 } from "@/lib/ai/context";
 import { rewriteQueryWithContext } from "@/lib/ai/rewrite-query";
+import { reportAiFailure } from "@/lib/alerts/ai-failure-alert";
 import {
   redactChildNames,
   redactChildNamesInMessages,
@@ -132,7 +133,7 @@ export async function prepareChatTurn({
     keywordSearchChunks(searchQuery, schoolId),
   ]);
   if (vectorResult.status === "fulfilled") matchedChunks = vectorResult.value;
-  else console.error("RAG search failed (continuing without sources):", vectorResult.reason);
+  else reportAiFailure(vectorResult.reason, { source: "chat.retrieval-embedding", schoolId });
   if (keywordResult.status === "fulfilled") keywordHits = keywordResult.value;
   else console.error("Keyword search failed (continuing without it):", keywordResult.reason);
 

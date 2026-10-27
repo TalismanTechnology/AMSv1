@@ -1,5 +1,7 @@
 "use client";
 
+import { PARENT_AI_ERROR_MESSAGE, isAiProviderError } from "@/lib/ai/provider-errors";
+
 export default function ParentError({
   error,
   reset,
@@ -14,7 +16,10 @@ export default function ParentError({
           Something went wrong
         </h2>
         <p className="text-sm text-muted-foreground mb-4">
-          {error.message || "An unexpected error occurred."}
+          {/* Never error.message: it can carry provider or server internals. */}
+          {isAiProviderError(error)
+            ? PARENT_AI_ERROR_MESSAGE
+            : "An unexpected error occurred. Please try again."}
         </p>
         <button
           onClick={reset}
