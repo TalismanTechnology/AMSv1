@@ -7,6 +7,7 @@ import { logAudit } from "@/lib/audit";
 import { applySorting, chooseSorting } from "@/lib/documents/auto-sort";
 import { toFolderOptions } from "@/lib/ai/classify-document";
 import { proposeFolders } from "@/lib/ai/propose-folders";
+import { adminSafeErrorMessage } from "@/lib/alerts/ai-failure-alert";
 import {
   autoFolderCandidates,
   protectedFolderIds,
@@ -103,15 +104,15 @@ export interface SortResult {
 }
 
 /** A reason an admin can act on, rather than a stack trace. */
-function reasonFor(err: unknown): string {
+function reasonFor(err: unknown, source: string, schoolId: string): string {
   const message = err instanceof Error ? err.message : String(err);
   if (/no object generated|could not parse|NoObjectGenerated/i.test(message)) {
     return "The AI didn't return an answer. Try again.";
   }
-  if (/api key|unauthori[sz]ed|permission denied|\b40[13]\b/i.test(message)) {
-    return "The AI service refused the request. Check the Google AI key on Vercel.";
-  }
-  return message.length > 160 ? `${message.slice(0, 157)}…` : message;
+  // Provider failures get a category message (and alert the owner); the
+  // provider's own text never reaches the page.
+  const safe = adminSafeErrorMessage(err, { source, schoolId });
+  return safe.length > 160 ? `${safe.slice(0, 157)}…` : safe;
 }
 
 /**
@@ -164,7 +165,7 @@ export async function sortDocumentsNow(
         return { ...base, error: "No category fits it. File it by hand, or add an Other category." };
       } catch (err) {
         console.error(`[sort] Sorting ${doc.id} failed:`, err);
-        return { ...base, error: reasonFor(err) };
+        return { ...base, error: reasonFor(err, "sorting.classify", schoolId) };
       }
     })
   );
@@ -363,7 +364,7 @@ export async function proposeAutoFolders(
     };
   } catch (err) {
     console.error(`[auto-folder] Proposal for ${schoolId} failed:`, err);
-    return { error: reasonFor(err) };
+    return { error: reasonFor(err, "sorting.propose-folders", schoolId) };
   }
 }
 
@@ -480,6 +481,6 @@ export async function applyAutoFolders(
     return { created, moved, skipped: plan.moves.length - moved + plan.skipped.length };
   } catch (err) {
     console.error(`[auto-folder] Applying for ${schoolId} failed:`, err);
-    return { error: reasonFor(err) };
+    return { error: reasonFor(err, "sorting.apply-folders", schoolId) };
   }
 }

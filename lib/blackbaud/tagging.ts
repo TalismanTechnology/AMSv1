@@ -3,6 +3,7 @@ import { google } from "@ai-sdk/google";
 import { z } from "zod";
 import type { EventType } from "@/lib/types";
 import type { NormalizedEvent } from "./ical";
+import { reportAiFailure } from "@/lib/alerts/ai-failure-alert";
 
 // Decides which of a school's own divisions/categories a synced Blackbaud
 // event belongs to.
@@ -262,8 +263,9 @@ Rules:
           confidence: tag.confidence,
         });
       }
-    } catch {
+    } catch (err) {
       // Leave this batch untagged; the review queue is the safety net.
+      reportAiFailure(err, { source: "calendar.tagging" });
       continue;
     }
   }

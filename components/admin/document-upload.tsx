@@ -42,6 +42,7 @@ import {
 } from "@/components/admin/category-select-items";
 import type { Category, EventCalendar, Folder } from "@/lib/types";
 import { stripMarkdown } from "@/lib/markdown/normalize";
+import { adminSafeStoredError } from "@/lib/ai/provider-errors";
 
 // Both lists come from lib/documents/file-types so the browser allowlist and
 // the server's type mapping stay in step. They were previously hand-copied
@@ -140,7 +141,7 @@ export function DocumentUpload({
           updateItem(itemId, {
             status: data.status,
             summary: data.summary,
-            error: data.error_message,
+            error: adminSafeStoredError(data.error_message) ?? undefined,
           });
 
           if (data.status === "ready") {

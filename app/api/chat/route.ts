@@ -16,6 +16,8 @@ import { fetchChildrenForContext } from "@/lib/ai/context";
 import { CHAT_MODEL_ID, prepareChatTurn } from "@/lib/ai/chat-turn";
 import { aiConsentGate } from "@/lib/ai/consent";
 import { parseFollowUps } from "@/lib/chat-utils";
+import { PARENT_AI_ERROR_MESSAGE, isAiProviderError } from "@/lib/ai/provider-errors";
+import { reportAiFailure } from "@/lib/alerts/ai-failure-alert";
 import type { ChatSource } from "@/lib/types";
 import {
   contactCardPrompt,
@@ -372,7 +374,7 @@ export async function POST(request: NextRequest) {
               }
             }
           } catch (err) {
-            debugLog(`FAILED to embed unanswered question: ${err}`);
+            reportAiFailure(err, { source: "chat.unanswered-embedding", schoolId });
           }
         })());
       }
@@ -398,8 +400,11 @@ export async function POST(request: NextRequest) {
       temperature,
       maxRetries: 5,
       onError: ({ error }) => {
-        console.error("Chat stream error:", error);
-        assistantSaved();
+        // Logged and alerted on; the parent only sees PARENT_AI_ERROR_MESSAGE
+        // (toUIMessageStream's onError below).
+        reportAiFailure(error, { source: "chat.stream", schoolId }).alerted.finally(
+          () => assistantSaved()
+        );
       },
       onAbort: () => assistantSaved(),
       onFinish: async ({ text }) => {
@@ -452,25 +457,25 @@ export async function POST(request: NextRequest) {
           writer.write({ type: "data-unanswered", data: true });
         }
         writer.write({ type: "data-message-id", data: assistantMessageId });
-        writer.merge(result.toUIMessageStream());
+        // The SDK's default sends error.message to the browser; parents must
+        // never see the provider's words.
+        writer.merge(result.toUIMessageStream({ onError: () => PARENT_AI_ERROR_MESSAGE }));
       },
+      onError: () => PARENT_AI_ERROR_MESSAGE,
     });
 
     return createUIMessageStreamResponse({ stream });
   } catch (error) {
-    console.error("Chat API error:", error);
-    const message = error instanceof Error ? error.message : "";
-    const isRateLimit =
-      message.includes("Resource exhausted") ||
-      message.includes("429") ||
-      message.includes("rate");
-    return new Response(
-      JSON.stringify({
-        error: isRateLimit
-          ? "The AI is receiving too many requests right now. Please wait a moment and try again."
-          : message || "An unexpected error occurred",
-      }),
-      { status: isRateLimit ? 429 : 500, headers: { "Content-Type": "application/json" } }
-    );
+    // Before the stream starts: an AI call that must succeed (none today —
+    // rewrite, retrieval and routing all fall back), a database error, or a
+    // bad request body. Whatever it is, the parent sees one friendly line;
+    // the details stay in the logs (and the owner alert, if it's the AI).
+    const fromProvider = isAiProviderError(error);
+    if (fromProvider) reportAiFailure(error, { source: "chat.prepare" });
+    else console.error("Chat API error:", error);
+    return new Response(JSON.stringify({ error: PARENT_AI_ERROR_MESSAGE }), {
+      status: fromProvider ? 503 : 500,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 }

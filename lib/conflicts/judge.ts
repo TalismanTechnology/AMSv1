@@ -3,6 +3,7 @@ import { google } from "@ai-sdk/google";
 import { z } from "zod";
 import { normalizeQuoteText, quoteAppearsIn } from "./quotes";
 import { statementsDifferInYear, yearRange, type YearRange } from "./years";
+import { reportAiFailure } from "@/lib/alerts/ai-failure-alert";
 
 // Asking Gemini whether two near-identical passages genuinely disagree.
 // Several pairs go in one call (JUDGE_BATCH_SIZE) to keep the per-pair cost
@@ -155,7 +156,7 @@ export async function judgePairs(pairs: JudgePair[]): Promise<(Judgment | null)[
     }
     return pairs.map((_, i) => byPair.get(i + 1) ?? null);
   } catch (err) {
-    console.error("[conflicts] Judging failed:", err instanceof Error ? err.message : err);
+    reportAiFailure(err, { source: "conflicts.judge" });
     return pairs.map(() => null);
   }
 }

@@ -9,6 +9,7 @@ import {
   type DocumentInput,
 } from "@/lib/ai/document-audit";
 import { categoryLabels } from "@/lib/documents/division-categories";
+import { adminSafeErrorMessage } from "@/lib/alerts/ai-failure-alert";
 
 export interface StoredAudit {
   id: string;
@@ -67,10 +68,14 @@ export async function runDocumentAudit(schoolId: string): Promise<StoredAudit> {
   }));
 
   // Run AI analysis against checklist
-  const result = await analyzeDocumentGaps(
-    docInputs,
-    school?.name || "Unknown School"
-  );
+  // A provider failure reaches the page (via the error boundary) only as its
+  // category message.
+  let result: Awaited<ReturnType<typeof analyzeDocumentGaps>>;
+  try {
+    result = await analyzeDocumentGaps(docInputs, school?.name || "Unknown School");
+  } catch (err) {
+    throw new Error(adminSafeErrorMessage(err, { source: "documents.audit", schoolId }));
+  }
 
   // Store result
   const { data: audit, error } = await supabase

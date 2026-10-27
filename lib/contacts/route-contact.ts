@@ -1,6 +1,7 @@
 import { generateObject } from "ai";
 import { google } from "@ai-sdk/google";
 import { z } from "zod";
+import { reportAiFailure } from "@/lib/alerts/ai-failure-alert";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   CONTACT_TOPICS,
@@ -90,7 +91,7 @@ Question: ${question.slice(0, 500)}`,
     if (object.topic === NOT_SCHOOL) return "not_school";
     return isContactTopic(object.topic) ? object.topic : null;
   } catch (err) {
-    console.error("[contacts] Topic classification failed:", err instanceof Error ? err.message : err);
+    reportAiFailure(err, { source: "chat.contact-topic" });
     return null;
   }
 }
