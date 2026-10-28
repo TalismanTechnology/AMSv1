@@ -21,7 +21,7 @@ export default async function ContactsPage({
 
   return (
     <PageTransition>
-      <div className="mx-auto max-w-2xl space-y-8 pb-8">
+      <div className="mx-auto max-w-6xl space-y-6 pb-8">
         <ContentPageHeader page="contacts" />
         <ContactsDirectory schoolId={school.id} data={contacts} />
       </div>

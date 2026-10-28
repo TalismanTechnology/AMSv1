@@ -22,6 +22,7 @@ import {
   isMissingTableError,
   type SchoolContact,
 } from "@/lib/contacts/directory";
+import { isContactFoldersMissingError, sortContactFolders } from "@/lib/contacts/folders";
 
 const CALLBACK_RESULTS: readonly string[] = ["connected", "denied", "error"];
 
@@ -264,7 +265,7 @@ export async function loadParentSignInConfig(school: School): Promise<ParentSign
  */
 export async function loadContacts(schoolId: string): Promise<ContactsDirectoryData> {
   const supabase = await createClient();
-  const [{ data, error }, { data: divisions }] = await Promise.all([
+  const [{ data, error }, { data: divisions }, folders] = await Promise.all([
     supabase
       .from("school_contacts")
       .select("*, source_document:documents(title)")
@@ -277,9 +278,26 @@ export async function loadContacts(schoolId: string): Promise<ContactsDirectoryD
       .eq("school_id", schoolId)
       .eq("kind", "division")
       .order("sort_order", { ascending: true }),
+    supabase
+      .from("contact_folders")
+      .select("id, name, sort_order")
+      .eq("school_id", schoolId)
+      .order("sort_order", { ascending: true }),
   ]);
 
-  const base = { divisions: divisions ?? [], contacts: [] };
+  // Without migration 049 the page still works, as one flat grid.
+  let foldersMissing = false;
+  if (folders.error) {
+    foldersMissing = isContactFoldersMissingError(folders.error);
+    if (!foldersMissing) console.error("[contacts] Loading contact folders failed:", folders.error.message);
+  }
+
+  const base = {
+    divisions: divisions ?? [],
+    contacts: [],
+    folders: sortContactFolders(folders.data ?? []),
+    foldersMissing,
+  };
   if (error) {
     if (isMissingTableError(error)) {
       return { ...base, loadError: CONTACTS_TABLE_MISSING_MESSAGE, tableMissing: true };
@@ -290,6 +308,8 @@ export async function loadContacts(schoolId: string): Promise<ContactsDirectoryD
 
   return {
     ...base,
+    // The select is "*", so folder_id is there once 049 is applied.
+    foldersMissing: foldersMissing || (data ?? []).some((row) => !("folder_id" in row)),
     loadError: null,
     tableMissing: false,
     contacts: (data ?? []).map((row) => {
@@ -299,6 +319,7 @@ export async function loadContacts(schoolId: string): Promise<ContactsDirectoryD
       return {
         ...contact,
         topics: contact.topics ?? [],
+        folder_id: contact.folder_id ?? null,
         source_document_title: source_document?.title ?? null,
       };
     }),

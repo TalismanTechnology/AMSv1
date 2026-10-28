@@ -6,6 +6,7 @@ import { useRef, useCallback, useEffect, useState } from "react";
 import {
   MessageSquare,
   FileText,
+  BookUser,
   CalendarDays,
   User,
   LogOut,
@@ -32,6 +33,7 @@ function getNavItems(slug: string) {
   return [
     { href: `/s/${slug}/parent/chat`, label: "Chat", icon: MessageSquare },
     { href: `/s/${slug}/parent/documents`, label: "Documents", icon: FileText },
+    { href: `/s/${slug}/parent/contacts`, label: "Contacts", icon: BookUser },
     { href: `/s/${slug}/parent/events`, label: "Calendar", icon: CalendarDays },
     { href: `/s/${slug}/parent/profile`, label: "Profile", icon: User },
   ];
