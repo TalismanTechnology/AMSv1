@@ -1,5 +1,6 @@
 import { generateObject } from "ai";
 import { google } from "@ai-sdk/google";
+import { TEXT_MODEL_ID } from "@/lib/ai/models";
 import { z } from "zod";
 import {
   SCHOOL_CHECKLIST,
@@ -129,7 +130,7 @@ async function matchCategory(
     .join("\n");
 
   const { object } = await generateObject({
-    model: google("gemini-2.5-flash"),
+    model: google(TEXT_MODEL_ID),
     schema: MatchSchema,
     system: `You are a school document auditor. You compare a school's uploaded documents against a checklist of required items.
 

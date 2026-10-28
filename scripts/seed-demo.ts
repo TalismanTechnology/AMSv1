@@ -26,6 +26,7 @@ import { generateEmbeddings } from "@/lib/ai/embeddings";
 import { generateSummary } from "@/lib/ai/summary";
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
+import { TEXT_MODEL_ID } from "@/lib/ai/models";
 
 // ---------------------------------------------------------------------------
 // Config
@@ -753,7 +754,7 @@ async function processOneDocument(
   const { text: content } = await withRetry(
     () =>
       generateText({
-        model: google("gemini-2.5-flash"),
+        model: google(TEXT_MODEL_ID),
         prompt: `Generate a realistic school document for Westfield Academy, a K-12 school.
 
 Title: ${docDef.title}

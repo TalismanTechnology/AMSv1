@@ -1,5 +1,6 @@
 import { generateObject } from "ai";
 import { google } from "@ai-sdk/google";
+import { TEXT_MODEL_ID } from "@/lib/ai/models";
 import { z } from "zod";
 
 const CONTENT_MAX_CHARS = 6000;
@@ -161,7 +162,7 @@ export async function classifyDocument(
       : input.content;
 
   const { object } = await generateObject({
-    model: google("gemini-2.5-flash"),
+    model: google(TEXT_MODEL_ID),
     schema: z.object({
       categoryName: choiceField(categories, "category"),
       folderName: choiceField(folders, "folder"),
@@ -197,7 +198,7 @@ ${trimmed}
 Return the best-fit category and folder.`,
     temperature: 0.1,
     maxOutputTokens: 300,
-    // Gemini 2.5 charges thinking tokens against maxOutputTokens. Left on,
+    // Gemini's thinking models charge thinking tokens against maxOutputTokens. Left on,
     // thinking over a long list of division categories used up the budget
     // before any answer was written, and every document came back unsorted.
     providerOptions: { google: { thinkingConfig: { thinkingBudget: 0 } } },

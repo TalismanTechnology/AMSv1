@@ -1,5 +1,6 @@
 import { generateObject } from "ai";
 import { google } from "@ai-sdk/google";
+import { TEXT_MODEL_ID } from "@/lib/ai/models";
 import { z } from "zod";
 import type { EventType } from "@/lib/types";
 
@@ -114,7 +115,7 @@ export async function extractCalendarEvents(
   ].join("\n");
 
   const { object } = await generateObject({
-    model: google("gemini-2.5-flash"),
+    model: google(TEXT_MODEL_ID),
     schema: ExtractionSchema,
     system: `You extract calendar events from a school document (calendars, schedules, newsletters).
 

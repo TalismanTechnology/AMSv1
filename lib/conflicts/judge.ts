@@ -1,5 +1,6 @@
 import { generateObject } from "ai";
 import { google } from "@ai-sdk/google";
+import { TEXT_MODEL_ID } from "@/lib/ai/models";
 import { z } from "zod";
 import { normalizeQuoteText, quoteAppearsIn } from "./quotes";
 import { statementsDifferInYear, yearRange, type YearRange } from "./years";
@@ -9,7 +10,7 @@ import { reportAiFailure } from "@/lib/alerts/ai-failure-alert";
 // Several pairs go in one call (JUDGE_BATCH_SIZE) to keep the per-pair cost
 // down; a failed call judges nothing, so its pairs are retried next scan.
 
-export const JUDGE_MODEL_ID = "gemini-2.5-flash";
+export const JUDGE_MODEL_ID = TEXT_MODEL_ID;
 /** Below this, a "conflict" is stored as auto-dismissed. */
 export const MIN_CONFLICT_CONFIDENCE = 0.8;
 export const JUDGE_BATCH_SIZE = 4;
