@@ -26,7 +26,7 @@ export default function PrivacyPage() {
     <LegalPage
       eyebrow="Legal"
       title="Privacy Policy"
-      lastUpdated="October 20, 2026"
+      lastUpdated="October 28, 2026"
       intro={
         <>
           <p>
