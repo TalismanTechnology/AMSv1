@@ -197,14 +197,14 @@ An app preview video is optional.
 
 - **You must be 18 or over** (the age of majority) to enroll. Since Lucas is
   under 18, either:
-  - **Jesse Haines** (parent/guardian) enrolls as an **Individual** with
-    their own Apple Account. The App Store then shows "Jesse Haines" as the
-    seller. Jesse adds Lucas to the team (App Store Connect > Users and
+  - **Nicholas Haines** enrolls as an **Individual** with
+    their own Apple Account (this is the current enrollment). The App Store
+    then shows "Nicholas Haines" as the seller. Nicholas adds Lucas to the team (App Store Connect > Users and
     Access) with the **Admin** or **App Manager** role, so Lucas can do the
     rest; or
   - enroll **Talisman Technology** as an **Organization** if it's a legal
     entity: needs a free D-U-N-S number (allow 1–2 weeks), a website, and an
-    adult with legal authority to sign Apple's agreements (Jesse). The
+    adult with legal authority to sign Apple's agreements (Nicholas). The
     seller then shows as the company, which looks better to schools.
 - Enroll at https://developer.apple.com/programs/enroll/ (the Apple Developer
   app on an iPhone also works, so no Mac is needed).
@@ -293,7 +293,7 @@ then Organizer > Distribute App > App Store Connect > Upload.
    (10–30 minutes, an email arrives). Answer the export-compliance question if
    asked (the app declares `ITSAppUsesNonExemptEncryption = NO`, so it
    usually isn't).
-2. Internal testing: add yourself and Jesse as internal testers; install the
+2. Internal testing: add yourself and Nicholas as internal testers; install the
    TestFlight app on an iPhone and test:
    - [ ] Sign in with Blackbaud for a real school, and for the demo school
    - [ ] Notification permission prompt appears after sign-in
@@ -342,7 +342,7 @@ release needed. A new build is only needed for native changes (Swift,
 | Privacy policy / terms live at /privacy, /terms | PR #8 (needs legal review, merge) |
 | In-app account deletion | PR #13 (merge before submitting) |
 | Support URL with contact info | **TODO** (PR #11 or a /support page) |
-| Apple Developer enrollment | **Lucas / Jesse** |
+| Apple Developer enrollment | **Lucas / Nicholas** (enrolled under Nicholas Haines) |
 | Team ID in Vercel, APNs key, ASC API key, GitHub secrets | **Lucas** |
 | App record in App Store Connect | **Lucas** |
 | Demo school + reviewer login | **Lucas** |

@@ -15,9 +15,9 @@ export const LEGAL_CONTACT_EMAIL = PRIVACY_EMAIL;
 // Who operates the Service, as named on /privacy and /terms. There is no LLC
 // yet, so a named individual operates it on AskMySchool's behalf.
 // TODO(lucas): update this one constant if/when an entity is formed.
-export const LEGAL_OPERATOR = "Jesse Haines, on behalf of AskMySchool";
+export const LEGAL_OPERATOR = "Nicholas Haines, on behalf of AskMySchool";
 
-export const LEGAL_LAST_UPDATED = "October 9, 2026";
+export const LEGAL_LAST_UPDATED = "October 28, 2026";
 
 interface LegalPageProps {
   eyebrow: string;
