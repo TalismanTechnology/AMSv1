@@ -5,11 +5,15 @@ import type { MetadataRoute } from "next";
 // a generated letter icon.
 export default function manifest(): MetadataRoute.Manifest {
   return {
+    // Stable app identity for installs, independent of start_url changes.
+    id: "/",
     name: "AskMySchool",
     short_name: "AskMySchool",
     description:
       "Ask questions in plain English and get instant answers from your school's official documents.",
-    start_url: "/",
+    // Signed-in users land on their dashboard (/login redirects them), the
+    // same place the iOS / Android app opens; signed-out users pick a school.
+    start_url: "/login",
     scope: "/",
     display: "standalone",
     background_color: "#faf8f5",

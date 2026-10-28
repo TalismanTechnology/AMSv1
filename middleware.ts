@@ -13,6 +13,7 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico and static assets (images, videos, icons, fonts, robots.txt,
      *   sitemap.xml, the web manifest)
+     * - sw.js and offline.html (the service worker and its offline page)
      * - .well-known (apple-app-site-association must never redirect)
      *
      * This covers:
@@ -23,6 +24,6 @@ export const config = {
      * - /register, /admin/*, /parent/* (legacy redirects)
      * - /api/* (keeps the session fresh for route handlers too)
      */
-    "/((?!_next/static|_next/image|favicon.ico|\\.well-known/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico|txt|xml|webmanifest|woff2?|ttf|otf|mp4)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|sw\\.js$|offline\\.html$|\\.well-known/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico|txt|xml|webmanifest|woff2?|ttf|otf|mp4)$).*)",
   ],
 };

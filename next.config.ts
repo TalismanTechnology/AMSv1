@@ -18,6 +18,15 @@ const nextConfig: NextConfig = {
         source: "/:file(logo|file|globe|next|vercel|window).svg",
         headers: [{ key: "Cache-Control", value: PUBLIC_ASSET_CACHE }],
       },
+      {
+        // Browsers must always see the latest service worker.
+        source: "/sw.js",
+        headers: [
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+          { key: "Service-Worker-Allowed", value: "/" },
+          { key: "Content-Type", value: "application/javascript; charset=utf-8" },
+        ],
+      },
     ];
   },
 };
