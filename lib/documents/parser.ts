@@ -1,5 +1,6 @@
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
+import { TEXT_MODEL_ID } from "@/lib/ai/models";
 import type { ChunkMetadata } from "@/lib/ai/rag";
 
 const VISION_PROMPT = `You are extracting content from a school document for a search index that parents will query. Do BOTH of the following in your output:
@@ -503,7 +504,7 @@ async function extractWithVision(
 ): Promise<string> {
   const base64 = buffer.toString("base64");
   const { text, finishReason } = await generateText({
-    model: google("gemini-2.5-flash"),
+    model: google(TEXT_MODEL_ID),
     messages: [
       {
         role: "user",

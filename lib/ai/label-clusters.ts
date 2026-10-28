@@ -1,5 +1,6 @@
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
+import { TEXT_MODEL_ID } from "@/lib/ai/models";
 import type { QuestionCluster } from "./clustering";
 import { stripMarkdown } from "@/lib/markdown/normalize";
 
@@ -28,7 +29,7 @@ export async function labelClusters(
     .join("\n\n");
 
   const { text } = await generateText({
-    model: google("gemini-2.5-flash"),
+    model: google(TEXT_MODEL_ID),
     prompt: `You are labeling groups of similar questions that parents asked a school chatbot. For each cluster below, provide a short topic label (3-8 words) that describes what parents are asking about.
 
 ${clusterDescriptions}
@@ -36,7 +37,7 @@ ${clusterDescriptions}
 Respond with one label per line, in order. Just the labels, no numbering or extra text.`,
     maxOutputTokens: 200,
     temperature: 0.2,
-    // Thinking tokens count against maxOutputTokens on Gemini 2.5 and were
+    // Thinking tokens count against maxOutputTokens on Gemini thinking models and were
     // consuming nearly the whole budget, cutting the label list short — the
     // trailing clusters silently lost their labels.
     providerOptions: { google: { thinkingConfig: { thinkingBudget: 0 } } },

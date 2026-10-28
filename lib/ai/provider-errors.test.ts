@@ -17,7 +17,7 @@ const CREDITS_DEPLETED =
 function apiError(statusCode: number | undefined, message: string, responseBody?: string) {
   return new APICallError({
     message,
-    url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent",
+    url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:streamGenerateContent",
     requestBodyValues: {},
     statusCode,
     responseBody,

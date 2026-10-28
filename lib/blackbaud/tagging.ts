@@ -1,5 +1,6 @@
 import { generateObject } from "ai";
 import { google } from "@ai-sdk/google";
+import { TEXT_MODEL_ID } from "@/lib/ai/models";
 import { z } from "zod";
 import type { EventType } from "@/lib/types";
 import type { NormalizedEvent } from "./ical";
@@ -227,7 +228,7 @@ export async function tagWithModel(
 
     try {
       const { object } = await generateObject({
-        model: google("gemini-2.5-flash"),
+        model: google(TEXT_MODEL_ID),
         schema: TagSchema,
         system: `You tag a school's calendar events with the school's own division and category labels.
 

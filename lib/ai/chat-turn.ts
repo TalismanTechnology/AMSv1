@@ -38,9 +38,10 @@ import {
   withoutDropped,
 } from "@/lib/conflicts/resolutions";
 import type { ChatSource } from "@/lib/types";
+import { TEXT_MODEL_ID } from "@/lib/ai/models";
 
 /** The model that writes parent-facing answers. Shared with the eval harness. */
-export const CHAT_MODEL_ID = "gemini-2.5-flash";
+export const CHAT_MODEL_ID = TEXT_MODEL_ID;
 
 // Grounded Q&A wants near-deterministic output; a school's configured
 // temperature is honoured but never allowed above this.

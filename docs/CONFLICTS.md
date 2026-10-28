@@ -74,7 +74,7 @@ conflicts; scans write with the service role.
    statements both appear in the candidate's chunks, i.e. the same conflict
    after re-chunking; different school years (below); at most 3 pairs per
    document pair; then the top N by similarity.
-3. **Judge** (`judge.ts`): Gemini 2.5 Flash via `generateObject`, 4 pairs per
+3. **Judge** (`judge.ts`): Gemini Flash (`TEXT_MODEL_ID`, `lib/ai/models.ts`) via `generateObject`, 4 pairs per
    call, 3 calls at a time. The prompt has each excerpt's document title,
    source (upload / website / email), dates (added / last processed / email
    sent), divisions, page and year clues (below), and asks only for genuine
@@ -89,7 +89,7 @@ conflicts; scans write with the service role.
    school's email" — reason `placeholder`), *and* both quotes appear in
    their own chunk (whitespace, case and quote style aside). Everything else
    is stored `auto_dismissed`.
-5. **Verifier** (`verify.ts`): each survivor gets a second Gemini 2.5 Flash
+5. **Verifier** (`verify.ts`): each survivor gets a second Gemini Flash
    call (one pair per call, temperature 0, like the judge) with a skeptical
    prompt told to look for reasons it is *not* a conflict: different
    occurrences of a recurring event; different issues / editions / periods
@@ -141,7 +141,7 @@ takes the next most-similar unjudged pairs.
 
 ### Cost
 
-Gemini 2.5 Flash, ~4 pairs per call with up to 2,500 characters per excerpt:
+Gemini Flash, ~4 pairs per call with up to 2,500 characters per excerpt:
 roughly 5–7k input tokens per call, so a 40-pair manual scan is ~10 calls —
 cents — plus one ~2–4k-token verifier call per pair the judge keeps open. The daily cron costs nothing for schools with no new documents. No
 embeddings are generated (existing chunk embeddings are reused).

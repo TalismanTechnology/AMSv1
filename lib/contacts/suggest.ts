@@ -1,5 +1,6 @@
 import { generateObject } from "ai";
 import { google } from "@ai-sdk/google";
+import { TEXT_MODEL_ID } from "@/lib/ai/models";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getDocumentText } from "@/lib/documents/get-document-text";
@@ -196,7 +197,7 @@ async function extractContacts(
     .join("\n\n=====\n\n");
   try {
     const { object } = await generateObject({
-      model: google("gemini-2.5-flash"),
+      model: google(TEXT_MODEL_ID),
       schema: extractionSchema,
       temperature: 0,
       maxRetries: 2,

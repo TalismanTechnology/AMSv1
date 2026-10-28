@@ -1,5 +1,6 @@
 import { generateObject } from "ai";
 import { google } from "@ai-sdk/google";
+import { TEXT_MODEL_ID } from "@/lib/ai/models";
 import { z } from "zod";
 import { reportAiFailure } from "@/lib/alerts/ai-failure-alert";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -72,7 +73,7 @@ export async function classifyContactTopic(
   const topicList = CONTACT_TOPICS.map((t) => `- ${t}: ${CONTACT_TOPIC_LABELS[t]}`).join("\n");
   try {
     const { object } = await generateObject({
-      model: google("gemini-2.5-flash"),
+      model: google(TEXT_MODEL_ID),
       schema: classifySchema,
       temperature: 0,
       maxRetries: 1,

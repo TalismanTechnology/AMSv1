@@ -1,5 +1,6 @@
 import { generateObject } from "ai";
 import { google } from "@ai-sdk/google";
+import { TEXT_MODEL_ID } from "@/lib/ai/models";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redactChildNames, type NamedChild } from "@/lib/ai/child-privacy";
@@ -162,7 +163,7 @@ async function labelBatch(
       : "There are no existing topic labels yet.";
 
   const { object } = await generateObject({
-    model: google("gemini-2.5-flash"),
+    model: google(TEXT_MODEL_ID),
     schema: responseSchema,
     system: `You assign a short topic to each question parents asked a school's assistant.
 
@@ -177,7 +178,7 @@ Rules:
 Questions:
 ${list}`,
     temperature: 0,
-    // As in lib/ai/label-clusters.ts: Gemini 2.5 thinking tokens otherwise eat
+    // As in lib/ai/label-clusters.ts: Gemini thinking tokens otherwise eat
     // the output budget and truncate the list.
     providerOptions: { google: { thinkingConfig: { thinkingBudget: 0 } } },
   });

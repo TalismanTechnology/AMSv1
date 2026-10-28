@@ -1,5 +1,6 @@
 import { generateObject } from "ai";
 import { google } from "@ai-sdk/google";
+import { TEXT_MODEL_ID } from "@/lib/ai/models";
 import { z } from "zod";
 import {
   AUTO_FOLDER_MAX_FOLDERS,
@@ -27,7 +28,7 @@ export interface ProposeFoldersInput {
 
 const MODEL_OPTIONS = {
   temperature: 0.1,
-  // As in classify-document: Gemini 2.5 charges thinking tokens against
+  // As in classify-document: Gemini's thinking models charge thinking tokens against
   // maxOutputTokens, and a long list would otherwise come back cut short.
   providerOptions: { google: { thinkingConfig: { thinkingBudget: 0 } } },
   maxRetries: 2,
@@ -53,7 +54,7 @@ async function proposeStructure(
   lines: string[]
 ): Promise<string[]> {
   const { object } = await generateObject({
-    model: google("gemini-2.5-flash"),
+    model: google(TEXT_MODEL_ID),
     schema: z.object({
       folders: z
         .array(
@@ -90,7 +91,7 @@ async function assignBatch(
   batch: { n: number; line: string }[]
 ): Promise<{ n: number; folder: string }[]> {
   const { object } = await generateObject({
-    model: google("gemini-2.5-flash"),
+    model: google(TEXT_MODEL_ID),
     schema: z.object({
       assignments: z.array(
         z.object({

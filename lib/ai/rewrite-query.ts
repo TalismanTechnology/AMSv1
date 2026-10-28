@@ -1,5 +1,6 @@
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
+import { TEXT_MODEL_ID } from "@/lib/ai/models";
 import { reportAiFailure } from "@/lib/alerts/ai-failure-alert";
 import { labelChildren } from "./child-privacy";
 import type { ChildContext } from "./context";
@@ -106,7 +107,7 @@ export async function rewriteQueryWithContext(
 
   try {
     const { text, finishReason } = await generateText({
-      model: google("gemini-2.5-flash"),
+      model: google(TEXT_MODEL_ID),
       prompt: `Rewrite the follow-up question as a standalone search query for a school document search.
 
 Rules:
@@ -124,7 +125,7 @@ Follow-up: ${lastMessageText}
 Standalone query:`,
       maxOutputTokens: 150,
       temperature: 0,
-      // Gemini 2.5 charges thinking tokens against maxOutputTokens. Left on,
+      // Gemini's thinking models charge thinking tokens against maxOutputTokens. Left on,
       // reasoning consumed ~140 of the 150 and the rewrite was cut off
       // mid-phrase ("What time does Mia,") — which then became the search
       // query. Rewriting one sentence needs no deliberation.

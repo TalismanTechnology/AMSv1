@@ -7,6 +7,7 @@ import { after } from "next/server";
 import { logAudit } from "@/lib/audit";
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
+import { TEXT_MODEL_ID } from "@/lib/ai/models";
 
 // --- Auth guard ---
 
@@ -66,7 +67,7 @@ export async function generateBulkDocuments(
     try {
       // Generate realistic content with AI
       const { text: content } = await generateText({
-        model: google("gemini-2.5-flash"),
+        model: google(TEXT_MODEL_ID),
         prompt: `Generate a realistic school document with the following details:
 Title: ${row.title}
 Description: ${row.description}
