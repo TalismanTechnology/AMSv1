@@ -63,6 +63,8 @@ export interface SchoolContact {
   source: ContactSource;
   source_document_id: string | null;
   source_excerpt: string | null;
+  /** contact_folders row (migration 049); absent until 049 is applied. */
+  folder_id?: string | null;
   created_at: string;
   updated_at: string;
 }

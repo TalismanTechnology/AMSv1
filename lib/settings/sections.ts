@@ -72,8 +72,8 @@ export const CONTENT_PAGE_INFO: Record<ContentPage, SettingsSectionInfo & { path
   contacts: {
     label: "Contacts",
     path: "/contacts",
-    description: "Who parents are pointed to when the assistant can't answer.",
-    keywords: ["staff contacts", "directory", "staff", "people"],
+    description: "Your staff directory, in folders. Parents browse approved contacts, and the assistant points them to the right one when it can't answer.",
+    keywords: ["staff contacts", "directory", "staff", "people", "folders"],
   },
 };
 
@@ -110,7 +110,7 @@ export const SETTING_ENTRIES: readonly SettingEntry[] = [
   { anchor: "setting-welcome-message", section: "assistant", label: "Welcome message", keywords: ["greeting", "chat"] },
   { anchor: "setting-suggested-questions", section: "assistant", label: "Suggested questions", keywords: ["starter", "prompts", "chat"] },
   { anchor: "setting-staff-contacts", section: "contacts", label: "Staff contacts", keywords: ["directory", "add contact", "main office"] },
-  { anchor: "setting-suggested-contacts", section: "contacts", label: "Suggested contacts", keywords: ["approve all", "review", "suggest from documents"] },
+  { anchor: "setting-suggested-contacts", section: "contacts", label: "Suggested contacts", keywords: ["approve all", "review", "suggest from documents", "ai sort", "folders"] },
   { anchor: "setting-email-ingestion", section: "email-intake", label: "Enable email ingestion", keywords: ["inbound", "forward", "email"] },
   { anchor: "setting-inbound-addresses", section: "email-intake", label: "Intake email addresses", keywords: ["inbound address", "forward to", "division email", "copy"] },
   { anchor: "setting-auto-sort", section: "email-intake", label: "Auto-sort into categories & folders", keywords: ["auto sort", "ai", "library", "organize"] },
