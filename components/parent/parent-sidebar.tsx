@@ -28,6 +28,7 @@ import { motion, LayoutGroup } from "framer-motion";
 import { sidebarVariants } from "@/lib/motion";
 import { Logo } from "@/components/logo";
 import { JoinSchoolDialog } from "@/components/shared/join-school-dialog";
+import { InstallAppButton } from "@/components/shared/install-app-button";
 
 function getNavItems(slug: string) {
   return [
@@ -150,6 +151,11 @@ export function ParentSidebarContent({ onNavigate, forceExpanded, children }: Si
             Join School
           </Button>
         )}
+        <InstallAppButton
+          collapsed={collapsed}
+          tipSide={collapsed ? "right" : "top"}
+          className="mt-0.5 w-full rounded-lg text-ink-soft hover:bg-secondary hover:text-ink"
+        />
       </div>
 
       <JoinSchoolDialog open={joinDialogOpen} onOpenChange={setJoinDialogOpen} />

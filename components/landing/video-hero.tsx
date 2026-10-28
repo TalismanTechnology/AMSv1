@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Instrument_Serif } from "next/font/google";
 import { ChevronDown } from "lucide-react";
 import { Logo } from "@/components/logo";
+import { InstallAppButton } from "@/components/shared/install-app-button";
 
 // The headline's display face: an editorial serif with a true italic, to
 // suit the old-schoolhouse scene. Everything else on the page stays in the
@@ -90,7 +91,8 @@ function Navbar() {
             </Link>
           </div>
 
-          {/* Desktop: the schools link, then the parent sign-in pill. There
+          {/* Desktop: the schools link, "Install app" where the browser can
+              install the site, then the parent sign-in pill. There
               is no self-serve sign-up: parents sign in through their
               school's Blackbaud login (/login is the school picker) and
               schools get in touch via the closing section. */}
@@ -98,6 +100,12 @@ function Navbar() {
             <a href="#get-started" className={NAV_LINK_CLASS}>
               For schools
             </a>
+            <InstallAppButton
+              tipSide="bottom"
+              tipAlign="end"
+              iconClassName="h-3.5 w-3.5"
+              className="h-auto gap-1.5 px-0 text-sm font-normal uppercase tracking-wide text-brand-dark transition-opacity hover:bg-transparent hover:text-brand-dark hover:opacity-70"
+            />
             <Link
               href="/login"
               className="inline-flex items-center px-5 py-2.5 bg-brand-dark text-white text-sm tracking-wide uppercase rounded-full hover:bg-brand-green transition-colors"

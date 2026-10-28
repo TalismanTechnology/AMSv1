@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { NativeBridge } from "@/components/native/native-bridge";
 import { NativeShell } from "@/components/native/native-shell";
+import { PwaSetup } from "@/components/pwa/pwa-setup";
 import "./globals.css";
 
 // The whole UI sets in Inter (the `--font-sans` stack in globals.css), at a
@@ -69,6 +70,7 @@ export default function RootLayout({
             <Toaster />
             <NativeBridge />
             <NativeShell />
+            <PwaSetup />
           </TooltipProvider>
         </div>
       </body>

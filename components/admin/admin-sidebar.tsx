@@ -42,6 +42,7 @@ import { SchoolSwitcher } from "@/components/shared/school-switcher";
 import { motion, LayoutGroup } from "framer-motion";
 import { sidebarVariants } from "@/lib/motion";
 import { SuperAdminLogo } from "@/components/admin/super-admin-logo";
+import { InstallAppButton } from "@/components/shared/install-app-button";
 import {
   ADMIN_NAV,
   activeNavChild,
@@ -134,6 +135,11 @@ export function AdminSidebarContent({ onNavigate, forceExpanded }: SidebarConten
       </nav>
 
       <div className="px-2 py-2">
+        <InstallAppButton
+          collapsed={collapsed}
+          tipSide={collapsed ? "right" : "top"}
+          className="mb-0.5 w-full text-sidebar-foreground/55 hover:text-sidebar-foreground"
+        />
         <form action={logout}>
           {collapsed ? (
             <Tooltip>
