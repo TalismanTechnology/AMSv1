@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { LogoSpinner } from "@/components/logo-spinner";
 import {
   Dialog,
@@ -10,8 +11,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { SchoolPicker } from "@/components/auth/school-picker";
-import { listSignInSchools } from "@/actions/sign-in-schools";
-import type { SignInSchool } from "@/lib/auth/sign-in-schools";
+import { listJoinableSchools } from "@/actions/sign-in-schools";
+import type { JoinableSchools } from "@/lib/auth/joinable-schools";
 
 interface JoinSchoolDialogProps {
   open: boolean;
@@ -19,19 +20,20 @@ interface JoinSchoolDialogProps {
 }
 
 // Adding another school is the same as signing in to it: pick the school,
-// sign in with its Blackbaud, and the roster decides.
+// sign in with its Blackbaud, and the roster decides. Schools the user
+// already belongs to aren't offered.
 export function JoinSchoolDialog({ open, onOpenChange }: JoinSchoolDialogProps) {
-  const [schools, setSchools] = useState<SignInSchool[] | null>(null);
+  const [schools, setSchools] = useState<JoinableSchools | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open || schools) return;
 
     let cancelled = false;
-    listSignInSchools().then((result) => {
+    listJoinableSchools().then((result) => {
       if (cancelled) return;
       if ("error" in result) setError(result.error);
-      else setSchools(result.schools);
+      else setSchools(result);
     });
 
     return () => {
@@ -39,14 +41,18 @@ export function JoinSchoolDialog({ open, onOpenChange }: JoinSchoolDialogProps) 
     };
   }, [open, schools]);
 
+  const nothingToAdd = schools !== null && schools.available.length === 0;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Add a school</DialogTitle>
-          <DialogDescription>
-            Choose the school and sign in with its Blackbaud account.
-          </DialogDescription>
+          {!nothingToAdd && (
+            <DialogDescription>
+              Choose the school and sign in with its Blackbaud account.
+            </DialogDescription>
+          )}
         </DialogHeader>
 
         {error ? (
@@ -54,7 +60,30 @@ export function JoinSchoolDialog({ open, onOpenChange }: JoinSchoolDialogProps) 
             {error}
           </p>
         ) : schools ? (
-          <SchoolPicker schools={schools} />
+          <div className="space-y-3">
+            {nothingToAdd ? (
+              <p className="rounded-xl border border-border bg-secondary/60 px-5 py-6 text-center text-sm text-ink-soft">
+                You&apos;re already in every school on AskMySchool. If your school
+                isn&apos;t listed, ask your school office or{" "}
+                <Link
+                  href="/support"
+                  className="font-medium text-primary underline-offset-4 hover:underline"
+                  onClick={() => onOpenChange(false)}
+                >
+                  contact us
+                </Link>
+                .
+              </p>
+            ) : (
+              <SchoolPicker schools={schools.available} />
+            )}
+            {schools.pending.length > 0 && (
+              <p className="text-center text-sm text-ink-soft">
+                Waiting for approval:{" "}
+                {schools.pending.map((school) => school.name).join(", ")}
+              </p>
+            )}
+          </div>
         ) : (
           <div className="flex justify-center py-6">
             <LogoSpinner />

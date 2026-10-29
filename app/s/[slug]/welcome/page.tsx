@@ -26,12 +26,9 @@ export default async function WelcomePage({ params }: WelcomePageProps) {
     .eq("id", user.id)
     .single();
 
-  if (profile?.onboarding_completed) {
-    redirect(`/s/${slug}/parent/chat`);
-  }
-
-  // Parents who registered before SSO existed already have children on file.
-  // Flip the flag and let them through rather than asking again.
+  // Onboarded parents land here too, from the add-your-children prompt, when
+  // they skipped this step earlier. Anyone with children on file goes on to
+  // chat — parents who registered before SSO existed have the flag flipped.
   const { count: childCount } = await supabase
     .from("children")
     .select("id", { count: "exact", head: true })
@@ -39,7 +36,7 @@ export default async function WelcomePage({ params }: WelcomePageProps) {
     .eq("school_id", school.id);
 
   if ((childCount ?? 0) > 0) {
-    await markOnboardingComplete();
+    if (!profile?.onboarding_completed) await markOnboardingComplete();
     redirect(`/s/${slug}/parent/chat`);
   }
 
@@ -74,6 +71,7 @@ export default async function WelcomePage({ params }: WelcomePageProps) {
       schoolName={school.name}
       rosterName={rosterName}
       fallbackName={profile?.full_name ?? null}
+      returning={Boolean(profile?.onboarding_completed)}
     />
   );
 }

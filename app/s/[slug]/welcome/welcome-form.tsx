@@ -16,7 +16,7 @@ import {
 import { LogoSpinner } from "@/components/logo-spinner";
 import { Logo } from "@/components/logo";
 import { GRADES } from "@/lib/grades";
-import { completeOnboarding } from "@/actions/onboarding";
+import { completeOnboarding, skipChildrenPrompt } from "@/actions/onboarding";
 import { schoolPossessive } from "@/lib/school-display-name";
 
 interface WelcomeFormProps {
@@ -26,6 +26,8 @@ interface WelcomeFormProps {
   /** Name on the school's Blackbaud roster, when the school gates on it. */
   rosterName: string | null;
   fallbackName: string | null;
+  /** Already through first run — back here because they have no children on file. */
+  returning: boolean;
 }
 
 interface ChildDraft {
@@ -40,6 +42,7 @@ export function WelcomeForm({
   schoolName,
   rosterName,
   fallbackName,
+  returning,
 }: WelcomeFormProps) {
   const router = useRouter();
   const [children, setChildren] = useState<ChildDraft[]>([
@@ -47,6 +50,7 @@ export function WelcomeForm({
   ]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [skipping, setSkipping] = useState(false);
 
   const matchedName = rosterName ?? fallbackName;
 
@@ -99,6 +103,15 @@ export function WelcomeForm({
     router.replace(`/s/${schoolSlug}/parent/chat`);
   }
 
+  // Not a hard wall: a parent without children here (or App Review) can go
+  // straight in. They're asked again next session while they still have none.
+  async function handleSkip() {
+    setError(null);
+    setSkipping(true);
+    await skipChildrenPrompt();
+    router.replace(`/s/${schoolSlug}/parent/chat`);
+  }
+
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-xl flex-col justify-center px-6 py-16">
       <div className="metallic-card rounded-2xl p-8 sm:p-10">
@@ -106,12 +119,16 @@ export function WelcomeForm({
           <Logo size={24} className="text-primary" />
         </span>
 
-        <p className="eyebrow">Welcome</p>
+        <p className="eyebrow">{returning ? "One more thing" : "Welcome"}</p>
         <h1 className="mt-2 font-serif-display text-3xl font-medium tracking-[-0.02em] text-ink">
-          {schoolName.trim() ? `You're in at ${schoolName.trim()}` : "You're in"}
+          {returning
+            ? "Add your children"
+            : schoolName.trim()
+              ? `You're in at ${schoolName.trim()}`
+              : "You're in"}
         </h1>
 
-        {matchedName && (
+        {matchedName && !returning && (
           <p className="mt-4 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/[0.04] p-3 text-sm text-ink-soft">
             <ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" />
             <span>
@@ -203,9 +220,20 @@ export function WelcomeForm({
             </p>
           )}
 
-          <Button type="submit" className="h-11 w-full" disabled={saving}>
+          <Button type="submit" className="h-11 w-full" disabled={saving || skipping}>
             {saving && <LogoSpinner className="mr-2" />}
             Continue
+          </Button>
+
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-full text-ink-soft"
+            onClick={handleSkip}
+            disabled={saving || skipping}
+          >
+            {skipping && <LogoSpinner className="mr-2" />}
+            Skip for now
           </Button>
         </form>
       </div>
