@@ -130,9 +130,9 @@ export function DocumentAuditClient({
   }
 
   return (
-    <div className="relative p-4 md:p-6 flex flex-col h-[calc(100vh-3.5rem)] overflow-hidden">
+    <div className="relative flex flex-col h-[calc(100dvh-6.25rem)] md:h-[calc(100dvh-4rem)] overflow-hidden">
       {/* Header row */}
-      <div className="relative flex items-end justify-between mb-6 shrink-0">
+      <div className="relative flex items-end justify-between gap-4 mb-6 shrink-0">
         <div>
           <h1 className="text-2xl font-semibold text-ink tracking-[-0.01em]">
             Document Audit
@@ -228,7 +228,7 @@ export function DocumentAuditClient({
 
           {/* Global filters */}
           <div className="flex flex-wrap items-center gap-2 shrink-0">
-            <div className="flex gap-1">
+            <div className="flex flex-wrap gap-1">
               {(["all", "missing", "covered"] as const).map((f) => (
                 <Button
                   key={f}
@@ -244,8 +244,8 @@ export function DocumentAuditClient({
                 </Button>
               ))}
             </div>
-            <span className="text-muted-foreground text-xs">|</span>
-            <div className="flex gap-1">
+            <span className="hidden text-muted-foreground text-xs sm:inline">|</span>
+            <div className="flex flex-wrap gap-1">
               {(["all", "critical", "recommended", "nice-to-have"] as const).map((f) => (
                 <Button
                   key={f}
@@ -291,13 +291,13 @@ export function DocumentAuditClient({
               className={`flex flex-col min-h-0 ${selectedCategory ? "w-1/2" : "w-full"} transition-all`}
             >
               <div className="overflow-y-auto rounded-xl border border-border">
-                <table className="w-full text-sm">
+                <table className="w-full table-fixed text-sm">
                   <thead className="sticky top-0 bg-background z-10 border-b border-border">
                     <tr className="text-xs text-muted-foreground">
                       <th className="text-left font-medium px-3 py-2.5">
                         Category
                       </th>
-                      <th className="text-center font-medium px-2 py-2.5 w-20 hidden sm:table-cell">
+                      <th className="text-center font-medium px-2 py-2.5 w-24 hidden sm:table-cell">
                         Coverage
                       </th>
                       <th className="text-right font-medium px-3 py-2.5 w-16">
@@ -338,7 +338,7 @@ export function DocumentAuditClient({
                         >
                           <td className="px-3 py-2.5">
                             <div className="flex items-center gap-2">
-                              <span className="font-medium text-ink truncate">
+                              <span className="min-w-0 font-medium text-ink sm:truncate">
                                 {cat.categoryName}
                               </span>
                               {missCrit > 0 && (

@@ -55,7 +55,7 @@ export function EventsClient({
 
   return (
     <div className="relative">
-      <header className="relative mb-8 flex items-start justify-between gap-4">
+      <header className="relative mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-ink tracking-[-0.01em]">
             Events
@@ -65,7 +65,7 @@ export function EventsClient({
             event{eventCount !== 1 ? "s" : ""} scheduled across your calendars.
           </p>
         </div>
-        <div className="flex shrink-0 flex-wrap justify-end gap-2">
+        <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
           <Button variant="outline" onClick={() => setImportOpen(true)}>
             <Sparkles className="mr-2 h-4 w-4" />
             Import from document

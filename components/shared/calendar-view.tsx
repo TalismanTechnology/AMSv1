@@ -921,8 +921,8 @@ export function CalendarView({
                   className="flex items-start justify-between rounded-lg border bg-card p-3.5 metallic-card sm:p-3"
                 >
                   <div className="space-y-1.5 min-w-0 flex-1 sm:space-y-1">
-                    <div className="flex items-start gap-2 sm:items-center">
-                      <p className="font-medium text-sm sm:truncate">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <p className="min-w-0 font-medium text-sm sm:truncate">
                         {event.title}
                       </p>
                       <LabelChip event={event} />

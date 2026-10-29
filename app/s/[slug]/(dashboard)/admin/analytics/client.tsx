@@ -205,7 +205,7 @@ export function AnalyticsClient({ data: initialData, schoolId, schoolSlug }: Ana
         </div>
 
         {/* Secondary numbers */}
-        <dl className="mb-12 grid grid-cols-2 gap-x-8 gap-y-4 border-b border-border py-5 text-sm lg:grid-cols-4">
+        <dl className="mb-12 grid grid-cols-2 gap-x-6 gap-y-5 border-b sm:gap-x-8 border-border py-5 text-sm lg:grid-cols-4">
           <MiniStat
             label="Avg questions / day"
             window={labels.range}
@@ -464,7 +464,10 @@ function MiniStat({
   return (
     <div className="min-w-0">
       <dt className="text-xs text-muted-foreground">
-        {label} · <WindowTag ranged={ranged}>{window}</WindowTag>
+        {/* Two lines on phones, where "label · WINDOW" wraps mid-tag. */}
+        <span className="block lg:inline">{label}</span>
+        <span className="hidden lg:inline"> · </span>
+        <WindowTag ranged={ranged}>{window}</WindowTag>
       </dt>
       <dd className="mt-0.5 font-semibold tabular-nums text-ink">{value}</dd>
     </div>

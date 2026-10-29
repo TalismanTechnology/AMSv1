@@ -233,7 +233,7 @@ export function AppSettings({ settings, schoolId, schoolSlug }: SettingsFormProp
             </p>
           </div>
           <div id="setting-disable-animations" className="scroll-mt-6">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-4">
               <div className="space-y-0.5">
                 <Label htmlFor="disable-animations">Disable Animations</Label>
                 <p className="text-xs text-muted-foreground">

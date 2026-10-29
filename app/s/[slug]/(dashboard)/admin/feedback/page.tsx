@@ -114,7 +114,7 @@ export default async function FeedbackPage({
   const unansweredCount = unansweredGroups.reduce((sum, g) => sum + g.count, 0);
 
   return (
-    <div className="relative space-y-10 p-4 md:p-6">
+    <div className="relative space-y-10">
       <header className="relative">
         <h1 className="text-2xl font-semibold text-ink tracking-[-0.01em]">
           Feedback &amp; Review
@@ -199,7 +199,7 @@ export default async function FeedbackPage({
               ) : (
                 flagged.map((x) => (
                   <TableRow key={x.key} className="transition-colors hover:bg-muted/60">
-                    <TableCell className="max-w-md space-y-1 py-4">
+                    <TableCell className="w-full max-w-0 space-y-1 py-4">
                       {x.question && (
                         <p className="truncate text-sm font-medium text-ink">
                           Q: {stripMarkdown(x.question, { singleLine: true, maxLength: 160 })}
@@ -210,6 +210,14 @@ export default async function FeedbackPage({
                           A: {stripMarkdown(x.answer, { singleLine: true, maxLength: 160 })}
                         </p>
                       )}
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 pt-1 md:hidden">
+                        <Badge variant={x.reason === "unhelpful" ? "destructive" : "secondary"}>
+                          {x.reason === "unhelpful" ? "Marked unhelpful" : "Couldn\u2019t answer"}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">
+                          {formatDistanceToNow(new Date(x.createdAt), { addSuffix: true })}
+                        </span>
+                      </div>
                     </TableCell>
                     <TableCell className="hidden py-4 md:table-cell">
                       <Badge variant={x.reason === "unhelpful" ? "destructive" : "secondary"}>

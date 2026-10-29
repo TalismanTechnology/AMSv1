@@ -313,9 +313,9 @@ export function DocumentTable({
                     onCheckedChange={() => toggleSelect(doc.id)}
                   />
                 </TableCell>
-                <TableCell className="py-4">
-                  <div>
-                    <p className="font-medium text-ink">{doc.title}</p>
+                <TableCell className="whitespace-normal py-4">
+                  <div className="min-w-0">
+                    <p className="break-words font-medium text-ink">{doc.title}</p>
                     {doc.summary && <DocumentSummary summary={doc.summary} />}
                     {doc.divisions && doc.divisions.length > 0 && (
                       <div className="mt-1 flex flex-wrap gap-1">
@@ -325,7 +325,7 @@ export function DocumentTable({
                       </div>
                     )}
                     {doc.tags.length > 0 && (
-                      <div className="mt-1 flex gap-1">
+                      <div className="mt-1 flex flex-wrap gap-1">
                         {doc.tags.map((tag) => (
                           <Badge key={tag} variant="outline" className="text-xs">
                             {tag}
@@ -333,7 +333,7 @@ export function DocumentTable({
                         ))}
                       </div>
                     )}
-                    <div className="mt-1 flex gap-1 md:hidden">
+                    <div className="mt-2 flex flex-wrap gap-1 md:hidden">
                       <Badge variant="secondary" className="text-xs uppercase">
                         {doc.file_type}
                       </Badge>

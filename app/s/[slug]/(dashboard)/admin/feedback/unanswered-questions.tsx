@@ -168,7 +168,7 @@ export function UnansweredQuestionsSection({
           </p>
         </div>
       ) : (
-      <div className="grid gap-2">
+      <div className="grid grid-cols-1 gap-2">
         {filteredGroups.map((group, index) => (
           <div
             key={index}
@@ -181,7 +181,7 @@ export function UnansweredQuestionsSection({
                   setExpandedIndex(expandedIndex === index ? null : index)
                 }
               >
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2 min-w-0">
                     <h3 className="truncate text-base font-semibold text-ink tracking-[-0.01em]">
                       {stripMarkdown(group.label, { singleLine: true })}

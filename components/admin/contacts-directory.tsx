@@ -282,7 +282,7 @@ export function ContactsDirectory({
         className="flex scroll-mt-6 flex-wrap items-center justify-between gap-3"
       >
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-          <div className="relative w-full sm:w-64">
+          <div className="relative w-full sm:w-72">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={query}
@@ -535,7 +535,7 @@ function FolderButton({
       )}
     >
       {icon}
-      <span className="max-w-[12rem] truncate md:max-w-none">{label}</span>
+      <span className="max-w-[12rem] truncate md:max-w-none" title={label}>{label}</span>
       <span className="ml-auto pl-1 text-xs tabular-nums text-muted-foreground">{count}</span>
     </button>
   );
@@ -560,7 +560,7 @@ function FolderList({
   return (
     <nav
       aria-label="Contact folders"
-      className="md:w-56 md:shrink-0 md:self-start md:rounded-xl md:border md:border-border md:p-3"
+      className="md:w-60 md:shrink-0 md:self-start md:rounded-xl md:border md:border-border md:p-3"
     >
       <div className="mb-2 hidden items-center justify-between border-b border-border pb-2.5 md:flex">
         <span className="text-xs text-muted-foreground">Folders</span>
@@ -725,7 +725,7 @@ function ContactCard({
             {title}
           </p>
           {contact.name && contact.role && (
-            <p className="truncate text-xs text-ink-soft" title={contact.role}>
+            <p className="line-clamp-2 text-xs text-ink-soft" title={contact.role}>
               {contact.role}
             </p>
           )}

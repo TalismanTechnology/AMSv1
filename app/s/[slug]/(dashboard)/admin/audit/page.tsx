@@ -30,7 +30,7 @@ export default async function AuditLogPage({
     .limit(100);
 
   return (
-    <div className="p-4 md:p-6 space-y-10">
+    <div className="space-y-10">
       <header>
         <h1 className="text-2xl font-semibold tracking-[-0.01em] text-ink">
           Audit Log
@@ -51,7 +51,7 @@ export default async function AuditLogPage({
               <TableHead className="text-xs font-medium text-muted-foreground">
                 Action
               </TableHead>
-              <TableHead className="text-xs font-medium text-muted-foreground">
+              <TableHead className="hidden text-xs font-medium text-muted-foreground md:table-cell">
                 Entity
               </TableHead>
               <TableHead className="hidden text-xs font-medium text-muted-foreground md:table-cell">
@@ -88,12 +88,18 @@ export default async function AuditLogPage({
                     <TableCell className="py-4 text-sm font-medium text-ink">
                       {admin?.full_name || admin?.email || "System"}
                     </TableCell>
-                    <TableCell className="py-4">
+                    <TableCell className="py-4 whitespace-normal">
                       <Badge variant="outline" className="text-xs font-medium">
                         {log.action}
                       </Badge>
+                      <p className="mt-1.5 text-xs text-muted-foreground md:hidden">
+                        {log.entity_type} ·{" "}
+                        {formatDistanceToNow(new Date(log.created_at), {
+                          addSuffix: true,
+                        })}
+                      </p>
                     </TableCell>
-                    <TableCell className="py-4 text-sm text-muted-foreground">
+                    <TableCell className="hidden py-4 text-sm text-muted-foreground md:table-cell">
                       {log.entity_type}
                       {log.entity_id && (
                         <span className="ml-1 font-mono text-xs text-muted-foreground">

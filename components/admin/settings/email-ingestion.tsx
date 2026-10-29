@@ -77,7 +77,7 @@ export function EmailIngestionSection({
         </p>
       </div>
       <div className="space-y-5">
-        <div id="setting-email-ingestion" className="flex scroll-mt-6 items-center justify-between">
+        <div id="setting-email-ingestion" className="flex scroll-mt-6 items-center justify-between gap-4">
           <div className="space-y-0.5">
             <Label htmlFor="email-ingestion-enabled">Enable email ingestion</Label>
             <p className="text-xs text-muted-foreground">
@@ -94,7 +94,7 @@ export function EmailIngestionSection({
         {(enabled || addresses.wholeSchoolToken) && (
           <div
             id="setting-inbound-addresses"
-            className="scroll-mt-6 space-y-4 rounded-xl border border-border p-4"
+            className="scroll-mt-6 space-y-4 rounded-xl border border-border p-3 sm:p-4"
           >
             <div className="space-y-1">
               <Label>Where to send emails</Label>
@@ -150,7 +150,7 @@ export function EmailIngestionSection({
           </div>
         )}
 
-        <div id="setting-auto-sort" className="flex scroll-mt-6 items-center justify-between">
+        <div id="setting-auto-sort" className="flex scroll-mt-6 items-center justify-between gap-4">
           <div className="space-y-0.5">
             <Label htmlFor="auto-sort">Auto-sort into categories &amp; folders</Label>
             <p className="text-xs text-muted-foreground">
@@ -206,13 +206,15 @@ function AddressRow({
 
   return (
     <div className="space-y-1.5">
-      <p className="flex items-center gap-1.5 text-xs font-medium text-ink-soft">
-        {color && (
-          <span
-            className={cn("h-2 w-2 rounded-full", calendarColorClasses(color).dot)}
-          />
-        )}
-        {label}
+      <p className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs font-medium text-ink-soft">
+        <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+          {color && (
+            <span
+              className={cn("h-2 w-2 rounded-full", calendarColorClasses(color).dot)}
+            />
+          )}
+          {label}
+        </span>
         {hint && <span className="font-normal text-muted-foreground">· {hint}</span>}
       </p>
       <div className="flex gap-2">
@@ -220,7 +222,7 @@ function AddressRow({
           readOnly
           value={address}
           aria-label={`${label} inbound address`}
-          className="font-mono"
+          className="px-2.5 font-mono text-[11px] sm:px-3 sm:text-sm"
           onFocus={(e) => e.target.select()}
         />
         <Button
@@ -339,7 +341,7 @@ function RecentEmails({
             return (
               <li
                 key={entry.id}
-                className="flex flex-col gap-1 px-3.5 py-2.5 sm:flex-row sm:items-center sm:gap-3"
+                className="flex flex-col gap-1.5 px-3.5 py-3 sm:flex-row sm:items-center sm:gap-4"
               >
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm text-ink">
@@ -347,8 +349,12 @@ function RecentEmails({
                   </p>
                   <p className="truncate text-xs text-muted-foreground">
                     {entry.fromAddress ?? "Unknown sender"}
-                    {detail ? ` · ${detail}` : ""}
                   </p>
+                  {detail && (
+                    <p className="line-clamp-2 text-xs text-muted-foreground">
+                      {detail}
+                    </p>
+                  )}
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   {pending && (
