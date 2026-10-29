@@ -67,3 +67,17 @@ test("Email intake and Contacts are top-level Content items, not Settings childr
   assert.equal(isNavItemActive(item("contacts"), "/contacts"), true);
   assert.equal(isNavItemActive(item("settings"), "/contacts"), false);
 });
+
+test("Insights is merged into Analytics under Parents", () => {
+  const parents = ADMIN_NAV.find((g) => g.key === "parents")!;
+  assert.deepEqual(
+    parents.items.map((i) => i.label),
+    ["Analytics", "Feedback", "Users"]
+  );
+  assert.equal(items.some((i) => i.key === "insights" || i.path === "/insights"), false);
+  for (const word of ["topics", "trends", "questions", "insights"]) {
+    assert.ok(item("analytics").keywords?.includes(word), word);
+  }
+  // The old route still exists, as a redirect to Analytics.
+  assert.ok(statSync(path.join(ADMIN_DIR, "insights", "page.tsx")).isFile());
+});

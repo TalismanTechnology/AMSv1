@@ -1,32 +1,19 @@
-// Pure helpers behind the admin Insights page (actions/insights.ts) and the
-// topic labeler (lib/insights/topics.ts). No I/O here so it can be unit tested.
+// Pure helpers behind the "Topics & questions" section of admin Analytics
+// (lib/metrics/topics.ts) and the topic labeler (lib/insights/topics.ts). No
+// I/O here so it can be unit tested. Counts (questions, active parents,
+// answer rate) live in lib/metrics/definitions.ts.
 //
 // Privacy (app/privacy/page.tsx §6, migration 031): school staff may read a
 // parent's words only for FLAGGED exchanges (unanswered / thumbs-down).
 // Everything else on the page is aggregate, and topics are k-anonymous.
 
-export type RangeDays = 7 | 30 | 90;
-export const RANGE_DAYS: readonly RangeDays[] = [7, 30, 90];
-export const DEFAULT_RANGE_DAYS: RangeDays = 30;
-
 // A topic is shown only once at least this many questions, from at least this
-// many DIFFERENT parents, fall under it — mirrors
-// MIN_DISTINCT_ASKERS_FOR_TOP_QUESTION in actions/analytics.ts.
+// many DIFFERENT parents, fall under it.
 export const MIN_TOPIC_QUESTIONS = 3;
 export const MIN_DISTINCT_ASKERS = 3;
 
 export const TOPIC_MAX_CHARS = 40;
 export const FALLBACK_TOPIC = "Other";
-
-export function isRangeDays(value: unknown): value is RangeDays {
-  return value === 7 || value === 30 || value === 90;
-}
-
-/** "7" | "30" | "90" (e.g. a search param) → RangeDays, else the default. */
-export function parseRangeDays(value: unknown): RangeDays {
-  const n = typeof value === "string" ? Number(value) : value;
-  return isRangeDays(n) ? n : DEFAULT_RANGE_DAYS;
-}
 
 // --------------------------------------------
 // Topic labels
@@ -113,43 +100,6 @@ export function summarizeTopics(
   }
   visible.sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
   return { topics: visible.slice(0, limit), hiddenTopicCount };
-}
-
-// --------------------------------------------
-// Answer rate
-// --------------------------------------------
-
-/** Lookup key for matching an analytics event to an unanswered_questions row. */
-export function sessionQuestionKey(sessionId: string, question: string): string {
-  return `${sessionId}\u0000${question}`;
-}
-
-export interface QuestionEventFlags {
-  /** metadata.unanswered — present on events logged after it was added. */
-  unanswered?: unknown;
-  sessionId?: string | null;
-  question?: string | null;
-}
-
-/**
- * Was this question left unanswered (no school sources found)? Uses the
- * explicit flag when the event has one; older events fall back to "an
- * unanswered_questions row exists for the same session with the same text".
- */
-export function isUnansweredEvent(
-  event: QuestionEventFlags,
-  unansweredKeys: ReadonlySet<string>
-): boolean {
-  if (typeof event.unanswered === "boolean") return event.unanswered;
-  if (!event.sessionId || !event.question) return false;
-  return unansweredKeys.has(sessionQuestionKey(event.sessionId, event.question));
-}
-
-/** Whole-number percentage of questions answered; null when none were asked. */
-export function answerRate(total: number, unanswered: number): number | null {
-  if (total <= 0) return null;
-  const answered = Math.max(0, total - Math.min(unanswered, total));
-  return Math.round((answered / total) * 100);
 }
 
 // --------------------------------------------

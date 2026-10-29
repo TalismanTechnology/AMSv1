@@ -75,9 +75,8 @@ export const ADMIN_NAV: readonly AdminNavGroup[] = [
     key: "parents",
     label: "Parents",
     items: [
-      { key: "insights", label: "Insights", path: "/insights", prefix: true, keywords: ["topics", "trends", "questions"] },
+      { key: "analytics", label: "Analytics", path: "/analytics", prefix: true, keywords: ["usage", "charts", "stats", "statistics", "insights", "topics", "trends", "questions", "answer rate", "active parents"] },
       { key: "feedback", label: "Feedback", path: "/feedback", prefix: true, keywords: ["flagged", "thumbs", "unanswered", "ratings"] },
-      { key: "analytics", label: "Analytics", path: "/analytics", prefix: true, keywords: ["usage", "charts", "stats"] },
       { key: "users", label: "Users", path: "/users", prefix: true, keywords: ["parents", "admins", "roles", "people", "members"] },
     ],
   },

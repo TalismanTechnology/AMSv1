@@ -21,6 +21,9 @@ import {
   Legend,
 } from "recharts";
 import type { AnalyticsData } from "@/actions/analytics";
+import { formatDayKey } from "@/lib/metrics/time";
+
+type Metrics = AnalyticsData["metrics"];
 
 const PIE_COLORS = ["#2d3a2e", "#3d5a3e", "#7a9a7c", "#b5c2b6", "#c9a86a", "#8a8f88"];
 
@@ -32,7 +35,7 @@ const tooltipStyle = {
   boxShadow: "0 10px 30px rgba(45, 58, 46, 0.18)",
 };
 
-export function QuestionsTrendChart({ data }: { data: AnalyticsData["dailyData"] }) {
+export function QuestionsTrendChart({ data }: { data: Metrics["questionsByDay"] }) {
   return (
     <ResponsiveContainer width="100%" height={250}>
       <AreaChart data={data}>
@@ -56,10 +59,7 @@ export function QuestionsTrendChart({ data }: { data: AnalyticsData["dailyData"]
         <XAxis
           dataKey="date"
           tick={{ fill: "#536872", fontSize: 12 }}
-          tickFormatter={(v) => {
-            const d = new Date(v);
-            return `${d.getMonth() + 1}/${d.getDate()}`;
-          }}
+          tickFormatter={(v) => formatDayKey(String(v))}
           interval="preserveStartEnd"
         />
         <YAxis
@@ -68,16 +68,12 @@ export function QuestionsTrendChart({ data }: { data: AnalyticsData["dailyData"]
         />
         <Tooltip
           contentStyle={tooltipStyle}
-          labelFormatter={(v) =>
-            new Date(v).toLocaleDateString("en-US", {
-              month: "short",
-              day: "numeric",
-            })
-          }
+          labelFormatter={(v) => formatDayKey(String(v), { year: true })}
         />
         <Area
           type="monotone"
-          dataKey="questions"
+          dataKey="count"
+          name="Questions"
           stroke="#4682b4"
           fill="url(#questionsGradient)"
           strokeWidth={2}
@@ -87,7 +83,7 @@ export function QuestionsTrendChart({ data }: { data: AnalyticsData["dailyData"]
   );
 }
 
-export function DocumentTypesChart({ data }: { data: AnalyticsData["documentTypes"] }) {
+export function DocumentTypesChart({ data }: { data: AnalyticsData["documents"]["byType"] }) {
   return (
     <ResponsiveContainer width="100%" height={250}>
       <PieChart>
@@ -116,7 +112,7 @@ export function DocumentTypesChart({ data }: { data: AnalyticsData["documentType
   );
 }
 
-export function QuestionsByHourChart({ data }: { data: AnalyticsData["hourlyDistribution"] }) {
+export function QuestionsByHourChart({ data }: { data: Metrics["questionsByHour"] }) {
   return (
     <ResponsiveContainer width="100%" height={250}>
       <BarChart data={data}>
@@ -136,10 +132,11 @@ export function QuestionsByHourChart({ data }: { data: AnalyticsData["hourlyDist
         />
         <Tooltip
           contentStyle={tooltipStyle}
-          labelFormatter={(h) => `${h}:00 – ${h}:59`}
+          labelFormatter={(h) => `${h}:00 – ${h}:59 ET`}
         />
         <Bar
           dataKey="count"
+          name="Questions"
           fill="#536872"
           radius={[4, 4, 0, 0]}
         />
@@ -148,7 +145,7 @@ export function QuestionsByHourChart({ data }: { data: AnalyticsData["hourlyDist
   );
 }
 
-export function UserGrowthChart({ data }: { data: AnalyticsData["userGrowth"] }) {
+export function UserGrowthChart({ data }: { data: Metrics["parentGrowth"] }) {
   return (
     <ResponsiveContainer width="100%" height={250}>
       <LineChart data={data}>
@@ -160,10 +157,7 @@ export function UserGrowthChart({ data }: { data: AnalyticsData["userGrowth"] })
         <XAxis
           dataKey="date"
           tick={{ fill: "#536872", fontSize: 12 }}
-          tickFormatter={(v) => {
-            const d = new Date(v);
-            return `${d.getMonth() + 1}/${d.getDate()}`;
-          }}
+          tickFormatter={(v) => formatDayKey(String(v))}
           interval="preserveStartEnd"
         />
         <YAxis
@@ -172,16 +166,12 @@ export function UserGrowthChart({ data }: { data: AnalyticsData["userGrowth"] })
         />
         <Tooltip
           contentStyle={tooltipStyle}
-          labelFormatter={(v) =>
-            new Date(v).toLocaleDateString("en-US", {
-              month: "short",
-              day: "numeric",
-            })
-          }
+          labelFormatter={(v) => formatDayKey(String(v), { year: true })}
         />
         <Line
           type="monotone"
-          dataKey="users"
+          dataKey="total"
+          name="Parents"
           stroke="#e5e4e2"
           strokeWidth={2}
           dot={{ fill: "#c0c0c0", r: 3 }}

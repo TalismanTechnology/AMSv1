@@ -1,30 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  answerRate,
   groupFlaggedQuestions,
-  isUnansweredEvent,
   matchExistingTopic,
   normalizeQuestion,
-  parseRangeDays,
   sanitizeTopic,
-  sessionQuestionKey,
   summarizeTopics,
   type FlaggedQuestion,
 } from "./aggregate";
-
-// --- range ---
-
-test("parseRangeDays accepts 7/30/90 and defaults to 30", () => {
-  assert.equal(parseRangeDays("7"), 7);
-  assert.equal(parseRangeDays(90), 90);
-  assert.equal(parseRangeDays("30"), 30);
-  assert.equal(parseRangeDays("365"), 30);
-  assert.equal(parseRangeDays(undefined), 30);
-  assert.equal(parseRangeDays("abc"), 30);
-});
-
-// --- sanitizeTopic ---
 
 test("sanitizeTopic trims quotes and punctuation at the ends", () => {
   assert.equal(sanitizeTopic('  "Lunch Menu."  '), "Lunch Menu");
@@ -96,30 +79,6 @@ test("summarizeTopics returns only labels and counts", () => {
 });
 
 // --- answer rate ---
-
-test("isUnansweredEvent prefers the explicit metadata flag", () => {
-  const keys = new Set([sessionQuestionKey("s1", "When is lunch?")]);
-  assert.equal(isUnansweredEvent({ unanswered: false, sessionId: "s1", question: "When is lunch?" }, keys), false);
-  assert.equal(isUnansweredEvent({ unanswered: true, sessionId: "s2", question: "x" }, keys), true);
-});
-
-test("isUnansweredEvent falls back to a same-session, same-text match", () => {
-  const keys = new Set([sessionQuestionKey("s1", "When is lunch?")]);
-  assert.equal(isUnansweredEvent({ sessionId: "s1", question: "When is lunch?" }, keys), true);
-  assert.equal(isUnansweredEvent({ sessionId: "s2", question: "When is lunch?" }, keys), false);
-  assert.equal(isUnansweredEvent({ sessionId: "s1", question: "when is lunch?" }, keys), false);
-  assert.equal(isUnansweredEvent({ sessionId: null, question: "When is lunch?" }, keys), false);
-});
-
-test("answerRate is a whole percentage and null with no questions", () => {
-  assert.equal(answerRate(0, 0), null);
-  assert.equal(answerRate(10, 0), 100);
-  assert.equal(answerRate(3, 1), 67);
-  assert.equal(answerRate(4, 4), 0);
-  assert.equal(answerRate(4, 9), 0);
-});
-
-// --- flagged grouping ---
 
 test("normalizeQuestion lowercases, collapses whitespace, strips trailing punctuation", () => {
   assert.equal(normalizeQuestion("  When IS   the Book Fair??  "), "when is the book fair");

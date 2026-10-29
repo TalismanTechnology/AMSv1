@@ -1,7 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { labelPendingQuestions } from "./topics";
 import { chunk, fetchAllPages } from "./queries";
-import { sessionQuestionKey } from "./aggregate";
+import { sessionQuestionKey } from "@/lib/metrics/definitions";
+import { findParentUserIds } from "@/lib/metrics/load";
 import {
   askerHashSecret,
   hashAsker,
@@ -97,17 +98,8 @@ export async function scrubExpiredQuestionEvents(
     if (ready.length === 0) continue;
 
     const userIds = [...new Set(ready.map((e) => e.user_id).filter((id): id is string => !!id))];
-    const parents = new Set<string>();
-    for (const ids of chunk(userIds)) {
-      const { data, error } = await admin
-        .from("school_memberships")
-        .select("user_id")
-        .eq("school_id", schoolId)
-        .eq("role", "parent")
-        .in("user_id", ids);
-      if (error) throw new Error(error.message);
-      for (const row of (data ?? []) as { user_id: string }[]) parents.add(row.user_id);
-    }
+    // Same "is a parent" test as active parents (lib/metrics/definitions.ts).
+    const parents = await findParentUserIds(admin, schoolId, userIds);
 
     // Events from before metadata.unanswered existed: resolve the answer
     // flag now, while session_id + text can still be matched.

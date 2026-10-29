@@ -10,7 +10,7 @@ import { reportAiFailure } from "@/lib/alerts/ai-failure-alert";
 
 /**
  * Give each recent parent question a short, generic topic label ("Lunch
- * Menu") and cache it in question_topics, so the Insights page can show
+ * Menu") and cache it in question_topics, so admin Analytics can show
  * aggregate topics without ever showing the questions.
  *
  * Cheap by design: only unlabeled questions from the last 90 days, ~60 per

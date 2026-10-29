@@ -1,4 +1,4 @@
-// Shared server-side reads for Insights. PostgREST caps a response at 1000
+// Shared server-side reads for analytics (lib/metrics, lib/insights). PostgREST caps a response at 1000
 // rows, so range reads page through until a short page comes back.
 
 const PAGE_SIZE = 1000;
