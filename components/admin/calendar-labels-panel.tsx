@@ -222,17 +222,20 @@ function LinkStatus({ link, state }: { link: LabelLink | null; state: LinkState 
   if (!link) return <span>No iCal link · events added by hand</span>;
 
   return (
-    <span className="min-w-0 truncate">
-      <span className="text-ink-soft">{link.host}</span>
-      {" · "}
-      {state === "paused" && "Sync paused"}
-      {state === "waiting" && "Not synced yet"}
-      {state === "error" && "Last sync failed"}
-      {state === "ok" && link.lastSyncedAt && (
-        <>
-          Synced <TimeAgo date={link.lastSyncedAt} />
-        </>
-      )}
+    <span className="flex min-w-0 items-center gap-1">
+      {/* The host gives way first, so the sync status stays readable. */}
+      <span className="min-w-0 truncate text-ink-soft">{link.host}</span>
+      <span className="shrink-0">
+        {"· "}
+        {state === "paused" && "Sync paused"}
+        {state === "waiting" && "Not synced yet"}
+        {state === "error" && "Last sync failed"}
+        {state === "ok" && link.lastSyncedAt && (
+          <>
+            Synced <TimeAgo date={link.lastSyncedAt} />
+          </>
+        )}
+      </span>
     </span>
   );
 }

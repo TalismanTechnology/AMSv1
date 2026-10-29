@@ -360,8 +360,8 @@ export function UsersClient({ users, schoolId, schoolSlug }: UsersClientProps) {
                   !user.approved ? "opacity-60" : ""
                 }`}
               >
-                <TableCell className="py-4 font-medium text-ink">
-                  <div className="flex items-center gap-2">
+                <TableCell className="whitespace-normal py-4 font-medium text-ink">
+                  <div className="flex flex-wrap items-center gap-2">
                     {user.full_name || "\u2014"}
                     {!user.approved && (
                       <Badge className="rounded-full border border-amber-500/30 bg-amber-500/15 text-[10px] uppercase tracking-wide text-amber-600">
@@ -369,7 +369,7 @@ export function UsersClient({ users, schoolId, schoolSlug }: UsersClientProps) {
                       </Badge>
                     )}
                   </div>
-                  <p className="text-xs text-ink-soft md:hidden">{user.email}</p>
+                  <p className="mt-0.5 break-all text-xs font-normal text-ink-soft md:hidden">{user.email}</p>
                 </TableCell>
                 <TableCell className="hidden py-4 text-ink-soft md:table-cell">{user.email}</TableCell>
                 <TableCell className="py-4">

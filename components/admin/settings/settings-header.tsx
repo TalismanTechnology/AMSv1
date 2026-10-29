@@ -43,14 +43,14 @@ export function SettingsPageHeader({
     <header className="space-y-3">
       <SettingsBackLink slug={slug} />
       {title ? (
-        <div className="flex items-end justify-between gap-4">
-          <div>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0">
             <h1 className="text-2xl font-semibold text-ink tracking-[-0.01em]">
               {info.label}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">{info.description}</p>
           </div>
-          {action}
+          {action && <div className="shrink-0">{action}</div>}
         </div>
       ) : (
         <h1 className="sr-only">{info.label}</h1>

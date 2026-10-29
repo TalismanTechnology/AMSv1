@@ -282,7 +282,7 @@ export function DocumentsClient({
           view === "map" && "hidden"
         )}
       >
-        <div className="relative flex-1 min-w-[200px]">
+        <div className="relative min-w-[200px] flex-1 basis-full sm:basis-auto">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder={
@@ -309,7 +309,7 @@ export function DocumentsClient({
           </Button>
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[140px]">
+          <SelectTrigger className="min-w-0 flex-1 sm:w-[140px] sm:flex-none">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -320,7 +320,7 @@ export function DocumentsClient({
           </SelectContent>
         </Select>
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-[200px]">
+          <SelectTrigger className="min-w-0 flex-1 sm:w-[200px] sm:flex-none">
             <SelectValue placeholder="Category">
               {categoryLabels.get(categoryFilter)}
             </SelectValue>

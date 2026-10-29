@@ -76,7 +76,7 @@ export function FolderTree({
   }
 
   return (
-    <div className="w-52 shrink-0 self-start">
+    <div className="w-60 shrink-0 self-start">
       <div className="mb-3 flex items-center justify-between border-b border-border pb-2.5">
         <span className="text-xs text-muted-foreground">Folders</span>
         <Button
@@ -255,6 +255,7 @@ function FolderNode({
         ) : (
           <button
             className="flex-1 truncate text-left"
+            title={folder.name}
             onClick={() => onSelect(folder.id)}
           >
             {folder.name}
