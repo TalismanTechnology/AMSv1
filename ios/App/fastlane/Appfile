@@ -1,5 +1,4 @@
 # Apple Developer / App Store Connect identifiers for AskMySchool.
-# The Team ID comes from the APPLE_TEAM_ID environment variable (a GitHub
-# Actions secret in CI), so nothing account-specific lives in the repo.
+# The Team ID is public; the APPLE_TEAM_ID environment variable overrides it.
 app_identifier("app.askmyschool")
-team_id(ENV["APPLE_TEAM_ID"]) if ENV["APPLE_TEAM_ID"]
+team_id(ENV.fetch("APPLE_TEAM_ID", "").strip.empty? ? "DCVUJWG3YP" : ENV["APPLE_TEAM_ID"].strip)

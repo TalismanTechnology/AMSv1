@@ -2,18 +2,18 @@
 // open the iOS app (universal links). Served by
 // app/.well-known/apple-app-site-association/route.ts.
 //
-// Apple ties it to the app by "<Team ID>.<bundle id>". The Team ID comes from
-// APPLE_TEAM_ID once the Apple Developer account exists; until then the file
-// carries the TEAMID placeholder and simply matches no app.
+// Apple ties it to the app by "<Team ID>.<bundle id>". The Team ID is public
+// (it's in every signed app), so it lives here and in the Xcode project. A
+// valid APPLE_TEAM_ID env var overrides it, e.g. for a different account.
 
 export const IOS_BUNDLE_ID = "app.askmyschool";
-export const TEAM_ID_PLACEHOLDER = "TEAMID";
+export const APPLE_TEAM_ID = "DCVUJWG3YP";
 
 const TEAM_ID_PATTERN = /^[A-Z0-9]{10}$/;
 
 export function appleTeamId(value: string | undefined): string {
   const trimmed = value?.trim().toUpperCase();
-  return trimmed && TEAM_ID_PATTERN.test(trimmed) ? trimmed : TEAM_ID_PLACEHOLDER;
+  return trimmed && TEAM_ID_PATTERN.test(trimmed) ? trimmed : APPLE_TEAM_ID;
 }
 
 export function appleAppSiteAssociation(teamId: string) {

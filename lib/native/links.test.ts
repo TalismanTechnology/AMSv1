@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { deepLinkPath, opensInAppBrowser } from "./links";
-import { appleAppSiteAssociation, appleTeamId, TEAM_ID_PLACEHOLDER } from "./app-links";
+import { APPLE_TEAM_ID, appleAppSiteAssociation, appleTeamId } from "./app-links";
 
 const ORIGIN = "https://askmyschool.app";
 
@@ -52,14 +52,16 @@ test("sign-in callbacks, API routes and foreign links are not deep links", () =>
   assert.equal(deepLinkPath("not a url"), null);
 });
 
-test("the AASA file uses the Team ID when it looks real, the placeholder otherwise", () => {
+test("the AASA file uses the env Team ID when it looks real, the app's Team ID otherwise", () => {
+  assert.equal(APPLE_TEAM_ID, "DCVUJWG3YP");
   assert.equal(appleTeamId("ab12cd34ef"), "AB12CD34EF");
-  assert.equal(appleTeamId(undefined), TEAM_ID_PLACEHOLDER);
-  assert.equal(appleTeamId("not-a-team"), TEAM_ID_PLACEHOLDER);
+  assert.equal(appleTeamId(undefined), "DCVUJWG3YP");
+  assert.equal(appleTeamId(""), "DCVUJWG3YP");
+  assert.equal(appleTeamId("not-a-team"), "DCVUJWG3YP");
 
-  const file = appleAppSiteAssociation("AB12CD34EF");
-  assert.deepEqual(file.applinks.details[0].appIDs, ["AB12CD34EF.app.askmyschool"]);
-  assert.deepEqual(file.webcredentials.apps, ["AB12CD34EF.app.askmyschool"]);
+  const file = appleAppSiteAssociation(appleTeamId(undefined));
+  assert.deepEqual(file.applinks.details[0].appIDs, ["DCVUJWG3YP.app.askmyschool"]);
+  assert.deepEqual(file.webcredentials.apps, ["DCVUJWG3YP.app.askmyschool"]);
   const components = file.applinks.details[0].components;
   // Exclusions come before the parent-area matches, since the first match wins.
   const firstInclude = components.findIndex((c) => !("exclude" in c));
