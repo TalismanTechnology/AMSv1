@@ -1,0 +1,132 @@
+/* The /wall background. Everything that moves animates transform/opacity
+   only, so the compositor does the work: no layout, paint, or JS per frame. */
+
+.root {
+  background: linear-gradient(160deg, #07110d 0%, #0b1a14 55%, #081410 100%);
+  color: #faf8f5;
+  font-variant-numeric: tabular-nums;
+}
+
+.blob {
+  position: absolute;
+  border-radius: 9999px;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.blobGreen {
+  width: 90vmax;
+  height: 90vmax;
+  left: -25vmax;
+  top: -20vmax;
+  background: radial-gradient(closest-side, rgba(47, 93, 74, 0.55), rgba(47, 93, 74, 0.18) 55%, transparent);
+  animation: driftA 52s ease-in-out infinite alternate;
+}
+
+.blobAmber {
+  width: 70vmax;
+  height: 70vmax;
+  right: -22vmax;
+  bottom: -28vmax;
+  background: radial-gradient(closest-side, rgba(232, 184, 109, 0.22), rgba(232, 184, 109, 0.06) 55%, transparent);
+  animation: driftB 44s ease-in-out infinite alternate;
+}
+
+.blobTeal {
+  width: 60vmax;
+  height: 60vmax;
+  left: 30vmax;
+  top: 25vmax;
+  background: radial-gradient(closest-side, rgba(61, 90, 62, 0.45), rgba(31, 74, 64, 0.12) 60%, transparent);
+  animation: driftC 60s ease-in-out infinite alternate;
+}
+
+@keyframes driftA {
+  0% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.9; }
+  50% { transform: translate3d(12vmax, 8vmax, 0) scale(1.12); opacity: 1; }
+  100% { transform: translate3d(4vmax, 16vmax, 0) scale(0.95); opacity: 0.8; }
+}
+
+@keyframes driftB {
+  0% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.7; }
+  50% { transform: translate3d(-14vmax, -6vmax, 0) scale(1.08); opacity: 1; }
+  100% { transform: translate3d(-6vmax, -14vmax, 0) scale(1.15); opacity: 0.75; }
+}
+
+@keyframes driftC {
+  0% { transform: translate3d(0, 0, 0) scale(1.05); opacity: 0.6; }
+  50% { transform: translate3d(-10vmax, 6vmax, 0) scale(0.92); opacity: 0.85; }
+  100% { transform: translate3d(8vmax, -8vmax, 0) scale(1.1); opacity: 0.55; }
+}
+
+/* Static film grain: one SVG turbulence tile, painted once. */
+.grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.07;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.6 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+.vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 55%, transparent 40%, rgba(3, 8, 6, 0.65) 100%);
+}
+
+.particle {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 9999px;
+  background: rgba(250, 236, 205, 0.7);
+  box-shadow: 0 0 6px rgba(232, 184, 109, 0.8);
+  pointer-events: none;
+  will-change: transform, opacity;
+  animation: floatUp linear infinite;
+}
+
+@keyframes floatUp {
+  0% { transform: translate3d(0, 0, 0); opacity: 0; }
+  15% { opacity: 0.8; }
+  85% { opacity: 0.5; }
+  100% { transform: translate3d(3vmax, -40vh, 0); opacity: 0; }
+}
+
+/* Weight comes from .font-serif-display (light, set !important globally). */
+.heroNumber {
+  letter-spacing: -0.04em;
+  line-height: 0.95;
+  color: #fdf6e8;
+  text-shadow:
+    0 0 0.08em rgba(255, 228, 176, 0.55),
+    0 0 0.3em rgba(232, 184, 109, 0.35),
+    0 0 0.8em rgba(47, 93, 74, 0.9);
+}
+
+.tile {
+  /* No backdrop-filter: re-blurring the moving blobs would cost every frame. */
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.025));
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 20px 50px -20px rgba(0, 0, 0, 0.6);
+}
+
+.liveDot {
+  animation: pulse 3s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .blob,
+  .liveDot {
+    animation: none;
+  }
+  .particle {
+    display: none;
+  }
+}

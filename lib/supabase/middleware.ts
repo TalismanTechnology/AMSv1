@@ -17,7 +17,9 @@ const adminClient = createClient(
 // Public pages that must load for anyone, signed in or not. The legal pages
 // are linked from the app stores and sign-in screens, and /support is the App
 // Store support URL — none of them may ever bounce to a sign-in screen.
-const PUBLIC_PAGES = new Set(["/privacy", "/terms", "/support"]);
+// /wall (and /wall.json) is the private stats wallpaper: it has no session (it checks its own
+// URL token) and must never redirect.
+const PUBLIC_PAGES = new Set(["/privacy", "/terms", "/support", "/wall", "/wall.json"]);
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });

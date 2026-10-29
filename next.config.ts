@@ -8,6 +8,10 @@ const PUBLIC_ASSET_CACHE = "public, max-age=86400, stale-while-revalidate=604800
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ["officeparser", "pdfjs-dist", "libreoffice-convert", "resend"],
+  // /wall.png sets its text in Liberation Sans (SIL OFL), read from disk.
+  outputFileTracingIncludes: {
+    "/wall.png": ["./node_modules/pdfjs-dist/standard_fonts/LiberationSans-{Regular,Bold}.ttf"],
+  },
   async headers() {
     return [
       {
@@ -17,6 +21,12 @@ const nextConfig: NextConfig = {
       {
         source: "/:file(logo|file|globe|next|vercel|window).svg",
         headers: [{ key: "Cache-Control", value: PUBLIC_ASSET_CACHE }],
+      },
+      {
+        // The private stats wallpaper: never indexed (the page and route also
+        // send no-store themselves).
+        source: "/:path(wall|wall\\.png|wall\\.json)",
+        headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
       },
       {
         // Browsers must always see the latest service worker.
