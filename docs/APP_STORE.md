@@ -208,16 +208,21 @@ An app preview video is optional.
     seller then shows as the company, which looks better to schools.
 - Enroll at https://developer.apple.com/programs/enroll/ (the Apple Developer
   app on an iPhone also works, so no Mac is needed).
+- **Status: approved.** Individual enrollment under **Nicholas Nettleton
+  Haines**, valid through **2027-10-29** (renew before then). Team ID
+  **`DCVUJWG3YP`**.
 - Accept the agreements in App Store Connect > Business, and fill in the
   tax / banking forms (needed even for a free app's "Free Apps" agreement).
 
 ### 6.2 Identifiers and keys (developer.apple.com, once)
 
-1. **Team ID**: Membership details > Team ID (10 characters). Then:
-   - Vercel > Project > Settings > Environment Variables: `APPLE_TEAM_ID` =
-     the Team ID, and redeploy. Check
-     https://askmyschool.app/.well-known/apple-app-site-association shows
-     `<TEAMID>.app.askmyschool` instead of `TEAMID.app.askmyschool`.
+1. **Team ID**: `DCVUJWG3YP` (Membership details > Team ID). It's public and
+   already set everywhere it's needed: `DEVELOPMENT_TEAM` in the Xcode
+   project, the AASA file (`APPLE_TEAM_ID` in `lib/native/app-links.ts`), and
+   the fastlane `Fastfile` / `Appfile`. The `APPLE_TEAM_ID` env var (Vercel)
+   and GitHub secret are **optional**, only to override it. After deploying,
+   check https://askmyschool.app/.well-known/apple-app-site-association shows
+   `DCVUJWG3YP.app.askmyschool`.
 2. **App ID**: Certificates, Identifiers & Profiles > Identifiers > +, App
    IDs, bundle ID `app.askmyschool` (explicit). Capabilities: **Push
    Notifications** and **Associated Domains**. (Automatic signing can also
@@ -254,14 +259,15 @@ GitHub-hosted Mac (`macos-26`, Xcode 26) with fastlane
 (`ios/App/fastlane/Fastfile`). It **only runs when started by hand**.
 
 1. GitHub > repo > Settings > Secrets and variables > Actions > New
-   repository secret, four times:
-   - `APPLE_TEAM_ID`: Team ID
+   repository secret, three times (plus an optional fourth):
    - `ASC_KEY_ID`: the API key's Key ID
    - `ASC_ISSUER_ID`: the Issuer ID
    - `ASC_KEY_P8_BASE64`: the `.p8` file base64-encoded: `base64 -i
      AuthKey_XXXX.p8 | pbcopy` on a Mac, `base64 -w0 AuthKey_XXXX.p8` on
      Linux, or `[Convert]::ToBase64String([IO.File]::ReadAllBytes("AuthKey_XXXX.p8"))`
      in PowerShell.
+   - `APPLE_TEAM_ID` (optional): only to override the default Team ID
+     `DCVUJWG3YP`; if unset, fastlane uses the default.
 2. Actions > "iOS: build for TestFlight" > Run workflow (branch `main`).
    It runs `npm ci`, `npx cap sync ios`, then fastlane: picks the next build
    number from TestFlight, archives with automatic signing (Xcode creates the
@@ -283,8 +289,9 @@ npx cap sync ios          # Node 22+
 npx cap open ios          # opens Xcode
 ```
 
-In Xcode: App target > Signing & Capabilities > Team = your team, "Automatically
-manage signing" on. Set the version / build under General. Product > Archive,
+In Xcode: App target > Signing & Capabilities: Team is already set
+(`DCVUJWG3YP`, Nicholas Nettleton Haines) and "Automatically manage signing"
+is on; sign in to Xcode with an Apple Account on that team. Set the version / build under General. Product > Archive,
 then Organizer > Distribute App > App Store Connect > Upload.
 
 ### 6.6 TestFlight
@@ -298,8 +305,8 @@ then Organizer > Distribute App > App Store Connect > Upload.
    - [ ] Sign in with Blackbaud for a real school, and for the demo school
    - [ ] Notification permission prompt appears after sign-in
    - [ ] Universal link: tap `https://askmyschool.app/s/<school>/parent/events`
-         in Notes or Messages; it should open the app (needs the real
-         `APPLE_TEAM_ID` deployed)
+         in Notes or Messages; it should open the app (the AASA file
+         lists `DCVUJWG3YP.app.askmyschool` by default)
    - [ ] Share an answer; pull to refresh; Airplane Mode shows the offline
          screen and it recovers
    - [ ] External links open in the in-app browser
@@ -333,7 +340,7 @@ release needed. A new build is only needed for native changes (Swift,
 | Launch screen (brand, cream background) | Done |
 | Push notifications (APNs) wired to `push_devices` | Done (needs APNs key in Vercel) |
 | Sign-in via ASWebAuthenticationSession, not the web view | Done (Blackbaud; Veracross in PR #14) |
-| Universal links + `apple-app-site-association` | Done (needs `APPLE_TEAM_ID`) |
+| Universal links + `apple-app-site-association` | Done (Team ID `DCVUJWG3YP` built in) |
 | Offline screen, pull-to-refresh, share, haptics, in-app browser | Done |
 | Info.plist usage strings, export compliance key | Done |
 | Privacy manifest (`PrivacyInfo.xcprivacy`) | Done |
@@ -342,8 +349,8 @@ release needed. A new build is only needed for native changes (Swift,
 | Privacy policy / terms live at /privacy, /terms | PR #8 (needs legal review, merge) |
 | In-app account deletion | PR #13 (merge before submitting) |
 | Support URL with contact info | **TODO** (PR #11 or a /support page) |
-| Apple Developer enrollment | **Lucas / Nicholas** (enrolled under Nicholas Haines) |
-| Team ID in Vercel, APNs key, ASC API key, GitHub secrets | **Lucas** |
+| Apple Developer enrollment | Done (Individual, Nicholas Nettleton Haines, Team ID `DCVUJWG3YP`, valid through 2027-10-29) |
+| APNs key, ASC API key, GitHub secrets (Team ID already in the repo; `APPLE_TEAM_ID` optional) | **Lucas** |
 | App record in App Store Connect | **Lucas** |
 | Demo school + reviewer login | **Lucas** |
 | Screenshots (iPhone 6.9", iPad 13") | **Lucas** (plan above) |

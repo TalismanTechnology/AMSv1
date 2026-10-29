@@ -7,9 +7,9 @@
 	<key>aps-environment</key>
 	<string>development</string>
 	<!-- Universal links (https://askmyschool.app/s/.../parent/... opens the
-	     app) and password autofill for staff sign-in. Needs
-	     /.well-known/apple-app-site-association to carry the real Team ID
-	     (APPLE_TEAM_ID in Vercel; app/.well-known/apple-app-site-association). -->
+	     app) and password autofill for staff sign-in. Paired with
+	     /.well-known/apple-app-site-association, which lists
+	     DCVUJWG3YP.app.askmyschool (lib/native/app-links.ts). -->
 	<key>com.apple.developer.associated-domains</key>
 	<array>
 		<string>applinks:askmyschool.app</string>

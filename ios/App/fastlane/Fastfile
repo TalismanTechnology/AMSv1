@@ -5,7 +5,7 @@
 #   cd ios/App && bundle exec fastlane beta
 #
 # Needs, as environment variables (GitHub Actions secrets in CI):
-#   APPLE_TEAM_ID      10-character Team ID (developer.apple.com > Membership)
+#   APPLE_TEAM_ID      optional; defaults to DCVUJWG3YP (developer.apple.com > Membership)
 #   ASC_KEY_ID         App Store Connect API key id
 #   ASC_ISSUER_ID      App Store Connect API issuer id
 #   ASC_KEY_P8_BASE64  the downloaded AuthKey_XXXX.p8, base64-encoded
@@ -20,11 +20,14 @@ require "tmpdir"
 default_platform(:ios)
 
 APP_IDENTIFIER = "app.askmyschool"
+# Public, and also set as DEVELOPMENT_TEAM in the Xcode project.
+DEFAULT_TEAM_ID = "DCVUJWG3YP"
 
 platform :ios do
   desc "Build a signed App Store build and upload it to TestFlight"
   lane :beta do |options|
-    team_id = ENV.fetch("APPLE_TEAM_ID")
+    team_id = ENV["APPLE_TEAM_ID"].to_s.strip
+    team_id = DEFAULT_TEAM_ID if team_id.empty?
     key_id = ENV.fetch("ASC_KEY_ID")
     issuer_id = ENV.fetch("ASC_ISSUER_ID")
     key_base64 = ENV.fetch("ASC_KEY_P8_BASE64")
