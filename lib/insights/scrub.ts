@@ -9,7 +9,7 @@ import crypto from "node:crypto";
 // then "scrubs" it:
 // the text and anything linking it to a parent or chat is dropped, user_id is
 // nulled, and a keyed hash of (school, user) is kept as metadata.asker so
-// Insights can still count DISTINCT askers for its k-anonymity threshold and
+// Analytics (lib/metrics) can still count DISTINCT askers for its k-anonymity threshold and
 // active-parent total — without holding a parent id.
 //
 // If labeling keeps failing, an event is scrubbed unlabeled after

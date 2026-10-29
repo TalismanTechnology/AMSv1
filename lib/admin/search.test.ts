@@ -87,3 +87,10 @@ test("every word must match; empty query lists pages", () => {
   assert.ok(empty.length > 0);
   assert.ok(empty.every((e) => e.group === "Pages"));
 });
+
+test("Insights searches find the merged Analytics page", () => {
+  for (const query of ["insights", "topics", "trends", "analytics", "statistics"]) {
+    assert.equal(searchAdmin(admin, query)[0]?.href, "/s/demo/admin/analytics", query);
+  }
+  assert.ok(!admin.some((e) => e.href.includes("/insights")));
+});

@@ -2,10 +2,11 @@
 // app/wall, app/wall.png). No I/O here so it can be unit tested, and nothing
 // server-only, so the client component can share the types.
 //
-// "Days" on the wall are America/New_York calendar days: the school day, not
-// the server's (UTC) day.
+// Every number on the wall comes from lib/metrics (the same definitions as
+// admin Analytics and the dashboard); days are Eastern (lib/metrics/time.ts).
 
-export const WALL_TIME_ZONE = "America/New_York";
+export { formatEtTime } from "@/lib/metrics/time";
+
 export const SPARKLINE_DAYS = 14;
 
 /** Aggregates only — never names, emails, ids or question text. */
@@ -31,122 +32,6 @@ export interface WallStats {
     questions: number;
     answerRate: number | null;
   } | null;
-}
-
-// --------------------------------------------
-// Eastern-time days
-// --------------------------------------------
-
-const partsFormatter = new Intl.DateTimeFormat("en-US", {
-  timeZone: WALL_TIME_ZONE,
-  hourCycle: "h23",
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  second: "2-digit",
-});
-
-function etParts(date: Date) {
-  const get = (type: string) =>
-    Number(partsFormatter.formatToParts(date).find((p) => p.type === type)?.value);
-  return {
-    year: get("year"),
-    month: get("month"),
-    day: get("day"),
-    hour: get("hour") % 24,
-    minute: get("minute"),
-    second: get("second"),
-  };
-}
-
-/** Minutes Eastern time is ahead of UTC at `date` (-240 in EDT, -300 in EST). */
-function etOffsetMinutes(date: Date): number {
-  const p = etParts(date);
-  const asUtc = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
-  return Math.round((asUtc - Math.floor(date.getTime() / 1000) * 1000) / 60_000);
-}
-
-/** "YYYY-MM-DD" of the Eastern calendar day containing `date`. */
-export function etDayKey(date: Date | string): string {
-  const p = etParts(typeof date === "string" ? new Date(date) : date);
-  return `${p.year}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`;
-}
-
-/** The instant of Eastern midnight starting the day `daysBack` days before `now`'s day. */
-export function etStartOfDay(now: Date, daysBack = 0): Date {
-  const p = etParts(now);
-  const wallMidnight = Date.UTC(p.year, p.month - 1, p.day - daysBack);
-  // Guess with the offset now, then correct with the offset at the guess
-  // (they differ when a DST change falls in between).
-  let instant = wallMidnight - etOffsetMinutes(now) * 60_000;
-  instant = wallMidnight - etOffsetMinutes(new Date(instant)) * 60_000;
-  return new Date(instant);
-}
-
-/** The last `days` Eastern day keys, oldest first, ending with today. */
-export function lastEtDayKeys(now: Date, days: number): string[] {
-  const keys: string[] = [];
-  for (let back = days - 1; back >= 0; back--) {
-    // Noon of the day avoids DST edges entirely.
-    keys.push(etDayKey(new Date(etStartOfDay(now, back).getTime() + 12 * 3_600_000)));
-  }
-  return keys;
-}
-
-/** Count timestamps per Eastern day over the last `days` days; others ignored. */
-export function bucketByEtDay(
-  timestamps: Iterable<string>,
-  now: Date,
-  days = SPARKLINE_DAYS
-): { date: string; count: number }[] {
-  const keys = lastEtDayKeys(now, days);
-  const counts = new Map(keys.map((k) => [k, 0]));
-  for (const ts of timestamps) {
-    const key = etDayKey(ts);
-    const current = counts.get(key);
-    if (current !== undefined) counts.set(key, current + 1);
-  }
-  return keys.map((date) => ({ date, count: counts.get(date)! }));
-}
-
-/**
- * "10:42 AM" in Eastern time. Newer ICU puts a narrow no-break space before
- * AM/PM; a plain space keeps server and browser output identical.
- */
-export function formatEtTime(date: Date | string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: WALL_TIME_ZONE,
-    hour: "numeric",
-    minute: "2-digit",
-  })
-    .format(typeof date === "string" ? new Date(date) : date)
-    .replace(/[\u202f\u00a0]/g, " ");
-}
-
-// --------------------------------------------
-// Counting
-// --------------------------------------------
-
-/** Number of distinct non-empty keys. */
-export function countDistinct(keys: Iterable<string | null | undefined>): number {
-  const seen = new Set<string>();
-  for (const key of keys) if (key) seen.add(key);
-  return seen.size;
-}
-
-/** Distinct users among rows created at or after `since` (ISO). */
-export function countDistinctSince(
-  rows: Iterable<{ user_id: string | null; created_at: string }>,
-  since: Date
-): number {
-  const sinceMs = since.getTime();
-  const keys: string[] = [];
-  for (const row of rows) {
-    if (row.user_id && new Date(row.created_at).getTime() >= sinceMs) keys.push(row.user_id);
-  }
-  return countDistinct(keys);
 }
 
 // --------------------------------------------

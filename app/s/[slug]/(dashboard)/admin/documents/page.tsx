@@ -15,7 +15,7 @@ export default async function DocumentsPage({
   searchParams: Promise<{ upload?: string }>;
 }) {
   const { slug } = await params;
-  // ?upload=1 (e.g. from Insights) opens the upload dialog on arrival.
+  // ?upload=1 (e.g. from Analytics) opens the upload dialog on arrival.
   const { upload } = await searchParams;
   const { school } = await requireSchoolContext(slug);
 

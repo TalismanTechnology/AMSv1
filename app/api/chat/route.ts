@@ -319,7 +319,7 @@ export async function POST(request: NextRequest) {
             question: lastMessageText,
             source_count: relevantChunks.length,
             // Same condition as the unanswered_questions log below; read by
-            // the admin Insights answer rate.
+            // the admin Analytics answer rate (lib/metrics).
             unanswered: sources.length === 0,
             source_document_ids: [
               ...new Set(relevantChunks.map((c) => c.document_id)),

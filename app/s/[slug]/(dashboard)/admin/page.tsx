@@ -9,6 +9,15 @@ import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import { PageTransition } from "@/components/motion";
+import { loadDocumentMetrics, loadHeadlineMetrics } from "@/lib/metrics/load";
+
+interface PendingRow {
+  user_id: string;
+  profiles:
+    | { full_name: string | null; email: string | null }
+    | { full_name: string | null; email: string | null }[]
+    | null;
+}
 
 export default async function AdminDashboard({
   params,
@@ -21,69 +30,34 @@ export default async function AdminDashboard({
 
   const supabase = await createClient();
   // analytics_events holds parents' question text, so school admins can't read
-  // it through RLS (migration 031). Counts only, via the service role, after
-  // the admin check above.
+  // it through RLS (migration 031). The shared metrics (lib/metrics) read with
+  // the service role, after the admin check above, and return counts only.
   const service = createAdminClient();
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const [
-    { count: totalDocuments },
-    { count: readyDocuments },
-    { count: totalParents },
-    { count: pendingParents },
-    { count: questionsToday },
-    { count: questionsTotal },
-    { data: recentDocs },
-    { data: pendingUsers },
-  ] = await Promise.all([
-    supabase
-      .from("documents")
-      .select("*", { count: "exact", head: true })
-      .eq("school_id", school.id),
-    supabase
-      .from("documents")
-      .select("*", { count: "exact", head: true })
-      .eq("school_id", school.id)
-      .eq("status", "ready"),
-    supabase
-      .from("profiles")
-      .select("*, school_memberships!inner(school_id)", { count: "exact", head: true })
-      .eq("school_memberships.school_id", school.id)
-      .eq("role", "parent"),
-    supabase
-      .from("profiles")
-      .select("*, school_memberships!inner(school_id)", { count: "exact", head: true })
-      .eq("school_memberships.school_id", school.id)
-      .eq("role", "parent")
-      .eq("approved", false),
-    service
-      .from("analytics_events")
-      .select("id", { count: "exact", head: true })
-      .eq("school_id", school.id)
-      .eq("event_type", "question")
-      .gte("created_at", today.toISOString()),
-    service
-      .from("analytics_events")
-      .select("id", { count: "exact", head: true })
-      .eq("school_id", school.id)
-      .eq("event_type", "question"),
+  const [metrics, documents, { data: recentDocs }, { data: pendingRows }] = await Promise.all([
+    loadHeadlineMetrics(service, { schoolId: school.id, range: "7d" }),
+    loadDocumentMetrics(service, school.id),
     supabase
       .from("documents")
       .select("id, title, status, created_at")
       .eq("school_id", school.id)
       .order("created_at", { ascending: false })
       .limit(5),
+    // Approval is per school (school_memberships.approved), the same rows
+    // the "pending" count above is taken from.
     supabase
-      .from("profiles")
-      .select("id, full_name, email, created_at, school_memberships!inner(school_id)")
-      .eq("school_memberships.school_id", school.id)
+      .from("school_memberships")
+      .select("user_id, created_at, profiles!inner(full_name, email)")
+      .eq("school_id", school.id)
       .eq("role", "parent")
       .eq("approved", false)
       .order("created_at", { ascending: false })
       .limit(5),
   ]);
+  const pendingUsers = ((pendingRows ?? []) as unknown as PendingRow[]).map((row) => {
+    const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
+    return { id: row.user_id, full_name: profile?.full_name ?? null, email: profile?.email ?? null };
+  });
 
   return (
     <PageTransition>
@@ -98,14 +72,7 @@ export default async function AdminDashboard({
         </p>
       </header>
 
-      <StatsCards
-        totalDocuments={totalDocuments || 0}
-        readyDocuments={readyDocuments || 0}
-        totalParents={totalParents || 0}
-        pendingParents={pendingParents || 0}
-        questionsToday={questionsToday || 0}
-        questionsTotal={questionsTotal || 0}
-      />
+      <StatsCards metrics={metrics} documents={documents} analyticsHref={`/s/${slug}/admin/analytics`} />
 
       <div className="mt-12 grid gap-10 lg:grid-cols-2">
         {/* Recent Documents */}
@@ -172,7 +139,7 @@ export default async function AdminDashboard({
               </Link>
             </Button>
           </div>
-          {pendingUsers && pendingUsers.length > 0 ? (
+          {pendingUsers.length > 0 ? (
             <div className="divide-y divide-border">
               {pendingUsers.map((user) => (
                 <div

@@ -9,7 +9,7 @@ export const maxDuration = 300;
 // Gemini batch can't push the run past the limit mid-insert.
 const TIME_BUDGET_MS = 240_000;
 
-// Label new parent questions with generic topics for the admin Insights page.
+// Label new parent questions with generic topics for the Topics section of admin Analytics.
 //   GET /api/cron/label-question-topics
 //   Authorization: Bearer <CRON_SECRET>   (or ?key=<CRON_SECRET>)
 //
