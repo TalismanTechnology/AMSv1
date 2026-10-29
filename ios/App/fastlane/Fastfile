@@ -1,20 +1,28 @@
-# Builds the AskMySchool iOS app and uploads it to TestFlight, with no Mac
-# signing setup: Xcode's automatic signing fetches (or creates) the App Store
-# certificate and provisioning profile through the App Store Connect API key.
+# Builds the AskMySchool iOS app and uploads it to TestFlight with manual
+# App Store signing: the "Apple Distribution" certificate comes in as a .p12
+# and is imported into a temporary keychain, and the existing "AskMySchool
+# App Store" provisioning profile is downloaded through the App Store Connect
+# API key. (Automatic signing archives with a Development profile, which
+# needs a registered device; the team has none.)
 #
 #   cd ios/App && bundle exec fastlane beta
 #
 # Needs, as environment variables (GitHub Actions secrets in CI):
-#   APPLE_TEAM_ID      optional; defaults to DCVUJWG3YP (developer.apple.com > Membership)
-#   ASC_KEY_ID         App Store Connect API key id
-#   ASC_ISSUER_ID      App Store Connect API issuer id
-#   ASC_KEY_P8_BASE64  the downloaded AuthKey_XXXX.p8, base64-encoded
-# The API key needs the Admin role: cloud-managed signing certificates
-# aren't available to lower roles.
+#   APPLE_TEAM_ID             optional; defaults to DCVUJWG3YP (developer.apple.com > Membership)
+#   ASC_KEY_ID                App Store Connect API key id
+#   ASC_ISSUER_ID             App Store Connect API issuer id
+#   ASC_KEY_P8_BASE64         the downloaded AuthKey_XXXX.p8, base64-encoded
+#   IOS_DIST_CERT_P12_BASE64  the Apple Distribution certificate + key (.p12), base64-encoded
+#   IOS_DIST_CERT_PASSWORD    the .p12 password
+#
+# The lane switches the App target's Release configuration to manual signing
+# in App.xcodeproj; on a Mac, discard that change afterwards.
 #
 # Run `npx cap sync ios` first so the web assets and plugin list are current.
 
 require "base64"
+require "fileutils"
+require "securerandom"
 require "tmpdir"
 
 default_platform(:ios)
@@ -22,15 +30,23 @@ default_platform(:ios)
 APP_IDENTIFIER = "app.askmyschool"
 # Public, and also set as DEVELOPMENT_TEAM in the Xcode project.
 DEFAULT_TEAM_ID = "DCVUJWG3YP"
+PROFILE_NAME = "AskMySchool App Store"
+CODE_SIGN_IDENTITY = "Apple Distribution"
+KEYCHAIN_NAME = "askmyschool-signing"
 
 platform :ios do
   desc "Build a signed App Store build and upload it to TestFlight"
   lane :beta do |options|
+    work_dir = Dir.mktmpdir("askmyschool-signing")
+    keychain_created = false
+
     team_id = ENV["APPLE_TEAM_ID"].to_s.strip
     team_id = DEFAULT_TEAM_ID if team_id.empty?
     key_id = ENV.fetch("ASC_KEY_ID")
     issuer_id = ENV.fetch("ASC_ISSUER_ID")
     key_base64 = ENV.fetch("ASC_KEY_P8_BASE64")
+    cert_base64 = ENV.fetch("IOS_DIST_CERT_P12_BASE64")
+    cert_password = ENV.fetch("IOS_DIST_CERT_PASSWORD")
 
     api_key = app_store_connect_api_key(
       key_id: key_id,
@@ -40,9 +56,68 @@ platform :ios do
       in_house: false
     )
 
-    # xcodebuild wants the key as a file for -allowProvisioningUpdates.
-    key_path = File.join(Dir.tmpdir, "AuthKey_#{key_id}.p8")
-    File.write(key_path, Base64.decode64(key_base64))
+    # A throwaway keychain for the distribution certificate, deleted (and the
+    # previous default keychain restored) in `ensure`. Only made the default
+    # keychain on CI, so a local run doesn't touch the login keychain.
+    keychain_password = SecureRandom.hex(24)
+    create_keychain(
+      name: KEYCHAIN_NAME,
+      password: keychain_password,
+      default_keychain: is_ci,
+      unlock: true,
+      timeout: 0,
+      lock_when_sleeps: false,
+      add_to_search_list: true
+    )
+    keychain_created = true
+
+    cert_path = File.join(work_dir, "dist.p12")
+    File.binwrite(cert_path, Base64.decode64(cert_base64))
+    import_certificate(
+      certificate_path: cert_path,
+      certificate_password: cert_password,
+      keychain_name: KEYCHAIN_NAME,
+      keychain_password: keychain_password,
+      log_output: false
+    )
+    # import_certificate only logs a failed `security import` (wrong password,
+    # or a .p12 with encryption the keychain can't read), so check here.
+    # No -v: the WWDR intermediate may not be installed until sigh runs.
+    identities = sh(
+      "security", "find-identity", "-p", "codesigning",
+      FastlaneCore::Helper.keychain_path(KEYCHAIN_NAME), log: false
+    )
+    unless identities.include?(CODE_SIGN_IDENTITY)
+      UI.user_error!("No #{CODE_SIGN_IDENTITY} identity in the keychain after importing " \
+                     "IOS_DIST_CERT_P12_BASE64: check IOS_DIST_CERT_PASSWORD and that " \
+                     "the .p12 includes the private key (legacy 3DES export)")
+    end
+
+    # Finds (and installs) the existing App Store profile for the imported
+    # certificate; only creates one if it's missing.
+    get_provisioning_profile(
+      api_key: api_key,
+      app_identifier: APP_IDENTIFIER,
+      team_id: team_id,
+      provisioning_name: PROFILE_NAME,
+      ignore_profiles_with_different_name: true,
+      readonly: false,
+      force: false,
+      output_path: work_dir
+    )
+    profile_name = lane_context[SharedValues::SIGH_NAME]
+    UI.message("Signing with profile #{profile_name} (#{lane_context[SharedValues::SIGH_UUID]})")
+
+    # Only the App target, so the Swift package targets keep their settings.
+    update_code_signing_settings(
+      path: "App.xcodeproj",
+      targets: ["App"],
+      build_configurations: ["Release"],
+      use_automatic_signing: false,
+      team_id: team_id,
+      code_sign_identity: CODE_SIGN_IDENTITY,
+      profile_name: profile_name
+    )
 
     # Every upload needs a new build number; the marketing version
     # (MARKETING_VERSION in the Xcode project) only changes per release.
@@ -53,13 +128,6 @@ platform :ios do
     ) + 1
     UI.message("Building AskMySchool build #{build_number}")
 
-    auth_args = [
-      "-allowProvisioningUpdates",
-      "-authenticationKeyPath #{key_path}",
-      "-authenticationKeyID #{key_id}",
-      "-authenticationKeyIssuerID #{issuer_id}",
-    ].join(" ")
-
     build_app(
       project: "App.xcodeproj",
       scheme: "App",
@@ -68,12 +136,14 @@ platform :ios do
       clean: true,
       output_directory: "build",
       output_name: "AskMySchool.ipa",
-      xcargs: "#{auth_args} DEVELOPMENT_TEAM=#{team_id} CODE_SIGN_STYLE=Automatic " \
-              "CURRENT_PROJECT_VERSION=#{build_number}",
-      export_xcargs: auth_args,
+      # No codesigning_identity: it would set CODE_SIGN_IDENTITY on every
+      # target, Swift packages included; the App target already has it.
+      xcargs: "DEVELOPMENT_TEAM=#{team_id} CURRENT_PROJECT_VERSION=#{build_number}",
       export_options: {
         teamID: team_id,
-        signingStyle: "automatic",
+        signingStyle: "manual",
+        signingCertificate: CODE_SIGN_IDENTITY,
+        provisioningProfiles: { APP_IDENTIFIER => profile_name },
         destination: "export",
         manageAppVersionAndBuildNumber: false,
       }
@@ -89,6 +159,7 @@ platform :ios do
       )
     end
   ensure
-    File.delete(key_path) if key_path && File.exist?(key_path)
+    FileUtils.rm_rf(work_dir) if work_dir
+    delete_keychain(name: KEYCHAIN_NAME) if keychain_created
   end
 end

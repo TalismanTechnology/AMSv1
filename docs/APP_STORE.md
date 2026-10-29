@@ -259,20 +259,32 @@ GitHub-hosted Mac (`macos-26`, Xcode 26) with fastlane
 (`ios/App/fastlane/Fastfile`). It **only runs when started by hand**.
 
 1. GitHub > repo > Settings > Secrets and variables > Actions > New
-   repository secret, three times (plus an optional fourth):
+   repository secret, five times (plus an optional sixth):
    - `ASC_KEY_ID`: the API key's Key ID
    - `ASC_ISSUER_ID`: the Issuer ID
    - `ASC_KEY_P8_BASE64`: the `.p8` file base64-encoded: `base64 -i
      AuthKey_XXXX.p8 | pbcopy` on a Mac, `base64 -w0 AuthKey_XXXX.p8` on
      Linux, or `[Convert]::ToBase64String([IO.File]::ReadAllBytes("AuthKey_XXXX.p8"))`
      in PowerShell.
+   - `IOS_DIST_CERT_P12_BASE64`: the "Apple Distribution: NICHOLAS NETTLETON
+     HAINES" certificate and its private key, exported as a `.p12` (legacy
+     3DES encryption, so the macOS keychain can import it) and base64-encoded
+     the same way as the `.p8`. The certificate expires **2027-10-29**; renew
+     it before then and update this secret (and the profile below).
+   - `IOS_DIST_CERT_PASSWORD`: the `.p12` password.
    - `APPLE_TEAM_ID` (optional): only to override the default Team ID
      `DCVUJWG3YP`; if unset, fastlane uses the default.
 2. Actions > "iOS: build for TestFlight" > Run workflow (branch `main`).
-   It runs `npm ci`, `npx cap sync ios`, then fastlane: picks the next build
-   number from TestFlight, archives with automatic signing (Xcode creates the
-   distribution certificate and profile through the API key), and uploads.
-   Untick "Upload" to only build the `.ipa` (kept as a workflow artifact).
+   It runs `npm ci`, `npx cap sync ios`, then fastlane: imports the
+   certificate into a temporary keychain, downloads the existing App Store
+   provisioning profile **"AskMySchool App Store"** (for `app.askmyschool`,
+   tied to that certificate) through the API key, switches the App target's
+   Release configuration to manual signing with it, picks the next build
+   number from TestFlight, archives, and uploads. Signing is manual because
+   automatic signing archives with a Development profile, which needs a
+   registered device. Release builds use `App/App.Release.entitlements`
+   (production push). Untick "Upload" to only build the `.ipa` (kept as a
+   workflow artifact).
 3. macOS runner minutes count 10× against the GitHub Actions quota on
    private repos; one build is roughly 10–20 minutes.
 

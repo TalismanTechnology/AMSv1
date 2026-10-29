@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Release (TestFlight / App Store) entitlements: CODE_SIGN_ENTITLEMENTS
+	     for the Release configuration. Same as App.entitlements except push
+	     uses the production APNs environment, matching the App Store
+	     provisioning profile. Keep the associated domains in sync. -->
+	<key>aps-environment</key>
+	<string>production</string>
+	<!-- Universal links (https://askmyschool.app/s/.../parent/... opens the
+	     app) and password autofill for staff sign-in. Paired with
+	     /.well-known/apple-app-site-association, which lists
+	     DCVUJWG3YP.app.askmyschool (lib/native/app-links.ts). -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:askmyschool.app</string>
+		<string>webcredentials:askmyschool.app</string>
+	</array>
+</dict>
+</plist>

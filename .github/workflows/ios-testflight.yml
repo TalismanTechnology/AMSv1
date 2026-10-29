@@ -7,6 +7,9 @@
 #   ASC_KEY_ID          App Store Connect API key id (Admin role)
 #   ASC_ISSUER_ID       App Store Connect API issuer id
 #   ASC_KEY_P8_BASE64   `base64 -i AuthKey_XXXX.p8` output
+#   IOS_DIST_CERT_P12_BASE64  Apple Distribution certificate (.p12), base64-encoded
+#   IOS_DIST_CERT_PASSWORD    the .p12 password
+# Signing is manual, with the "AskMySchool App Store" provisioning profile.
 # See docs/APP_STORE.md, "Release without a Mac".
 
 name: "iOS: build for TestFlight"
@@ -55,9 +58,11 @@ jobs:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+          IOS_DIST_CERT_P12_BASE64: ${{ secrets.IOS_DIST_CERT_P12_BASE64 }}
+          IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
         run: |
           missing=0
-          for name in ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8_BASE64; do
+          for name in ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8_BASE64 IOS_DIST_CERT_P12_BASE64 IOS_DIST_CERT_PASSWORD; do
             if [ -z "${!name}" ]; then echo "::error::Secret $name is not set"; missing=1; fi
           done
           exit $missing
@@ -70,7 +75,12 @@ jobs:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+          IOS_DIST_CERT_P12_BASE64: ${{ secrets.IOS_DIST_CERT_P12_BASE64 }}
+          IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
           SKIP_UPLOAD: ${{ inputs.upload && 'false' || 'true' }}
+          # `xcodebuild -showBuildSettings` takes >6s on a cold runner; the
+          # default 3s timeout only got through on fastlane's third retry.
+          FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT: "30"
         run: bundle exec fastlane beta skip_upload:$SKIP_UPLOAD
 
       - name: Keep the .ipa
