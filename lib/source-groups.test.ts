@@ -59,20 +59,38 @@ test("merges documents with the same source URL", () => {
   assert.equal(groups[0].isWebsite, true);
 });
 
-test("caps the list at three rows", () => {
+test("lists every cited document, with no row cap", () => {
   const sources = ["A", "B", "C", "D", "E"].map((id, i) => source(i + 1, id));
 
   const groups = groupSources(sources, new Set([5, 4, 3, 2, 1]));
 
-  assert.deepEqual(groups.map((g) => g.key), ["E", "D", "C"]);
+  assert.deepEqual(groups.map((g) => g.key), ["E", "D", "C", "B", "A"]);
 });
 
-test("a passage of a listed document still joins its row past the cap", () => {
+test("cited events do not crowd out cited documents", () => {
+  const sources = [
+    source(1, "ev1", { source_type: "event", title: "Early Dismissal" }),
+    source(2, "ev2", { source_type: "event", title: "Early Dismissal" }),
+    source(3, "Handbook"),
+    source(4, "Letter"),
+  ];
+
+  const groups = groupSources(sources, new Set([1, 2, 3, 4]));
+
+  assert.equal(groups.length, 4);
+  assert.deepEqual(groups.map((g) => g.isEvent), [true, true, false, false]);
+  assert.deepEqual(
+    groups.flatMap((g) => g.passages.map((p) => p.source_number)),
+    [1, 2, 3, 4]
+  );
+});
+
+test("a later passage of a listed document joins its row", () => {
   const sources = ["A", "B", "C", "D"].map((id, i) => source(i + 1, id)).concat(source(5, "A"));
 
   const groups = groupSources(sources, new Set([1, 2, 3, 4, 5]));
 
-  assert.deepEqual(groups.map((g) => g.key), ["A", "B", "C"]);
+  assert.deepEqual(groups.map((g) => g.key), ["A", "B", "C", "D"]);
   assert.deepEqual(groups[0].passages.map((p) => p.source_number), [1, 5]);
 });
 

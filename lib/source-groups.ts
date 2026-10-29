@@ -12,9 +12,6 @@ export interface SourceGroup {
   isEvent: boolean;
 }
 
-/** At most this many rows under an answer; more reads as padding, not support. */
-export const MAX_SOURCE_ROWS = 3;
-
 /** "Calendar Details - Collegiate School" and "calendar details – collegiate school" match. */
 export function normalizeTitle(title: string): string {
   return title.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
@@ -26,9 +23,10 @@ export function normalizeTitle(title: string): string {
  * ones the answer cited, so every chip opens the page its fact came from.
  *
  * Rows that are the same document in all but id — the same web page, or the
- * same title — merge into the one cited first, and the list stops at
- * MAX_SOURCE_ROWS. Numbering is untouched: an inline [N] still opens
- * sources[N-1] even when its row was merged or capped away.
+ * same title — merge into the one cited first. There is no row cap: every
+ * cited [N] the parent sees lands in some row, so the list always accounts
+ * for every inline number. Numbering is untouched: an inline [N] still opens
+ * sources[N-1] even when its row was merged.
  *
  * Calendar entries are never merged by title: "Early Dismissal" on two dates
  * is two events, each with its own row.
@@ -66,7 +64,6 @@ export function groupSources(sources: ChatSource[], citedNumbers: Set<number>): 
       if (title) existing.titles.add(title);
       continue;
     }
-    if (groups.length >= MAX_SOURCE_ROWS) continue;
 
     groups.push({
       key: isDocument ? source.document_id : `${source.source_type}-${n}`,

@@ -29,7 +29,7 @@ import {
 } from "./resolutions";
 import { isRunActive, STALE_RUN_MS, type ScanRunSummary } from "./runs";
 import { buildSystemPrompt } from "@/lib/ai/system-prompt";
-import { groupSources, MAX_SOURCE_ROWS } from "@/lib/source-groups";
+import { groupSources } from "@/lib/source-groups";
 import type { CitablePassage } from "@/lib/ai/rag";
 import type { ChatSource } from "@/lib/types";
 
@@ -552,11 +552,10 @@ test("admin clarifications render as one deduped 'School clarification' row, wit
   assert.equal(groups[0].isWebsite, false);
 });
 
-test("a clarification counts toward the three-row citation cap", () => {
+test("a clarification gets its own row alongside every cited document", () => {
   const sources = [clarificationSource(1, "c1"), source(2), source(3), source(4)];
   const groups = groupSources(sources, new Set([1, 2, 3, 4]));
-  assert.equal(groups.length, MAX_SOURCE_ROWS);
-  assert.deepEqual(groups.map((g) => g.title), [CLARIFICATION_TITLE, "Document 2", "Document 3"]);
+  assert.deepEqual(groups.map((g) => g.title), [CLARIFICATION_TITLE, "Document 2", "Document 3", "Document 4"]);
 });
 
 test("an uncited answer never falls back to a clarification row", () => {
