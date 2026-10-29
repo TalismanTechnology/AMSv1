@@ -13,6 +13,7 @@ import {
 import {
   fetchEventsForContext,
   fetchAnnouncementsForContext,
+  formatEventLine,
   formatEventsContext,
   groupEventOccurrences,
   formatAnnouncementsContext,
@@ -37,6 +38,7 @@ import {
   planConflictResolutions,
   withoutDropped,
 } from "@/lib/conflicts/resolutions";
+import { eventSource } from "@/lib/ai/citations";
 import type { ChatSource } from "@/lib/types";
 import { TEXT_MODEL_ID } from "@/lib/ai/models";
 
@@ -53,6 +55,12 @@ export interface ChatTurn {
   systemPrompt: string;
   /** Citable passages, in [N] order — sources[N-1] is what [N] opens. */
   sources: ChatSource[];
+  /**
+   * Every calendar entry, numbered after the passages (sources.length + 1…).
+   * Only the ones an answer cites are sent to the parent — see
+   * citedEventSources.
+   */
+  eventSources: ChatSource[];
   /** Raw vector hits, for analytics. */
   relevantChunks: RelevantChunk[];
   modelMessages: ModelMessage[];
@@ -197,14 +205,17 @@ export async function prepareChatTurn({
     passages.push(...clarificationPassages(conflictPlan.relevant, passages, similarityByKey));
   }
 
-  // The calendar is prompt context, not a citable source — see
-  // formatEventsContext. Multi-day events are still collapsed from their
-  // one-row-per-day storage into single dated entries so the prompt reads as
-  // one line per event rather than ten identical ones.
+  // Calendar entries are citable too, numbered after the passages. Multi-day
+  // events are collapsed from their one-row-per-day storage into single dated
+  // entries first, so a recess is one number rather than ten.
   const calendar = groupEventOccurrences(events);
+  const firstEventNumber = passages.length + 1;
+  const eventSources = calendar.map((entry, i) =>
+    eventSource(entry, firstEventNumber + i, formatEventLine(entry))
+  );
 
   const systemPrompt = buildSystemPrompt(passages, {
-    eventsContext: formatEventsContext(calendar),
+    eventsContext: formatEventsContext(calendar, firstEventNumber),
     announcementsContext: formatAnnouncementsContext(announcements),
     childrenContext: formatChildrenContext(resolvedChildren),
     childCount: resolvedChildren.length,
@@ -242,6 +253,7 @@ export async function prepareChatTurn({
     searchQuery,
     systemPrompt,
     sources,
+    eventSources,
     relevantChunks,
     modelMessages,
     temperature,

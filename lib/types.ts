@@ -173,6 +173,18 @@ export interface ChatSource {
   // number for PPTX, section heading for DOCX. Null when the file type doesn't
   // have a meaningful intra-document location.
   location?: ChatSourceLocation | null;
+  /** Set when source_type is "event": the calendar entry, for linking to it. */
+  event?: ChatSourceEvent;
+}
+
+export interface ChatSourceEvent {
+  /** First day, YYYY-MM-DD. */
+  date: string;
+  /** Last day, when the entry spans several days. */
+  date_end?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  location?: string | null;
 }
 
 export interface ChatSourceLocation {

@@ -14,6 +14,16 @@ import { extractSpecifics, findCitationMismatches } from "./citation-check";
 import { splitVisionPages } from "@/lib/documents/parser";
 import { groupSources } from "@/lib/source-groups";
 import type { ChatSource } from "@/lib/types";
+import {
+  citedEventSources,
+  citedNumbersInOrder,
+  eventSource,
+  eventSourceHref,
+  formatEventWhen,
+  renumberCitations,
+} from "./citations";
+import { formatEventsContext, type CalendarEntry } from "./context";
+import { buildSystemPrompt } from "./system-prompt";
 
 // ── Passage splitting ────────────────────────────────────────────────────────
 
@@ -234,4 +244,161 @@ test("lists only the documents the answer cites", () => {
 
   assert.deepEqual(groups.map((g) => g.key), ["Handbook"]);
   assert.equal(groups[0].isCited, true);
+});
+
+// ── Per-answer renumbering ───────────────────────────────────────────────────
+
+test("renumbers citations 1, 2, 3… in order of first appearance", () => {
+  const sources = [7, 4, 8, 17].map((n) => source(n, `doc${n}`, n));
+
+  const out = renumberCitations("Lunch is at noon [4]. Pickup is at 3 [7][8]. Again [4]. Gym [17].", sources);
+
+  assert.equal(out.content, "Lunch is at noon [1]. Pickup is at 3 [2][3]. Again [1]. Gym [4].");
+  assert.deepEqual(
+    out.sources.map((s) => [s.source_number, s.document_id]),
+    [[1, "doc4"], [2, "doc7"], [3, "doc8"], [4, "doc17"]]
+  );
+});
+
+test("every renumbered marker still opens the passage the model cited", () => {
+  const sources = [1, 2, 3, 4, 5, 6, 7, 8].map((n) => source(n, `doc${n}`, n));
+  const raw = "A [7]. B [3]. C [7].";
+
+  const out = renumberCitations(raw, sources);
+
+  const opened = [...out.content.matchAll(/\[(\d+)\]/g)].map(
+    (m) => out.sources.find((s) => s.source_number === Number(m[1]))!.document_id
+  );
+  assert.deepEqual(opened, ["doc7", "doc3", "doc7"]);
+});
+
+test("keeps uncited sources, numbered after the cited ones in their old order", () => {
+  const sources = [1, 2, 3].map((n) => source(n, `doc${n}`, n));
+
+  const out = renumberCitations("Only this [3].", sources);
+
+  assert.deepEqual(
+    out.sources.map((s) => [s.source_number, s.document_id]),
+    [[1, "doc3"], [2, "doc1"], [3, "doc2"]]
+  );
+});
+
+test("drops markers that resolve to no source", () => {
+  const out = renumberCitations("Real [5]. Bogus [99].", [source(5, "doc5", 1)]);
+  assert.equal(out.content, "Real [1]. Bogus.");
+  assert.equal(renumberCitations("No sources [1].", []).content, "No sources.");
+});
+
+test("renumbering is idempotent, so saved answers render unchanged", () => {
+  const sources = [3, 9, 12].map((n) => source(n, `doc${n}`, n));
+  const once = renumberCitations("X [12]. Y [3].", sources);
+  const twice = renumberCitations(once.content, once.sources);
+  assert.deepEqual(twice, once);
+});
+
+test("passage badges of one document show the new numbers, in order", () => {
+  const sources = [source(7, "MSHandbook 25.26", 14), source(8, "MSHandbook 25.26", 15), source(2, "Letter", 1)];
+
+  const out = renumberCitations("Dress code [8]. Phones [7]. Trip [2].", sources);
+  const groups = groupSources(out.sources, new Set(citedNumbersInOrder(out.content)));
+
+  assert.deepEqual(groups.map((g) => g.title), ["MSHandbook 25.26", "Letter"]);
+  assert.deepEqual(
+    groups[0].passages.map((p) => [p.source_number, p.location?.label]),
+    [[1, "p. 15"], [2, "p. 14"]]
+  );
+  assert.deepEqual(groups[1].passages.map((p) => p.source_number), [3]);
+});
+
+// ── Calendar entries as citable sources ──────────────────────────────────────
+
+function entry(id: string, extra: Partial<CalendarEntry> = {}): CalendarEntry {
+  return {
+    id,
+    title: `Event ${id}`,
+    description: null,
+    date: "2026-10-30",
+    date_end: null,
+    start_time: null,
+    end_time: null,
+    location: null,
+    event_type: "event",
+    ...extra,
+  };
+}
+
+test("formats an event's date, with the time unless it's all-day", () => {
+  assert.equal(formatEventWhen({ date: "2026-10-30" }), "Fri, Oct 30, 2026");
+  assert.equal(
+    formatEventWhen({ date: "2026-10-30", start_time: "15:00:00", end_time: "16:30:00" }),
+    "Fri, Oct 30, 2026 · 3:00 PM – 4:30 PM"
+  );
+  assert.equal(formatEventWhen({ date: "2026-10-30", start_time: "00:15" }), "Fri, Oct 30, 2026 · 12:15 AM");
+  assert.equal(
+    formatEventWhen({ date: "2025-12-22", date_end: "2026-01-02" }),
+    "Dec 22, 2025 – Jan 2, 2026"
+  );
+});
+
+test("an event source carries its number, date label and calendar link", () => {
+  const s = eventSource(entry("ev1", { title: "Fall Fair", start_time: "09:00:00" }), 6, "line");
+
+  assert.equal(s.source_type, "event");
+  assert.equal(s.source_number, 6);
+  assert.equal(s.title, "Fall Fair");
+  assert.equal(s.location?.label, "Fri, Oct 30, 2026 · 9:00 AM");
+  assert.equal(eventSourceHref("collegiate", s), "/s/collegiate/parent/events?date=2026-10-30");
+  assert.equal(eventSourceHref("collegiate", source(1, "doc", 1)), null);
+});
+
+test("calendar entries are numbered after the documents in the prompt", () => {
+  const block = formatEventsContext([entry("a"), entry("b", { title: "Recess" })], 4);
+  assert.match(block, /\[Source 4\] "Event a" on 2026-10-30/);
+  assert.match(block, /\[Source 5\] "Recess" on 2026-10-30/);
+});
+
+test("only cited events are kept, in order of first citation", () => {
+  const events = [entry("a"), entry("b"), entry("c")].map((e, i) => eventSource(e, 10 + i, ""));
+
+  const cited = citedEventSources("Fair [12]. Doc [1]. Recess [10]. Fair again [12].", events);
+
+  assert.deepEqual(cited.map((s) => s.document_id), ["c", "a"]);
+});
+
+test("events and documents share one sequence in order of first appearance", () => {
+  const docs = [source(1, "Handbook", 3), source(2, "Letter", 1)];
+  const events = [entry("fair", { title: "Fall Fair" }), entry("recess")].map((e, i) =>
+    eventSource(e, 3 + i, "")
+  );
+  const raw = "The fair is Friday [3]. Bring a lunch [2]. Fair rules [1]. Fair again [3].";
+
+  const out = renumberCitations(raw, [...docs, ...citedEventSources(raw, events)]);
+
+  assert.equal(out.content, "The fair is Friday [1]. Bring a lunch [2]. Fair rules [3]. Fair again [1].");
+  const groups = groupSources(out.sources, new Set(citedNumbersInOrder(out.content)));
+  assert.deepEqual(
+    groups.map((g) => [g.title, g.isEvent, g.passages.map((p) => p.source_number)]),
+    [["Fall Fair", true, [1]], ["Letter", false, [2]], ["Handbook", false, [3]]]
+  );
+  // The uncited recess entry never reaches the parent.
+  assert.ok(!out.sources.some((s) => s.document_id === "recess"));
+});
+
+test("events with the same title on different days stay separate rows", () => {
+  const events = [
+    eventSource(entry("d1", { title: "Early Dismissal", date: "2026-11-03" }), 1, ""),
+    eventSource(entry("d2", { title: "Early Dismissal", date: "2026-11-10" }), 2, ""),
+  ];
+
+  const groups = groupSources(events, new Set([1, 2]));
+
+  assert.equal(groups.length, 2);
+  assert.ok(groups.every((g) => g.isEvent));
+});
+
+test("the prompt makes the calendar citable", () => {
+  const prompt = buildSystemPrompt([], { eventsContext: formatEventsContext([entry("a")], 1) });
+  assert.match(prompt, /CITATIONS/);
+  assert.match(prompt, /<calendar>/);
+  assert.doesNotMatch(prompt, /Never cite the calendar/);
 });

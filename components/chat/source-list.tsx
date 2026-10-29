@@ -1,6 +1,6 @@
 "use client";
 
-import { BadgeCheck, FileText, Globe } from "lucide-react";
+import { BadgeCheck, CalendarDays, FileText, Globe } from "lucide-react";
 import { useSourcePanel } from "./source-panel-context";
 import { groupSources } from "@/lib/source-groups";
 import type { ChatSource } from "@/lib/types";
@@ -35,6 +35,8 @@ export function SourceList({
           >
             {group.passages[0].source_type === "clarification" ? (
               <BadgeCheck className="size-3.5 shrink-0" />
+            ) : group.isEvent ? (
+              <CalendarDays className="size-3.5 shrink-0" aria-label="Calendar event" />
             ) : group.isWebsite ? (
               <Globe className="size-3.5 shrink-0" />
             ) : (
@@ -45,7 +47,8 @@ export function SourceList({
             </span>
           </button>
           {/* A web page opens as a card linking to the page, so passage
-              chips would all lead to the same place. */}
+              chips would all lead to the same place. A calendar entry's chip
+              carries its date (and time, unless it's all-day). */}
           {!group.isWebsite && (
             <span className="flex shrink-0 flex-wrap gap-1">
               {group.passages.map((passage) => (

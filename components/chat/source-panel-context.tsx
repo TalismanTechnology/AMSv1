@@ -1,6 +1,8 @@
 "use client";
 
 import { createContext, useContext, useState, useCallback } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { eventSourceHref } from "@/lib/ai/citations";
 import type { ChatSource } from "@/lib/types";
 
 interface SourcePanelState {
@@ -29,7 +31,17 @@ export function SourcePanelProvider({
     isLoadingContent: false,
   });
 
+  const router = useRouter();
+  const { slug } = useParams<{ slug?: string }>();
+
   const openSource = useCallback(async (source: ChatSource) => {
+    // A cited calendar entry opens the school calendar on its day.
+    const eventHref = slug ? eventSourceHref(slug, source) : null;
+    if (eventHref) {
+      router.push(eventHref);
+      return;
+    }
+
     // Non-document sources (events, announcements) have no backing document to
     // fetch — show the detail we already carry on the source itself.
     if (source.source_type && source.source_type !== "document") {
@@ -64,7 +76,7 @@ export function SourcePanelProvider({
         isLoadingContent: false,
       }));
     }
-  }, []);
+  }, [router, slug]);
 
   const closePanel = useCallback(() => {
     setState({

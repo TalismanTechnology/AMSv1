@@ -6,10 +6,16 @@ import { LABEL_COLUMNS } from "@/lib/calendar-labels";
 
 export default async function ParentEventsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  /** ?date=YYYY-MM-DD opens the calendar on that day (an event cited in chat). */
+  searchParams: Promise<{ date?: string | string[] }>;
 }) {
   const { slug } = await params;
+  const { date: dateParam } = await searchParams;
+  const openDate =
+    typeof dateParam === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : undefined;
   const { school } = await requireSchoolContext(slug);
 
   const supabase = await createClient();
@@ -20,13 +26,17 @@ export default async function ParentEventsPage({
   const oneYearAhead = new Date();
   oneYearAhead.setFullYear(oneYearAhead.getFullYear() + 1);
 
+  // The day being opened is always in range, however far back or ahead.
+  const from = threeMonthsAgo.toISOString().split("T")[0];
+  const to = oneYearAhead.toISOString().split("T")[0];
+
   const [{ data: events }, { data: labels }] = await Promise.all([
     supabase
       .from("events")
       .select("*")
       .eq("school_id", school.id)
-      .gte("date", threeMonthsAgo.toISOString().split("T")[0])
-      .lte("date", oneYearAhead.toISOString().split("T")[0])
+      .gte("date", openDate && openDate < from ? openDate : from)
+      .lte("date", openDate && openDate > to ? openDate : to)
       .order("date", { ascending: true }),
     supabase
       .from("calendar_labels")
@@ -38,8 +48,10 @@ export default async function ParentEventsPage({
   return (
     <PageTransition>
       <ParentEventsClient
+        key={openDate}
         events={events || []}
         labels={labels || []}
+        initialDate={openDate}
       />
     </PageTransition>
   );

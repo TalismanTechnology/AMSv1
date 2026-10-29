@@ -8,6 +8,8 @@ export interface SourceGroup {
   isCited: boolean;
   /** A page from the school's website: listed by its page, not its passages. */
   isWebsite: boolean;
+  /** A calendar entry: opens the calendar, not a document. */
+  isEvent: boolean;
 }
 
 /** At most this many rows under an answer; more reads as padding, not support. */
@@ -28,6 +30,9 @@ export function normalizeTitle(title: string): string {
  * MAX_SOURCE_ROWS. Numbering is untouched: an inline [N] still opens
  * sources[N-1] even when its row was merged or capped away.
  *
+ * Calendar entries are never merged by title: "Early Dismissal" on two dates
+ * is two events, each with its own row.
+ *
  * `citedNumbers` is read in insertion order, which is the order the answer
  * first cites each number.
  */
@@ -43,14 +48,16 @@ export function groupSources(sources: ChatSource[], citedNumbers: Set<number>): 
     const source = byNumber.get(n);
     if (!source) continue;
     const isDocument = (source.source_type ?? "document") === "document";
-    const title = normalizeTitle(source.title);
+    const isEvent = source.source_type === "event";
+    const title = isEvent ? "" : normalizeTitle(source.title);
     const url = source.source_url?.trim() || null;
 
-    const existing = groups.find(
-      (g) =>
-        (isDocument && g.documentIds.has(source.document_id)) ||
-        (url != null && g.urls.has(url)) ||
-        (title !== "" && g.titles.has(title))
+    const existing = groups.find((g) =>
+      isEvent
+        ? g.isEvent && g.documentIds.has(source.document_id)
+        : (isDocument && g.documentIds.has(source.document_id)) ||
+          (url != null && g.urls.has(url)) ||
+          (title !== "" && g.titles.has(title))
     );
     if (existing) {
       if (!existing.passages.includes(source)) existing.passages.push(source);
@@ -67,19 +74,21 @@ export function groupSources(sources: ChatSource[], citedNumbers: Set<number>): 
       passages: [source],
       isCited: true,
       isWebsite: url != null,
-      documentIds: new Set(isDocument ? [source.document_id] : []),
+      isEvent,
+      documentIds: new Set(isDocument || isEvent ? [source.document_id] : []),
       urls: new Set(url ? [url] : []),
       titles: new Set(title ? [title] : []),
     });
   }
 
   if (groups.length > 0) {
-    return groups.map(({ key, title, passages, isCited, isWebsite }) => ({
+    return groups.map(({ key, title, passages, isCited, isWebsite, isEvent }) => ({
       key,
       title,
       passages: [...passages].sort((a, b) => (a.source_number ?? 0) - (b.source_number ?? 0)),
       isCited,
       isWebsite,
+      isEvent,
     }));
   }
 
@@ -95,6 +104,7 @@ export function groupSources(sources: ChatSource[], citedNumbers: Set<number>): 
       passages: [best],
       isCited: false,
       isWebsite: !!best.source_url,
+      isEvent: false,
     },
   ];
 }

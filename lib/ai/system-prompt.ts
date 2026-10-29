@@ -80,7 +80,7 @@ export function buildSystemPrompt(
     // Both rule sets are about applying material; with none they only confuse.
     hasMaterial ? divisionRules(!!childrenContext) : "",
     hasMaterial && childCount > 1 ? multiChildRules(childCount) : "",
-    hasDocuments ? citationRules(hasEvents) : "",
+    hasDocuments || hasEvents ? citationRules({ hasDocuments, hasEvents }) : "",
     formatSchoolInstructions(schoolInstructions),
     hasHistory ? LATEST_MESSAGE_ONLY : "",
     FOLLOW_UPS,
@@ -233,39 +233,58 @@ function multiChildRules(childCount: number): string {
 - Carry the child forward across turns: a follow-up like "what about the other one?" refers to the child you did not just answer about — label them by grade explicitly so the parent can see which one you mean.`;
 }
 
-function citationRules(hasEvents: boolean): string {
+function citationRules({
+  hasDocuments,
+  hasEvents,
+}: {
+  hasDocuments: boolean;
+  hasEvents: boolean;
+}): string {
+  const where = [hasDocuments && "<documents>", hasEvents && "<calendar>"]
+    .filter(Boolean)
+    .join(" or ");
   const rules = [
-    "Every sentence that states a fact from <documents> ends with the matching source number in square brackets, e.g. [1] or [1][2]. The app turns each number into a link that opens the document at that exact passage, so an uncited document fact is one the parent can't check. Cite even facts that feel obvious.",
-    "Each [Source N] is one passage, and a document can have several. Cite the number of the passage the fact is written in — not another passage from the same document, and not the first number that document shows.",
-    "Cite only the sources a claim actually relies on, and use the fewest that support the answer — usually one or two documents, never more than three distinct documents in one answer. When the same fact appears in several sources, cite the single clearest one, not all of them. Never cite a source just because it is related to the topic. (Sources that disagree are the exception: cite each value's own source, as above.)",
-    "Place each citation right after the sentence or clause it supports, never bunched at the end. Only use numbers shown in <documents>.",
-    "Don't cite follow-up questions, greetings, or clarifying questions.",
+    `Every sentence that states a fact from ${where} ends with the matching source number in square brackets, e.g. [1] or [1][2]. The app turns each number into a link that opens that exact source, so an uncited fact is one the parent can't check. Cite even facts that feel obvious.`,
   ];
-  if (hasEvents) {
+  if (hasDocuments) {
     rules.push(
-      "Never cite the calendar. Calendar entries have no source number, so any [N] on a calendar fact links to the wrong document. If a sentence mixes a document fact with a calendar fact, cite only the document part."
+      "Each [Source N] in <documents> is one passage, and a document can have several. Cite the number of the passage the fact is written in — not another passage from the same document, and not the first number that document shows."
     );
   }
+  if (hasEvents) {
+    rules.push(
+      "Each calendar entry in <calendar> has its own [Source N]. Cite a calendar fact with the number of the entry it comes from. One entry per fact: when several entries say the same thing, cite the one that answers the question, not all of them."
+    );
+  }
+  rules.push(
+    "Cite only the sources a claim actually relies on, and use the fewest that support the answer — usually one or two, never more than three distinct documents in one answer. When the same fact appears in several sources, cite the single clearest one, not all of them. Never cite a source just because it is related to the topic. (Sources that disagree are the exception: cite each value's own source, as above.)",
+    "Place each citation right after the sentence or clause it supports, never bunched at the end. Only use numbers shown in the reference material.",
+    "Don't cite follow-up questions, greetings, or clarifying questions."
+  );
 
-  const examples = [
-    `Question: "When does school start?"
+  const examples: string[] = [];
+  if (hasDocuments) {
+    examples.push(
+      `Question: "When does school start?"
   <documents>: Document: "Daily Schedule" [Source 1 | p. 1] First bell rings at 8:25 AM. Classes begin at 8:30 AM.
   Good: "Classes begin at 8:30 AM, with the first bell at 8:25 AM [1]."
   Bad (no citation): "Classes begin at 8:30 AM, with the first bell at 8:25 AM."
   Bad (invented): "Classes begin at 8:30 AM [1]. The school day ends at 3:15 PM." — the second sentence isn't in the material; leave it out or say it isn't covered.`,
-    `Question: "What time is the game?"
+      `Question: "What time is the game?"
   <documents>: Document: "Game Info (June)" [Source 1] Kickoff 10:00 AM. Document: "Game Info (August)" [Source 2] Kickoff 2:00 PM.
   Good: "The two letters disagree: the June letter says kickoff is 10:00 AM [1], while the August letter says 2:00 PM [2]. The August letter is more recent, but it's worth confirming with the coach."`,
-    `Question: "What are the dress code rules and when do I report an absence?"
+      `Question: "What are the dress code rules and when do I report an absence?"
   <documents>: Document: "Handbook" [Source 1 | p. 12] Students wear collared shirts. [Source 2 | p. 30] Report absences to the attendance office by 9:00 AM.
   Good: "Students wear collared shirts [1]. Absences must be reported to the attendance office by 9:00 AM [2]."
-  Bad (wrong passage): "Students wear collared shirts [1]. Absences must be reported by 9:00 AM [1]." — the absence rule is in Source 2, so [1] would open the wrong page.`,
-  ];
+  Bad (wrong passage): "Students wear collared shirts [1]. Absences must be reported by 9:00 AM [1]." — the absence rule is in Source 2, so [1] would open the wrong page.`
+    );
+  }
   if (hasEvents) {
     examples.push(`Question: "When is winter break?"
-  <calendar>: "Winter Break" from 2025-12-22 through 2026-01-02 (holiday)
-  Good: "Winter break runs from December 22 through January 2."
-  Bad (citing the calendar): "Winter break runs from December 22 through January 2 [16][17][18]."`);
+  <calendar>: [Source 16] "Winter Break" from 2025-12-22 through 2026-01-02 (holiday) [Source 17] "Classes Resume" on 2026-01-05 (academic)
+  Good: "Winter break runs from December 22 through January 2 [16], and classes resume on January 5 [17]."
+  Bad (no citation): "Winter break runs from December 22 through January 2."
+  Bad (wrong entry): "Winter break runs from December 22 through January 2 [17]." — the dates are in Source 16.`);
   }
 
   return `CITATIONS

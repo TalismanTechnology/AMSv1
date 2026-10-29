@@ -216,7 +216,7 @@ export function groupEventOccurrences(events: EventContext[]): CalendarEntry[] {
  * number). Shared by the prompt block and the citable source card so they
  * stay in sync.
  */
-function formatEventLine(e: CalendarEntry): string {
+export function formatEventLine(e: CalendarEntry): string {
   const isRange = !!e.date_end && e.date_end !== e.date;
   const parts = [
     isRange
@@ -234,20 +234,20 @@ function formatEventLine(e: CalendarEntry): string {
 }
 
 /**
- * Format events as a text block for the system prompt.
- *
- * Calendar entries are deliberately NOT numbered as sources: the calendar is
- * the school's own record, and numbering it turned a single answer about, say,
- * winter break into a stack of near-identical "[16] Winter Break" citation
- * chips. The model reads the calendar and answers from it directly; only
- * documents carry [N] citations.
+ * Format events as a text block for the system prompt, each entry numbered as
+ * a citable source starting at `firstNumber` — documents take 1..N, so the
+ * calendar continues the same sequence. Entries are grouped first
+ * (groupEventOccurrences), so a two-week recess is one number, not ten; the
+ * citation rules ask for one entry per fact. What the parent sees is
+ * renumbered per answer (lib/ai/citations.ts), so large numbers here never
+ * reach them.
  */
-export function formatEventsContext(events: CalendarEntry[]): string {
+export function formatEventsContext(events: CalendarEntry[], firstNumber = 1): string {
   if (events.length === 0) return "";
 
-  const lines = events.map((e) => `- ${formatEventLine(e)}`);
+  const lines = events.map((e, i) => `[Source ${firstNumber + i}] ${formatEventLine(e)}`);
 
-  return `SCHOOL EVENTS (full calendar — authoritative, but NOT a citable source: never attach [N] to a fact taken from here):\n${lines.join(
+  return `SCHOOL EVENTS (full calendar — authoritative; cite an entry by its source number):\n${lines.join(
     "\n"
   )}`;
 }

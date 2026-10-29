@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   startOfMonth,
   endOfMonth,
@@ -581,6 +581,19 @@ interface CalendarViewProps {
   onDeleteEvent?: (event: SchoolEvent) => void;
   /** The school's labels. Each event is colored by its own. */
   labels?: CalendarLabel[];
+  /**
+   * YYYY-MM-DD to open on instead of today (e.g. an event cited in a chat
+   * answer): its month is shown, the day selected and its events scrolled to.
+   */
+  initialDate?: string;
+}
+
+/** A YYYY-MM-DD string as that day at local midnight, or null if malformed. */
+function parseDateParam(date: string | undefined): Date | null {
+  const m = date?.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  const parsed = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 export function CalendarView({
@@ -590,10 +603,18 @@ export function CalendarView({
   onEditEvent,
   onDeleteEvent,
   labels = [],
+  initialDate,
 }: CalendarViewProps) {
+  const [openedOn] = useState(() => parseDateParam(initialDate));
   const [view, setView] = useState<ViewMode>("month");
-  const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [currentMonth, setCurrentMonth] = useState(() => openedOn ?? new Date());
+  const [selectedDate, setSelectedDate] = useState<Date>(() => openedOn ?? new Date());
+  const dayListRef = useRef<HTMLDivElement>(null);
+
+  // Opened on a specific day: bring its event list into view.
+  useEffect(() => {
+    if (openedOn) dayListRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+  }, [openedOn]);
   const [hiddenLabelIds, setHiddenLabelIds] = useState<Set<string>>(new Set());
 
   function toggleLabel(id: string) {
@@ -867,7 +888,7 @@ export function CalendarView({
 
       {/* Selected day event list */}
       {(
-        <div>
+        <div ref={dayListRef} className="scroll-mt-4">
           <h3
             aria-live="polite"
             className="mb-3 text-sm font-medium text-muted-foreground"
