@@ -1,8 +1,10 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { GRADE_VALUES } from "@/lib/grades";
+import { CHILDREN_PROMPT_SKIP_COOKIE } from "@/lib/onboarding/children-prompt";
 
 // First-run step for a parent who arrived via their school's SSO. Registration
 // used to collect children; SSO bypasses registration, so this fills that gap.
@@ -95,4 +97,22 @@ export async function markOnboardingComplete(): Promise<void> {
     .from("profiles")
     .update({ onboarding_completed: true })
     .eq("id", user.id);
+}
+
+/**
+ * "Skip for now" on the add-your-children step. Onboarding counts as done so
+ * the first-run gate lets them in, and a session cookie keeps the reminder
+ * away until their next session — it returns while they still have no
+ * children on file.
+ */
+export async function skipChildrenPrompt(): Promise<void> {
+  await markOnboardingComplete();
+
+  const cookieStore = await cookies();
+  cookieStore.set(CHILDREN_PROMPT_SKIP_COOKIE, "1", {
+    path: "/",
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
 }

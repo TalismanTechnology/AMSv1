@@ -257,13 +257,11 @@ export async function updateSession(request: NextRequest) {
       return redirectTo(`/s/${slug}/welcome`);
     }
 
-    // Already onboarded — don't let them back onto the first-run form.
-    if (!needsOnboarding && rest.startsWith("/welcome")) {
-      return redirectTo(
-        isSuperAdmin || membership?.role === "admin"
-          ? `/s/${slug}/admin`
-          : `/s/${slug}/parent/chat`
-      );
+    // Only parents use the welcome step. Onboarded parents may come back to it
+    // to add children they skipped; the page sends them on if they have some.
+    const isParent = !isSuperAdmin && membership?.role === "parent";
+    if (!isParent && rest.startsWith("/welcome")) {
+      return redirectTo(isSuperAdmin || membership?.role === "admin" ? `/s/${slug}/admin` : "/");
     }
 
     // /s/{slug}/parent/* or any other school route — require membership
