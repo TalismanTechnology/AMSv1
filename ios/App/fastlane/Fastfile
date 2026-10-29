@@ -101,8 +101,8 @@ platform :ios do
       team_id: team_id,
       provisioning_name: PROFILE_NAME,
       ignore_profiles_with_different_name: true,
-      readonly: false,
-      force: false,
+      # No readonly/force: sigh rejects passing both, even as false; the
+      # defaults (both off) reuse the existing profile.
       output_path: work_dir
     )
     profile_name = lane_context[SharedValues::SIGH_NAME]
