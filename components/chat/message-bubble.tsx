@@ -11,6 +11,7 @@ import { SourceList } from "./source-list";
 import { ContactCard } from "./contact-card";
 import { useSourcePanel } from "./source-panel-context";
 import { parseFollowUps } from "@/lib/chat-utils";
+import { citedNumbersInOrder, renumberCitations } from "@/lib/ai/citations";
 import type { ChatSource } from "@/lib/types";
 import type { ContactCardData } from "@/lib/contacts/directory";
 
@@ -41,7 +42,7 @@ export function MessageBubble({
   content,
   messageId,
   schoolId,
-  sources,
+  sources: rawSources,
   contact,
   webSearchQuery,
   isLastAssistant,
@@ -70,9 +71,13 @@ export function MessageBubble({
 
   const showTypewriter = isStreaming || typewriterActive;
 
-  const { content: displayContent, followUps, notFound } = !isUser
+  const { content: answer, followUps, notFound } = !isUser
     ? parseFollowUps(content)
     : { content, followUps: [], notFound: false };
+  // Citations as the parent sees them: [1], [2]… in order of first
+  // appearance, with the sources renumbered to match. Answers saved before
+  // renumbering existed are renumbered here too; newer ones are unchanged.
+  const { content: displayContent, sources } = renumberCitations(answer, rawSources);
 
   if (isUser) {
     return (
@@ -88,9 +93,7 @@ export function MessageBubble({
   // Share once the answer has finished arriving.
   const canShare = !showTypewriter && displayContent.trim().length > 0;
 
-  const citedNumbers = new Set(
-    [...displayContent.matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1]))
-  );
+  const citedNumbers = new Set(citedNumbersInOrder(displayContent));
 
   return (
     <div className="flex flex-col gap-3">

@@ -7,6 +7,7 @@ import {
   streamText,
   createUIMessageStream,
   createUIMessageStreamResponse,
+  type UIMessageChunk,
 } from "ai";
 import { google } from "@ai-sdk/google";
 import { generateEmbedding } from "@/lib/ai/embeddings";
@@ -16,6 +17,7 @@ import { fetchChildrenForContext } from "@/lib/ai/context";
 import { CHAT_MODEL_ID, prepareChatTurn } from "@/lib/ai/chat-turn";
 import { aiConsentGate } from "@/lib/ai/consent";
 import { parseFollowUps } from "@/lib/chat-utils";
+import { citedEventSources, renumberCitations } from "@/lib/ai/citations";
 import { PARENT_AI_ERROR_MESSAGE, isAiProviderError } from "@/lib/ai/provider-errors";
 import { reportAiFailure } from "@/lib/alerts/ai-failure-alert";
 import type { ChatSource } from "@/lib/types";
@@ -40,6 +42,30 @@ import {
 // A write the response doesn't depend on: already running, never awaited, and
 // kept alive past the end of the response by after().
 const inBackground = (task: PromiseLike<unknown>) => after(Promise.resolve(task));
+
+/**
+ * Calendar entries are numbered in the prompt but only the ones the answer
+ * cites are sent: each as its own data-sources part (the client concatenates
+ * them), written just before the text that first cites it so its marker
+ * never renders without a source behind it.
+ */
+function withCitedEvents(eventSources: ChatSource[]) {
+  let text = "";
+  const sent = new Set<number>();
+  return new TransformStream<UIMessageChunk, UIMessageChunk>({
+    transform(chunk, controller) {
+      if (chunk.type === "text-delta" && eventSources.length > 0) {
+        text += chunk.delta;
+        const fresh = citedEventSources(text, eventSources).filter(
+          (s) => !sent.has(s.source_number!)
+        );
+        for (const s of fresh) sent.add(s.source_number!);
+        if (fresh.length > 0) controller.enqueue({ type: "data-sources", data: fresh });
+      }
+      controller.enqueue(chunk);
+    },
+  });
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -208,6 +234,7 @@ export async function POST(request: NextRequest) {
       searchQuery,
       systemPrompt,
       sources,
+      eventSources,
       relevantChunks,
       modelMessages,
       temperature,
@@ -257,10 +284,6 @@ export async function POST(request: NextRequest) {
       const directory = await contactDirectory;
       if (directory) answerSystemPrompt = `${answerSystemPrompt}\n\n${directory}`;
     }
-
-    // Documents are the only citable sources; the calendar never produces
-    // cards, so what the client receives is exactly what [N] can resolve to.
-    const allSources: ChatSource[] = sources;
 
     // A new chat gets its session now, titled from its first question.
     const sessionId =
@@ -410,11 +433,13 @@ export async function POST(request: NextRequest) {
       onFinish: async ({ text }) => {
         try {
           if (!sessionId || !text.trim()) return;
-          // Strip follow-up markers before saving to DB
-          const cleanText = parseFollowUps(text).content;
-          // Only document sources are persisted — the calendar is scanned for
-          // every question but is never a citable card.
-          const savedSources: ChatSource[] = sources;
+          // Strip follow-up markers, keep the calendar entries the answer
+          // cites, and save it renumbered [1], [2]… as the parent saw it.
+          const answer = parseFollowUps(text).content;
+          const { content: cleanText, sources: savedSources } = renumberCitations(answer, [
+            ...sources,
+            ...citedEventSources(answer, eventSources),
+          ]);
           const { error } = await adminSupabase
             .from("chat_messages")
             .insert({
@@ -443,8 +468,8 @@ export async function POST(request: NextRequest) {
         if (sessionMoved) {
           writer.write({ type: "data-session-id", data: sessionId, transient: true });
         }
-        if (allSources.length > 0) {
-          writer.write({ type: "data-sources", data: allSources });
+        if (sources.length > 0) {
+          writer.write({ type: "data-sources", data: sources });
         }
         // Contact details come only from the approved row, never the model.
         if (contactCard) {
@@ -459,7 +484,11 @@ export async function POST(request: NextRequest) {
         writer.write({ type: "data-message-id", data: assistantMessageId });
         // The SDK's default sends error.message to the browser; parents must
         // never see the provider's words.
-        writer.merge(result.toUIMessageStream({ onError: () => PARENT_AI_ERROR_MESSAGE }));
+        writer.merge(
+          result
+            .toUIMessageStream({ onError: () => PARENT_AI_ERROR_MESSAGE })
+            .pipeThrough(withCitedEvents(eventSources))
+        );
       },
       onError: () => PARENT_AI_ERROR_MESSAGE,
     });

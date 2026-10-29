@@ -167,16 +167,19 @@ async function runCase(c: EvalCase, run: number, schoolId: string): Promise<Case
     const { content: answer, followUps } = parseFollowUps(text);
     const sourceTitles = turn.sources.map((s) => s.title);
     const cited = citedNumbers(answer);
+    // Calendar entries are numbered after the passages, so together they
+    // are every number the answer may cite.
+    const citable = [...turn.sources, ...turn.eventSources];
     const citationMismatches = findCitationMismatches(
       answer,
-      turn.sources.map((s) => s.chunk_content)
+      citable.map((s) => s.chunk_content)
     );
 
     const checks = {
       retrieval: (c.expectDocs ?? []).every((d) =>
         sourceTitles.some((t) => t.toLowerCase().includes(d.toLowerCase()))
       ),
-      citationsValid: cited.every((n) => n >= 1 && n <= turn.sources.length),
+      citationsValid: cited.every((n) => n >= 1 && n <= citable.length),
       citationsPrecise: citationMismatches.length === 0,
       followUps: followUps.length === 3,
       mustMatch: (c.mustMatch ?? []).every((re) => re.test(answer)),
