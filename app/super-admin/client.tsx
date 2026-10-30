@@ -99,8 +99,8 @@ export function SuperAdminClient({
 
   return (
     <div className="max-w-4xl mx-auto space-y-10">
-      <div className="flex items-end justify-between gap-4">
-        <div>
+      <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
           <h2 className="text-2xl font-semibold text-ink tracking-[-0.01em]">Schools</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Manage all schools on the platform
@@ -108,15 +108,15 @@ export function SuperAdminClient({
         </div>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button className="shrink-0">
               <Plus className="mr-2 h-4 w-4" />
               Create School
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Create a new school</DialogTitle>
-              <DialogDescription>
+              <DialogTitle className="pr-6 leading-snug break-words">Create a new school</DialogTitle>
+              <DialogDescription className="break-words">
                 Enter the school details. You can assign an admin after creation.
               </DialogDescription>
             </DialogHeader>
@@ -139,15 +139,15 @@ export function SuperAdminClient({
                 <Label htmlFor="slug">
                   URL slug
                 </Label>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span>askmyschool.com/s/</span>
+                <div className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
+                  <span className="shrink-0">askmyschool.app/s/</span>
                   <Input
                     id="slug"
                     name="slug"
                     placeholder="lincoln"
                     pattern="[a-z0-9-]+"
                     required
-                    className="flex-1"
+                    className="min-w-0 flex-1"
                   />
                 </div>
               </div>
@@ -164,15 +164,15 @@ export function SuperAdminClient({
         {schools.map((school) => (
           <div key={school.id} className="border-b border-border py-5">
             <div>
-              <div className="flex items-center justify-between gap-4">
-                <div className="min-w-0">
-                  <p className="text-base font-medium text-ink">{school.name}</p>
-                  <p className="text-sm text-muted-foreground">/s/{school.slug}</p>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                <div className="min-w-0 sm:flex-1">
+                  <p className="break-words text-base font-medium text-ink">{school.name}</p>
+                  <p className="break-all text-sm text-muted-foreground">/s/{school.slug}</p>
                   <p className="mt-1 text-sm text-muted-foreground">
                     {school.school_memberships?.[0]?.count || 0} members
                   </p>
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 sm:max-w-[60%] sm:justify-end">
                   <Dialog
                     open={editOpen === school.id}
                     onOpenChange={(open) => {
@@ -190,10 +190,10 @@ export function SuperAdminClient({
                         Edit
                       </Button>
                     </DialogTrigger>
-                    <DialogContent>
+                    <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
                       <DialogHeader>
-                        <DialogTitle>Edit school</DialogTitle>
-                        <DialogDescription>
+                        <DialogTitle className="pr-6 leading-snug break-words">Edit school</DialogTitle>
+                        <DialogDescription className="break-words">
                           Update the name or URL slug for {school.name}.
                         </DialogDescription>
                       </DialogHeader>
@@ -214,15 +214,15 @@ export function SuperAdminClient({
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="edit-slug">URL slug</Label>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <span>askmyschool.com/s/</span>
+                          <div className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
+                            <span className="shrink-0">askmyschool.app/s/</span>
                             <Input
                               id="edit-slug"
                               value={editSlug}
                               onChange={(e) => setEditSlug(e.target.value.toLowerCase())}
                               placeholder="lincoln"
                               pattern="[a-z0-9-]+"
-                              className="flex-1"
+                              className="min-w-0 flex-1"
                             />
                           </div>
                         </div>
@@ -250,9 +250,9 @@ export function SuperAdminClient({
                         Assign Admin
                       </Button>
                     </DialogTrigger>
-                    <DialogContent>
+                    <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
                       <DialogHeader>
-                        <DialogTitle>Assign admin to {school.name}</DialogTitle>
+                        <DialogTitle className="pr-6 leading-snug break-words">Assign admin to {school.name}</DialogTitle>
                         <DialogDescription>
                           Enter the admin&apos;s email. If they don&apos;t have an account yet, also set a temporary password to create one and share it with them.
                         </DialogDescription>
@@ -312,7 +312,7 @@ export function SuperAdminClient({
                     Delete
                   </Button>
                   <Button variant="ghost" size="sm" asChild>
-                    <Link href={`/s/${school.slug}/admin`}>
+                    <Link href={`/s/${school.slug}/admin`} aria-label="Open school">
                       <ExternalLink className="h-4 w-4" />
                     </Link>
                   </Button>
