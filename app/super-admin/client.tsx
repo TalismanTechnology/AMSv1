@@ -140,7 +140,7 @@ export function SuperAdminClient({
                   URL slug
                 </Label>
                 <div className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
-                  <span className="shrink-0">askmyschool.com/s/</span>
+                  <span className="shrink-0">askmyschool.app/s/</span>
                   <Input
                     id="slug"
                     name="slug"
@@ -215,7 +215,7 @@ export function SuperAdminClient({
                         <div className="space-y-2">
                           <Label htmlFor="edit-slug">URL slug</Label>
                           <div className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
-                            <span className="shrink-0">askmyschool.com/s/</span>
+                            <span className="shrink-0">askmyschool.app/s/</span>
                             <Input
                               id="edit-slug"
                               value={editSlug}
