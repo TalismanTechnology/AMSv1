@@ -14,6 +14,7 @@ import { parseFollowUps } from "@/lib/chat-utils";
 import { citedNumbersInOrder, renumberCitations } from "@/lib/ai/citations";
 import type { ChatSource } from "@/lib/types";
 import type { ContactCardData } from "@/lib/contacts/directory";
+import { SYSTEM_BROWSER_LINK } from "@/lib/native/links";
 
 interface MessageBubbleProps {
   role: "user" | "assistant";
@@ -127,6 +128,8 @@ export function MessageBubble({
           href={`https://www.google.com/search?q=${encodeURIComponent(webSearchQuery.trim())}`}
           target="_blank"
           rel="noopener"
+          // In the app: Safari / the default browser, never inside the app.
+          {...SYSTEM_BROWSER_LINK}
           className="inline-flex w-fit items-center gap-1.5 text-sm font-medium text-ink-soft underline-offset-4 hover:text-ink hover:underline"
         >
           <Search className="size-3.5" aria-hidden />

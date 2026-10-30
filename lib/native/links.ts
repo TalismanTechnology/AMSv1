@@ -12,13 +12,45 @@ export const APP_HOSTS = ["askmyschool.app"];
 export const APP_SCHEME = "app.askmyschool";
 
 /**
+ * Put on a link (`{...SYSTEM_BROWSER_LINK}`) to open it in the system browser
+ * (Safari / the default Android browser) rather than the in-app browser.
+ * On the website it changes nothing.
+ *
+ * native-shell.tsx leaves such links alone, so the tap navigates the web view
+ * to a host that isn't in server.allowNavigation, and Capacitor hands it to
+ * the OS instead of loading it:
+ *
+ * - iOS: WebViewDelegationHandler.webView(_:decidePolicyFor:decisionHandler:)
+ *   cancels it and calls UIApplication.shared.open (Safari). A target="_blank"
+ *   link arrives there first as a new-window action (targetFrame == nil); if
+ *   it ever reached webView(_:createWebViewWith:…) that also calls
+ *   UIApplication.shared.open.
+ * - Android: BridgeWebViewClient.shouldOverrideUrlLoading → Bridge.launchIntent
+ *   starts an ACTION_VIEW intent (the default browser). The web view doesn't
+ *   support multiple windows, so target="_blank" loads through the same path.
+ *
+ * Both are stock Capacitor, so this works in builds already in the stores.
+ * Used for "Search the web", which leads anywhere on the internet and so
+ * mustn't open inside the app (App Store age rating).
+ */
+export const SYSTEM_BROWSER_ATTRIBUTE = "data-system-browser";
+export const SYSTEM_BROWSER_LINK = { [SYSTEM_BROWSER_ATTRIBUTE]: "" } as const;
+
+/**
  * Should a tapped link open in the in-app browser (SFSafariViewController /
  * Custom Tab) rather than navigate the app's web view?
  *
- * Only http(s) links to some other site. Same-site links stay in the app,
- * and mailto:, tel:, sms: and friends are left to the system.
+ * Only http(s) links to some other site, and not ones marked for the system
+ * browser (SYSTEM_BROWSER_ATTRIBUTE). Same-site links stay in the app, and
+ * mailto:, tel:, sms: and friends are left to the system.
  */
-export function opensInAppBrowser(href: string, currentOrigin: string): boolean {
+export function opensInAppBrowser(
+  href: string,
+  currentOrigin: string,
+  systemBrowser = false
+): boolean {
+  if (systemBrowser) return false;
+
   let url: URL;
   try {
     url = new URL(href, currentOrigin);

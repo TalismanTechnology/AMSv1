@@ -5,14 +5,16 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { PluginListenerHandle } from "@capacitor/core";
 import { getNativePlatform } from "@/lib/native/platform";
-import { deepLinkPath, opensInAppBrowser } from "@/lib/native/links";
+import { SYSTEM_BROWSER_ATTRIBUTE, deepLinkPath, opensInAppBrowser } from "@/lib/native/links";
 
 // The parts of the iOS / Android app that make it feel like an app rather
 // than a website in a frame. Renders nothing, and does nothing on the website.
 //
 // - Hides the native launch screen once the first page has rendered.
 // - Links to other sites open in the in-app browser (SFSafariViewController /
-//   Chrome Custom Tab) over the app, instead of leaving for Safari.
+//   Chrome Custom Tab) over the app, instead of leaving for Safari. Links
+//   marked SYSTEM_BROWSER_LINK are left alone and go to Safari / the default
+//   browser (see lib/native/links.ts for how Capacitor does that).
 // - Universal links (https://askmyschool.app/s/…/parent/…) and
 //   app.askmyschool://open?path=… open the matching page in the app.
 // - Pull-to-refresh (UIRefreshControl in AppViewController.swift) refreshes
@@ -49,7 +51,8 @@ export function NativeShell() {
       const anchor = (event.target as Element | null)?.closest?.("a[href]");
       if (!(anchor instanceof HTMLAnchorElement)) return;
       if (anchor.hasAttribute("download")) return;
-      if (!opensInAppBrowser(anchor.href, window.location.origin)) return;
+      const systemBrowser = anchor.hasAttribute(SYSTEM_BROWSER_ATTRIBUTE);
+      if (!opensInAppBrowser(anchor.href, window.location.origin, systemBrowser)) return;
 
       event.preventDefault();
       void import("@capacitor/browser")

@@ -1,6 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { deepLinkPath, opensInAppBrowser } from "./links";
+import {
+  SYSTEM_BROWSER_ATTRIBUTE,
+  SYSTEM_BROWSER_LINK,
+  deepLinkPath,
+  opensInAppBrowser,
+} from "./links";
 import { APPLE_TEAM_ID, appleAppSiteAssociation, appleTeamId } from "./app-links";
 
 const ORIGIN = "https://askmyschool.app";
@@ -24,6 +29,15 @@ test("same-site, relative and non-web links stay put", () => {
   assert.equal(opensInAppBrowser("javascript:alert(1)", ORIGIN), false);
   // Local dev server: its own origin is in-app too.
   assert.equal(opensInAppBrowser("http://localhost:3000/login", "http://localhost:3000"), false);
+});
+
+test("links marked for the system browser skip the in-app browser", () => {
+  // native-shell.tsx passes anchor.hasAttribute(SYSTEM_BROWSER_ATTRIBUTE).
+  assert.deepEqual(Object.keys(SYSTEM_BROWSER_LINK), [SYSTEM_BROWSER_ATTRIBUTE]);
+  assert.equal(SYSTEM_BROWSER_ATTRIBUTE.startsWith("data-"), true);
+  const google = "https://www.google.com/search?q=lunch%20menu";
+  assert.equal(opensInAppBrowser(google, ORIGIN), true);
+  assert.equal(opensInAppBrowser(google, ORIGIN, true), false);
 });
 
 test("universal links map to their in-app path", () => {
