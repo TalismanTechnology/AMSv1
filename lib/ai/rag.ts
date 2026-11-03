@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateEmbedding } from "./embeddings";
+import type { StageTimer } from "./timing";
 import { stitchChunks } from "./stitch";
 
 export interface RelevantChunk {
@@ -213,20 +214,26 @@ export async function matchDocumentChunks(
   query: string,
   matchCount = 8,
   matchThreshold = 0.7,
-  schoolId?: string
+  schoolId?: string,
+  /** Chat latency logging only (lib/ai/timing.ts). */
+  timer?: StageTimer
 ): Promise<RelevantChunk[]> {
   const supabase = createAdminClient();
 
   // Generate embedding for the query
+  const embedded = timer?.start("embedding");
   const queryEmbedding = await generateEmbedding(query);
+  embedded?.();
 
   // Use the database function for semantic search
+  const matched = timer?.start("vectorRpc");
   const { data: chunks, error } = await supabase.rpc("match_document_chunks", {
     query_embedding: JSON.stringify(queryEmbedding),
     p_school_id: schoolId,
     match_threshold: matchThreshold,
     match_count: matchCount,
   });
+  matched?.();
 
   if (error) {
     console.error("Search error:", error);

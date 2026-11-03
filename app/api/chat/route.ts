@@ -20,6 +20,7 @@ import { parseFollowUps } from "@/lib/chat-utils";
 import { citedEventSources, renumberCitations } from "@/lib/ai/citations";
 import { PARENT_AI_ERROR_MESSAGE, isAiProviderError } from "@/lib/ai/provider-errors";
 import { reportAiFailure } from "@/lib/alerts/ai-failure-alert";
+import { createTimer } from "@/lib/ai/timing";
 import type { ChatSource } from "@/lib/types";
 import {
   contactCardPrompt,
@@ -68,15 +69,25 @@ function withCitedEvents(eventSources: ChatSource[]) {
 }
 
 export async function POST(request: NextRequest) {
+  // Per-stage latency, logged once per turn as `[chat-timing] {...}` when the
+  // stream ends (or the turn fails before it starts). Ids, counts and timings
+  // only — never the question, the answer or anything about the family.
+  const timer = createTimer();
+  const logTiming = (fields: Record<string, unknown>) => {
+    const line = timer.line(fields);
+    if (line) console.log(line);
+  };
   try {
     const supabase = await createClient();
     // Read the body while auth is verified; a bad body still only surfaces
     // (as before) once the caller is known to be signed in.
     const body = request.json();
     body.catch(() => {});
+    const authed = timer.start("auth");
     const {
       data: { user },
     } = await supabase.auth.getUser();
+    authed();
 
     if (!user) {
       return new Response("Unauthorized", { status: 401 });
@@ -115,10 +126,12 @@ export async function POST(request: NextRequest) {
     // A refused request never awaits this; don't let a failure there surface
     // as an unhandled rejection. prepareChatTurn's await still sees the error.
     children.catch(() => {});
+    timer.observe("children", children);
 
     // Verify access: super admins, or approved members of this school. Both
     // rows are read in parallel; they are still checked in the original order
     // (consent first, then membership) below.
+    const accessChecked = timer.start("access");
     const [{ data: profile }, { data: membership }] = await Promise.all([
       supabase
         .from("profiles")
@@ -133,6 +146,7 @@ export async function POST(request: NextRequest) {
         .eq("approved", true)
         .single(),
     ]);
+    accessChecked();
 
     // Nothing reaches the AI provider until this user has agreed to the
     // current AI-processing notice (App Store 5.1.2(i)). Enforced here, not
@@ -172,14 +186,17 @@ export async function POST(request: NextRequest) {
     // mid-request). Otherwise — a new chat (null), or one deleted, hidden,
     // expired or not theirs — a new session is created below, once the
     // question is ready to be saved. Never another existing session.
+    const claimed = timer.start("sessionClaim");
     const claimedSessionId = requestedSessionId
       ? await claimParentSession(adminSupabase, user.id, schoolId, requestedSessionId)
       : null;
+    claimed();
 
     // Model context is the session's latest stored messages plus this
     // question — never the history the client sent, which may hold deleted
     // (or invented) turns. Read before this turn is saved.
     let storedRows: StoredMessage[] = [];
+    const historyLoaded = timer.start("historyLoad");
     if (claimedSessionId) {
       const { data, error: storedError } = await adminSupabase
         .from("chat_messages")
@@ -192,7 +209,12 @@ export async function POST(request: NextRequest) {
       if (storedError) throw new Error(storedError.message);
       storedRows = (data ?? []) as StoredMessage[];
     }
+    historyLoaded();
     const contextMessages = buildModelHistory(storedRows, lastMessage);
+    timer.note(
+      "firstQuestion",
+      contextMessages.filter((m) => m.role === "user").length <= 1
+    );
     // The school's approved staff contacts (migration 044), read alongside
     // retrieval and used only if nothing answers the question. Never rejects:
     // a missing table or any error is "no contacts".
@@ -203,6 +225,7 @@ export async function POST(request: NextRequest) {
     const contactDirectory = approvedContacts.then((contacts) =>
       contactDirectoryPrompt(adminSupabase, schoolId, contacts)
     );
+    timer.observe("contactDirectory", contactDirectory);
     // The session's stored title and message count, read before this turn's
     // user message is saved, so auto-titling goes by what's in the DB rather
     // than how much history the client happened to send. Never rejects: an
@@ -230,6 +253,7 @@ export async function POST(request: NextRequest) {
           () => false
         )
       : Promise.resolve(false);
+    const prepared = timer.start("prepareChatTurn");
     const {
       searchQuery,
       systemPrompt,
@@ -244,7 +268,9 @@ export async function POST(request: NextRequest) {
       lastMessageText,
       schoolId,
       children,
+      timer,
     });
+    prepared();
 
     if (searchQuery !== lastMessageText) {
       debugLog(`Query rewritten: "${lastMessageText.slice(0, 60)}" → "${searchQuery.slice(0, 60)}"`);
@@ -261,6 +287,7 @@ export async function POST(request: NextRequest) {
     let contactCard: ContactCardData | null = null;
     let answerSystemPrompt = systemPrompt;
     if (sources.length === 0) {
+      const contactRouted = timer.start("contactRouting");
       try {
         const routed = await routeUnansweredQuestion({
           supabase: adminSupabase,
@@ -277,15 +304,19 @@ export async function POST(request: NextRequest) {
       } catch (err) {
         debugLog(`Contact routing failed (continuing without a card): ${err}`);
       }
+      contactRouted();
     }
     // No card: list the approved directory instead. (With a card, the model
     // is told not to write contact details — the card shows them.)
     if (!contactCard) {
+      const directoryWaited = timer.start("contactDirectoryWait");
       const directory = await contactDirectory;
+      directoryWaited();
       if (directory) answerSystemPrompt = `${answerSystemPrompt}\n\n${directory}`;
     }
 
     // A new chat gets its session now, titled from its first question.
+    const sessionCreated = timer.start("sessionCreate");
     const sessionId =
       claimedSessionId ??
       (await createParentSession(
@@ -294,12 +325,15 @@ export async function POST(request: NextRequest) {
         schoolId,
         truncateTitle(lastMessageText)
       ));
+    sessionCreated();
     const sessionMoved = sessionId !== requestedSessionId;
 
     // Save user message in the background. Each write starts now and never
     // blocks the stream; after() keeps the function alive until it lands.
     if (sessionId) {
+      const titleWaited = timer.start("titleCheckWait");
       const autoTitle = await titleCheck;
+      titleWaited();
       inBackground(adminSupabase
         .from("chat_messages")
         .insert({
@@ -416,21 +450,61 @@ export async function POST(request: NextRequest) {
     // after() never waits out the function timeout.
     let assistantSaved!: () => void;
     inBackground(new Promise<void>((resolve) => { assistantSaved = resolve; }));
+    const turnFields = {
+      schoolId,
+      sessionId,
+      messageId: assistantMessageId,
+      model: CHAT_MODEL_ID,
+      // None are passed to streamText: the provider's defaults (thinking
+      // included) apply.
+      providerOptions: null,
+      sources: sources.length,
+      eventSources: eventSources.length,
+      contactCard: !!contactCard,
+    };
+    timer.mark("streamStart");
     const result = streamText({
       model: google(CHAT_MODEL_ID),
       system: answerSystemPrompt,
       messages: modelMessages,
       temperature,
       maxRetries: 5,
+      onChunk: ({ chunk }) => {
+        timer.mark("firstChunk");
+        if (chunk.type === "reasoning-delta") timer.mark("firstReasoning");
+        if (chunk.type === "text-delta") timer.mark("firstText");
+      },
       onError: ({ error }) => {
+        timer.mark("error");
+        logTiming({ ...turnFields, outcome: "error" });
         // Logged and alerted on; the parent only sees PARENT_AI_ERROR_MESSAGE
         // (toUIMessageStream's onError below).
         reportAiFailure(error, { source: "chat.stream", schoolId }).alerted.finally(
           () => assistantSaved()
         );
       },
-      onAbort: () => assistantSaved(),
-      onFinish: async ({ text }) => {
+      onAbort: () => {
+        timer.mark("abort");
+        logTiming({ ...turnFields, outcome: "abort" });
+        assistantSaved();
+      },
+      onFinish: async ({ text, finishReason, totalUsage, providerMetadata }) => {
+        timer.mark("finish");
+        logTiming({
+          ...turnFields,
+          outcome: "finish",
+          finishReason,
+          usage: {
+            inputTokens: totalUsage.inputTokens,
+            outputTokens: totalUsage.outputTokens,
+            reasoningTokens: totalUsage.outputTokenDetails?.reasoningTokens,
+            textTokens: totalUsage.outputTokenDetails?.textTokens,
+            cacheReadTokens: totalUsage.inputTokenDetails?.cacheReadTokens,
+            totalTokens: totalUsage.totalTokens,
+          },
+          // Gemini's own token counts (thoughtsTokenCount etc.) — numbers only.
+          providerUsage: providerMetadata?.google?.usageMetadata ?? null,
+        });
         try {
           if (!sessionId || !text.trim()) return;
           // Strip follow-up markers, keep the calendar entries the answer
@@ -500,6 +574,7 @@ export async function POST(request: NextRequest) {
     // bad request body. Whatever it is, the parent sees one friendly line;
     // the details stay in the logs (and the owner alert, if it's the AI).
     const fromProvider = isAiProviderError(error);
+    logTiming({ outcome: "prepare-error", fromProvider });
     if (fromProvider) reportAiFailure(error, { source: "chat.prepare" });
     else console.error("Chat API error:", error);
     return new Response(JSON.stringify({ error: PARENT_AI_ERROR_MESSAGE }), {
