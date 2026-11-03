@@ -21,7 +21,8 @@ import {
   getTodayString,
   type ChildContext,
 } from "@/lib/ai/context";
-import { rewriteQueryWithContext } from "@/lib/ai/rewrite-query";
+import { rewriteQueryWithContext, shouldRewriteQuery } from "@/lib/ai/rewrite-query";
+import { createTimer, type StageTimer } from "@/lib/ai/timing";
 import { reportAiFailure } from "@/lib/alerts/ai-failure-alert";
 import {
   redactChildNames,
@@ -86,6 +87,7 @@ export async function prepareChatTurn({
   schoolId,
   children,
   now,
+  timer = createTimer(),
 }: {
   messages: UIMessage[];
   lastMessageText: string;
@@ -94,6 +96,8 @@ export async function prepareChatTurn({
   children: ChildContext[] | Promise<ChildContext[]>;
   /** Pinned by the eval so date-relative answers are reproducible. */
   now?: Date;
+  /** Per-stage latency for the chat route's log line (lib/ai/timing.ts). */
+  timer?: StageTimer;
 }): Promise<ChatTurn> {
   // Start the context fetches now; only the children are needed before the
   // rewrite, so the rest stay in flight through retrieval. These are
@@ -110,6 +114,7 @@ export async function prepareChatTurn({
       .single()
       .then((r) => r.data),
   ]);
+  timer.observe("restOfContext", restOfContext);
   // Graduated children are left out of the context (the assistant shouldn't
   // answer about them as 12th graders) but their names are still redacted.
   const { current: resolvedChildren, redactable } = splitGraduatedChildren(await children);
@@ -124,11 +129,15 @@ export async function prepareChatTurn({
   // search. Children are passed so "and my other kid?" resolves to a grade
   // level the documents are actually organised by. First questions skip the
   // model call entirely (see shouldRewriteQuery).
+  timer.note("rewriteCalled", shouldRewriteQuery(providerMessages, providerQuestion));
+  const rewritten = timer.start("rewrite");
   const searchQuery = await rewriteQueryWithContext(
     providerMessages,
     providerQuestion,
     resolvedChildren
   );
+  rewritten();
+  timer.note("queryRewritten", searchQuery !== providerQuestion);
 
   // Retrieve with both strategies in parallel (non-fatal — continue without
   // sources on failure). Semantic search finds passages that mean the same
@@ -137,10 +146,11 @@ export async function prepareChatTurn({
   // assemblePassages does the narrowing.
   let matchedChunks: RelevantChunk[] = [];
   let keywordHits: KeywordHit[] = [];
-  const [vectorResult, keywordResult] = await Promise.allSettled([
-    matchDocumentChunks(searchQuery, 40, 0.45, schoolId),
-    keywordSearchChunks(searchQuery, schoolId),
-  ]);
+  const vectorSearch = matchDocumentChunks(searchQuery, 40, 0.45, schoolId, timer);
+  const keywordSearch = keywordSearchChunks(searchQuery, schoolId);
+  timer.observe("vectorSearch", vectorSearch);
+  timer.observe("keywordSearch", keywordSearch);
+  const [vectorResult, keywordResult] = await Promise.allSettled([vectorSearch, keywordSearch]);
   if (vectorResult.status === "fulfilled") matchedChunks = vectorResult.value;
   else reportAiFailure(vectorResult.reason, { source: "chat.retrieval-embedding", schoolId });
   if (keywordResult.status === "fulfilled") keywordHits = keywordResult.value;
@@ -151,16 +161,22 @@ export async function prepareChatTurn({
   // info drops the vector hits, exactly as a failed searchDocuments would.
   // Admins' rulings on conflicting documents (lib/conflicts) ride along; that
   // read never throws and is empty until migration 046 is applied.
+  const docInfo = attachDocumentInfo(matchedChunks);
+  const passageChunks = fetchPassageChunks(matchedChunks, keywordHits);
+  const conflicts = loadResolvedConflicts(adminSupabase, schoolId, [
+    ...matchedChunks.map((c) => c.document_id),
+    ...keywordHits.map((h) => h.document_id),
+  ]);
+  timer.observe("docInfo", docInfo);
+  timer.observe("passages", passageChunks);
+  timer.observe("conflicts", conflicts);
   const [infoResult, knownChunks, resolvedConflicts] = await Promise.all([
-    attachDocumentInfo(matchedChunks).then(
+    docInfo.then(
       (chunks) => ({ ok: true as const, chunks }),
       (reason: unknown) => ({ ok: false as const, reason })
     ),
-    fetchPassageChunks(matchedChunks, keywordHits),
-    loadResolvedConflicts(adminSupabase, schoolId, [
-      ...matchedChunks.map((c) => c.document_id),
-      ...keywordHits.map((h) => h.document_id),
-    ]),
+    passageChunks,
+    conflicts,
   ]);
   let relevantChunks: RelevantChunk[] = [];
   if (infoResult.ok) relevantChunks = infoResult.chunks;
@@ -182,7 +198,9 @@ export async function prepareChatTurn({
 
   // Events, announcements and settings were kicked off before the rewrite
   // (all non-fatal — an empty result just means less context)
+  const contextWaited = timer.start("restOfContextWait");
   const [eventsResult, announcementsResult, settingsResult] = await restOfContext;
+  contextWaited();
   const events = eventsResult.status === "fulfilled" ? eventsResult.value : [];
   const announcements =
     announcementsResult.status === "fulfilled" ? announcementsResult.value : [];
