@@ -42,6 +42,7 @@ import {
 import { eventSource } from "@/lib/ai/citations";
 import type { ChatSource } from "@/lib/types";
 import { TEXT_MODEL_ID } from "@/lib/ai/models";
+import { answerSettings, classifyQuestion, type AnswerSettings } from "@/lib/ai/question-complexity";
 
 /** The model that writes parent-facing answers. Shared with the eval harness. */
 export const CHAT_MODEL_ID = TEXT_MODEL_ID;
@@ -72,6 +73,12 @@ export interface ChatTurn {
    * provider call (e.g. embedding an unanswered question).
    */
   providerQuestion: string;
+  /**
+   * The answer model, thinking level and provider options for this question
+   * (lib/ai/question-complexity.ts): a short single lookup thinks less;
+   * anything else gets the default call.
+   */
+  answer: AnswerSettings;
 }
 
 /**
@@ -267,6 +274,15 @@ export async function prepareChatTurn({
 
   const modelMessages = await convertToModelMessages(sanitizeMessages(providerMessages));
 
+  // Routed on the redacted question (and, for a follow-up, its rewrite).
+  const answer = answerSettings(
+    classifyQuestion(providerQuestion, {
+      followUp: providerMessages.filter((m) => m.role === "user").length > 1,
+      searchQuery,
+    }),
+    CHAT_MODEL_ID
+  );
+
   return {
     searchQuery,
     systemPrompt,
@@ -276,6 +292,7 @@ export async function prepareChatTurn({
     modelMessages,
     temperature,
     providerQuestion,
+    answer,
   };
 }
 

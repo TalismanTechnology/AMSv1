@@ -16,8 +16,14 @@
  *   npx tsx scripts/eval-chat.ts --runs 3        # repeat to see variance
  *   npx tsx scripts/eval-chat.ts --only eid,sick-who-to-call
  *   npx tsx scripts/eval-chat.ts --label baseline
+ *   npx tsx scripts/eval-chat.ts --no-routing    # every question as "complex"
  *   EVAL_JUDGE_MODEL=gemini-3.8-flash npx tsx scripts/eval-chat.ts \
  *     --rejudge eval-results/baseline-….json   # re-grade saved answers
+ *
+ * Answers use the production routing (lib/ai/question-complexity.ts): a
+ * simple question gets the low thinking level (CHAT_SIMPLE_THINKING_LEVEL,
+ * CHAT_SIMPLE_MODEL apply as in prod). --no-routing answers every question
+ * with the default call, for a side-by-side.
  *
  * Results are written to eval-results/<label>-<timestamp>.json.
  */
@@ -32,6 +38,7 @@ import { google } from "@ai-sdk/google";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CHAT_MODEL_ID, prepareChatTurn } from "@/lib/ai/chat-turn";
+import { answerSettings } from "@/lib/ai/question-complexity";
 import { parseFollowUps } from "@/lib/chat-utils";
 import { findCitationMismatches, type CitationMismatch } from "@/lib/ai/citation-check";
 import { CASES, type EvalCase } from "./eval/cases";
@@ -43,8 +50,10 @@ const DEFAULT_SCHOOL_SLUG = "collegiate";
 // API keys.)
 const JUDGE_MODEL_ID = process.env.EVAL_JUDGE_MODEL || "gemini-3.1-pro-preview";
 // Set to trial a different answer model on the same questions before
-// switching production (lib/ai/chat-turn.ts) over to it.
-const ANSWER_MODEL_ID = process.env.EVAL_ANSWER_MODEL || CHAT_MODEL_ID;
+// switching production (lib/ai/chat-turn.ts) over to it. Overrides the
+// routed model for every question.
+const EVAL_ANSWER_MODEL = process.env.EVAL_ANSWER_MODEL;
+const ANSWER_MODEL_ID = EVAL_ANSWER_MODEL || CHAT_MODEL_ID;
 const CONCURRENCY = 4;
 
 const { values: args } = parseArgs({
@@ -54,6 +63,7 @@ const { values: args } = parseArgs({
     only: { type: "string" },
     label: { type: "string", default: "run" },
     rejudge: { type: "string" },
+    "no-routing": { type: "boolean", default: false },
   },
 });
 
@@ -76,6 +86,9 @@ interface CaseResult {
   run: number;
   question: string;
   searchQuery: string;
+  /** How the question was routed (lib/ai/question-complexity.ts). */
+  complexity?: "simple" | "complex";
+  thinkingLevel?: string | null;
   answer: string;
   sourceTitles: string[];
   checks: {
@@ -156,11 +169,14 @@ async function runCase(c: EvalCase, run: number, schoolId: string): Promise<Case
       now: EVAL_NOW,
     });
 
+    // The route's call: the routed model and provider options.
+    const routing = args["no-routing"] ? answerSettings("complex", CHAT_MODEL_ID) : turn.answer;
     const { text } = await generateText({
-      model: google(ANSWER_MODEL_ID),
+      model: google(EVAL_ANSWER_MODEL || routing.modelId),
       system: turn.systemPrompt,
       messages: turn.modelMessages,
       temperature: turn.temperature,
+      providerOptions: routing.providerOptions,
       maxRetries: 5,
     });
 
@@ -201,6 +217,8 @@ async function runCase(c: EvalCase, run: number, schoolId: string): Promise<Case
     return {
       ...base,
       searchQuery: turn.searchQuery,
+      complexity: routing.complexity,
+      thinkingLevel: routing.thinkingLevel,
       answer,
       sourceTitles,
       checks,
@@ -256,7 +274,8 @@ function report(results: CaseResult[], runs: number) {
     if (r.judge && !r.judge.correct) failed.push("judge:incorrect");
     if (r.judge && !r.judge.grounded) failed.push("judge:ungrounded");
     const tag = r.pass ? "PASS" : r.judge || failed.length > 0 ? "FAIL" : "????";
-    console.log(`${tag}  ${r.id}${runs > 1 ? ` #${r.run + 1}` : ""}${failed.length ? `  [${failed.join(", ")}]` : ""}`);
+    const routed = r.complexity === "simple" ? `  (simple, thinking ${r.thinkingLevel})` : "";
+    console.log(`${tag}  ${r.id}${runs > 1 ? ` #${r.run + 1}` : ""}${routed}${failed.length ? `  [${failed.join(", ")}]` : ""}`);
     if (r.error) console.log(`      error: ${r.error}`);
     for (const m of r.citationMismatches ?? []) {
       console.log(`      citation: "${m.token}" not in [${m.cited.join("][")}] — "${m.clause.slice(0, 90)}"`);
@@ -279,6 +298,8 @@ Citations valid  ${rate(results, (r) => r.checks.citationsValid)}
 Citations precise ${rate(results, (r) => r.checks.citationsPrecise !== false)}
 Follow-ups       ${rate(results, (r) => r.checks.followUps)}
 Required facts   ${rate(results, (r) => r.checks.mustMatch && r.checks.mustNotMatch)}`);
+  const simple = judged.filter((r) => r.complexity === "simple");
+  if (simple.length > 0) console.log(`Pass (simple)    ${rate(simple, (r) => r.pass)}`);
 }
 
 function save(label: string, answerModel: string, results: CaseResult[]) {

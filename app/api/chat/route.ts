@@ -14,7 +14,7 @@ import { generateEmbedding } from "@/lib/ai/embeddings";
 import { assignToCluster } from "@/lib/ai/cluster-assignment";
 import { sendClusterAlert } from "@/lib/alerts/cluster-alerts";
 import { fetchChildrenForContext } from "@/lib/ai/context";
-import { CHAT_MODEL_ID, prepareChatTurn } from "@/lib/ai/chat-turn";
+import { prepareChatTurn } from "@/lib/ai/chat-turn";
 import { aiConsentGate } from "@/lib/ai/consent";
 import { parseFollowUps } from "@/lib/chat-utils";
 import { citedEventSources, renumberCitations } from "@/lib/ai/citations";
@@ -77,6 +77,9 @@ export async function POST(request: NextRequest) {
     const line = timer.line(fields);
     if (line) console.log(line);
   };
+  // A new chat's session, created while the turn is prepared. Cleared once
+  // the stream is about to start; still set if the turn fails before that.
+  let pendingSession: { created: Promise<string>; userId: string } | null = null;
   try {
     const supabase = await createClient();
     // Read the body while auth is verified; a bad body still only surfaces
@@ -192,6 +195,23 @@ export async function POST(request: NextRequest) {
       : null;
     claimed();
 
+    // A new chat gets its session, titled from its first question. Created
+    // now, alongside retrieval, rather than after it; awaited just before the
+    // stream starts, so a failure here still fails the turn as before. If the
+    // turn fails first, the catch below deletes it again — a failed question
+    // never leaves an empty chat behind.
+    if (!claimedSessionId) {
+      const created = createParentSession(
+        adminSupabase,
+        user.id,
+        schoolId,
+        truncateTitle(lastMessageText)
+      );
+      created.catch(() => {});
+      timer.observe("sessionCreate", created);
+      pendingSession = { created, userId: user.id };
+    }
+
     // Model context is the session's latest stored messages plus this
     // question — never the history the client sent, which may hold deleted
     // (or invented) turns. Read before this turn is saved.
@@ -263,6 +283,7 @@ export async function POST(request: NextRequest) {
       modelMessages,
       temperature,
       providerQuestion,
+      answer: routing,
     } = await prepareChatTurn({
       messages: contextMessages,
       lastMessageText,
@@ -315,38 +336,39 @@ export async function POST(request: NextRequest) {
       if (directory) answerSystemPrompt = `${answerSystemPrompt}\n\n${directory}`;
     }
 
-    // A new chat gets its session now, titled from its first question.
-    const sessionCreated = timer.start("sessionCreate");
-    const sessionId =
-      claimedSessionId ??
-      (await createParentSession(
-        adminSupabase,
-        user.id,
-        schoolId,
-        truncateTitle(lastMessageText)
-      ));
-    sessionCreated();
+    // The new chat's session (started above, usually long since created).
+    const sessionWaited = timer.start("sessionCreateWait");
+    const sessionId = claimedSessionId ?? (await pendingSession!.created);
+    sessionWaited();
+    // From here the turn either streams or fails inside the stream; the
+    // session is kept either way, as before.
+    pendingSession = null;
     const sessionMoved = sessionId !== requestedSessionId;
 
     // Save user message in the background. Each write starts now and never
     // blocks the stream; after() keeps the function alive until it lands.
+    // The question's row waits only for the auto-title check (started before
+    // retrieval, so long since done), whose message count must not include
+    // it. Never rejects; the assistant reply's save waits for it, so the two
+    // land in order.
+    let userSaved: Promise<void> = Promise.resolve();
     if (sessionId) {
-      const titleWaited = timer.start("titleCheckWait");
-      const autoTitle = await titleCheck;
-      titleWaited();
-      inBackground(adminSupabase
-        .from("chat_messages")
-        .insert({
-          session_id: sessionId,
-          role: "user",
-          content: lastMessageText,
-          sources: [],
-          school_id: schoolId,
-          // Flags this exchange for school staff (no school sources found) —
-          // the same condition that logs an unanswered question below.
-          unanswered: sources.length === 0,
-        })
-        .then(({ error }) => { if (error) console.error("Failed to save user message:", error); }));
+      userSaved = titleCheck.then(async () => {
+        const { error } = await adminSupabase
+          .from("chat_messages")
+          .insert({
+            session_id: sessionId,
+            role: "user",
+            content: lastMessageText,
+            sources: [],
+            school_id: schoolId,
+            // Flags this exchange for school staff (no school sources found) —
+            // the same condition that logs an unanswered question below.
+            unanswered: sources.length === 0,
+          });
+        if (error) console.error("Failed to save user message:", error);
+      });
+      inBackground(userSaved);
 
       // Update session timestamp
       inBackground(adminSupabase
@@ -355,15 +377,18 @@ export async function POST(request: NextRequest) {
         .eq("id", sessionId)
         .then(({ error }) => { if (error) console.error("Failed to update session timestamp:", error); }));
 
-      // Auto-title: only the session's first stored question titles it.
-      if (autoTitle) {
+      // Auto-title: only the session's first stored question titles it. The
+      // check was read before this turn's message is saved; the stream
+      // doesn't wait for it.
+      inBackground(titleCheck.then(async (autoTitle) => {
+        if (!autoTitle) return;
         const title = truncateTitle(lastMessageText) || "New chat";
-        inBackground(adminSupabase
+        const { error } = await adminSupabase
           .from("chat_sessions")
           .update({ title })
-          .eq("id", sessionId)
-          .then(({ error }) => { if (error) console.error("Failed to auto-title session:", error); }));
-      }
+          .eq("id", sessionId);
+        if (error) console.error("Failed to auto-title session:", error);
+      }));
 
       // Analytics event
       inBackground(adminSupabase
@@ -454,20 +479,24 @@ export async function POST(request: NextRequest) {
       schoolId,
       sessionId,
       messageId: assistantMessageId,
-      model: CHAT_MODEL_ID,
-      // None are passed to streamText: the provider's defaults (thinking
-      // included) apply.
-      providerOptions: null,
+      // Routing (lib/ai/question-complexity.ts): a simple question gets a low
+      // thinking level; a complex one passes no provider options, so the
+      // provider's defaults (thinking included) apply.
+      complexity: routing.complexity,
+      thinkingLevel: routing.thinkingLevel,
+      model: routing.modelId,
+      providerOptions: routing.providerOptions ?? null,
       sources: sources.length,
       eventSources: eventSources.length,
       contactCard: !!contactCard,
     };
     timer.mark("streamStart");
     const result = streamText({
-      model: google(CHAT_MODEL_ID),
+      model: google(routing.modelId),
       system: answerSystemPrompt,
       messages: modelMessages,
       temperature,
+      providerOptions: routing.providerOptions,
       maxRetries: 5,
       onChunk: ({ chunk }) => {
         timer.mark("firstChunk");
@@ -514,6 +543,7 @@ export async function POST(request: NextRequest) {
             ...sources,
             ...citedEventSources(answer, eventSources),
           ]);
+          await userSaved;
           const { error } = await adminSupabase
             .from("chat_messages")
             .insert({
@@ -569,6 +599,21 @@ export async function POST(request: NextRequest) {
 
     return createUIMessageStreamResponse({ stream });
   } catch (error) {
+    // A session created for this question would be an empty chat: remove it.
+    if (pendingSession) {
+      const { created, userId } = pendingSession;
+      inBackground(created.then(
+        async (id) => {
+          const { error: deleteError } = await createAdminClient()
+            .from("chat_sessions")
+            .delete()
+            .eq("id", id)
+            .eq("user_id", userId);
+          if (deleteError) console.error("Failed to remove unused chat session:", deleteError);
+        },
+        () => {}
+      ));
+    }
     // Before the stream starts: an AI call that must succeed (none today —
     // rewrite, retrieval and routing all fall back), a database error, or a
     // bad request body. Whatever it is, the parent sees one friendly line;
