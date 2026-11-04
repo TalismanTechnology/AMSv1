@@ -83,6 +83,8 @@ export function DocumentUpload({
 }: DocumentUploadProps) {
   const router = useRouter();
   const [items, setItems] = useState<UploadItem[]>([]);
+  // True from "Upload" until every file is stored (processing shows per file).
+  const [uploadingAll, setUploadingAll] = useState(false);
   const [categoryId, setCategoryId] = useState("");
   const categoryLabels = useCategoryLabels(categories, divisions);
   const [folderId, setFolderId] = useState(selectedFolderId || "none");
@@ -209,7 +211,12 @@ export function DocumentUpload({
     const idleItems = items.filter((i) => i.status === "idle");
     if (!idleItems.length) return;
 
-    await Promise.allSettled(idleItems.map((item) => uploadItem(item)));
+    setUploadingAll(true);
+    try {
+      await Promise.allSettled(idleItems.map((item) => uploadItem(item)));
+    } finally {
+      setUploadingAll(false);
+    }
   }
 
   function handleClose() {
@@ -397,7 +404,12 @@ export function DocumentUpload({
             <Button variant="outline" onClick={handleClose} size="sm">
               {allDone ? "Done" : "Cancel"}
             </Button>
-            {hasIdle && (
+            {uploadingAll ? (
+              <Button size="sm" disabled aria-busy>
+                <LogoSpinner size={14} />
+                Uploading…
+              </Button>
+            ) : hasIdle && (
               <Button onClick={handleUploadAll} size="sm" disabled={!hasIdle}>
                 <Upload className="mr-2 h-3.5 w-3.5" />
                 Upload {items.filter((i) => i.status === "idle").length} file

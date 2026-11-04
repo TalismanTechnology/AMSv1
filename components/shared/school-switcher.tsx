@@ -1,5 +1,6 @@
 "use client";
 
+import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useSchool } from "./school-context";
 import {
@@ -16,6 +17,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { GraduationCap, ArrowLeftRight } from "lucide-react";
+import { LogoSpinner } from "@/components/logo-spinner";
 
 interface SchoolSwitcherProps {
   collapsed?: boolean;
@@ -24,6 +26,8 @@ interface SchoolSwitcherProps {
 export function SchoolSwitcher({ collapsed = false }: SchoolSwitcherProps) {
   const { school, memberships } = useSchool();
   const router = useRouter();
+  // Pending until the other school's page has rendered.
+  const [switching, startSwitch] = useTransition();
 
   if (memberships.length <= 1) return null;
 
@@ -31,9 +35,8 @@ export function SchoolSwitcher({ collapsed = false }: SchoolSwitcherProps) {
     const target = memberships.find((m) => m.school_id === schoolId);
     if (target?.school?.slug) {
       const role = target.role;
-      router.push(
-        `/s/${target.school.slug}/${role === "admin" ? "admin" : "parent"}`
-      );
+      const href = `/s/${target.school.slug}/${role === "admin" ? "admin" : "parent"}`;
+      startSwitch(() => router.push(href));
     }
   };
 
@@ -53,9 +56,11 @@ export function SchoolSwitcher({ collapsed = false }: SchoolSwitcherProps) {
               size="icon"
               className="w-full"
               onClick={() => goToMembership(other.school_id)}
-              aria-label={label}
+              disabled={switching}
+              aria-busy={switching}
+              aria-label={switching ? "Switching…" : label}
             >
-              <ArrowLeftRight className="h-4 w-4" />
+              {switching ? <LogoSpinner /> : <ArrowLeftRight className="h-4 w-4" />}
             </Button>
           </TooltipTrigger>
           <TooltipContent side="right">{label}</TooltipContent>
@@ -69,9 +74,15 @@ export function SchoolSwitcher({ collapsed = false }: SchoolSwitcherProps) {
         size="sm"
         className="w-full justify-start gap-2 h-8 text-xs"
         onClick={() => goToMembership(other.school_id)}
+        disabled={switching}
+        aria-busy={switching}
       >
-        <ArrowLeftRight className="h-3.5 w-3.5 shrink-0" />
-        <span className="truncate">Switch to {otherName}</span>
+        {switching ? (
+          <LogoSpinner size={14} />
+        ) : (
+          <ArrowLeftRight className="h-3.5 w-3.5 shrink-0" />
+        )}
+        <span className="truncate">{switching ? "Switching…" : `Switch to ${otherName}`}</span>
       </Button>
     );
   }
@@ -79,14 +90,15 @@ export function SchoolSwitcher({ collapsed = false }: SchoolSwitcherProps) {
   // 3+ schools: dropdown selector.
   if (collapsed) {
     return (
-      <Select value={school.id} onValueChange={goToMembership}>
+      <Select value={school.id} onValueChange={goToMembership} disabled={switching}>
         <Tooltip>
           <TooltipTrigger asChild>
             <SelectTrigger
-              aria-label="Switch school"
+              aria-label={switching ? "Switching…" : "Switch school"}
+              aria-busy={switching}
               className="w-full h-8 justify-center [&>svg:last-child]:hidden"
             >
-              <GraduationCap className="h-4 w-4" />
+              {switching ? <LogoSpinner /> : <GraduationCap className="h-4 w-4" />}
             </SelectTrigger>
           </TooltipTrigger>
           <TooltipContent side="right">Switch school</TooltipContent>
@@ -106,10 +118,17 @@ export function SchoolSwitcher({ collapsed = false }: SchoolSwitcherProps) {
   }
 
   return (
-    <Select value={school.id} onValueChange={goToMembership}>
-      <SelectTrigger className="w-full h-8 text-xs">
-        <GraduationCap className="mr-1 h-3.5 w-3.5 shrink-0" />
-        <SelectValue />
+    <Select value={school.id} onValueChange={goToMembership} disabled={switching}>
+      <SelectTrigger className="w-full h-8 text-xs" aria-busy={switching}>
+        {switching ? (
+          <LogoSpinner size={14} className="mr-1 shrink-0" />
+        ) : (
+          <GraduationCap className="mr-1 h-3.5 w-3.5 shrink-0" />
+        )}
+        {switching && <span className="truncate">Switching…</span>}
+        <span className={switching ? "hidden" : "contents"}>
+          <SelectValue />
+        </span>
       </SelectTrigger>
       <SelectContent>
         {memberships.map((m) => (

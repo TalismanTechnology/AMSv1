@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Clock, ArrowLeft } from "lucide-react";
 import { logout } from "@/actions/auth";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { PendingPoller } from "./pending-poller";
 
 export default async function PendingApprovalPage({
@@ -76,9 +77,13 @@ export default async function PendingApprovalPage({
           )}
 
           <form action={logout} className="w-full">
-            <Button type="submit" variant="ghost" className="w-full text-muted-foreground">
+            <SubmitButton
+              variant="ghost"
+              className="w-full text-muted-foreground"
+              pendingText="Signing out…"
+            >
               Sign out
-            </Button>
+            </SubmitButton>
           </form>
         </div>
         </div>

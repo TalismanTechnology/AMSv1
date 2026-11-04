@@ -29,8 +29,12 @@ export function RosterSignInForm({ schoolSlug, onError, onSignedIn }: RosterSign
   const [code, setCode] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Which request `busy` is for, so each button names what it's doing.
+  const [busyWith, setBusyWith] = useState<"send" | "verify" | null>(null);
   const [cooldown, setCooldown] = useState(0);
   const codeInput = useRef<HTMLInputElement>(null);
+  const sending = busy && busyWith === "send";
+  const verifying = busy && busyWith === "verify";
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -44,6 +48,7 @@ export function RosterSignInForm({ schoolSlug, onError, onSignedIn }: RosterSign
 
   async function sendCode() {
     setBusy(true);
+    setBusyWith("send");
     onError(null);
     try {
       const result = await requestParentCode({ schoolSlug, email });
@@ -65,6 +70,7 @@ export function RosterSignInForm({ schoolSlug, onError, onSignedIn }: RosterSign
   async function signIn(value: string) {
     if (busy) return;
     setBusy(true);
+    setBusyWith("verify");
     onError(null);
     try {
       const result = await verifyParentCode({ schoolSlug, email, code: value });
@@ -109,8 +115,8 @@ export function RosterSignInForm({ schoolSlug, onError, onSignedIn }: RosterSign
           />
         </div>
         <Button type="submit" size="lg" className="group h-12 w-full text-base" disabled={busy}>
-          {busy && <LogoSpinner className="mr-2" />}
-          Email me a code
+          {busy && <LogoSpinner />}
+          {busy ? "Sending code…" : "Email me a code"}
           {!busy && (
             <ArrowRight className="ml-1 size-4 transition-transform group-hover:translate-x-0.5" />
           )}
@@ -160,8 +166,8 @@ export function RosterSignInForm({ schoolSlug, onError, onSignedIn }: RosterSign
         className="h-12 w-full text-base"
         disabled={busy || code.length !== 6}
       >
-        {busy && <LogoSpinner className="mr-2" />}
-        Sign in
+        {verifying && <LogoSpinner />}
+        {verifying ? "Verifying…" : "Sign in"}
       </Button>
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
         <button
@@ -182,7 +188,11 @@ export function RosterSignInForm({ schoolSlug, onError, onSignedIn }: RosterSign
           disabled={busy || cooldown > 0}
           className="text-ink-soft underline-offset-4 hover:text-ink hover:underline disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:no-underline"
         >
-          {cooldown > 0 ? `Resend code in ${cooldown}s` : "Resend code"}
+          {sending
+            ? "Sending code…"
+            : cooldown > 0
+              ? `Resend code in ${cooldown}s`
+              : "Resend code"}
         </button>
       </div>
       <RosterHint />

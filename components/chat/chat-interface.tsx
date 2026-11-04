@@ -4,6 +4,7 @@ import { useRef, useEffect, useLayoutEffect, useState, useMemo } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { Send, SquarePen } from "lucide-react";
+import { LogoSpinner } from "@/components/logo-spinner";
 import { motion } from "framer-motion";
 import { messageEntrance } from "@/lib/motion";
 import { RetrievalLoadingStrip } from "./retrieval-loading-strip";
@@ -487,9 +488,11 @@ export function ChatInterface({
                 type="submit"
                 size="icon"
                 disabled={isLoading || !input.trim()}
+                aria-busy={isLoading}
+                aria-label={isLoading ? "Sending…" : "Send"}
                 className="size-9 shrink-0 rounded-full bg-primary text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
               >
-                <Send className="size-4" />
+                {isLoading ? <LogoSpinner /> : <Send className="size-4" />}
               </Button>
             </form>
           </div>

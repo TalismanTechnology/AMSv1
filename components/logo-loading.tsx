@@ -15,9 +15,11 @@ const CYCLE_DURATION = 1.8;
 interface LogoLoadingProps {
   size?: number;
   fullScreen?: boolean;
+  /** Caption under the logo, e.g. "Signing you in…". */
+  label?: string;
 }
 
-export function LogoLoading({ size = 80, fullScreen }: LogoLoadingProps) {
+export function LogoLoading({ size = 80, fullScreen, label = "Loading..." }: LogoLoadingProps) {
   const prefersReduced = useMediaQuery("(prefers-reduced-motion: reduce)");
 
   const width = size * LOGO_ASPECT_RATIO;
@@ -26,6 +28,8 @@ export function LogoLoading({ size = 80, fullScreen }: LogoLoadingProps) {
   if (prefersReduced) {
     return (
       <div
+        role="status"
+        aria-label={label}
         className={cn(
           "flex items-center justify-center",
           fullScreen ? "min-h-screen" : "min-h-[200px]"
@@ -56,6 +60,7 @@ export function LogoLoading({ size = 80, fullScreen }: LogoLoadingProps) {
 
   return (
     <div
+      role="status"
       className={cn(
         "flex items-center justify-center",
         fullScreen ? "min-h-screen" : "min-h-[200px]"
@@ -123,7 +128,7 @@ export function LogoLoading({ size = 80, fullScreen }: LogoLoadingProps) {
           animate={{ opacity: [0.4, 0.8, 0.4] }}
           transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
         >
-          Loading...
+          {label}
         </motion.span>
       </div>
     </div>

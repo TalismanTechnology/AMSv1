@@ -22,7 +22,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 import {
   Tooltip,
   TooltipContent,
@@ -34,6 +33,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { logout } from "@/actions/auth";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { useSidebar } from "./sidebar-context";
 import { useCommandPalette, useShortcutLabel } from "./command-palette";
 import { useSchool } from "@/components/shared/school-context";
@@ -142,27 +142,26 @@ export function AdminSidebarContent({ onNavigate, forceExpanded }: SidebarConten
           {collapsed ? (
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button
-                  type="submit"
+                <SubmitButton
                   variant="ghost"
                   size="sm"
+                  aria-label="Sign out"
                   className="w-full justify-center text-sidebar-foreground/55 hover:text-sidebar-foreground"
-                >
-                  <LogOut className="h-4 w-4" />
-                </Button>
+                  icon={<LogOut className="h-4 w-4" />}
+                />
               </TooltipTrigger>
               <TooltipContent side="right">Sign out</TooltipContent>
             </Tooltip>
           ) : (
-            <Button
-              type="submit"
+            <SubmitButton
               variant="ghost"
               size="sm"
               className="w-full justify-start gap-2.5 text-sidebar-foreground/55 hover:text-sidebar-foreground"
+              icon={<LogOut className="h-4 w-4" />}
+              pendingText="Signing out…"
             >
-              <LogOut className="h-4 w-4" />
               Sign out
-            </Button>
+            </SubmitButton>
           )}
         </form>
       </div>
