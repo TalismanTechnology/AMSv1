@@ -16,6 +16,7 @@ import {
 } from "@/actions/notifications";
 import { TimeAgo } from "@/components/ui/time-ago";
 import { cn } from "@/lib/utils";
+import { LogoSpinner } from "@/components/logo-spinner";
 import { useSchool } from "@/components/shared/school-context";
 import { stripMarkdown } from "@/lib/markdown/normalize";
 
@@ -32,6 +33,8 @@ interface Notification {
 export function NotificationBell() {
   const { school } = useSchool();
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  // False until the first fetch lands, so the empty state doesn't flash.
+  const [loaded, setLoaded] = useState(false);
   const [open, setOpen] = useState(false);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
@@ -39,7 +42,7 @@ export function NotificationBell() {
   const loadNotifications = useCallback(() => {
     getNotifications(school.id).then(({ notifications: data }) => {
       setNotifications(data as Notification[]);
-    });
+    }).finally(() => setLoaded(true));
   }, [school.id]);
 
   useEffect(() => {
@@ -97,7 +100,11 @@ export function NotificationBell() {
           )}
         </div>
         <ScrollArea className="max-h-80">
-          {notifications.length === 0 ? (
+          {!loaded ? (
+            <div className="flex justify-center px-4 py-10" role="status" aria-label="Loading">
+              <LogoSpinner className="text-muted-foreground" />
+            </div>
+          ) : notifications.length === 0 ? (
             <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
               <Bell className="h-5 w-5 text-muted-foreground" />
               <p className="text-sm text-muted-foreground">No notifications yet</p>

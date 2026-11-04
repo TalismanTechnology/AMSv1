@@ -54,7 +54,7 @@ export function StaffLoginForm() {
             animate={{ opacity: 1 }}
             className="fixed inset-0 z-50 flex items-center justify-center bg-background"
           >
-            <LogoLoading size={100} />
+            <LogoLoading size={100} label="Signing you in…" />
           </motion.div>
         )}
       </AnimatePresence>
@@ -101,8 +101,8 @@ export function StaffLoginForm() {
             />
           </div>
           <Button type="submit" className="h-11 w-full" disabled={loading}>
-            {loading && <LogoSpinner className="mr-2" />}
-            Sign in
+            {loading && <LogoSpinner />}
+            {loading ? "Signing in…" : "Sign in"}
           </Button>
         </form>
 

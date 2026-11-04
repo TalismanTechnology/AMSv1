@@ -1,4 +1,5 @@
 import { logout } from "@/actions/auth";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
@@ -31,12 +32,14 @@ export default async function SuperAdminLayout({
         <div className="flex items-center justify-between gap-4">
           <h1 className="min-w-0 truncate text-sm font-semibold text-ink tracking-[-0.01em]">Super Admin</h1>
           <form action={logout} className="shrink-0">
-            <button
-              type="submit"
-              className="text-sm text-muted-foreground hover:text-foreground"
+            <SubmitButton
+              variant="link"
+              size="sm"
+              className="h-auto p-0 text-sm font-normal text-muted-foreground hover:text-foreground hover:no-underline has-[>svg]:px-0"
+              pendingText="Signing out…"
             >
               Sign out
-            </button>
+            </SubmitButton>
           </form>
         </div>
       </header>

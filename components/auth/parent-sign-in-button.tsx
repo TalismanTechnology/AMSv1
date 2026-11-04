@@ -1,5 +1,9 @@
+"use client";
+
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { LogoSpinner } from "@/components/logo-spinner";
+import { usePendingNavigation } from "@/hooks/use-pending-navigation";
 import { AUTH_PROVIDERS, parentSignInHref, type AuthProvider } from "@/lib/auth/provider";
 
 interface ParentSignInButtonProps {
@@ -14,11 +18,31 @@ interface ParentSignInButtonProps {
  * client-navigating to it would be wrong.
  */
 export function ParentSignInButton({ schoolSlug, provider }: ParentSignInButtonProps) {
+  const { pending, start } = usePendingNavigation();
+  const { label } = AUTH_PROVIDERS[provider];
+
   return (
-    <Button asChild size="lg" className="group h-12 w-full text-base">
-      <a href={parentSignInHref(provider, schoolSlug)}>
-        Sign in with {AUTH_PROVIDERS[provider].label}
-        <ArrowRight className="ml-1 size-4 transition-transform group-hover:translate-x-0.5" />
+    <Button
+      asChild
+      size="lg"
+      className="group h-12 w-full text-base aria-busy:pointer-events-none aria-busy:opacity-80"
+    >
+      <a
+        href={parentSignInHref(provider, schoolSlug)}
+        onClick={(event) => start(event)}
+        aria-busy={pending ?? undefined}
+      >
+        {pending ? (
+          <>
+            <LogoSpinner />
+            Redirecting to {label}…
+          </>
+        ) : (
+          <>
+            Sign in with {label}
+            <ArrowRight className="ml-1 size-4 transition-transform group-hover:translate-x-0.5" />
+          </>
+        )}
       </a>
     </Button>
   );

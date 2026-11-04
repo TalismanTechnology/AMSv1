@@ -1,4 +1,8 @@
+"use client";
+
 import { ArrowRight } from "lucide-react";
+import { LogoSpinner } from "@/components/logo-spinner";
+import { usePendingNavigation } from "@/hooks/use-pending-navigation";
 import type { SignInSchool } from "@/lib/auth/sign-in-schools";
 import { AUTH_PROVIDERS, parentSignInHref } from "@/lib/auth/provider";
 
@@ -21,6 +25,9 @@ function monogram(name: string): string {
  * or, for email-code (roster) schools, to the school's login page.
  */
 export function SchoolPicker({ schools }: SchoolPickerProps) {
+  // The id of the school being opened; it gets the spinner.
+  const { pending, start } = usePendingNavigation<string>();
+
   if (schools.length === 0) {
     return (
       <p className="rounded-xl border border-border bg-secondary/60 px-5 py-6 text-center text-sm text-ink-soft">
@@ -35,6 +42,8 @@ export function SchoolPicker({ schools }: SchoolPickerProps) {
         <li key={school.id}>
           <a
             href={parentSignInHref(school.provider, school.slug)}
+            onClick={(event) => start(event, school.id)}
+            aria-busy={pending === school.id || undefined}
             className="group flex items-center gap-4 rounded-2xl border border-border bg-card px-5 py-4 transition-colors hover:border-ring/50 hover:bg-secondary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             {school.logoUrl ? (
@@ -62,7 +71,11 @@ export function SchoolPicker({ schools }: SchoolPickerProps) {
                   : `Sign in with your ${AUTH_PROVIDERS[school.provider].label} account`}
               </span>
             </span>
-            <ArrowRight className="size-4 shrink-0 text-ink-soft transition-transform group-hover:translate-x-0.5 group-hover:text-ink" />
+            {pending === school.id ? (
+              <LogoSpinner className="shrink-0 text-ink-soft" />
+            ) : (
+              <ArrowRight className="size-4 shrink-0 text-ink-soft transition-transform group-hover:translate-x-0.5 group-hover:text-ink" />
+            )}
           </a>
         </li>
       ))}

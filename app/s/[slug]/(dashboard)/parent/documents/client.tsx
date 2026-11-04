@@ -30,6 +30,7 @@ import {
   CollapsibleContent,
 } from "@/components/ui/collapsible";
 import { searchDocumentContent } from "@/actions/documents";
+import { LogoSpinner } from "@/components/logo-spinner";
 import { TimeAgo } from "@/components/ui/time-ago";
 import {
   CategorySelectItems,
@@ -253,7 +254,10 @@ export function ParentDocumentsClient({
       {searchMode === "content" && searchQuery.length >= 3 && (
         <div className="mb-4">
           {isSearchingContent ? (
-            <p className="text-sm text-muted-foreground">Searching content...</p>
+            <p className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
+              <LogoSpinner size={14} />
+              Searching content…
+            </p>
           ) : contentResults.length > 0 ? (
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground">

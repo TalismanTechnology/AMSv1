@@ -20,6 +20,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { logout } from "@/actions/auth";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { useParentSidebar } from "./sidebar-context";
 import { useSchool } from "@/components/shared/school-context";
 import { SchoolSwitcher } from "@/components/shared/school-switcher";
@@ -180,14 +181,13 @@ export function ParentSidebarContent({ onNavigate, forceExpanded, children }: Si
               <form action={logout} className="shrink-0">
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button
-                      type="submit"
+                    <SubmitButton
                       variant="ghost"
                       size="icon"
+                      aria-label="Sign out"
                       className="h-7 w-7 rounded-lg text-ink-soft hover:bg-secondary hover:text-ink"
-                    >
-                      <LogOut className="h-3.5 w-3.5" />
-                    </Button>
+                      icon={<LogOut className="h-3.5 w-3.5" />}
+                    />
                   </TooltipTrigger>
                   <TooltipContent side="right">Sign out</TooltipContent>
                 </Tooltip>
@@ -199,14 +199,13 @@ export function ParentSidebarContent({ onNavigate, forceExpanded, children }: Si
           <form action={logout} className="mt-2">
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button
-                  type="submit"
+                <SubmitButton
                   variant="ghost"
                   size="sm"
+                  aria-label="Sign out"
                   className="w-full justify-center rounded-lg text-ink-soft hover:bg-secondary hover:text-ink"
-                >
-                  <LogOut className="h-4 w-4" />
-                </Button>
+                  icon={<LogOut className="h-4 w-4" />}
+                />
               </TooltipTrigger>
               <TooltipContent side="right">Sign out</TooltipContent>
             </Tooltip>
