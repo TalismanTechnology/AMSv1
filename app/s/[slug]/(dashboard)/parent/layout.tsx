@@ -8,6 +8,8 @@ import { ParentSidebar } from "@/components/parent/parent-sidebar";
 import { ParentMobileHeader } from "@/components/parent/mobile-header";
 import { ChatHistoryBridgeProvider } from "@/components/parent/chat-history-bridge";
 import { NativePush } from "@/components/native/native-push";
+import { KeyboardViewport } from "@/components/shared/keyboard-viewport";
+import { APP_VIEWPORT_CLASS } from "@/lib/viewport/keyboard";
 import { AddChildrenPrompt } from "@/components/parent/add-children-prompt";
 import {
   CHILDREN_PROMPT_SKIP_COOKIE,
@@ -67,7 +69,7 @@ export default async function ParentLayout({
     >
       <TooltipProvider>
         <ChatHistoryBridgeProvider>
-          <div className="flex h-dvh">
+          <div className={APP_VIEWPORT_CLASS}>
             <ParentSidebar />
             <div className="flex flex-1 flex-col overflow-hidden">
               <ParentMobileHeader />
@@ -75,6 +77,7 @@ export default async function ParentLayout({
             </div>
           </div>
         </ChatHistoryBridgeProvider>
+        <KeyboardViewport />
         <NativePush />
         {promptForChildren && <AddChildrenPrompt slug={slug} />}
       </TooltipProvider>

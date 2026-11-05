@@ -27,7 +27,8 @@ export function SuggestedQuestions({
   ).slice(0, 3);
 
   return (
-    <div className="flex flex-col items-center py-20 text-center">
+    // Compact while the keyboard is open, so the welcome fits above it.
+    <div className="flex flex-col items-center py-20 text-center [[data-keyboard=open]_&]:py-4">
       <h2 className="text-2xl font-semibold tracking-[-0.01em] text-ink">
         Ask about your school
       </h2>
