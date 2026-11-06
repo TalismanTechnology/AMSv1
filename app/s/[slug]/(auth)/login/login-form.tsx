@@ -1,12 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useActionState, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { LogoSpinner } from "@/components/logo-spinner";
 import { Logo } from "@/components/logo";
 import { LogoLoading } from "@/components/logo-loading";
 import { motion, AnimatePresence } from "framer-motion";
-import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { login } from "@/actions/auth";
@@ -35,23 +34,25 @@ export function LoginForm({
 }: LoginFormProps) {
   const { label: providerLabel, portalName } = AUTH_PROVIDERS[provider];
   const searchParams = useSearchParams();
-  const [error, setError] = useState<string | null>(searchParams.get("error"));
-  const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState("");
+  const [rosterError, setRosterError] = useState<string | null>(searchParams.get("error"));
+  const [rosterRedirecting, setRosterRedirecting] = useState(false);
+  const [dismissedAttempt, setDismissedAttempt] = useState(0);
   // Parents only ever use the school's provider (Blackbaud or Veracross). The
   // password form is for staff, so it stays collapsed behind a quiet link.
   const [showStaffSignIn, setShowStaffSignIn] = useState(false);
 
-  async function handleSubmit(formData: FormData) {
-    setLoading(true);
-    setError(null);
-    const result = await login(formData);
-    if (result?.error) {
-      setError(result.error);
-      setLoading(false);
-    }
-  }
+  const [actionState, formAction, formPending] = useActionState<{ attempt: number; error: string | null }, FormData>(
+    async (prev: { attempt: number; error: string | null }, formData: FormData) => {
+      const result = await login(formData);
+      return { attempt: prev.attempt + 1, error: result?.error ?? null };
+    },
+    { attempt: 0, error: null }
+  );
 
-  const showTransition = loading && !error;
+  const loading = formPending || rosterRedirecting;
+  const staffError = actionState.attempt > dismissedAttempt ? actionState.error : null;
+  const error = showStaffSignIn ? staffError : rosterError;
 
   // Built as whole strings so each sentence renders as one text node, and a
   // missing name reads "your school's" rather than "'s".
@@ -69,11 +70,13 @@ export function LoginForm({
   return (
     <AuthShell>
       <AnimatePresence>
-        {showTransition && (
+        {loading && (
           <motion.div
             key="auth-loading"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
             className="fixed inset-0 z-50 flex items-center justify-center bg-background"
           >
             <LogoLoading size={100} label="Signing you in…" />
@@ -97,7 +100,7 @@ export function LoginForm({
           </p>
         </div>
 
-        {error && (
+        {!loading && error && (
           <div
             role="alert"
             className="mb-4 rounded-lg border border-destructive/25 bg-destructive/10 p-3 text-sm text-destructive"
@@ -110,8 +113,8 @@ export function LoginForm({
           (signInEnabled && provider === "roster" ? (
             <RosterSignInForm
               schoolSlug={schoolSlug}
-              onError={setError}
-              onSignedIn={() => setLoading(true)}
+              onError={setRosterError}
+              onSignedIn={() => setRosterRedirecting(true)}
             />
           ) : signInEnabled ? (
             <>
@@ -127,7 +130,7 @@ export function LoginForm({
           ))}
 
         {showStaffSignIn && (
-          <form action={handleSubmit} className="space-y-4">
+          <form action={formAction} className="space-y-4">
             <input type="hidden" name="school_slug" value={schoolSlug} />
             <input type="hidden" name="school_id" value={schoolId} />
             <div className="space-y-2">
@@ -138,6 +141,9 @@ export function LoginForm({
                 type="email"
                 autoComplete="email"
                 placeholder="you@school.org"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                disabled={formPending}
                 required
               />
             </div>
@@ -149,20 +155,21 @@ export function LoginForm({
                 type="password"
                 autoComplete="current-password"
                 placeholder="Enter your password"
+                disabled={formPending}
                 required
               />
             </div>
-            <Button type="submit" className="h-11 w-full" disabled={loading}>
-              {loading && <LogoSpinner />}
-              {loading ? "Signing in…" : "Sign in"}
-            </Button>
+            <SubmitButton className="h-11 w-full" pendingText="Signing in…">
+              Sign in
+            </SubmitButton>
           </form>
         )}
 
         <button
           type="button"
           onClick={() => {
-            setError(null);
+            setRosterError(null);
+            setDismissedAttempt(actionState.attempt);
             setShowStaffSignIn((shown) => !shown);
           }}
           className="mt-6 w-full text-center text-sm text-ink-soft underline-offset-4 hover:text-ink hover:underline"

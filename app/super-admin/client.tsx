@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Plus, ExternalLink, Pencil, Trash2 } from "lucide-react";
 import { LogoSpinner } from "@/components/logo-spinner";
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -151,10 +152,9 @@ export function SuperAdminClient({
                   />
                 </div>
               </div>
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading && <LogoSpinner className="mr-2" />}
+              <SubmitButton className="w-full" pendingText="Creating…" disabled={loading}>
                 Create School
-              </Button>
+              </SubmitButton>
             </form>
           </DialogContent>
         </Dialog>
@@ -289,16 +289,9 @@ export function SuperAdminClient({
                             placeholder="At least 10 characters"
                           />
                         </div>
-                        <Button
-                          type="submit"
-                          className="w-full"
-                          disabled={loading}
-                        >
-                          {loading && (
-                            <LogoSpinner className="mr-2" />
-                          )}
+                        <SubmitButton className="w-full" pendingText="Assigning…" disabled={loading}>
                           Assign Admin
-                        </Button>
+                        </SubmitButton>
                       </form>
                     </DialogContent>
                   </Dialog>
