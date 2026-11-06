@@ -13,7 +13,7 @@ import {
 import { nearestCrossDocumentPairs, normalizeVector, parseEmbedding, type EmbeddedChunk } from "./knn";
 import { excerptAround, findQuoteRange, quoteAppearsIn, storedExcerpt } from "./quotes";
 import { verdictFor, buildJudgePrompt, hasPlaceholder, MIN_CONFLICT_CONFIDENCE, type Judgment, type JudgePair } from "./judge";
-import { applyVerification, buildVerifyPrompt, needsVerification } from "./verify";
+import { applyVerification, buildVerifyPrompt, needsVerification, MIN_VERIFIER_CONFIDENCE } from "./verify";
 import {
   CLARIFICATION_TITLE,
   MAX_CLARIFICATIONS,
@@ -245,7 +245,7 @@ test("verifier decides whether a judged conflict stays open", () => {
   assert.equal(kept?.status, "open");
   assert.equal(kept?.judgment.description, "A says 3:00, B says 3:15.");
 
-  const unsure = applyVerification(judged, { verdict: "conflict", reason: "Maybe.", confidence: MIN_CONFLICT_CONFIDENCE - 0.01 });
+  const unsure = applyVerification(judged, { verdict: "conflict", reason: "Maybe.", confidence: MIN_VERIFIER_CONFIDENCE - 0.01 });
   assert.deepEqual([unsure?.status, unsure?.reason], ["auto_dismissed", "verifier"]);
 
   const rejected = applyVerification(judged, { verdict: "not_conflict", reason: "Recurring meeting.", confidence: 0.95 });

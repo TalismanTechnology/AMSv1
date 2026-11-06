@@ -14,7 +14,7 @@ export const JUDGE_MODEL_ID = TEXT_MODEL_ID;
 /** Below this, a "conflict" is stored as auto-dismissed. */
 export const MIN_CONFLICT_CONFIDENCE = 0.8;
 export const JUDGE_BATCH_SIZE = 4;
-const MAX_EXCERPT_CHARS = 2500;
+const MAX_EXCERPT_CHARS = 3600;
 
 export interface JudgeSide {
   documentTitle: string;
@@ -106,24 +106,31 @@ export function buildJudgePrompt(pairs: JudgePair[]): string {
     .map((p, i) => `[Pair ${i + 1}]\n${describeSide("A", p.a)}\n\n${describeSide("B", p.b)}`)
     .join("\n\n=====\n\n");
 
-  return `You check a school's documents for contradictions that would make the school's parent help desk give a wrong answer. Each pair below is two excerpts from DIFFERENT documents of the same school that cover similar ground.
+  return `You check a school's documents for contradictions that would make the school's parent help desk give a wrong answer. Every document below is LIVE in the help desk right now: when a parent asks a question, any of them can be retrieved and quoted. Each pair below is two excerpts from DIFFERENT documents of the same school that cover similar ground. An excerpt may include the passages just before and after the matching one, for context.
 
-For each pair, decide whether the two excerpts GENUINELY CONFLICT: they state different facts about the SAME thing — the same event, policy, deadline, fee, time, place, or contact — for the same group and the same time period, so both cannot be true.
+For each pair, decide whether the two excerpts GENUINELY CONFLICT: they state different facts about the SAME thing — the same event, policy, rule, deadline, date window, fee, time, place, requirement or contact — for the same group, so a parent could be given either answer.
+
+THIS IS A CONFLICT (flag it, confidence 0.85 or higher):
+- A standing handbook, policy guide, directory or website page states one rule, date window, start/end date, bell or pickup time, fee, requirement or contact person, and another live document — including a newer school email, memo, announcement or a current handbook — states a different or updated one for the same division or group. Example: the handbook says winter dress code runs "Nov 1 through the end of spring break" while an email announces winter dress code runs "Monday, November 23 through Thursday, February 25". Admins need to rule on it so the help desk gives the updated answer.
+- This holds even when the handbook's file name carries last year's label (like "25.26") or the email is newer: a standing policy stays live until the school retires it, so a current notice that overrides or contradicts it IS a conflict, not a "change over time".
+- Two current documents giving different dates, times, places or contacts for the same single event or role.
 
 These are NOT conflicts:
 - The same fact in different words, or one excerpt giving more (or less) detail than the other.
-- Different school years, seasons, terms or editions (last year's welcome letter vs this year's, the 2024 preseason letter vs the current one), or two different events. Schools reuse last year's text almost word for word with new dates: two near-identical excerpts whose dates differ are usually two years, not a contradiction.
-- Different divisions, grades, campuses, teams or groups (Lower School pickup vs Upper School pickup).
+- Two annual event letters, orientation schedules or preseason letters from different years, each giving that year's calendar dates ("Wednesday, September 3" in 2025 vs "Wednesday, September 9" in 2026), or two different events. Schools reuse last year's letter almost word for word with new dates. If two such dated letters or schedules plausibly describe different school years, seasons or editions, it is NOT a conflict. This does not apply to a standing handbook, policy or website page against a newer notice (above).
+- Historical articles in alumni magazines, annual reports, yearbooks or student newspapers.
+- Different occurrences of a recurring event: a weekly, monthly or annual meeting, club or event listed on one date in one digest or newsletter and on another date in a later one is two occurrences, not a contradiction.
+- Different issues or editions of a periodical (newsletter, journal, weekly digest, bulletin) published at different times, each describing its own week: a new date or an updated list between issues is not a conflict.
+- Complementary or partial detail: one excerpt summarizes and the other adds detail without contradiction ("meets with the Division Head" vs "meets with the Division Head and PA President"). One excerpt's list being longer, shorter or a subset of the other's is not a conflict either: excerpts are partial chunks and lists can be cut off. Only a direct contradiction about the same item counts (the same role held by a different person, the same date with a different value).
+- Different divisions, grades, campuses, teams or audiences (Lower School pickup vs Upper School pickup). An all-school or Middle + Upper School announcement DOES apply to the Middle School and the Upper School: if it disagrees with the Middle School Handbook on a Middle School rule, that IS a conflict.
 - A general rule and a specific exception that the text itself presents as an exception.
 - Excerpts that are merely about related topics, or that don't both state the fact.
 - A subjective characterization or opinion vs a fact ("a successful season" vs "finished 10-15").
-- One excerpt's list being longer, shorter or a subset of the other's: excerpts are partial chunks and lists can be cut off. Only a direct contradiction about the same item counts (the same role held by a different person, the same date with a different value).
 - Redacted or placeholder text ("[REDACTED]", "TBD", "XXX", "see the school's email").
-- Different occurrences of a recurring event: a weekly, monthly or annual meeting, club or event listed on one date in one digest or newsletter and on another date in a later one is two occurrences, not a contradiction.
-- Different issues or editions of a periodical (newsletter, journal, weekly digest, bulletin) published at different times: a change between issues (a new advisor, a new date, an updated list) is a change over time, not a conflict. Only call it a conflict if both excerpts claim to describe the same current fact — e.g. two current documents giving different dates for the same single event.
-A conflict requires the SAME event, policy or contact for the SAME period. If the excerpts plausibly describe different school years, seasons or editions, it is NOT a conflict. Decide the period from the titles, the document dates (added, last processed, email sent), the source, and the "Year clues": years named in the title or text, and the years in which each written weekday falls on its date (worked out from the calendar, so trust them — "Wednesday, September 3" is 2025, "Wednesday, September 9" is 2026). Dates whose weekdays fit different years mean different years.
-If one document has an explicit older year in its title ("2024 ...") and the other is undated or newer, assume different seasons unless the excerpts clearly refer to the same dated event in the same year.
-When in doubt, it is not a conflict; if you are unsure, give a low confidence (0.5 or less).
+
+Use the titles, the document dates (added, last processed, email sent), the source and the "Year clues" to tell annual letters apart: years named in the title or text, and the years in which each written weekday falls on its date (worked out from the calendar, so trust them — "Wednesday, September 3" is 2025, "Wednesday, September 9" is 2026). Weekday dates that fit different years in two dated letters mean two years' letters.
+If one document has an explicit older year in its title ("2024 ...") and is a dated letter, schedule or periodical (not a standing handbook, policy, guide, directory or website page), assume different seasons unless the excerpts clearly refer to the same dated event in the same year.
+If you are genuinely unsure whether the two excerpts are about the same thing for the same group, give a low confidence (0.5 or less).
 
 For a conflict:
 - topic: a few words for what disagrees.

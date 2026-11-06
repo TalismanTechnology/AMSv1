@@ -20,6 +20,7 @@ export interface CandidatePair {
 export interface CandidateDocument {
   source?: string | null;
   source_url?: string | null;
+  title?: string | null;
 }
 
 export interface CandidateChunk {
@@ -33,6 +34,14 @@ export interface CandidateFilterOptions {
   maxPerDocumentPair?: number;
   /** Pairs at least this similar are copies of one text, not a disagreement. */
   identicalSimilarity?: number;
+  /**
+   * Chunks with less text than this (normalizeForComparison) are skipped as
+   * missing_text: a heading or a page number can't state a fact. 0 by default;
+   * the scan passes MIN_CHUNK_TEXT_CHARS.
+   */
+  minTextChars?: number;
+  /** At most this many pairs from one document pair when either is an archival periodical. */
+  maxPerArchivalPair?: number;
 }
 
 /**
@@ -51,6 +60,7 @@ export type SkipReason =
   | "already_judged"
   | "already_reviewed"
   | "website_pair"
+  | "archival_pair"
   | "identical"
   | "different_year"
   | "missing_text"
@@ -66,6 +76,9 @@ export interface CandidateFilterResult {
 
 export const DEFAULT_MAX_PER_DOCUMENT_PAIR = 3;
 export const DEFAULT_IDENTICAL_SIMILARITY = 0.98;
+export const DEFAULT_MAX_PER_ARCHIVAL_PAIR = 1;
+/** Chunk text shorter than this, normalized, is a fragment, not a statement. */
+export const MIN_CHUNK_TEXT_CHARS = 40;
 
 /** One key per unordered chunk pair — matches document_conflicts.pair_key. */
 export function pairKey(chunkA: string, chunkB: string): string {
@@ -124,6 +137,30 @@ export function isWebsiteDocument(doc: CandidateDocument | undefined): boolean {
   return !!doc && (doc.source === "website" || !!doc.source_url);
 }
 
+const ARCHIVAL_TITLE = [
+  /\b(magazine|alumni|annual giving|annual report|yearbook)\b/i,
+  /\bjournal\b.*\bissue\b/i,
+  /\bstudent newspaper\b/i,
+];
+
+/**
+ * Alumni magazines, annual reports, yearbooks and student-newspaper issues:
+ * long, historical, and full of past dates and names that read like
+ * conflicts with current documents. They are judged last, if at all.
+ */
+export function isArchivalPeriodical(title: string | null | undefined): boolean {
+  if (!title) return false;
+  const words = title.replace(/_+/g, " ");
+  return ARCHIVAL_TITLE.some((re) => re.test(words));
+}
+
+/** An HTML comment (`<!--placeholder-->`) or too little text to state anything. */
+export function isPlaceholderChunk(text: string, minChars = MIN_CHUNK_TEXT_CHARS): boolean {
+  const t = text.trim();
+  if (!t || /^<!--[\s\S]*-->$/.test(t)) return true;
+  return normalizeForComparison(t).length < minChars;
+}
+
 /**
  * Keep the pairs worth judging, most similar first:
  * - never two chunks of one document, nor a pair judged before (any status),
@@ -131,6 +168,10 @@ export function isWebsiteDocument(doc: CandidateDocument | undefined): boolean {
  * - never two website pages — sites repeat headers, footers and sidebars on
  *   every page, and those near-copies would swamp the budget;
  * - never near-identical text: two copies of one sentence can't disagree;
+ * - never placeholder chunks (an HTML comment, or under `minTextChars`);
+ * - never two archival periodicals (alumni magazines, yearbooks, student
+ *   newspaper issues); a pair with one is ranked after every other pair and
+ *   capped at `maxPerArchivalPair` per document pair;
  * - never two school years (`differentYear`, e.g. years.ts): returned apart,
  *   to be stored auto-dismissed without a model call;
  * - at most `maxPerDocumentPair` pairs per document pair, so two long
@@ -159,6 +200,8 @@ export function filterCandidates(
     limit,
     maxPerDocumentPair = DEFAULT_MAX_PER_DOCUMENT_PAIR,
     identicalSimilarity = DEFAULT_IDENTICAL_SIMILARITY,
+    minTextChars = 0,
+    maxPerArchivalPair = DEFAULT_MAX_PER_ARCHIVAL_PAIR,
   }: CandidateFilterOptions
 ): CandidateFilterResult {
   const skipped: Record<SkipReason, number> = {
@@ -166,6 +209,7 @@ export function filterCandidates(
     already_judged: 0,
     already_reviewed: 0,
     website_pair: 0,
+    archival_pair: 0,
     identical: 0,
     different_year: 0,
     missing_text: 0,
@@ -181,8 +225,15 @@ export function filterCandidates(
     if (!seen || c.similarity > seen.similarity) unique.set(key, c);
   }
 
+  const archival = (c: CandidatePair) =>
+    Number(isArchivalPeriodical(documents.get(c.document_a_id)?.title)) +
+    Number(isArchivalPeriodical(documents.get(c.document_b_id)?.title));
+  // Pairs without an archival periodical first, then by similarity.
   const ranked = [...unique.entries()].sort(
-    ([ka, a], [kb, b]) => b.similarity - a.similarity || (ka < kb ? -1 : ka > kb ? 1 : 0)
+    ([ka, a], [kb, b]) =>
+      Math.min(archival(a), 1) - Math.min(archival(b), 1) ||
+      b.similarity - a.similarity ||
+      (ka < kb ? -1 : ka > kb ? 1 : 0)
   );
 
   const selected: CandidatePair[] = [];
@@ -204,9 +255,14 @@ export function filterCandidates(
       skipped.website_pair++;
       continue;
     }
+    const archivalDocs = archival(c);
+    if (archivalDocs === 2) {
+      skipped.archival_pair++;
+      continue;
+    }
     const a = chunks.get(c.chunk_a_id)?.content;
     const b = chunks.get(c.chunk_b_id)?.content;
-    if (!a?.trim() || !b?.trim()) {
+    if (!a?.trim() || !b?.trim() || isPlaceholderChunk(a, minTextChars) || isPlaceholderChunk(b, minTextChars)) {
       skipped.missing_text++;
       continue;
     }
@@ -225,7 +281,7 @@ export function filterCandidates(
     }
     const docKey = documentPairKey(c.document_a_id, c.document_b_id);
     const used = perDocumentPair.get(docKey) ?? 0;
-    if (used >= maxPerDocumentPair) {
+    if (used >= (archivalDocs > 0 ? Math.min(maxPerArchivalPair, maxPerDocumentPair) : maxPerDocumentPair)) {
       skipped.document_pair_cap++;
       continue;
     }

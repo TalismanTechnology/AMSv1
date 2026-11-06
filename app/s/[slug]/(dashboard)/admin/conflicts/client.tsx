@@ -8,7 +8,9 @@ import {
   ExternalLink,
   FileText,
   Globe,
+  Mail,
   PenLine,
+  RefreshCw,
   RotateCcw,
   ScanSearch,
   X,
@@ -26,6 +28,7 @@ import {
   type ConflictRuling,
 } from "@/actions/conflicts";
 import type { HighlightedExcerpt } from "@/lib/conflicts/quotes";
+import { isClearlyNewer, isWebsiteOrigin, originLabel } from "@/lib/conflicts/display";
 import { isRunActive, type ScanRunSummary } from "@/lib/conflicts/runs";
 import { cn } from "@/lib/utils";
 import { stripMarkdown } from "@/lib/markdown/normalize";
@@ -47,6 +50,11 @@ export interface ConflictSideView {
   location: string | null;
   statement: string | null;
   excerpt: HighlightedExcerpt;
+  createdAt: string | null;
+  updatedAt: string | null;
+  /** An email document's sent date. */
+  emailDate: string | null;
+  divisions: string[];
 }
 
 export interface ConflictView {
@@ -78,9 +86,9 @@ const POLL_MS = 5000;
 export function ConflictsClient({ schoolId, data }: { schoolId: string; data: ConflictsPageData }) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("open");
-  const [starting, setStarting] = useState(false);
+  const [starting, setStarting] = useState<"scan" | "rescan" | null>(null);
   const [viewing, setViewing] = useState<ConflictSideView | null>(null);
-  const scanning = starting || isRunActive(data.lastRun);
+  const scanning = starting !== null || isRunActive(data.lastRun);
 
   // Follow a scan running in the background until its run row finishes.
   useEffect(() => {
@@ -89,15 +97,19 @@ export function ConflictsClient({ schoolId, data }: { schoolId: string; data: Co
     return () => clearInterval(timer);
   }, [data.lastRun, router]);
 
-  async function handleScan() {
-    setStarting(true);
-    const result = await scanConflicts(schoolId);
-    setStarting(false);
+  async function handleScan(rescanAll: boolean) {
+    setStarting(rescanAll ? "rescan" : "scan");
+    const result = await scanConflicts(schoolId, { rescanAll });
+    setStarting(null);
     if (result.error) {
       toast.error(result.error);
       return;
     }
-    toast.success("Scanning your documents for conflicts…");
+    toast.success(
+      rescanAll
+        ? "Re-checking all your documents, including passages set aside before…"
+        : "Scanning your documents for conflicts…"
+    );
     router.refresh();
   }
 
@@ -115,14 +127,25 @@ export function ConflictsClient({ schoolId, data }: { schoolId: string; data: Co
           </p>
           {data.installed && <LastScan run={data.lastRun} />}
         </div>
-        <Button
-          onClick={handleScan}
-          disabled={!data.installed || scanning}
-          className="bg-primary text-primary-foreground"
-        >
-          {scanning ? <LogoSpinner className="mr-2" /> : <ScanSearch className="mr-2 h-4 w-4" />}
-          {scanning ? "Scanning…" : "Scan for conflicts"}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            onClick={() => handleScan(true)}
+            disabled={!data.installed || scanning}
+            title="Re-check every passage, including ones an earlier scan set aside as not a conflict. Your rulings are kept."
+          >
+            {starting === "rescan" ? <LogoSpinner className="mr-2" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+            Full rescan
+          </Button>
+          <Button
+            onClick={() => handleScan(false)}
+            disabled={!data.installed || scanning}
+            className="bg-primary text-primary-foreground"
+          >
+            {scanning && starting !== "rescan" ? <LogoSpinner className="mr-2" /> : <ScanSearch className="mr-2 h-4 w-4" />}
+            {scanning ? "Scanning…" : "Scan for conflicts"}
+          </Button>
+        </div>
       </div>
 
       {!data.installed ? (
@@ -244,6 +267,7 @@ function ConflictCard({
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const isOpen = conflict.status === "open";
+  const bIsNewer = isClearlyNewer(conflict.a, conflict.b);
 
   async function run(action: () => Promise<{ error?: string }>, done: string) {
     setBusy(true);
@@ -301,6 +325,7 @@ function ConflictCard({
           label="Document B"
           side={conflict.b}
           chosen={conflict.resolution === "b_correct"}
+          newer={bIsNewer}
           onView={onView}
         />
       </div>
@@ -363,15 +388,16 @@ function ConflictCard({
           <>
             <Button size="sm" variant="outline" disabled={busy} onClick={() => setMode("a_correct")}>
               <Check className="mr-2 h-4 w-4" />
-              Document A is correct
+              Use Document A
             </Button>
             <Button size="sm" variant="outline" disabled={busy} onClick={() => setMode("b_correct")}>
               <Check className="mr-2 h-4 w-4" />
-              Document B is correct
+              Use Document B
+              {bIsNewer && <span className="ml-1 text-muted-foreground">(Newer)</span>}
             </Button>
             <Button size="sm" variant="outline" disabled={busy} onClick={() => setMode("custom")}>
               <PenLine className="mr-2 h-4 w-4" />
-              Write the correct answer
+              Write custom answer
             </Button>
             <Button
               size="sm"
@@ -428,14 +454,19 @@ function SideCard({
   label,
   side,
   chosen,
+  newer = false,
   onView,
 }: {
   label: string;
   side: ConflictSideView;
   chosen: boolean;
+  /** This side's document is clearly newer than the other's. */
+  newer?: boolean;
   onView: (side: ConflictSideView) => void;
 }) {
-  const isWebsite = side.source === "website" || !!side.sourceUrl;
+  const isWebsite = isWebsiteOrigin(side);
+  const origin = originLabel(side);
+  const OriginIcon = isWebsite ? Globe : side.source === "email" ? Mail : FileText;
   const { excerpt } = side;
   return (
     <div
@@ -446,9 +477,17 @@ function SideCard({
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
             {label}
-            {chosen && <span className="ml-1.5 normal-case text-primary">· chosen</span>}
+            {chosen && <span className="normal-case text-primary">· chosen</span>}
+            {newer && (
+              <span
+                className="rounded-full border border-primary/30 bg-primary/5 px-1.5 py-px text-[10px] normal-case tracking-normal text-primary"
+                title="Added or sent more than a day after Document A"
+              >
+                Newer
+              </span>
+            )}
           </p>
           {isWebsite && side.sourceUrl ? (
             <a
@@ -457,7 +496,7 @@ function SideCard({
               rel="noopener noreferrer"
               className="flex items-center gap-1.5 text-sm font-medium text-ink hover:underline"
             >
-              <Globe className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <OriginIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               <span className="truncate">{side.title}</span>
               <ExternalLink className="h-3 w-3 shrink-0 text-muted-foreground" />
             </a>
@@ -467,11 +506,11 @@ function SideCard({
               onClick={() => onView(side)}
               className="flex max-w-full items-center gap-1.5 text-left text-sm font-medium text-ink hover:underline"
             >
-              <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <OriginIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               <span className="truncate">{side.title}</span>
             </button>
           )}
-          {side.location && <p className="text-xs text-muted-foreground">{side.location}</p>}
+          <p className="text-xs text-muted-foreground">{origin}</p>
         </div>
       </div>
       <p className="mt-2 whitespace-pre-wrap break-words text-xs leading-relaxed text-ink-soft">
