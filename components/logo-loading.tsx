@@ -64,6 +64,7 @@ export function LogoLoading({ size = 80, fullScreen, label = "Loading..." }: Log
   return (
     <div
       role="status"
+      aria-label={label}
       className={cn(
         "flex items-center justify-center",
         fullScreen ? "min-h-screen" : "min-h-[200px]"
@@ -79,8 +80,9 @@ export function LogoLoading({ size = 80, fullScreen, label = "Loading..." }: Log
         >
           {/* Opacity pulses on the group, not the paths: head + body
               overlap, so fading them individually doubles the opacity in
-              the overlap and shows as a denser patch. The bounce (scale/y)
-              stays per-path so the two pieces still move independently. */}
+              the overlap and shows as a denser patch. Static SVG translate()
+              lives on plain <g> wrappers so Framer Motion's CSS style.transform
+              on <motion.path> never overrides the viewBox translation. */}
           <motion.g
             fill="currentColor"
             animate={{ opacity: [0.3, 1, 1, 0.3] }}
@@ -91,39 +93,39 @@ export function LogoLoading({ size = 80, fullScreen, label = "Loading..." }: Log
               times: [0, 0.3, 0.7, 1],
             }}
           >
-            {/* Head — bounces with slight delay */}
-            <motion.path
-              d={HEAD_PATH.d}
-              transform={`translate(${HEAD_PATH.translateX}, ${HEAD_PATH.translateY})`}
-              style={{ transformOrigin: "742px 385px" }}
-              animate={{
-                scale: [0.85, 1, 1, 0.85],
-                y: [-15, 0, 0, -15],
-              }}
-              transition={{
-                duration: CYCLE_DURATION,
-                repeat: Infinity,
-                ease: "easeInOut",
-                times: [0, 0.3, 0.7, 1],
-              }}
-            />
-            {/* Body — bounces with offset timing */}
-            <motion.path
-              d={BODY_PATH.d}
-              transform={`translate(${BODY_PATH.translateX}, ${BODY_PATH.translateY})`}
-              style={{ transformOrigin: "750px 500px" }}
-              animate={{
-                scale: [0.85, 1, 1, 0.85],
-                y: [15, 0, 0, 15],
-              }}
-              transition={{
-                duration: CYCLE_DURATION,
-                repeat: Infinity,
-                ease: "easeInOut",
-                times: [0, 0.3, 0.7, 1],
-                delay: 0.1,
-              }}
-            />
+            <g transform={`translate(${HEAD_PATH.translateX}, ${HEAD_PATH.translateY})`}>
+              <motion.path
+                d={HEAD_PATH.d}
+                style={{ transformBox: "fill-box", transformOrigin: "center" }}
+                animate={{
+                  scale: [0.85, 1, 1, 0.85],
+                  y: [-15, 0, 0, -15],
+                }}
+                transition={{
+                  duration: CYCLE_DURATION,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                  times: [0, 0.3, 0.7, 1],
+                }}
+              />
+            </g>
+            <g transform={`translate(${BODY_PATH.translateX}, ${BODY_PATH.translateY})`}>
+              <motion.path
+                d={BODY_PATH.d}
+                style={{ transformBox: "fill-box", transformOrigin: "center" }}
+                animate={{
+                  scale: [0.85, 1, 1, 0.85],
+                  y: [15, 0, 0, 15],
+                }}
+                transition={{
+                  duration: CYCLE_DURATION,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                  times: [0, 0.3, 0.7, 1],
+                  delay: 0.1,
+                }}
+              />
+            </g>
           </motion.g>
         </svg>
         <motion.span

@@ -140,3 +140,12 @@ test("staff and school password login forms use useActionState + SubmitButton", 
     assert.doesNotMatch(src, /setLoading\(true\);\s*setError\(null\);\s*const result = await login/, `${rel} must not set loading inside a <form action> transition`);
   }
 });
+
+test("LogoLoading keeps static SVG translate() off <motion.path> so CSS transforms do not hide the logo", () => {
+  const src = readFileSync(join(process.cwd(), "components/logo-loading.tsx"), "utf8");
+  for (const tag of src.match(/<motion\.path\s[\s\S]*?\/>/g) ?? []) {
+    assert.doesNotMatch(tag, /transform=\{`translate/);
+  }
+  assert.match(src, /<g transform=\{`translate\(\$\{HEAD_PATH\.translateX\}/);
+  assert.match(src, /<g transform=\{`translate\(\$\{BODY_PATH\.translateX\}/);
+});
