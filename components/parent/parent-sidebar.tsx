@@ -63,7 +63,7 @@ export function ParentSidebarContent({ onNavigate, forceExpanded, children }: Si
           <Logo size={collapsed ? 18 : 20} className="text-primary" />
         </span>
         {!collapsed && (
-          <span className="font-serif-display min-w-0 truncate text-[15px] tracking-[-0.01em] text-ink">
+          <span className="min-w-0 truncate text-sm font-semibold tracking-[-0.01em] text-ink">
             {school.name}
           </span>
         )}

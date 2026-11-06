@@ -65,7 +65,7 @@ export function ParentSteps() {
               >
                 {step.n}
               </span>
-              <h3 className="font-serif-display mt-6 text-xl text-ink">{step.title}</h3>
+              <h3 className="mt-6 text-lg font-semibold text-ink">{step.title}</h3>
               <p className="mt-3 text-[15px] leading-relaxed text-ink-soft">
                 {step.body}
               </p>

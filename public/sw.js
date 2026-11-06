@@ -3,34 +3,21 @@
 // offline page instead of the browser's error.
 //
 // Only same-origin page navigations go through it (network first, offline
-// page on failure), plus the precached offline fonts used by offline.html.
-// Everything else — POSTs, API and auth routes, Next's RSC / data fetches,
-// Supabase and other cross-origin requests — is left to the browser untouched.
-// Pages themselves are never cached (they're signed in).
+// page on failure). Everything else — POSTs, API and auth routes, Next's RSC
+// / data fetches, Supabase and other cross-origin requests — is left to the
+// browser untouched. Pages themselves are never cached (they're signed in).
 //
 // Bump VERSION when offline.html changes.
 
-const VERSION = "v2";
+const VERSION = "v1";
 const CACHE = `ams-offline-${VERSION}`;
 const OFFLINE_URL = "/offline.html";
-const PRECACHE_URLS = [
-  OFFLINE_URL,
-  "/fonts/YesevaOne-Regular.ttf",
-  "/fonts/JosefinSans-Regular.ttf",
-  "/fonts/JosefinSans-SemiBold.ttf",
-];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
       .open(CACHE)
-      .then((cache) =>
-        Promise.all(
-          PRECACHE_URLS.map((url) =>
-            cache.add(new Request(url, { cache: "reload" }))
-          )
-        )
-      )
+      .then((cache) => cache.add(new Request(OFFLINE_URL, { cache: "reload" })))
       .then(() => self.skipWaiting())
   );
 });
@@ -72,20 +59,7 @@ function isPageNavigation(request) {
   return true;
 }
 
-function isOfflineFont(request) {
-  if (request.method !== "GET") return false;
-  const url = new URL(request.url);
-  return url.origin === self.location.origin && PRECACHE_URLS.includes(url.pathname) && url.pathname !== OFFLINE_URL;
-}
-
 self.addEventListener("fetch", (event) => {
-  if (isOfflineFont(event.request)) {
-    event.respondWith(
-      caches.match(event.request, { cacheName: CACHE }).then((cached) => cached || fetch(event.request))
-    );
-    return;
-  }
-
   // Returning without respondWith() lets the browser handle it normally.
   if (!isPageNavigation(event.request)) return;
 

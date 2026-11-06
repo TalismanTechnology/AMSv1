@@ -162,7 +162,7 @@ function Brand({ size }: { size: number }) {
       <span className="flex" style={{ width: u(size * 2.16), height: u(size) }}>
         <Logo className="h-full w-full" />
       </span>
-      <span className="font-serif-display tracking-tight" style={{ fontSize: u(size * 0.75) }}>
+      <span className="font-medium tracking-tight" style={{ fontSize: u(size * 0.75) }}>
         AskMySchool
       </span>
     </span>
@@ -245,14 +245,14 @@ function StatTiles({ stats, width, compact }: { stats: WallStats; width?: string
             {t.label}
           </span>
           {t.value === null ? (
-            <span className="font-serif-display text-[#fdf6e8]" style={{ fontSize: u(4.4 * s), lineHeight: 1.1 }}>
+            <span className="font-light text-[#fdf6e8]" style={{ fontSize: u(4.4 * s), lineHeight: 1.1 }}>
               {formatRate(null)}
             </span>
           ) : (
             <CountUp
               value={t.value}
               format={t.format}
-              className="font-serif-display tabular-nums tracking-tight text-[#fdf6e8]"
+              className="font-light tabular-nums tracking-tight text-[#fdf6e8]"
               style={{
                 fontSize: u(4.4 * s),
                 lineHeight: 1.1,

@@ -44,11 +44,8 @@ export function ChatExport({ messages, sessionTitle }: ChatExportProps) {
     const html = `
       <html><head><title>${title}</title>
       <style>
-        @font-face { font-family: 'Yeseva One'; src: url('/fonts/YesevaOne-Regular.ttf') format('truetype'); font-weight: 400; font-style: normal; }
-        @font-face { font-family: 'Josefin Sans'; src: url('/fonts/JosefinSans-Regular.ttf') format('truetype'); font-weight: 400; font-style: normal; }
-        @font-face { font-family: 'Josefin Sans'; src: url('/fonts/JosefinSans-SemiBold.ttf') format('truetype'); font-weight: 600; font-style: normal; }
-        body { font-family: 'Josefin Sans', system-ui, sans-serif; max-width: 700px; margin: 0 auto; padding: 40px 20px; color: #2d3a2e; }
-        h1 { font-family: 'Yeseva One', Georgia, serif; font-weight: 400; font-size: 20px; border-bottom: 1px solid #ddd; padding-bottom: 8px; }
+        body { font-family: system-ui, sans-serif; max-width: 700px; margin: 0 auto; padding: 40px 20px; }
+        h1 { font-size: 18px; border-bottom: 1px solid #ddd; padding-bottom: 8px; }
         .msg { margin: 16px 0; }
         .role { font-weight: 600; font-size: 13px; color: #666; margin-bottom: 4px; }
         .content { white-space: pre-wrap; font-size: 14px; line-height: 1.6; }

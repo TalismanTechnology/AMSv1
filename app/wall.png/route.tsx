@@ -16,24 +16,22 @@ export const dynamic = "force-dynamic";
 
 const NO_STORE = { "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" };
 
-const FONT_DIR = path.join(process.cwd(), "public/fonts");
-type Font = { name: string; data: ArrayBuffer; weight: 400 | 600 | 700; style: "normal" };
+const FONT_DIR = path.join(process.cwd(), "node_modules/pdfjs-dist/standard_fonts");
+type Font = { name: string; data: ArrayBuffer; weight: 400 | 700; style: "normal" };
 let fontsPromise: Promise<Font[] | undefined> | null = null;
 
-/** Yeseva One + Josefin Sans static TTFs bundled in public/fonts for Satori. */
+/** Liberation Sans from pdfjs-dist when it's on disk; else Satori's default font. */
 function loadFonts(): Promise<Font[] | undefined> {
   fontsPromise ??= Promise.all(
     (
       [
-        ["Yeseva One", "YesevaOne-Regular.ttf", 400],
-        ["Josefin Sans", "JosefinSans-Regular.ttf", 400],
-        ["Josefin Sans", "JosefinSans-SemiBold.ttf", 600],
-        ["Josefin Sans", "JosefinSans-Bold.ttf", 700],
+        ["LiberationSans-Regular.ttf", 400],
+        ["LiberationSans-Bold.ttf", 700],
       ] as const
-    ).map(async ([name, file, weight]): Promise<Font> => {
+    ).map(async ([file, weight]): Promise<Font> => {
       const buf = await readFile(path.join(FONT_DIR, file));
       return {
-        name,
+        name: "Liberation Sans",
         data: buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer,
         weight,
         style: "normal",
