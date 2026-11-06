@@ -29,7 +29,7 @@ export function ParentMobileHeader() {
         <span className="flex h-8 w-8 shrink-0 items-center justify-center">
           <Logo size={20} className="text-primary" />
         </span>
-        <span className="font-serif-display truncate text-[15px] tracking-[-0.01em] text-ink">
+        <span className="truncate text-sm font-semibold tracking-[-0.01em] text-ink">
           {school.name}
         </span>
       </div>
