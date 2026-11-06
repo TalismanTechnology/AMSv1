@@ -35,25 +35,28 @@ export function LogoLoading({ size = 80, fullScreen, label = "Loading..." }: Log
           fullScreen ? "min-h-screen" : "min-h-[200px]"
         )}
       >
-        <svg
-          width={width}
-          height={height}
-          viewBox={LOGO_VIEWBOX}
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          className="text-muted-foreground"
-        >
-          <g fill="currentColor">
-            <path
-              d={HEAD_PATH.d}
-              transform={`translate(${HEAD_PATH.translateX}, ${HEAD_PATH.translateY})`}
-            />
-            <path
-              d={BODY_PATH.d}
-              transform={`translate(${BODY_PATH.translateX}, ${BODY_PATH.translateY})`}
-            />
-          </g>
-        </svg>
+        <div className="flex flex-col items-center gap-3">
+          <svg
+            width={width}
+            height={height}
+            viewBox={LOGO_VIEWBOX}
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            className="text-muted-foreground"
+          >
+            <g fill="currentColor">
+              <path
+                d={HEAD_PATH.d}
+                transform={`translate(${HEAD_PATH.translateX}, ${HEAD_PATH.translateY})`}
+              />
+              <path
+                d={BODY_PATH.d}
+                transform={`translate(${BODY_PATH.translateX}, ${BODY_PATH.translateY})`}
+              />
+            </g>
+          </svg>
+          <span className="text-xs text-muted-foreground">{label}</span>
+        </div>
       </div>
     );
   }

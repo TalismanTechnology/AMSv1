@@ -1,13 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useActionState, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { LogoSpinner } from "@/components/logo-spinner";
 import { Logo } from "@/components/logo";
 import { LogoLoading } from "@/components/logo-loading";
 import { motion, AnimatePresence } from "framer-motion";
-import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { login } from "@/actions/auth";
@@ -16,20 +15,17 @@ import { LegalNotice } from "@/components/legal/legal-notice";
 
 export function StaffLoginForm() {
   const searchParams = useSearchParams();
-  const [error, setError] = useState<string | null>(searchParams.get("error"));
-  const [loading, setLoading] = useState(false);
-
-  async function handleSubmit(formData: FormData) {
-    setLoading(true);
-    setError(null);
-    const result = await login(formData);
-    if (result?.error) {
-      setError(result.error);
-      setLoading(false);
-    }
-  }
-
-  const showTransition = loading && !error;
+  const [email, setEmail] = useState("");
+  // useActionState marks `pending` urgent as soon as the form submits and keeps
+  // it true across `login()` and its post-sign-in redirect; plain `setState`
+  // inside a `<form action>` handler is deferred by React 19's transition.
+  const [error, formAction, pending] = useActionState<string | null, FormData>(
+    async (_prevError: string | null, formData: FormData) => {
+      const result = await login(formData);
+      return result?.error ?? null;
+    },
+    searchParams.get("error")
+  );
 
   return (
     <AuthShell
@@ -47,11 +43,13 @@ export function StaffLoginForm() {
       ]}
     >
       <AnimatePresence>
-        {showTransition && (
+        {pending && (
           <motion.div
             key="auth-loading"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
             className="fixed inset-0 z-50 flex items-center justify-center bg-background"
           >
             <LogoLoading size={100} label="Signing you in…" />
@@ -73,20 +71,27 @@ export function StaffLoginForm() {
           </p>
         </div>
 
-        {error && (
-          <div className="mb-4 rounded-lg border border-destructive/25 bg-destructive/10 p-3 text-sm text-destructive">
+        {!pending && error && (
+          <div
+            role="alert"
+            className="mb-4 rounded-lg border border-destructive/25 bg-destructive/10 p-3 text-sm text-destructive"
+          >
             {error}
           </div>
         )}
 
-        <form action={handleSubmit} className="space-y-4">
+        <form action={formAction} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
               id="email"
               name="email"
               type="email"
+              autoComplete="email"
               placeholder="you@school.org"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              disabled={pending}
               required
             />
           </div>
@@ -96,14 +101,15 @@ export function StaffLoginForm() {
               id="password"
               name="password"
               type="password"
+              autoComplete="current-password"
               placeholder="Enter your password"
+              disabled={pending}
               required
             />
           </div>
-          <Button type="submit" className="h-11 w-full" disabled={loading}>
-            {loading && <LogoSpinner />}
-            {loading ? "Signing in…" : "Sign in"}
-          </Button>
+          <SubmitButton className="h-11 w-full" pendingText="Signing in…">
+            Sign in
+          </SubmitButton>
         </form>
 
         <p className="mt-6 text-center text-sm text-ink-soft">
