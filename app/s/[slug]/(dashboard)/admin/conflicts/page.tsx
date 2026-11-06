@@ -3,7 +3,7 @@ import { requireSchoolContext } from "@/lib/school-context";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isNotInstalledError } from "@/lib/supabase/not-installed";
 import { formatChunkLocation, type ChunkMetadata } from "@/lib/ai/rag";
-import { excerptAround } from "@/lib/conflicts/quotes";
+import { excerptAround, quoteAppearsIn } from "@/lib/conflicts/quotes";
 import { CONFLICTS_NOT_INSTALLED_MESSAGE } from "@/lib/conflicts/store";
 import { latestScanRun } from "@/lib/conflicts/scan";
 import { PageTransition } from "@/components/motion";
@@ -22,6 +22,10 @@ interface DocEmbed {
   file_url: string | null;
   source: string | null;
   source_url: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  email_meta: { date?: unknown } | null;
+  divisions: { name: string | null }[] | null;
 }
 
 interface ChunkEmbed {
@@ -56,12 +60,14 @@ interface ConflictRow {
   chunk_b: ChunkEmbed | ChunkEmbed[] | null;
 }
 
-const DOC = "title, file_name, file_type, file_url, source, source_url";
-const COLUMNS = `id, status, resolution, admin_note, topic, description, confidence, similarity,
+const DOC_FULL =
+  "title, file_name, file_type, file_url, source, source_url, created_at, updated_at, email_meta, divisions:event_calendars(name)";
+const DOC_BASIC = "title, file_name, file_type, file_url, source, created_at, updated_at";
+const columnsFor = (doc: string) => `id, status, resolution, admin_note, topic, description, confidence, similarity,
   created_at, resolved_at, document_a_id, document_b_id, chunk_a_index, chunk_b_index,
   chunk_a_page, chunk_b_page, statement_a, statement_b, excerpt_a, excerpt_b,
-  document_a:documents!document_conflicts_document_a_id_fkey(${DOC}),
-  document_b:documents!document_conflicts_document_b_id_fkey(${DOC}),
+  document_a:documents!document_conflicts_document_a_id_fkey(${doc}),
+  document_b:documents!document_conflicts_document_b_id_fkey(${doc}),
   chunk_a:document_chunks!document_conflicts_chunk_a_id_fkey(content, metadata),
   chunk_b:document_chunks!document_conflicts_chunk_b_id_fkey(content, metadata)`;
 
@@ -72,9 +78,18 @@ function toSide(row: ConflictRow, which: "a" | "b"): ConflictSideView {
   const chunk = one(which === "a" ? row.chunk_a : row.chunk_b);
   const statement = which === "a" ? row.statement_a : row.statement_b;
   const page = which === "a" ? row.chunk_a_page : row.chunk_b_page;
+  const stored = which === "a" ? row.excerpt_a : row.excerpt_b;
   // The chunk is gone once its document was re-processed: show the text as
-  // it was judged.
-  const text = chunk?.content ?? (which === "a" ? row.excerpt_a : row.excerpt_b) ?? statement ?? "";
+  // it was judged. A quote that runs across a chunk seam is only whole in the
+  // stored excerpt (the chunk and its neighbour, stitched): show that.
+  const acrossSeam =
+    !!statement &&
+    !!chunk?.content &&
+    !quoteAppearsIn(statement, chunk.content) &&
+    !!stored &&
+    quoteAppearsIn(statement, stored);
+  const text = (acrossSeam ? stored : chunk?.content) ?? stored ?? statement ?? "";
+  const emailDate = typeof doc?.email_meta?.date === "string" ? doc.email_meta.date : null;
   return {
     documentId: which === "a" ? row.document_a_id : row.document_b_id,
     title: doc?.title || "Untitled document",
@@ -87,6 +102,10 @@ function toSide(row: ConflictRow, which: "a" | "b"): ConflictSideView {
     location: formatChunkLocation(chunk?.metadata ?? (page != null ? { page } : null))?.label ?? null,
     statement,
     excerpt: excerptAround(text, statement),
+    createdAt: doc?.created_at ?? null,
+    updatedAt: doc?.updated_at ?? null,
+    emailDate,
+    divisions: (doc?.divisions ?? []).map((d) => d.name).filter((n): n is string => !!n),
   };
 }
 
@@ -111,26 +130,35 @@ async function loadConflicts(schoolId: string): Promise<ConflictsPageData> {
   // query is scoped to this school, and the layout and the check below only
   // let this school's admins (and super admins) in.
   const supabase = createAdminClient();
-  const [open, reviewed, scan] = await Promise.all([
-    supabase
-      .from("document_conflicts")
-      .select(COLUMNS)
-      .eq("school_id", schoolId)
-      .eq("status", "open")
-      .order("confidence", { ascending: false })
-      .order("created_at", { ascending: false })
-      .limit(LIST_LIMIT)
-      .returns<ConflictRow[]>(),
-    supabase
-      .from("document_conflicts")
-      .select(COLUMNS)
-      .eq("school_id", schoolId)
-      .in("status", ["resolved", "dismissed"])
-      .order("resolved_at", { ascending: false })
-      .limit(LIST_LIMIT)
-      .returns<ConflictRow[]>(),
+  const queryLists = (doc: string) =>
+    Promise.all([
+      supabase
+        .from("document_conflicts")
+        .select(columnsFor(doc))
+        .eq("school_id", schoolId)
+        .eq("status", "open")
+        .order("confidence", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(LIST_LIMIT)
+        .returns<ConflictRow[]>(),
+      supabase
+        .from("document_conflicts")
+        .select(columnsFor(doc))
+        .eq("school_id", schoolId)
+        .in("status", ["resolved", "dismissed"])
+        .order("resolved_at", { ascending: false })
+        .limit(LIST_LIMIT)
+        .returns<ConflictRow[]>(),
+    ]);
+  const [[firstOpen, firstReviewed], scan] = await Promise.all([
+    queryLists(DOC_FULL),
     latestScanRun(supabase, schoolId),
   ]);
+  const [open, reviewed] =
+    (firstOpen.error && !isNotInstalledError(firstOpen.error)) ||
+    (firstReviewed.error && !isNotInstalledError(firstReviewed.error))
+      ? await queryLists(DOC_BASIC)
+      : [firstOpen, firstReviewed];
 
   const notInstalled =
     !scan.installed || isNotInstalledError(open.error) || isNotInstalledError(reviewed.error);

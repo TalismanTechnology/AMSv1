@@ -4,6 +4,8 @@ import { isNotInstalledError } from "@/lib/supabase/not-installed";
 import {
   filterCandidates,
   indexReviewedConflicts,
+  isReviewedConflict,
+  MIN_CHUNK_TEXT_CHARS,
   pairKey,
   type CandidatePair,
   type ReviewedConflict,
@@ -11,7 +13,7 @@ import {
 } from "./candidates";
 import { nearestCrossDocumentPairs, normalizeVector, parseEmbedding, type EmbeddedChunk } from "./knn";
 import { callSplittingOnTimeout, packByChunkCount } from "./batches";
-import { storedExcerpt } from "./quotes";
+import { pinQuoteToWindow, stitchChunkWindow, storedExcerpt, type QuoteWindow } from "./quotes";
 import type { ScanRunSummary, ScanTrigger } from "./runs";
 import { JUDGE_BATCH_SIZE, judgePairs, verdictFor, type JudgePair, type Verdict } from "./judge";
 import { applyVerification, needsVerification, verifyConflict, type Verification } from "./verify";
@@ -32,13 +34,20 @@ import {
 // judged pair plus a conflict_scan_runs row. Shared by the admin action, the
 // daily cron and scripts/scan-conflicts.ts.
 //
+// Each side is judged as its matched chunk stitched with the chunks either
+// side of it (quotes.ts), since the deciding sentence is often just above or
+// below the passage that matched; the stored row points at whichever chunk
+// holds the quote.
+//
 // A dry run (write: false) reads only: no run row, no judged pairs. With
 // inMemoryFallback (the script), a dry run also works before migration 046:
 // candidates then come from the school's embeddings in memory (knn.ts).
-// Documents and chunks are only ever read.
+// Documents and chunks are only ever read. A full rescan (clearAutoDismissed)
+// deletes the school's auto_dismissed document_conflicts rows first — never
+// open, resolved or dismissed ones.
 
-export const DEFAULT_SIMILARITY_THRESHOLD = 0.85;
-export const DEFAULT_MAX_JUDGED = 40;
+export const DEFAULT_SIMILARITY_THRESHOLD = 0.78;
+export const DEFAULT_MAX_JUDGED = 80;
 const NEIGHBORS_PER_CHUNK = 8;
 const CANDIDATES_PER_CALL = 300;
 /** Candidates whose text is loaded for filtering, per pair to judge. */
@@ -48,6 +57,8 @@ const ID_BATCH = 100;
 /** Rows per page when reading a whole school's chunks or conflicts. */
 const PAGE_SIZE = 500;
 const MAX_REVIEWED_ROWS = 20_000;
+/** Documents per neighbouring-chunk query (each adds an or() clause). */
+const NEIGHBOR_DOC_BATCH = 25;
 const UNIQUE_VIOLATION = "23505";
 
 export type { ScanTrigger, ScanRunSummary } from "./runs";
@@ -71,6 +82,24 @@ export interface ScanOptions {
    * and memory-hungry — for scripts/scan-conflicts.ts, never a request.
    */
   inMemoryFallback?: boolean;
+  /**
+   * Dry run only: find candidates in memory even when find_conflict_candidates
+   * exists. That function leaves out every pair already in document_conflicts,
+   * so a dry-run rescan (with ignoreAutoDismissed) needs this to see them.
+   */
+  forceInMemory?: boolean;
+  /**
+   * Treat auto_dismissed rows as never judged: their pairs and statements
+   * don't skip a candidate. For a dry-run rescan; a writing rescan uses
+   * clearAutoDismissed instead.
+   */
+  ignoreAutoDismissed?: boolean;
+  /**
+   * Write only: delete the school's auto_dismissed document_conflicts rows
+   * before scanning, so every pass the model or the year check dismissed is
+   * judged again. Open, resolved and dismissed rows are never deleted.
+   */
+  clearAutoDismissed?: boolean;
   /** Progress lines (the script prints them). */
   log?: (message: string) => void;
 }
@@ -358,15 +387,18 @@ async function fetchJudgedKeys(
   supabase: SupabaseClient,
   schoolId: string,
   keys: string[],
-  optional: boolean
+  optional: boolean,
+  ignoreAutoDismissed = false
 ): Promise<Set<string>> {
   const judged = new Set<string>();
   for (const batch of chunked(keys, ID_BATCH)) {
-    const { data, error } = await supabase
+    let query = supabase
       .from("document_conflicts")
       .select("pair_key")
       .eq("school_id", schoolId)
       .in("pair_key", batch);
+    if (ignoreAutoDismissed) query = query.neq("status", "auto_dismissed");
+    const { data, error } = await query;
     if (error) {
       if (isNotInstalledError(error)) {
         if (optional) return judged;
@@ -386,16 +418,19 @@ async function fetchJudgedKeys(
 async function fetchReviewedConflicts(
   supabase: SupabaseClient,
   schoolId: string,
-  optional: boolean
+  optional: boolean,
+  ignoreAutoDismissed = false
 ): Promise<ReviewedConflict[]> {
   const rows: ReviewedConflict[] = [];
   for (let from = 0; from < MAX_REVIEWED_ROWS; from += PAGE_SIZE) {
-    const { data, error } = await supabase
+    let query = supabase
       .from("document_conflicts")
       .select("document_a_id, document_b_id, statement_a, statement_b")
       .eq("school_id", schoolId)
       .not("statement_a", "is", null)
-      .not("statement_b", "is", null)
+      .not("statement_b", "is", null);
+    if (ignoreAutoDismissed) query = query.neq("status", "auto_dismissed");
+    const { data, error } = await query
       .order("id", { ascending: true })
       .range(from, from + PAGE_SIZE - 1)
       .returns<ReviewedConflict[]>();
@@ -424,6 +459,37 @@ async function fetchChunks(supabase: SupabaseClient, ids: string[]): Promise<Map
   }
   return chunks;
 }
+
+const positionKey = (documentId: string, chunkIndex: number) => `${documentId}#${chunkIndex}`;
+
+/** Chunks at these (document, chunk_index) positions; missing ones are left out. */
+async function fetchChunksAt(
+  supabase: SupabaseClient,
+  positions: { document_id: string; chunk_index: number }[]
+): Promise<ChunkRow[]> {
+  const byDocument = new Map<string, Set<number>>();
+  for (const p of positions) {
+    if (p.chunk_index < 0) continue;
+    const set = byDocument.get(p.document_id) ?? new Set<number>();
+    set.add(p.chunk_index);
+    byDocument.set(p.document_id, set);
+  }
+  const rows: ChunkRow[] = [];
+  for (const batch of chunked([...byDocument.entries()], NEIGHBOR_DOC_BATCH)) {
+    const filter = batch
+      .map(([doc, indexes]) => `and(document_id.eq.${doc},chunk_index.in.(${[...indexes].join(",")}))`)
+      .join(",");
+    const { data, error } = await supabase
+      .from("document_chunks")
+      .select("id, document_id, chunk_index, content, metadata")
+      .or(filter);
+    if (error) throw new Error(`Reading neighbouring chunks failed: ${error.message}`);
+    rows.push(...((data ?? []) as ChunkRow[]));
+  }
+  return rows;
+}
+
+type ChunkWindow = QuoteWindow<ChunkRow>;
 
 type DocRow = {
   id: string;
@@ -532,6 +598,7 @@ export async function scanSchoolConflicts(
   } = options;
   // Never when writing: a write needs 046 for the rows anyway.
   const inMemoryFallback = !write && !!options.inMemoryFallback;
+  const forceInMemory = !write && !!options.forceInMemory;
 
   const result: ScanResult = {
     installed: true,
@@ -558,7 +625,18 @@ export async function scanSchoolConflicts(
     await runScan(
       supabase,
       schoolId,
-      { write, maxJudged, threshold, deadline, documentIds: options.documentIds, inMemoryFallback, log },
+      {
+        write,
+        maxJudged,
+        threshold,
+        deadline,
+        documentIds: options.documentIds,
+        inMemoryFallback,
+        forceInMemory,
+        ignoreAutoDismissed: !!options.ignoreAutoDismissed,
+        clearAutoDismissed: write && !!options.clearAutoDismissed,
+        log,
+      },
       result
     );
   } catch (err) {
@@ -585,6 +663,9 @@ async function runScan(
     deadline,
     documentIds,
     inMemoryFallback,
+    forceInMemory,
+    ignoreAutoDismissed,
+    clearAutoDismissed,
     log,
   }: {
     write: boolean;
@@ -593,21 +674,34 @@ async function runScan(
     deadline: number;
     documentIds?: string[] | null;
     inMemoryFallback: boolean;
+    forceInMemory: boolean;
+    ignoreAutoDismissed: boolean;
+    clearAutoDismissed: boolean;
     log: (message: string) => void;
   },
   result: ScanResult
 ): Promise<void> {
+  if (clearAutoDismissed) {
+    const cleared = await clearAutoDismissedConflicts(supabase, schoolId);
+    log(`Full rescan: cleared ${cleared} auto-dismissed pair(s).`);
+  }
+
   const sourceIds = documentIds ? [...new Set(documentIds)] : await readyDocumentIds(supabase, schoolId);
   result.documentsScanned = sourceIds.length;
   if (sourceIds.length === 0 || maxJudged <= 0) return;
 
   let fetched: CandidateFetch;
-  try {
-    fetched = await fetchCandidates(supabase, schoolId, sourceIds, threshold, deadline);
-  } catch (err) {
-    if (!(err instanceof NotInstalled) || !inMemoryFallback) throw err;
-    log("find_conflict_candidates isn't installed (migration 046): finding candidates in memory instead.");
+  if (forceInMemory) {
+    log("Rescan: finding candidates in memory, including pairs judged before.");
     fetched = await inMemoryCandidates(supabase, schoolId, documentIds ? sourceIds : null, threshold, log);
+  } else {
+    try {
+      fetched = await fetchCandidates(supabase, schoolId, sourceIds, threshold, deadline);
+    } catch (err) {
+      if (!(err instanceof NotInstalled) || !inMemoryFallback) throw err;
+      log("find_conflict_candidates isn't installed (migration 046): finding candidates in memory instead.");
+      fetched = await inMemoryCandidates(supabase, schoolId, documentIds ? sourceIds : null, threshold, log);
+    }
   }
   const { candidates, truncated } = fetched;
   result.truncated = truncated;
@@ -632,8 +726,14 @@ async function runScan(
   const poolChunkIds = [...new Set(pool.flatMap((c) => [c.chunk_a_id, c.chunk_b_id]))];
   const preloaded = fetched.chunks ?? new Map<string, ChunkRow>();
   const [judged, reviewed, loaded, documents] = await Promise.all([
-    fetchJudgedKeys(supabase, schoolId, pool.map((c) => pairKey(c.chunk_a_id, c.chunk_b_id)), optional),
-    fetchReviewedConflicts(supabase, schoolId, optional),
+    fetchJudgedKeys(
+      supabase,
+      schoolId,
+      pool.map((c) => pairKey(c.chunk_a_id, c.chunk_b_id)),
+      optional,
+      ignoreAutoDismissed
+    ),
+    fetchReviewedConflicts(supabase, schoolId, optional, ignoreAutoDismissed),
     fetchChunks(supabase, poolChunkIds.filter((id) => !preloaded.has(id))),
     fetchDocuments(supabase, [...new Set(pool.flatMap((c) => [c.document_a_id, c.document_b_id]))]),
   ]);
@@ -652,18 +752,62 @@ async function runScan(
     documentDates: documentDates.get(docId),
   });
 
-  const { selected, differentYear, skipped } = filterCandidates(
+  const reviewedIndex = indexReviewedConflicts(reviewed);
+  const filtered = filterCandidates(
     pool,
     {
       documents,
       chunks,
       judged,
-      reviewed: indexReviewedConflicts(reviewed),
+      reviewed: reviewedIndex,
       differentYear: (c, a, b) =>
         differentYearEvidence(yearSide(c.document_a_id, a), yearSide(c.document_b_id, b), range) !== null,
     },
-    { limit: maxJudged }
+    { limit: maxJudged, minTextChars: MIN_CHUNK_TEXT_CHARS }
   );
+  const { differentYear, skipped } = filtered;
+
+  // Each selected chunk with the chunks either side of it.
+  const atPosition = new Map<string, ChunkRow>();
+  const remember = (chunk: ChunkRow) => atPosition.set(positionKey(chunk.document_id, chunk.chunk_index), chunk);
+  for (const chunk of chunks.values()) remember(chunk);
+  const selectedChunks = [...new Set(filtered.selected.flatMap((c) => [c.chunk_a_id, c.chunk_b_id]))]
+    .map((id) => chunks.get(id)!)
+    .filter(Boolean);
+  const wanted = selectedChunks.flatMap((chunk) =>
+    [chunk.chunk_index - 1, chunk.chunk_index + 1].map((chunk_index) => ({
+      document_id: chunk.document_id,
+      chunk_index,
+    }))
+  );
+  if (preloaded.size > 0) {
+    const wantedKeys = new Set(wanted.map((p) => positionKey(p.document_id, p.chunk_index)));
+    for (const chunk of preloaded.values()) {
+      if (wantedKeys.has(positionKey(chunk.document_id, chunk.chunk_index))) remember(chunk);
+    }
+  }
+  const missing = wanted.filter((p) => p.chunk_index >= 0 && !atPosition.has(positionKey(p.document_id, p.chunk_index)));
+  for (const chunk of await fetchChunksAt(supabase, missing)) remember(chunk);
+  const windows = new Map<string, ChunkWindow>();
+  for (const current of selectedChunks) {
+    const prev = atPosition.get(positionKey(current.document_id, current.chunk_index - 1)) ?? null;
+    const next = atPosition.get(positionKey(current.document_id, current.chunk_index + 1)) ?? null;
+    windows.set(current.id, {
+      prev,
+      current,
+      next,
+      text: stitchChunkWindow(prev?.content ?? null, current.content, next?.content ?? null),
+    });
+  }
+  const windowOf = (chunkId: string) => windows.get(chunkId)!;
+
+  // A conflict already reviewed whose statement sits in a neighbour of this
+  // chunk (it was judged via the chunk above, say) isn't raised again.
+  const selected = filtered.selected.filter((c) => {
+    if (!isReviewedConflict(c, windowOf(c.chunk_a_id).text, windowOf(c.chunk_b_id).text, reviewedIndex)) return true;
+    skipped.already_reviewed++;
+    return false;
+  });
   Object.assign(result.skipped, Object.fromEntries(Object.entries(skipped).filter(([, n]) => n > 0)));
   if (unique.size > pool.length) {
     result.skipped.over_limit = (result.skipped.over_limit ?? 0) + unique.size - pool.length;
@@ -683,16 +827,16 @@ async function runScan(
   const oriented = selected.map(orient);
 
   const sideFor = (chunkId: string, docId: string): JudgePair["a"] => {
-    const chunk = chunks.get(chunkId)!;
+    const { current, text } = windowOf(chunkId);
     const doc = documents.get(docId);
     return {
       documentTitle: doc?.title ?? "Untitled document",
       documentDates: doc ? describeDates(doc) : "",
       source: doc?.source ?? (doc?.source_url ? "website" : null),
-      yearClues: describeYearClues(yearSide(docId, chunk.content), range),
+      yearClues: describeYearClues(yearSide(docId, text), range),
       divisions: doc?.divisions ?? [],
-      location: formatChunkLocation(chunk.metadata ?? undefined)?.label ?? null,
-      text: chunk.content,
+      location: formatChunkLocation(current.metadata ?? undefined)?.label ?? null,
+      text,
     };
   };
 
@@ -709,16 +853,16 @@ async function runScan(
       documentBType: docB?.file_type ?? null,
       documentASource: docA?.source ?? null,
       documentBSource: docB?.source ?? null,
-      chunkAId: c.chunk_a_id,
-      chunkBId: c.chunk_b_id,
+      chunkAId: chunkA.id,
+      chunkBId: chunkB.id,
       chunkAIndex: chunkA.chunk_index,
       chunkBIndex: chunkB.chunk_index,
     };
   };
   const rowFor = (c: CandidatePair, chunkA: ChunkRow, chunkB: ChunkRow) => ({
     school_id: schoolId,
-    chunk_a_id: c.chunk_a_id,
-    chunk_b_id: c.chunk_b_id,
+    chunk_a_id: chunkA.id,
+    chunk_b_id: chunkB.id,
     document_a_id: c.document_a_id,
     document_b_id: c.document_b_id,
     chunk_a_index: chunkA.chunk_index,
@@ -730,6 +874,14 @@ async function runScan(
 
   const batches = chunked(oriented, JUDGE_BATCH_SIZE);
   const rows: Record<string, unknown>[] = [];
+  // One row per chunk pair: the unique index is on pair_key.
+  const rowKeys = new Set<string>();
+  const pushRow = (row: Record<string, unknown>) => {
+    const key = pairKey(row.chunk_a_id as string, row.chunk_b_id as string);
+    if (rowKeys.has(key)) return;
+    rowKeys.add(key);
+    rows.push(row);
+  };
 
   // Different school years: stored auto-dismissed, never judged.
   for (const c of differentYear.map(orient)) {
@@ -753,7 +905,7 @@ async function runScan(
       statementB: "",
       confidence: 0,
     });
-    rows.push({
+    pushRow({
       ...rowFor(c, chunkA, chunkB),
       topic: null,
       description: evidence.slice(0, 1000),
@@ -790,9 +942,9 @@ async function runScan(
       batch.flatMap((c, k) => {
         const judgment = answers[w][k];
         if (!judgment) return [];
-        const chunkA = chunks.get(c.chunk_a_id)!;
-        const chunkB = chunks.get(c.chunk_b_id)!;
-        return [{ c, chunkA, chunkB, verdict: verdictFor(judgment, chunkA.content, chunkB.content, range) }];
+        const windowA = windowOf(c.chunk_a_id);
+        const windowB = windowOf(c.chunk_b_id);
+        return [{ c, windowA, windowB, verdict: verdictFor(judgment, windowA.text, windowB.text, range) }];
       })
     );
     // Every pair the judge kept open gets a skeptical second call.
@@ -807,7 +959,7 @@ async function runScan(
       )
     );
 
-    answered.forEach(({ c, chunkA, chunkB, verdict: judged }, n) => {
+    answered.forEach(({ c, windowA, windowB, verdict: judged }, n) => {
       const verification = verifications[n];
       const verdict = verification === undefined ? judged : applyVerification(judged, verification);
       // A failed verifier call: not stored, judged again next scan.
@@ -818,6 +970,13 @@ async function runScan(
         result.autoDismissed[verdict.reason] = (result.autoDismissed[verdict.reason] ?? 0) + 1;
       }
       const j = verdict.judgment;
+      const statementA = j.statement_a?.trim().slice(0, 1000) || null;
+      const statementB = j.statement_b?.trim().slice(0, 1000) || null;
+      // Point the row at the chunk that holds each quote.
+      const pinnedA = pinQuoteToWindow(windowA, statementA);
+      const pinnedB = pinQuoteToWindow(windowB, statementB);
+      const chunkA = pinnedA.chunk;
+      const chunkB = pinnedB.chunk;
       judgedViews.push({
         ...view(c, chunkA, chunkB),
         judgedByModel: true,
@@ -831,19 +990,33 @@ async function runScan(
         statementB: j.statement_b,
         confidence: j.confidence,
       });
-      const statementA = j.statement_a?.trim().slice(0, 1000) || null;
-      const statementB = j.statement_b?.trim().slice(0, 1000) || null;
-      rows.push({
+      pushRow({
         ...rowFor(c, chunkA, chunkB),
         topic: j.topic?.trim().slice(0, 200) || null,
         description: j.description?.trim().slice(0, 1000) || null,
         statement_a: statementA,
         statement_b: statementB,
-        excerpt_a: storedExcerpt(chunkA.content, statementA),
-        excerpt_b: storedExcerpt(chunkB.content, statementB),
+        excerpt_a: pinnedA.excerpt,
+        excerpt_b: pinnedB.excerpt,
         confidence: j.confidence,
         status: verdict.status,
       });
+      // Stored under a neighbour's chunk: mark the matched pair judged too, or
+      // find_conflict_candidates would offer it again on every scan.
+      if (pairKey(chunkA.id, chunkB.id) !== pairKey(c.chunk_a_id, c.chunk_b_id)) {
+        const original = { a: windowA.current, b: windowB.current };
+        pushRow({
+          ...rowFor(c, original.a, original.b),
+          topic: null,
+          description: "Judged via adjacent chunk.",
+          statement_a: null,
+          statement_b: null,
+          excerpt_a: storedExcerpt(original.a.content, null),
+          excerpt_b: storedExcerpt(original.b.content, null),
+          confidence: null,
+          status: "auto_dismissed",
+        });
+      }
     });
   }
 
@@ -852,21 +1025,46 @@ async function runScan(
 
   if (!write || rows.length === 0) return;
 
-  // Judged pairs were checked against pair_key before judging, so a plain
-  // insert. The unique index on pair_key is partial (046), which an upsert
+  // Candidates were checked against pair_key before judging, but a row moved
+  // to a neighbouring chunk names a pair that may already be stored.
+  const stored = await fetchJudgedKeys(supabase, schoolId, [...rowKeys], false);
+  const fresh = rows.filter(
+    (row) => !stored.has(pairKey(row.chunk_a_id as string, row.chunk_b_id as string))
+  );
+  if (fresh.length === 0) return;
+
+  // So a plain insert. The unique index on pair_key is partial (046), which an upsert
   // can't target; if a concurrent scan stored one of these pairs meanwhile,
   // insert row by row and let its first row — and any ruling on it — stand.
   const insert = (batch: Record<string, unknown>[]) => supabase.from("document_conflicts").insert(batch);
-  const { error } = await insert(rows);
+  const { error } = await insert(fresh);
   if (!error) return;
   if (isNotInstalledError(error)) throw new NotInstalled();
   if (error.code !== UNIQUE_VIOLATION) throw new Error(`Saving judged pairs failed: ${error.message}`);
-  for (const row of rows) {
+  for (const row of fresh) {
     const { error: rowError } = await insert([row]);
     if (rowError && rowError.code !== UNIQUE_VIOLATION) {
       throw new Error(`Saving judged pairs failed: ${rowError.message}`);
     }
   }
+}
+
+/**
+ * Full rescan: delete the school's auto_dismissed document_conflicts rows so
+ * their pairs are found and judged again. Only auto_dismissed — open,
+ * resolved and admin-dismissed rows are never touched. Returns how many went.
+ */
+export async function clearAutoDismissedConflicts(supabase: SupabaseClient, schoolId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from("document_conflicts")
+    .delete({ count: "exact" })
+    .eq("school_id", schoolId)
+    .eq("status", "auto_dismissed");
+  if (error) {
+    if (isNotInstalledError(error)) throw new NotInstalled();
+    throw new Error(`Clearing auto-dismissed pairs failed: ${error.message}`);
+  }
+  return count ?? 0;
 }
 
 /** The school's newest scan run; installed: false before migration 046. */

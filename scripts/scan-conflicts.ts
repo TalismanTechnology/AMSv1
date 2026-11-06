@@ -10,6 +10,8 @@
  *   npx tsx scripts/scan-conflicts.ts <school-id> --limit 10     # judge at most 10 pairs
  *   npx tsx scripts/scan-conflicts.ts <school-id> --json out.json # dry run, judgments also saved as JSON
  *   npx tsx scripts/scan-conflicts.ts <school-id> --write        # store judgments + a scan run
+ *   npx tsx scripts/scan-conflicts.ts <school-id> --rescan       # dry run that re-judges auto-dismissed pairs too
+ *   npx tsx scripts/scan-conflicts.ts <school-id> --rescan --write # delete auto_dismissed rows, then scan and store
  *
  * A dry run still calls Gemini for each judged pair (that's the point: see
  * what it would decide) but writes nothing to the database — no conflicts, no
@@ -20,6 +22,13 @@
  * embedding and finds near neighbours in memory (lib/conflicts/knn.ts) —
  * slower, and it reads the whole school, but the same candidates. --write
  * needs 046.
+ *
+ * --rescan treats auto_dismissed rows as never judged. As a dry run it finds
+ * candidates in memory (find_conflict_candidates leaves out pairs already in
+ * document_conflicts) and ignores auto_dismissed rows when skipping judged
+ * pairs — the database is not touched. With --write it deletes the school's
+ * auto_dismissed rows (never open, resolved or dismissed ones) first, like
+ * Admin > Conflicts > "Full rescan".
  *
  * Env: NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY and
  * GOOGLE_GENERATIVE_AI_API_KEY from the process env, or .env.local if present.
@@ -38,16 +47,18 @@ function parseArgs(argv: string[]) {
   let write = false;
   let limit = DEFAULT_MAX_JUDGED;
   let json: string | undefined;
+  let rescan = false;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--write") write = true;
+    else if (arg === "--rescan") rescan = true;
     else if (arg === "--limit") limit = Number(argv[++i]);
     else if (arg.startsWith("--limit=")) limit = Number(arg.slice("--limit=".length));
     else if (arg === "--json") json = argv[++i];
     else if (arg.startsWith("--json=")) json = arg.slice("--json=".length);
     else if (!arg.startsWith("--")) schoolId = arg;
   }
-  return { schoolId, write, limit, json };
+  return { schoolId, write, limit, json, rescan };
 }
 
 const clip = (s: string, n = 220) => {
@@ -56,7 +67,7 @@ const clip = (s: string, n = 220) => {
 };
 
 async function main() {
-  const { schoolId, write, limit, json } = parseArgs(process.argv.slice(2));
+  const { schoolId, write, limit, json, rescan } = parseArgs(process.argv.slice(2));
   if (
     !schoolId ||
     !/^[0-9a-f-]{36}$/i.test(schoolId) ||
@@ -64,7 +75,7 @@ async function main() {
     limit < 1 ||
     (json !== undefined && !json)
   ) {
-    console.error("Usage: tsx scripts/scan-conflicts.ts <school-id> [--write] [--limit N] [--json <path>]");
+    console.error("Usage: tsx scripts/scan-conflicts.ts <school-id> [--write] [--rescan] [--limit N] [--json <path>]");
     process.exit(1);
   }
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -98,12 +109,17 @@ async function main() {
     }
   }
 
-  console.log(`${write ? "WRITE" : "DRY RUN"} — ${school.name} (${school.id}), judging up to ${limit} pairs`);
+  console.log(
+    `${write ? "WRITE" : "DRY RUN"}${rescan ? " (full rescan)" : ""} — ${school.name} (${school.id}), judging up to ${limit} pairs`
+  );
   const result = await scanSchoolConflicts(supabase, schoolId, {
     write,
     trigger: "script",
     maxJudged: limit,
     inMemoryFallback: true,
+    forceInMemory: rescan && !write,
+    ignoreAutoDismissed: rescan && !write,
+    clearAutoDismissed: rescan && write,
     log: (message) => console.log(message),
   });
   if (!result.installed) {
@@ -114,7 +130,9 @@ async function main() {
     );
     process.exit(1);
   }
-  if (result.inMemory) console.log("(Candidates found in memory: migration 046 isn't applied.)");
+  if (result.inMemory && !(rescan && !write)) {
+    console.log("(Candidates found in memory: migration 046 isn't applied.)");
+  }
 
   console.log(
     `Scanned ${result.documentsScanned} documents: ${result.pairsConsidered} candidate pairs, ${result.pairsJudged} judged, ${result.conflictsFound} conflicts.`
@@ -152,6 +170,7 @@ async function main() {
     const report = {
       school: { id: school.id, name: school.name },
       mode: write ? "write" : "dry_run",
+      rescan,
       candidateSource: result.inMemory ? "in_memory" : "database",
       threshold: DEFAULT_SIMILARITY_THRESHOLD,
       generatedAt: new Date().toISOString(),

@@ -28,6 +28,7 @@ const MAX_NOTE_LENGTH = 2000;
 // The scan runs after the response; stop starting model calls before the
 // function's maxDuration (the conflicts page sets 300s).
 const SCAN_BUDGET_MS = 240_000;
+const FULL_RESCAN_MAX_JUDGED = 160;
 
 function friendlyDbError(error: { code?: string; message: string }): string {
   if (isNotInstalledError(error)) return CONFLICTS_NOT_INSTALLED_MESSAGE;
@@ -41,8 +42,15 @@ function revalidate() {
 /**
  * Start a conflict scan of the school's documents. Returns at once; the scan
  * runs in after() and the page polls the run row for progress.
+ *
+ * rescanAll ("Full rescan"): first delete the school's auto_dismissed rows,
+ * so passages the model or the year check dismissed before are judged again.
+ * Open, resolved and dismissed conflicts are kept.
  */
-export async function scanConflicts(schoolId: string): Promise<{ error?: string; runId?: string }> {
+export async function scanConflicts(
+  schoolId: string,
+  { rescanAll = false }: { rescanAll?: boolean } = {}
+): Promise<{ error?: string; runId?: string }> {
   const auth = await requireSchoolAdmin(schoolId);
   if ("error" in auth) return { error: auth.error };
 
@@ -62,13 +70,21 @@ export async function scanConflicts(schoolId: string): Promise<{ error?: string;
       trigger: "manual",
       runId: started.runId,
       requestedBy: auth.userId,
-      maxJudged: DEFAULT_MAX_JUDGED,
+      maxJudged: rescanAll ? FULL_RESCAN_MAX_JUDGED : DEFAULT_MAX_JUDGED,
       deadline,
+      clearAutoDismissed: rescanAll === true,
     });
     if (result.error) console.error(`[conflicts] Manual scan for ${schoolId} failed:`, result.error);
   });
 
-  logAudit(auth.userId, "conflict.scan", "conflict_scan_run", started.runId, undefined, schoolId);
+  logAudit(
+    auth.userId,
+    "conflict.scan",
+    "conflict_scan_run",
+    started.runId,
+    rescanAll ? { rescanAll: true } : undefined,
+    schoolId
+  );
   revalidate();
   return { runId: started.runId };
 }

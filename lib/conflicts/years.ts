@@ -267,9 +267,48 @@ export interface YearSide {
   documentDates?: WeekdayDate[];
 }
 
+const STANDING_POLICY_TITLE =
+  /\b(handbook|policy|policies|manual|guide|guidelines|code of conduct|dress code|directory|curriculum|tuition|financial aid)\b/i;
+
+/**
+ * A document that states standing rules (a handbook, policy, directory…).
+ * Schools keep these live across years without renaming them, so a year in
+ * the title ("MSHandbook 25.26") doesn't mean the rules in it are retired.
+ */
+export function isStandingPolicyTitle(title: string): boolean {
+  // "MSHandbook", "ParentHandbook_2025" → separate words for \b.
+  const words = title
+    .replace(/[_-]+/g, " ")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/([A-Z])([A-Z][a-z])/g, "$1 $2");
+  return STANDING_POLICY_TITLE.test(words);
+}
+
+/**
+ * A title without its years, numbers, copy markers and extension:
+ * "MSHandbook 25.26 (1).pdf" and "MSHandbook 26.27" are both "mshandbook".
+ */
+export function documentSeriesTitle(title: string): string {
+  return title
+    .replace(/\.[a-z0-9]{2,5}$/i, "")
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/\b(copy of|copy|final|draft|updated|revised|v)\b/gi, " ")
+    .replace(/[^\p{L}]+/gu, " ")
+    .trim()
+    .toLowerCase();
+}
+
+/** Two editions of one document series (last year's handbook and this year's)? */
+export function sameDocumentSeries(titleA: string, titleB: string): boolean {
+  const a = documentSeriesTitle(titleA);
+  return a.length > 0 && a === documentSeriesTitle(titleB);
+}
+
 function datesFor(side: YearSide, range: YearRange): WeekdayDate[] {
   const own = findWeekdayDates(side.text, range);
-  return own.length > 0 ? own : side.documentDates ?? [];
+  if (own.length > 0) return own;
+  // An undated rule in a handbook doesn't take its year from another page's calendar.
+  return isStandingPolicyTitle(side.title) ? [] : side.documentDates ?? [];
 }
 
 function describeDates(dates: WeekdayDate[]): string {
@@ -282,8 +321,19 @@ function describeDates(dates: WeekdayDate[]): string {
 /**
  * Why two candidate chunks belong to different school years, or null. Checked
  * before judging: such a pair is auto-dismissed without a model call.
+ *
+ * A standing policy document (handbook, policy, directory…) against anything
+ * but another edition of itself is never dismissed here: it stays live until
+ * the school retires it, so a newer notice that disagrees with it is exactly
+ * the conflict admins need to see, whatever year its title names.
  */
 export function differentYearEvidence(a: YearSide, b: YearSide, range: YearRange): string | null {
+  if (
+    (isStandingPolicyTitle(a.title) || isStandingPolicyTitle(b.title)) &&
+    !sameDocumentSeries(a.title, b.title)
+  ) {
+    return null;
+  }
   const titleA = findExplicitYears(a.title);
   const titleB = findExplicitYears(b.title);
   if (explicitYearsDiffer(titleA, titleB)) {
@@ -322,7 +372,7 @@ export function describeYearClues(side: YearSide, range: YearRange): string {
   if (own.length > 0) {
     const shown = own.slice(0, MAX_CLUE_DATES).map((d) => `"${d.text}" matches ${formatYears(d.years)}`);
     clues.push(`Weekday dates: ${shown.join("; ")}`);
-  } else if (side.documentDates?.length) {
+  } else if (side.documentDates?.length && !isStandingPolicyTitle(side.title)) {
     const years = [...new Set(side.documentDates.flatMap((d) => d.years))].sort((x, y) => x - y);
     clues.push(`Weekday dates elsewhere in this document match ${formatYears(years)}`);
   }

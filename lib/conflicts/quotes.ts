@@ -89,3 +89,124 @@ export function storedExcerpt(text: string, statement: string | null, radius = 7
   const e = excerptAround(text, statement, radius);
   return `${e.clippedStart ? "… " : ""}${e.before}${e.match}${e.after}${e.clippedEnd ? " …" : ""}`;
 }
+
+// ── Neighbouring chunks ──────────────────────────────────────────────────────
+// A chunk is ~1000 characters, split with ~200 of overlap. The sentence that
+// decides a conflict is often in the chunk above or below the one that
+// matched ("Winter dress code begins Monday, November 23 through Thursday,
+// February 25" heading chunk 0, the clothing list in chunk 1), so the judge
+// reads each side as the matched chunk with its neighbours.
+
+/** Normalized seam overlap, in characters, below which two chunks are just joined. */
+export const MIN_SEAM_OVERLAP = 25;
+/** The chunker's overlap is 200 characters; look a little further for safety. */
+const MAX_SEAM_SEARCH = 600;
+
+/**
+ * Lowercased, whitespace-collapsed text and, for each of its characters, the
+ * offset of that character in the original.
+ */
+function normalizeWithOffsets(text: string): { norm: string; offsets: number[] } {
+  let norm = "";
+  const offsets: number[] = [];
+  let pendingSpace = -1;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (/\s/.test(ch)) {
+      if (norm.length > 0 && pendingSpace < 0) pendingSpace = i;
+      continue;
+    }
+    if (pendingSpace >= 0) {
+      norm += " ";
+      offsets.push(pendingSpace);
+      pendingSpace = -1;
+    }
+    norm += ch.toLowerCase();
+    offsets.push(i);
+  }
+  return { norm, offsets };
+}
+
+/**
+ * Where `head` stops repeating the end of `tail`: the offset into `head` just
+ * after the longest overlap of at least MIN_SEAM_OVERLAP normalized
+ * characters, or 0 when they don't overlap.
+ */
+export function seamOverlapEnd(tail: string, head: string): number {
+  const t = normalizeWithOffsets(tail.slice(-MAX_SEAM_SEARCH)).norm;
+  const { norm: h, offsets } = normalizeWithOffsets(head);
+  if (t.length < MIN_SEAM_OVERLAP || h.length < MIN_SEAM_OVERLAP) return 0;
+  const probe = h.slice(0, MIN_SEAM_OVERLAP);
+  // Earliest start in the tail = longest overlap.
+  for (let p = t.indexOf(probe); p >= 0 && t.length - p >= MIN_SEAM_OVERLAP; p = t.indexOf(probe, p + 1)) {
+    const overlap = t.slice(p);
+    if (!h.startsWith(overlap)) continue;
+    return overlap.length >= h.length ? head.length : offsets[overlap.length];
+  }
+  return 0;
+}
+
+/**
+ * The matched chunk with the chunks either side of it, as one text, the text
+ * the chunker repeated at each seam kept once. Chunks that don't overlap are
+ * separated by a blank line.
+ */
+export function stitchChunkWindow(prev: string | null, current: string, next: string | null): string {
+  let out = current.trim();
+  if (prev?.trim()) {
+    const p = prev.trim();
+    const cut = seamOverlapEnd(p, out);
+    out = cut > 0 ? p + out.slice(cut) : `${p}\n\n${out}`;
+  }
+  if (next?.trim()) {
+    const n = next.trim();
+    const cut = seamOverlapEnd(out, n);
+    out = cut > 0 ? out + n.slice(cut) : `${out}\n\n${n}`;
+  }
+  return out;
+}
+
+export type WindowPart = "prev" | "current" | "next";
+
+/**
+ * Which chunk of a window holds `quote`: the matched chunk when it does,
+ * else the neighbour that does. A quote across a seam (in neither chunk
+ * alone) stays with the matched chunk.
+ */
+export function locateQuoteInWindow(
+  quote: string,
+  prev: string | null,
+  current: string,
+  next: string | null
+): WindowPart {
+  if (quoteAppearsIn(quote, current)) return "current";
+  if (prev && quoteAppearsIn(quote, prev)) return "prev";
+  if (next && quoteAppearsIn(quote, next)) return "next";
+  return "current";
+}
+
+/** A matched chunk with its neighbours, and the three stitched into one text. */
+export interface QuoteWindow<T extends { content: string }> {
+  prev: T | null;
+  current: T;
+  next: T | null;
+  /** stitchChunkWindow() of the three. */
+  text: string;
+}
+
+/**
+ * The chunk of a window that holds `statement`, and the excerpt to store for
+ * it: that chunk's text around the quote, or the stitched window's when the
+ * quote runs across a seam (so the admin page can still highlight it). With
+ * no statement, the matched chunk.
+ */
+export function pinQuoteToWindow<T extends { content: string }>(
+  w: QuoteWindow<T>,
+  statement: string | null
+): { chunk: T; part: WindowPart; excerpt: string } {
+  if (!statement) return { chunk: w.current, part: "current", excerpt: storedExcerpt(w.current.content, null) };
+  const part = locateQuoteInWindow(statement, w.prev?.content ?? null, w.current.content, w.next?.content ?? null);
+  const chunk = (part === "prev" ? w.prev : part === "next" ? w.next : null) ?? w.current;
+  const acrossSeam = !quoteAppearsIn(statement, chunk.content) && quoteAppearsIn(statement, w.text);
+  return { chunk, part, excerpt: storedExcerpt(acrossSeam ? w.text : chunk.content, statement) };
+}
