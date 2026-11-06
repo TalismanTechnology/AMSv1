@@ -28,7 +28,7 @@ export function ClosingCta() {
             />
             <div className="relative max-w-xl lg:max-w-[52%]">
               <p className="eyebrow !text-white/50">For schools</p>
-              <h2 className="mt-4 text-3xl leading-[1.12] tracking-tight sm:text-4xl lg:text-[2.9rem]">
+              <h2 className="font-serif-display mt-4 text-3xl leading-[1.14] tracking-tight sm:text-4xl lg:text-[2.9rem]">
                 <span className="text-white">Answers parents can trust.</span>
                 <br />
                 <span className="text-white/55">Bring it to your school.</span>

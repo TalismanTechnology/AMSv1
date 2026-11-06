@@ -10,6 +10,27 @@
         --forest: #2d3a2e;
         --muted: #6b705f;
       }
+      @font-face {
+        font-family: "Yeseva One";
+        src: url("./fonts/YesevaOne-Regular.ttf") format("truetype");
+        font-weight: 400;
+        font-style: normal;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: "Josefin Sans";
+        src: url("./fonts/JosefinSans-Regular.ttf") format("truetype");
+        font-weight: 400;
+        font-style: normal;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: "Josefin Sans";
+        src: url("./fonts/JosefinSans-SemiBold.ttf") format("truetype");
+        font-weight: 600;
+        font-style: normal;
+        font-display: swap;
+      }
       body {
         margin: 0;
         min-height: 100vh;
@@ -17,7 +38,8 @@
         place-items: center;
         background: var(--cream);
         color: var(--forest);
-        font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif;
+        font-family: "Josefin Sans", -apple-system, sans-serif;
+        font-weight: 400;
         text-align: center;
         padding: 24px;
         box-sizing: border-box;
@@ -25,7 +47,7 @@
         user-select: none;
       }
       svg { width: 56px; height: 56px; margin-bottom: 20px; }
-      h1 { font-weight: 300; letter-spacing: -0.02em; margin: 0 0 12px; }
+      h1 { font-family: "Yeseva One", Georgia, serif; font-weight: 400; letter-spacing: -0.01em; margin: 0 0 12px; }
       p { color: var(--muted); margin: 0 auto 24px; max-width: 320px; line-height: 1.45; }
       button {
         appearance: none;

@@ -6,6 +6,27 @@
     <meta name="theme-color" content="#faf8f5" />
     <title>Offline · AskMySchool</title>
     <style>
+      @font-face {
+        font-family: "Yeseva One";
+        src: url("/fonts/YesevaOne-Regular.ttf") format("truetype");
+        font-weight: 400;
+        font-style: normal;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: "Josefin Sans";
+        src: url("/fonts/JosefinSans-Regular.ttf") format("truetype");
+        font-weight: 400;
+        font-style: normal;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: "Josefin Sans";
+        src: url("/fonts/JosefinSans-SemiBold.ttf") format("truetype");
+        font-weight: 600;
+        font-style: normal;
+        font-display: swap;
+      }
       html,
       body {
         height: 100%;
@@ -19,8 +40,8 @@
         box-sizing: border-box;
         background: #faf8f5;
         color: #2d3a2e;
-        font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        font-weight: 300;
+        font-family: "Josefin Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-weight: 400;
         text-align: center;
       }
       main {
@@ -28,8 +49,9 @@
       }
       h1 {
         margin: 20px 0 8px;
-        font-size: 1.25rem;
-        font-weight: 600;
+        font-family: "Yeseva One", Georgia, serif;
+        font-size: 1.5rem;
+        font-weight: 400;
         letter-spacing: -0.01em;
       }
       p {
@@ -46,6 +68,7 @@
         color: #fff;
         font: inherit;
         font-size: 0.875rem;
+        font-weight: 600;
         cursor: pointer;
       }
     </style>

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist_Mono, Inter } from "next/font/google";
+import { Geist_Mono, Josefin_Sans, Yeseva_One } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { NativeBridge } from "@/components/native/native-bridge";
@@ -7,17 +7,20 @@ import { NativeShell } from "@/components/native/native-shell";
 import { PwaSetup } from "@/components/pwa/pwa-setup";
 import "./globals.css";
 
-// The whole UI sets in Inter (the `--font-sans` stack in globals.css), at a
-// light base weight to keep the airy look the UI had with Helvetica Neue
-// Light. next/font downloads Inter (SIL Open Font License) at build time and
-// serves it from our own domain: no third-party font request at runtime, so
-// visitors' IPs aren't sent to a font CDN, and no unlicensed Helvetica Neue
-// files. It's a variable font, so real 300-700 weights replace the synthetic
-// bold the single-weight Helvetica face needed.
-//
-// The variable goes on <html> so the :root `--font-sans` token can resolve it.
-const inter = Inter({
-  variable: "--font-inter",
+// Site & app font pairing: Yeseva One for display/headings (`--font-serif`)
+// and Josefin Sans for body and UI copy (`--font-sans`). Both are self-hosted
+// at build time by next/font and placed on <html> so root tokens and portals
+// resolve them everywhere across web and the Capacitor iOS/Android shell.
+const josefinSans = Josefin_Sans({
+  variable: "--font-josefin-sans",
+  subsets: ["latin"],
+  style: ["normal", "italic"],
+  display: "swap",
+});
+
+const yesevaOne = Yeseva_One({
+  weight: "400",
+  variable: "--font-yeseva-one",
   subsets: ["latin"],
   display: "swap",
 });
@@ -56,7 +59,7 @@ export default function RootLayout({
     // Browser extensions (e.g. QuillBot's data-qb-installed) stamp attributes
     // onto <html> before hydration. This only silences attribute mismatches on
     // this one element, not on anything inside it.
-    <html lang="en" className={inter.variable} suppressHydrationWarning>
+    <html lang="en" className={`${josefinSans.variable} ${yesevaOne.variable}`} suppressHydrationWarning>
       <body className={`${geistMono.variable} antialiased`}>
         <div
           style={{

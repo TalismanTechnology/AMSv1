@@ -171,7 +171,7 @@ function StackCard({
       <div className="grid grid-cols-1 gap-8 p-7 sm:p-10 md:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] md:items-center md:gap-12 lg:p-14">
         <div>
           <StepCounter index={index} count={count} isAccent={isAccent} />
-          <p className={`mt-6 overflow-hidden text-5xl tracking-tight tabular-nums sm:text-6xl ${numeral}`}>
+          <p className={`font-serif-display mt-6 overflow-hidden text-5xl tracking-tight tabular-nums sm:text-6xl ${numeral}`}>
             <motion.span
               className="inline-block"
               variants={{
@@ -182,7 +182,7 @@ function StackCard({
               {step.n}
             </motion.span>
           </p>
-          <h3 className="mt-5 text-2xl leading-snug tracking-tight sm:text-3xl">
+          <h3 className="font-serif-display mt-5 text-2xl leading-snug tracking-tight sm:text-3xl">
             <RisingWords text={step.title} delay={0.12} />
           </h3>
           <motion.p
