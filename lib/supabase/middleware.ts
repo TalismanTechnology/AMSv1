@@ -288,7 +288,7 @@ function redirectResponse(request: NextRequest, path: string): NextResponse {
 
 function authUnavailableResponse(): NextResponse {
   return new NextResponse(
-    '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="5"><title>AskMySchool</title><p style="font-family:system-ui,sans-serif;text-align:center;margin-top:30vh">Having trouble reaching the server. Retrying…</p>',
+    '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="5"><title>AskMySchool</title><p style="font-family:&quot;Josefin Sans&quot;,system-ui,sans-serif;text-align:center;margin-top:30vh">Having trouble reaching the server. Retrying…</p>',
     {
       status: 503,
       headers: {

@@ -2,20 +2,9 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { Instrument_Serif } from "next/font/google";
 import { ChevronDown } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { InstallAppButton } from "@/components/shared/install-app-button";
-
-// The headline's display face: an editorial serif with a true italic, to
-// suit the old-schoolhouse scene. Everything else on the page stays in the
-// light Inter UI face, so this is loaded here, for the hero only.
-const heroSerif = Instrument_Serif({
-  weight: "400",
-  style: ["normal", "italic"],
-  subsets: ["latin"],
-  display: "swap",
-});
 
 // Opening viewport of the landing page: a fixed nav that turns cream once
 // scrolled, then a full-bleed landscape video with the headline centred over
@@ -85,7 +74,7 @@ function Navbar() {
               aria-label="AskMySchool home"
             >
               <Logo size={20} className="text-brand-dark" />
-              <span className="text-xl text-brand-dark tracking-tight">
+              <span className="font-serif-display text-xl text-brand-dark tracking-tight">
                 AskMySchool
               </span>
             </Link>
@@ -208,14 +197,14 @@ export function VideoHero({ children }: { children?: ReactNode }) {
               each rises in turn. */}
           <h1
             id="landing-heading"
-            className={`${heroSerif.className} text-brand-dark text-[min(clamp(2.75rem,1.2rem+4.6vw,5.75rem),10svh)] leading-[0.98] tracking-[-0.02em]`}
+            className="font-serif-display text-brand-dark text-[min(clamp(2.25rem,1rem+3.8vw,4.65rem),9.2svh)] leading-[1.06] tracking-[-0.015em]"
           >
             <span className="block animate-fade-up stagger-4">
               Every school question,
             </span>
             <span className="block animate-fade-up stagger-5">
               answered from{" "}
-              <span className="italic text-brand-green">official sources.</span>
+              <span className="text-brand-green">official sources.</span>
             </span>
           </h1>
 

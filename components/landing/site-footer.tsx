@@ -42,7 +42,7 @@ export function SiteFooter() {
         <div>
           <div className="flex items-center gap-2">
             <Logo size={20} className="text-brand-dark" />
-            <span className="text-base tracking-tight text-brand-dark">AskMySchool</span>
+            <span className="font-serif-display text-base tracking-tight text-brand-dark">AskMySchool</span>
           </div>
           <p className="mt-3 max-w-xs text-sm text-muted-foreground">
             An assistant that answers parents&apos; questions from the

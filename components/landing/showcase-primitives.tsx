@@ -8,7 +8,7 @@ import { BlurReveal } from "@/components/motion";
 // section headings, rounded tiles (white, or the forest "accent"), inline
 // heading chips, captions that sit under a tile, and the number/title/body
 // rows of the stats column. Everything sits on the app's cream / forest
-// tokens; headings are the light Inter face with tight tracking.
+// tokens; headings use Yeseva One and body copy uses Josefin Sans.
 
 /** A muted word inside a heading — the second tone of the two-tone title. */
 export function Muted({ children }: { children: ReactNode }) {
@@ -110,7 +110,7 @@ export function Chip({
 }) {
   return (
     <span
-      className="mx-0.5 inline-flex translate-y-[-0.08em] items-center gap-1.5 rounded-full px-2.5 py-0.5 align-middle text-[0.82em] font-medium leading-none"
+      className="font-sans mx-0.5 inline-flex translate-y-[-0.08em] items-center gap-1.5 rounded-full px-2.5 py-0.5 align-middle text-[0.78em] font-medium leading-none"
       style={chipStyle}
     >
       <Icon className="size-[0.9em]" aria-hidden="true" />
@@ -134,7 +134,7 @@ export function FeatureCard({
   const body = tone === "accent" ? "text-white/70" : "text-ink-soft";
   return (
     <Tile tone={tone} className="flex h-full flex-col p-6 sm:p-8">
-      <h3 className="text-xl leading-snug tracking-tight sm:text-2xl">
+      <h3 className="font-serif-display text-xl leading-snug tracking-tight sm:text-2xl">
         {title}
       </h3>
       <p className={`mt-2.5 max-w-md text-sm leading-relaxed sm:text-[15px] ${body}`}>

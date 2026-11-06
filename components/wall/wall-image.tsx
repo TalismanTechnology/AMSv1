@@ -34,7 +34,7 @@ export function WallImage({ stats, w, h, layout }: { stats: WallStats; w: number
         overflow: "hidden",
         backgroundImage: "linear-gradient(160deg, #07110d 0%, #0b1a14 55%, #081410 100%)",
         color: INK,
-        fontFamily: "Liberation Sans",
+        fontFamily: "Josefin Sans",
       }}
     >
       <Blob size={90 * vmax} left={-25 * vmax} top={-20 * vmax} color="47,93,74" alpha={0.8} />
@@ -167,7 +167,7 @@ function Brand({ size }: { size: number }) {
           <path d={BODY_PATH.d} transform={`translate(${BODY_PATH.translateX},${BODY_PATH.translateY})`} />
         </g>
       </svg>
-      <span style={{ fontSize: size * 0.75, fontWeight: 700, letterSpacing: "-0.01em" }}>AskMySchool</span>
+      <span style={{ fontFamily: "Yeseva One", fontSize: size * 0.75, fontWeight: 400, letterSpacing: "-0.01em" }}>AskMySchool</span>
     </div>
   );
 }
@@ -195,9 +195,10 @@ function Hero({ stats, label, number, sub }: { stats: WallStats; label: number; 
       <span style={{ fontSize: label, letterSpacing: "0.32em", color: AMBER }}>PARENTS ON ASKMYSCHOOL</span>
       <span
         style={{
+          fontFamily: "Yeseva One",
           fontSize: number,
-          fontWeight: 700,
-          letterSpacing: "-0.04em",
+          fontWeight: 400,
+          letterSpacing: "-0.02em",
           lineHeight: 1,
           marginTop: number * 0.08,
           color: INK,
@@ -241,8 +242,9 @@ function Tile({ label, value, sub, u, width }: { label: string; value: string; s
       <span style={{ fontSize: 1.2 * u, letterSpacing: "0.12em", color: MUTED }}>{label}</span>
       <span
         style={{
+          fontFamily: "Yeseva One",
           fontSize: 4.4 * u,
-          fontWeight: 700,
+          fontWeight: 400,
           lineHeight: 1.1,
           marginTop: 0.5 * u,
           color: INK,

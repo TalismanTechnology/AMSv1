@@ -94,9 +94,9 @@
   100% { transform: translate3d(3vmax, -40vh, 0); opacity: 0; }
 }
 
-/* Weight comes from .font-serif-display (light, set !important globally). */
+/* Display face: Yeseva One (400) via .font-serif-display. */
 .heroNumber {
-  letter-spacing: -0.04em;
+  letter-spacing: -0.02em;
   line-height: 0.95;
   color: #fdf6e8;
   text-shadow:
