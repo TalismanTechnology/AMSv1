@@ -476,6 +476,27 @@
   }
 }
 
+/* ===== INDETERMINATE PROGRESS — segment sweeps the track (no percentage) =====
+   The segment is 40% of the track, so -100% → 250% of its own width crosses
+   the whole track. */
+
+@keyframes indeterminate-progress {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(250%); }
+}
+
+.indeterminate-progress-bar {
+  animation: indeterminate-progress 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .indeterminate-progress-bar {
+    animation: none;
+    width: 100%;
+    opacity: 0.5;
+  }
+}
+
 /* ===== FAB AMBIENT GLOW PULSE ===== */
 
 @keyframes fab-glow-pulse {
