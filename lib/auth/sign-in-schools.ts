@@ -100,8 +100,7 @@ async function getRosterSignInSchools(): Promise<SchoolRow[]> {
     const rows = (data ?? []) as SchoolRow[];
     const ready = await Promise.all(
       rows.map(async (school) => {
-        const summary = await getRosterSummary(school.id);
-        return summary.installed && summary.activeCount > 0 ? school : null;
+        return isRosterReady(await getRosterSummary(school.id)) ? school : null;
       })
     );
     return ready.filter((school): school is SchoolRow => school !== null);
@@ -125,17 +124,39 @@ export async function getSchoolEnvironmentId(schoolId: string): Promise<string |
   return data?.environment_id ?? null;
 }
 
+/** A roster school can take sign-ins once 045 is applied and someone is active on it. */
+function isRosterReady(summary: Awaited<ReturnType<typeof getRosterSummary>>): boolean {
+  return summary.installed && summary.activeCount > 0;
+}
+
+/** Injectable lookups for getSchoolSignIn; tests pass fakes, production uses the real ones. */
+export interface SchoolSignInDeps {
+  getVeracrossConnection?: (schoolId: string) => Promise<unknown>;
+  getSchoolEnvironmentId?: (schoolId: string) => Promise<string | null>;
+  getRosterSummary?: typeof getRosterSummary;
+}
+
 /** Which provider a school uses, and whether its parents can sign in yet. */
-export async function getSchoolSignIn(school: {
-  id: string;
-  auth_provider?: string | null;
-}): Promise<{ provider: AuthProvider; enabled: boolean }> {
+export async function getSchoolSignIn(
+  school: {
+    id: string;
+    auth_provider?: string | null;
+  },
+  deps: SchoolSignInDeps = {}
+): Promise<{ provider: AuthProvider; enabled: boolean }> {
   const provider = resolveAuthProvider(school.auth_provider);
 
   const enabled =
     provider === "veracross"
-      ? Boolean(await getVeracrossConnection(school.id))
-      : Boolean(await getSchoolEnvironmentId(school.id));
+      ? Boolean(await (deps.getVeracrossConnection ?? getVeracrossConnection)(school.id))
+      : provider === "roster"
+        ? await (deps.getRosterSummary ?? getRosterSummary)(school.id).then(isRosterReady, (caught: unknown) => {
+            // Fail closed like the other providers rather than break the login page.
+            const message = caught instanceof Error ? caught.message : "Unknown error";
+            console.error(`Could not check roster sign-in: ${message}`);
+            return false;
+          })
+        : Boolean(await (deps.getSchoolEnvironmentId ?? getSchoolEnvironmentId)(school.id));
 
   return { provider, enabled };
 }
