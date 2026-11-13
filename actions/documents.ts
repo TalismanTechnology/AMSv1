@@ -9,6 +9,7 @@ import { isBlockedFile, fileTypeFromName } from "@/lib/documents/file-types";
 import { enqueueDocumentPush } from "@/lib/push/document-push-runner";
 import { APPROVAL_MAX_AGE_MS } from "@/lib/push/document-push";
 import { stripMarkdown } from "@/lib/markdown/normalize";
+import { schoolLockError } from "@/lib/school-lock/access";
 
 function triggerProcessing(documentId: string) {
   // Use after() so processing runs after the response is sent.
@@ -30,6 +31,8 @@ export async function uploadDocument(formData: FormData) {
   } = await supabase.auth.getUser();
 
   if (!user) return { error: "Not authenticated" };
+  const locked = await schoolLockError(formData.get("school_id") as string, "admin", user.id);
+  if (locked) return { error: locked };
 
   const file = formData.get("file") as File;
   const title = formData.get("title") as string;
@@ -127,6 +130,8 @@ export async function createDocumentRecord(params: {
   } = await supabase.auth.getUser();
 
   if (!user) return { error: "Not authenticated" };
+  const locked = await schoolLockError(params.schoolId, "admin", user.id);
+  if (locked) return { error: locked };
 
   const { data: doc, error: insertError } = await supabase
     .from("documents")
@@ -177,6 +182,8 @@ export async function deleteDocument(documentId: string, schoolId: string) {
   } = await supabase.auth.getUser();
 
   if (!user) return { error: "Not authenticated" };
+  const locked = await schoolLockError(schoolId, "admin", user.id);
+  if (locked) return { error: locked };
 
   const { data: doc } = await supabase
     .from("documents")
@@ -217,6 +224,8 @@ export async function bulkDeleteDocuments(ids: string[], schoolId: string) {
   } = await supabase.auth.getUser();
 
   if (!user) return { error: "Not authenticated" };
+  const locked = await schoolLockError(schoolId, "admin", user.id);
+  if (locked) return { error: locked };
 
   const { data: docs } = await supabase
     .from("documents")
@@ -255,6 +264,8 @@ export async function approveDocument(documentId: string, schoolId: string) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const locked = await schoolLockError(schoolId, "admin", user?.id ?? null);
+  if (locked) return { error: locked };
 
   const { data: approved, error } = await supabase
     .from("documents")
@@ -300,6 +311,8 @@ export async function updateDocument(
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const locked = await schoolLockError(schoolId, "admin", user?.id ?? null);
+  if (locked) return { error: locked };
 
   const { division_ids, ...fields } = data;
 
@@ -412,6 +425,8 @@ export async function searchDocumentsByName(
   } = await supabase.auth.getUser();
 
   if (!user) return { error: "Not authenticated", documents: [] };
+  const locked = await schoolLockError(schoolId, "member", user.id);
+  if (locked) return { error: locked, documents: [] };
 
   // Sanitize query for use in PostgREST filter strings — escape special chars
   const sanitized = query.replace(/[%_\\,.()"']/g, "");
@@ -462,6 +477,8 @@ export async function searchDocumentContent(
   } = await supabase.auth.getUser();
 
   if (!user) return { error: "Not authenticated", results: [] };
+  const locked = await schoolLockError(schoolId, "member", user.id);
+  if (locked) return { error: locked, results: [] };
 
   const { data, error } = await supabase.rpc("search_document_chunks", {
     p_school_id: schoolId,

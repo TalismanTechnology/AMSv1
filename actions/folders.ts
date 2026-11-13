@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { schoolLockError } from "@/lib/school-lock/access";
 
 export async function createFolder(
   schoolId: string,
@@ -13,6 +14,8 @@ export async function createFolder(
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
+  const locked = await schoolLockError(schoolId, "admin", user.id);
+  if (locked) return { error: locked };
 
   const { error } = await supabase.from("folders").insert({
     name: data.name,
@@ -34,6 +37,8 @@ export async function renameFolder(folderId: string, schoolId: string, name: str
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
+  const locked = await schoolLockError(schoolId, "admin", user.id);
+  if (locked) return { error: locked };
 
   const { error } = await supabase
     .from("folders")
@@ -51,6 +56,8 @@ export async function deleteFolder(folderId: string, schoolId: string) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
+  const locked = await schoolLockError(schoolId, "admin", user.id);
+  if (locked) return { error: locked };
 
   const { error } = await supabase
     .from("folders")
@@ -72,6 +79,8 @@ export async function moveDocumentToFolder(
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
+  const locked = await schoolLockError(schoolId, "admin", user.id);
+  if (locked) return { error: locked };
 
   const { error } = await supabase
     .from("documents")

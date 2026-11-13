@@ -4,6 +4,8 @@ import { isTransientAuthError } from "@/lib/supabase/response-cookies";
 import { redirect, notFound } from "next/navigation";
 import { cache } from "react";
 import type { School, SchoolMembership, UserRole } from "@/lib/types";
+import { superAdminLockedOut } from "@/lib/school-lock/access";
+import { hasGenuineAccess } from "@/lib/school-lock/core";
 
 /**
  * Resolve a school from its slug. Cached per request.
@@ -102,7 +104,16 @@ export const requireSchoolContext = cache(async function requireSchoolContext(
   ]);
 
   if (profile?.role === "super_admin") {
-    return { user, school, role: "admin" as const, isSuperAdmin: true };
+    // The school's owner lock keeps a super-admin who is only here through
+    // platform privileges out until they enter its password. Their own
+    // membership (if any) still applies as it would for anyone else.
+    if (
+      hasGenuineAccess(membership, "admin") ||
+      !(await superAdminLockedOut(user.id, school.id))
+    ) {
+      return { user, school, role: "admin" as const, isSuperAdmin: true };
+    }
+    if (!membership?.approved) redirect(`/s/${slug}/unlock`);
   }
 
   if (!membership) {

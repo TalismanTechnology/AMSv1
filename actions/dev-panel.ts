@@ -8,6 +8,7 @@ import { logAudit } from "@/lib/audit";
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
 import { TEXT_MODEL_ID } from "@/lib/ai/models";
+import { assertSchoolNotLocked } from "@/lib/school-lock/access";
 
 // --- Auth guard ---
 
@@ -25,7 +26,10 @@ async function requireAdmin(schoolId: string) {
     .eq("id", user.id)
     .single();
 
-  if (profile?.role === "super_admin") return user;
+  if (profile?.role === "super_admin") {
+    await assertSchoolNotLocked(schoolId, "admin", user.id);
+    return user;
+  }
 
   // Check school_memberships for admin role
   const { data: membership } = await supabase

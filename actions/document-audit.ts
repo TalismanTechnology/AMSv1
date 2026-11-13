@@ -10,6 +10,7 @@ import {
 } from "@/lib/ai/document-audit";
 import { categoryLabels } from "@/lib/documents/division-categories";
 import { adminSafeErrorMessage } from "@/lib/alerts/ai-failure-alert";
+import { assertSchoolNotLocked } from "@/lib/school-lock/access";
 
 export interface StoredAudit {
   id: string;
@@ -28,6 +29,7 @@ export async function runDocumentAudit(schoolId: string): Promise<StoredAudit> {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
+  await assertSchoolNotLocked(schoolId, "admin", user.id);
 
   // Fetch documents with category and folder names
   const { data: documents } = await supabase
@@ -116,6 +118,7 @@ export async function getLatestAudit(
   schoolId: string
 ): Promise<StoredAudit | null> {
   const supabase = await createClient();
+  await assertSchoolNotLocked(schoolId, "admin");
 
   const { data } = await supabase
     .from("document_audits")

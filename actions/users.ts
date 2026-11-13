@@ -6,12 +6,15 @@ import { logAudit } from "@/lib/audit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireSchoolAdmin } from "@/lib/auth/require-school-admin";
 import { deleteAccount } from "@/lib/account/delete-account";
+import { schoolLockError } from "@/lib/school-lock/access";
 
 export async function approveUser(userId: string, schoolId: string) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const locked = await schoolLockError(schoolId, "admin", user?.id ?? null);
+  if (locked) return { error: locked };
 
   const { error } = await supabase
     .from("school_memberships")
@@ -32,6 +35,8 @@ export async function approveAllPending(schoolId: string) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const locked = await schoolLockError(schoolId, "admin", user?.id ?? null);
+  if (locked) return { error: locked };
 
   const { data: pending } = await supabase
     .from("school_memberships")
@@ -59,6 +64,8 @@ export async function changeUserRole(userId: string, role: "admin" | "parent", s
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const locked = await schoolLockError(schoolId, "admin", user?.id ?? null);
+  if (locked) return { error: locked };
 
   const { error } = await supabase
     .from("school_memberships")
