@@ -7,6 +7,7 @@ import type { createAdminClient } from "@/lib/supabase/admin";
 import { countSchools, loadHeadlineMetrics } from "@/lib/metrics/load";
 import { ANSWER_RATE_DAYS } from "@/lib/metrics/windows";
 import { SPARKLINE_DAYS, type WallStats } from "./aggregate";
+import { loadSchoolLock } from "@/lib/school-lock/store";
 
 type AdminClient = ReturnType<typeof createAdminClient>;
 
@@ -21,7 +22,15 @@ export async function loadWallStats(supabase: AdminClient, now = new Date()): Pr
     supabase.from("schools").select("id").eq("slug", COLLEGIATE_SLUG).maybeSingle(),
   ]);
   const collegiateId = (collegiate.data as { id: string } | null)?.id ?? null;
-  const college = collegiateId
+  // A school with an owner lock isn't broken out on its own (it still counts
+  // toward the all-schools totals). Unknown lock state hides it too.
+  const collegiateLocked = collegiateId
+    ? await loadSchoolLock(collegiateId).then(
+        (lock) => lock.passwordHash !== null,
+        () => true
+      )
+    : false;
+  const college = collegiateId && !collegiateLocked
     ? await loadHeadlineMetrics(supabase, { schoolId: collegiateId, range: WALL_RANGE, now })
     : null;
 

@@ -10,6 +10,7 @@ import {
   type ExtractedEvent,
 } from "@/lib/ai/event-extraction";
 import { adminSafeErrorMessage } from "@/lib/alerts/ai-failure-alert";
+import { schoolLockError } from "@/lib/school-lock/access";
 
 // ── Extract events from an uploaded document ─────────
 
@@ -22,6 +23,8 @@ export async function extractEventsFromDocument(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
+  const locked = await schoolLockError(schoolId, "admin", user.id);
+  if (locked) return { error: locked };
 
   const { data: doc, error: docError } = await supabase
     .from("documents")
@@ -104,6 +107,8 @@ export async function createEventsBulk(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
+  const locked = await schoolLockError(schoolId, "admin", user.id);
+  if (locked) return { error: locked };
 
   const parsed = z.array(BulkEventSchema).safeParse(events);
   if (!parsed.success) return { error: "Some events are invalid." };

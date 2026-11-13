@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { logAudit } from "@/lib/audit";
 import { ensureInboundAddresses, type InboundAddresses } from "@/lib/email/addresses";
 import { isValidRollover } from "@/lib/grades";
+import { schoolLockError } from "@/lib/school-lock/access";
 
 export async function updateSettings(
   schoolId: string,
@@ -35,6 +36,8 @@ export async function updateSettings(
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const locked = await schoolLockError(schoolId, "admin", user?.id ?? null);
+  if (locked) return { error: locked };
 
   // Extract join_code since it lives on the schools table, not settings
   const { join_code, ...settingsData } = data;
@@ -98,6 +101,8 @@ export async function updateEmailIngestion(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
+  const locked = await schoolLockError(schoolId, "admin", user.id);
+  if (locked) return { error: locked };
 
   // Once ingestion is on, the school has all its addresses: the whole
   // school's and one per division.

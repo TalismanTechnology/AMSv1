@@ -8,6 +8,7 @@ import {
   type ClusterableQuestion,
 } from "@/lib/ai/clustering";
 import { labelClusters } from "@/lib/ai/label-clusters";
+import { assertSchoolNotLocked, schoolLockError } from "@/lib/school-lock/access";
 
 export interface UnansweredQuestionGroup {
   label: string;
@@ -23,6 +24,7 @@ export async function getUnansweredQuestions(
   schoolId: string
 ): Promise<UnansweredQuestionGroup[]> {
   const supabase = await createClient();
+  await assertSchoolNotLocked(schoolId, "admin");
 
   // 1. Fetch persistent clusters sorted by priority
   const { data: clusters } = await supabase
@@ -161,9 +163,10 @@ export async function dismissUnansweredQuestion(questionId: string) {
   // Get the cluster_id before deleting
   const { data: question } = await supabase
     .from("unanswered_questions")
-    .select("cluster_id")
+    .select("cluster_id, school_id")
     .eq("id", questionId)
     .single();
+  await assertSchoolNotLocked(question?.school_id);
 
   const { error } = await supabase
     .from("unanswered_questions")
@@ -183,8 +186,11 @@ export async function dismissUnansweredCluster(questionIds: string[]) {
   // Get unique cluster IDs before deleting
   const { data: questions } = await supabase
     .from("unanswered_questions")
-    .select("cluster_id")
+    .select("cluster_id, school_id")
     .in("id", questionIds);
+  for (const schoolId of new Set(questions?.map((q) => q.school_id as string))) {
+    await assertSchoolNotLocked(schoolId);
+  }
 
   const clusterIds = [
     ...new Set(
@@ -240,6 +246,8 @@ export async function answerUnansweredCluster(
   } = await supabase.auth.getUser();
 
   if (!user) return { error: "Not authenticated" };
+  const locked = await schoolLockError(schoolId, "admin", user.id);
+  if (locked) return { error: locked };
   if (!answer.trim()) return { error: "Answer cannot be empty" };
 
   // 1. Find or create "Responses" folder

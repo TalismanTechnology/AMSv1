@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { schoolLockError } from "@/lib/school-lock/access";
 import { stitchChunks } from "@/lib/ai/stitch";
 
 export async function GET(
@@ -20,13 +21,17 @@ export async function GET(
   // Fetch document metadata
   const { data: doc } = await supabase
     .from("documents")
-    .select("id, title, file_type, file_name, file_url")
+    .select("id, title, file_type, file_name, file_url, school_id")
     .eq("id", id)
     .single();
 
   if (!doc) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+
+  // The school's owner lock (only ever affects a super-admin).
+  const locked = await schoolLockError(doc.school_id, "member", user.id);
+  if (locked) return NextResponse.json({ error: locked }, { status: 423 });
 
   // Fetch all chunks ordered by index (RLS enforces access)
   const { data: chunks } = await supabase
@@ -41,7 +46,13 @@ export async function GET(
   const content = stitchChunks(chunks || []);
 
   return NextResponse.json({
-    document: doc,
+    document: {
+      id: doc.id,
+      title: doc.title,
+      file_type: doc.file_type,
+      file_name: doc.file_name,
+      file_url: doc.file_url,
+    },
     content,
     chunkCount: chunks?.length || 0,
   });

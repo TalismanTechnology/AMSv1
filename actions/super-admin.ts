@@ -5,6 +5,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { logAudit } from "@/lib/audit";
 import { removeWebsiteStorageForSchool } from "@/lib/website/documents";
 import { revalidatePath } from "next/cache";
+import { superAdminLockedOut } from "@/lib/school-lock/access";
+import { SCHOOL_LOCKED_ERROR } from "@/lib/school-lock/core";
 
 export async function createSchool(formData: FormData) {
   const supabase = await createClient();
@@ -149,6 +151,10 @@ export async function assignSchoolAdmin(formData: FormData) {
 
   if (!schoolId || !email)
     return { error: "School ID and email are required" };
+
+  // Making yourself (or an account you control) an admin would get around
+  // the school's owner lock, so a locked school's own admins add admins.
+  if (await superAdminLockedOut(user.id, schoolId)) return { error: SCHOOL_LOCKED_ERROR };
 
   const adminSupabase = createAdminClient();
 

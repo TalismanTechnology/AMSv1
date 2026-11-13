@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { logAudit } from "@/lib/audit";
 import type { EventCalendar, EventCalendarKind } from "@/lib/types";
+import { schoolLockError } from "@/lib/school-lock/access";
 
 export async function createEventCalendar(
   schoolId: string,
@@ -14,6 +15,8 @@ export async function createEventCalendar(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
+  const locked = await schoolLockError(schoolId, "admin", user.id);
+  if (locked) return { error: locked };
 
   const name = data.name.trim();
   if (!name) return { error: "Name is required" };
@@ -67,6 +70,8 @@ export async function updateEventCalendar(
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const locked = await schoolLockError(schoolId, "admin", user?.id ?? null);
+  if (locked) return { error: locked };
 
   const payload: Record<string, string> = {};
   if (data.name !== undefined) {
@@ -99,6 +104,8 @@ export async function deleteEventCalendar(id: string, schoolId: string) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const locked = await schoolLockError(schoolId, "admin", user?.id ?? null);
+  if (locked) return { error: locked };
 
   // event_calendar_links rows cascade-delete via FK;
   // the events themselves are untouched.

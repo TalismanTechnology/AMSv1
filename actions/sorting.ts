@@ -24,6 +24,7 @@ import {
   categoryLabels,
 } from "@/lib/documents/division-categories";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { assertSchoolNotLocked } from "@/lib/school-lock/access";
 
 /**
  * Documents sorted per call. Each takes a model call, so the client sends a
@@ -45,7 +46,10 @@ async function requireSchoolAdmin(schoolId: string) {
     .select("role")
     .eq("id", user.id)
     .single();
-  if (profile?.role === "super_admin") return user;
+  if (profile?.role === "super_admin") {
+    await assertSchoolNotLocked(schoolId, "admin", user.id);
+    return user;
+  }
 
   const { data: membership } = await supabase
     .from("school_memberships")

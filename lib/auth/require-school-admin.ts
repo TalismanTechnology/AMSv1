@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import { schoolAccessFor } from "@/lib/school-lock/access";
+import { SCHOOL_LOCKED_ERROR } from "@/lib/school-lock/core";
 
 // Shared authorization gate for server actions that mutate one school's
 // configuration. Always re-authorizes against the SPECIFIC school id passed in
@@ -27,14 +29,25 @@ export async function requireSchoolAdmin(
     .eq("id", user.id)
     .single();
 
-  if (profile?.role === "super_admin") return { userId: user.id };
-
   const { data: membership } = await supabase
     .from("school_memberships")
-    .select("role")
+    .select("role, approved")
     .eq("user_id", user.id)
     .eq("school_id", schoolId)
-    .single();
+    .maybeSingle();
+
+  if (profile?.role === "super_admin") {
+    // Allowed unless the school's owner lock keeps them out.
+    const access = await schoolAccessFor({
+      userId: user.id,
+      schoolId,
+      isSuperAdmin: true,
+      membership: membership ?? null,
+      need: "admin",
+    });
+    if (access === "locked") return { error: SCHOOL_LOCKED_ERROR };
+    return { userId: user.id };
+  }
 
   if (membership?.role !== "admin") {
     return { error: "You do not have permission to manage this school" };

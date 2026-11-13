@@ -7,6 +7,7 @@ import {
   OAUTH_STATE_COOKIE,
   OAUTH_STATE_MAX_AGE_SECONDS,
 } from "@/lib/blackbaud/state";
+import { schoolLockError } from "@/lib/school-lock/access";
 
 // Starts the per-school Blackbaud authorization. A school admin hits this and
 // gets redirected to Blackbaud's consent screen.
@@ -54,6 +55,9 @@ export async function GET(request: Request) {
     if (membership?.role !== "admin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
+  } else {
+    const locked = await schoolLockError(school.id, "admin", user.id);
+    if (locked) return NextResponse.json({ error: locked }, { status: 423 });
   }
 
   const state = createOAuthState(school.id, school.slug);

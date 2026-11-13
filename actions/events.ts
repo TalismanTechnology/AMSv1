@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { logAudit } from "@/lib/audit";
 import { schoolLabelId } from "@/lib/calendar-labels";
+import { schoolLockError } from "@/lib/school-lock/access";
 
 export async function createEvent(schoolId: string, formData: FormData) {
   const supabase = await createClient();
@@ -12,6 +13,8 @@ export async function createEvent(schoolId: string, formData: FormData) {
   } = await supabase.auth.getUser();
 
   if (!user) return { error: "Not authenticated" };
+  const locked = await schoolLockError(schoolId, "admin", user.id);
+  if (locked) return { error: locked };
 
   const title = formData.get("title") as string;
   const description = formData.get("description") as string;
@@ -122,6 +125,8 @@ export async function updateEvent(
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const locked = await schoolLockError(schoolId, "admin", user?.id ?? null);
+  if (locked) return { error: locked };
 
   const { label_id, ...eventFields } = data;
 
@@ -158,6 +163,8 @@ export async function deleteEvent(eventId: string, schoolId: string) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const locked = await schoolLockError(schoolId, "admin", user?.id ?? null);
+  if (locked) return { error: locked };
 
   const { error } = await supabase
     .from("events")

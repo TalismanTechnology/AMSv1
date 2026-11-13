@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import type { Document, Category } from "@/lib/types";
+import { schoolLockError } from "@/lib/school-lock/access";
 
 export async function getParentDocuments(
   schoolId: string,
@@ -13,6 +14,8 @@ export async function getParentDocuments(
   } = await supabase.auth.getUser();
 
   if (!user) return { documents: [], error: "Unauthorized" };
+  const locked = await schoolLockError(schoolId, "member", user.id);
+  if (locked) return { documents: [], error: locked };
 
   let query = supabase
     .from("documents")
@@ -39,6 +42,7 @@ export async function getParentCategories(
   schoolId: string
 ): Promise<Category[]> {
   const supabase = await createClient();
+  if (await schoolLockError(schoolId, "member")) return [];
   const { data } = await supabase
     .from("categories")
     .select("*")

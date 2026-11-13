@@ -12,6 +12,7 @@ export const SETTINGS_SECTIONS = [
   "website",
   "sign-in",
   "blackbaud",
+  "security",
 ] as const;
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
 
@@ -51,6 +52,11 @@ export const SETTINGS_SECTION_INFO: Record<SettingsSection, SettingsSectionInfo>
     label: "Blackbaud",
     description: "Blackbaud connection, roster sync, and where calendar links live.",
     keywords: ["blackbaud", "sky", "integration", "calendar"],
+  },
+  security: {
+    label: "Security",
+    description: "An owner lock that keeps platform staff out unless they have your password.",
+    keywords: ["lock", "owner lock", "password", "privacy", "support access"],
   },
 };
 
@@ -120,6 +126,7 @@ export const SETTING_ENTRIES: readonly SettingEntry[] = [
   { anchor: "setting-parent-roster", section: "sign-in", label: "Parent roster", keywords: ["csv", "upload", "allowed parents", "list"] },
   { anchor: "setting-roster-gate", section: "sign-in", label: "Require roster match", keywords: ["gate", "restrict", "only roster"] },
   { anchor: "setting-blackbaud-connection", section: "blackbaud", label: "Blackbaud connection", keywords: ["connect", "reconnect", "sync now", "roster", "oauth"] },
+  { anchor: "setting-owner-lock", section: "security", label: "Owner lock", keywords: ["lock", "password", "platform staff", "support access", "privacy"] },
   { anchor: "setting-blackbaud-feeds", section: "blackbaud", label: "Blackbaud calendar links", keywords: ["ical", "events", "subscription", "calendar", "labels", "feeds"] },
 ];
 
@@ -167,6 +174,8 @@ const SECTION_ALIASES: Record<string, SettingsLocation> = {
   signin: "sign-in",
   login: "sign-in",
   roster: "sign-in",
+  lock: "security",
+  "owner-lock": "security",
 };
 
 /** The section a path segment like "general" or "ai" refers to, if any. */

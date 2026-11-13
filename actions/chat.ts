@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { findFlaggedSessionIds, isSessionId, recheckDeletable } from "@/lib/chat/retention";
 import { listParentChats, loadParentChat } from "@/lib/chat/history";
 import { normalizeChatTitle } from "@/lib/chat/chat-view";
+import { schoolLockError } from "@/lib/school-lock/access";
 
 // Parent chat history (lib/chat/retention.ts): list, open, rename and delete
 // the signed-in parent's own chats. Every query is pinned to the caller's
@@ -40,6 +41,9 @@ async function authorizeSchoolChat(schoolId: string) {
     if (!membership) {
       return { error: "You don't have access to this school's chat." } as const;
     }
+  } else {
+    const locked = await schoolLockError(schoolId, "member", user.id);
+    if (locked) return { error: locked } as const;
   }
   return { userId: user.id } as const;
 }

@@ -1,6 +1,7 @@
 import { NextRequest, after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { schoolLockError } from "@/lib/school-lock/access";
 import { appendFileSync } from "fs";
 const debugLog = (msg: string) => { const line = `[${new Date().toISOString()}] ${msg}\n`; console.log(line.trim()); if (process.env.NODE_ENV !== "production") { try { appendFileSync("chat-debug.log", line); } catch {} } };
 import {
@@ -162,6 +163,16 @@ export async function POST(request: NextRequest) {
       if (!membership) {
         return new Response(JSON.stringify({ error: "Access denied" }), {
           status: 403,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+    } else if (!membership) {
+      // A super-admin without their own membership is held to the school's
+      // owner lock. Members (parents, staff) never reach this.
+      const locked = await schoolLockError(schoolId, "member", user.id);
+      if (locked) {
+        return new Response(JSON.stringify({ error: locked }), {
+          status: 423,
           headers: { "Content-Type": "application/json" },
         });
       }

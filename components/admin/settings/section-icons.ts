@@ -4,6 +4,7 @@ import {
   KeyRound,
   Plug,
   School,
+  ShieldCheck,
   Sparkles,
   type LucideIcon,
 } from "lucide-react";
@@ -16,4 +17,5 @@ export const SETTINGS_SECTION_ICONS: Record<SettingsSection, LucideIcon> = {
   website: Globe,
   "sign-in": KeyRound,
   blackbaud: Plug,
+  security: ShieldCheck,
 };

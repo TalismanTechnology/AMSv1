@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { schoolLockError } from "@/lib/school-lock/access";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const SIGNED_URL_TTL_SECONDS = 600;
@@ -22,13 +23,17 @@ export async function GET(
   // Fetch document — RLS ensures user has access via school membership
   const { data: doc } = await supabase
     .from("documents")
-    .select("id, file_url, pdf_url")
+    .select("id, file_url, pdf_url, school_id")
     .eq("id", id)
     .single();
 
   if (!doc || !doc.file_url) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+
+  // The school's owner lock (only ever affects a super-admin).
+  const locked = await schoolLockError(doc.school_id, "member", user.id);
+  if (locked) return NextResponse.json({ error: locked }, { status: 423 });
 
   const admin = createAdminClient();
 
