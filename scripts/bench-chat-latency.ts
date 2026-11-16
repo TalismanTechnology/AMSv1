@@ -136,14 +136,14 @@ function installFetchStub(l: Latencies, t0: () => number, trace: TraceEntry[]) {
   const respond = (url: URL): { ms: number; label: string; res: () => Response } => {
     if (url.origin === SUPABASE_URL) {
       const path = url.pathname;
-      if (path === "/rest/v1/rpc/match_document_chunks") {
+      if (path === "/rest/v1/rpc/match_document_chunks_v2") {
         return {
           ms: l.search,
           label: "rpc match_document_chunks",
           res: () => json([chunk(2, "Pickup is at 3:15 PM, except Wednesdays at 1:30 PM.", 0.82)]),
         };
       }
-      if (path === "/rest/v1/rpc/search_document_chunks") {
+      if (path === "/rest/v1/rpc/search_document_chunks_v2") {
         return { ms: l.search, label: "rpc search_document_chunks", res: () => json([]) };
       }
       const table = path.replace("/rest/v1/", "");
@@ -244,7 +244,13 @@ async function realNewPipeline(l: Latencies, followUp: boolean) {
   children.catch(() => {});
   await Promise.all([sleep(l.db), sleep(l.db)]);
 
-  const turn = await prepareChatTurn({ messages, lastMessageText, schoolId: SCHOOL_ID, children });
+  const turn = await prepareChatTurn({
+    messages,
+    lastMessageText,
+    schoolId: SCHOOL_ID,
+    viewerId: "user-1",
+    children,
+  });
   if (turn.sources.length === 0) throw new Error("bench: real pipeline produced no sources — stub mismatch");
   if (followUp && turn.searchQuery === lastMessageText) {
     throw new Error("bench: follow-up was not rewritten — stub mismatch");

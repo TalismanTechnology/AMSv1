@@ -3,7 +3,12 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { ensureInboundAddresses, type InboundAddresses } from "@/lib/email/addresses";
+import {
+  ensureInboundAddresses,
+  INTAKE_ADDRESS_COLUMNS,
+  summarizeAddresses,
+  type InboundAddresses,
+} from "@/lib/email/addresses";
 import type {
   BlackbaudConfig,
   BlackbaudCallbackResult,
@@ -132,7 +137,7 @@ export async function loadInboundAddresses(
     const [{ data: addresses, error }, { data: divisions }] = await Promise.all([
       supabase
         .from("email_ingestion_addresses")
-        .select("id, token, division_id")
+        .select(INTAKE_ADDRESS_COLUMNS)
         .eq("school_id", schoolId)
         .order("created_at", { ascending: true }),
       supabase
@@ -145,12 +150,7 @@ export async function loadInboundAddresses(
     if (error) throw new Error(error.message);
     return {
       addressesError: null,
-      wholeSchoolToken:
-        (addresses ?? []).find((a) => a.division_id === null)?.token ?? null,
-      divisionAddresses: (addresses ?? [])
-        .filter((a) => a.division_id !== null)
-        .map((a) => ({ id: a.id, token: a.token, divisionId: a.division_id })),
-      divisions: (divisions ?? []) as EventCalendar[],
+      ...summarizeAddresses(addresses ?? [], (divisions ?? []) as EventCalendar[]),
     };
   } catch (err) {
     console.error(
@@ -161,8 +161,9 @@ export async function loadInboundAddresses(
       wholeSchoolToken: null,
       divisionAddresses: [],
       divisions: [],
+      addresses: [],
       addressesError:
-        "Your email addresses couldn't be loaded. If the database migration 028_division_email_addresses.sql hasn't been applied yet, apply it and reload.",
+        "Your email addresses couldn't be loaded. If the database migration 051_intake_address_visibility.sql hasn't been applied yet, apply it and reload.",
     };
   }
 }

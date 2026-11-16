@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fileTypeFromName } from "@/lib/documents/file-types";
+import { isForAllParents, mergeVisibleGrades } from "@/lib/documents/grade-visibility";
 
 /**
  * Sanitize a filename for use in a storage key: keep it readable but strip
@@ -18,6 +19,10 @@ export interface IngestFileParams {
   contentType?: string;
   title: string;
   description?: string | null;
+  /** Who may see it (documents.visible_grades); null/empty = all parents. */
+  visibleGrades?: string[] | null;
+  /** Folder to file it in, e.g. the intake address's default folder. */
+  folderId?: string | null;
 }
 
 /**
@@ -26,9 +31,11 @@ export interface IngestFileParams {
  * Returns the new document id, or null on failure (caller logs the reason).
  */
 export async function ingestFileAsDocument(
-  params: IngestFileParams
+  params: IngestFileParams,
+  /** Tests only: a stand-in for the service-role client. */
+  client?: Pick<ReturnType<typeof createAdminClient>, "from" | "storage">
 ): Promise<{ documentId: string | null; error?: string }> {
-  const supabase = createAdminClient();
+  const supabase = client ?? createAdminClient();
 
   const cleanName = safeFileName(params.fileName);
   const fileType = fileTypeFromName(cleanName);
@@ -62,6 +69,10 @@ export async function ingestFileAsDocument(
       source: "email",
       uploaded_by: null,
       school_id: params.schoolId,
+      // Only sent when set, so the insert is unchanged for every address
+      // without these settings.
+      ...(isForAllParents(params.visibleGrades) ? {} : { visible_grades: params.visibleGrades }),
+      ...(params.folderId ? { folder_id: params.folderId } : {}),
     })
     .select("id")
     .single();
@@ -105,6 +116,37 @@ export async function addDocumentDivisions(
     .from("document_divisions")
     .upsert(rows, { onConflict: "document_id,division_id", ignoreDuplicates: true });
   if (error) throw new Error(`Could not tag divisions: ${error.message}`);
+}
+
+/**
+ * Let more parents see documents a later copy of an email also reached:
+ * all parents when `visibleGrades` is null, else the grades added to theirs.
+ * Never narrows, and leaves documents for all parents alone. Throws on a
+ * database error, like addDocumentDivisions.
+ */
+export async function widenDocumentVisibility(
+  documentIds: string[],
+  visibleGrades: string[] | null
+): Promise<void> {
+  if (!documentIds.length) return;
+  const supabase = createAdminClient();
+
+  const { data: docs, error: readError } = await supabase
+    .from("documents")
+    .select("id, visible_grades")
+    .in("id", documentIds);
+  if (readError) throw new Error(`Could not read documents: ${readError.message}`);
+
+  for (const doc of (docs ?? []) as { id: string; visible_grades: string[] | null }[]) {
+    if (isForAllParents(doc.visible_grades)) continue;
+    const merged = mergeVisibleGrades(doc.visible_grades, visibleGrades);
+    if (merged && merged.length === doc.visible_grades!.length) continue;
+    const { error } = await supabase
+      .from("documents")
+      .update({ visible_grades: merged })
+      .eq("id", doc.id);
+    if (error) throw new Error(`Could not widen visibility: ${error.message}`);
+  }
 }
 
 /**

@@ -10,10 +10,97 @@ export interface DivisionAddress {
   divisionId: string;
 }
 
+/**
+ * Any of a school's intake addresses, with its settings (migration 051).
+ * 'school' and 'division' are the system addresses; 'list' ones are added
+ * by admins, one per mailing list.
+ */
+export interface IntakeAddress {
+  id: string;
+  token: string;
+  kind: "school" | "division" | "list";
+  divisionId: string | null;
+  label: string | null;
+  enabled: boolean;
+  /** null = all parents. */
+  visibleGrades: string[] | null;
+  /** null = any sender. */
+  allowedSenders: string[] | null;
+  defaultFolderId: string | null;
+  createdAt: string;
+}
+
 export interface InboundAddresses {
   wholeSchoolToken: string | null;
   divisionAddresses: DivisionAddress[];
   divisions: EventCalendar[];
+  /** Every address: whole school first, then divisions, then lists. */
+  addresses: IntakeAddress[];
+}
+
+export const INTAKE_ADDRESS_COLUMNS =
+  "id, token, kind, division_id, label, enabled, visible_grades, allowed_senders, default_folder_id, created_at";
+
+interface AddressRow {
+  id: string;
+  token: string;
+  kind?: string | null;
+  division_id: string | null;
+  label?: string | null;
+  enabled?: boolean | null;
+  visible_grades?: string[] | null;
+  allowed_senders?: string[] | null;
+  default_folder_id?: string | null;
+  created_at?: string;
+}
+
+const KIND_ORDER = { school: 0, division: 1, list: 2 } as const;
+
+export function toIntakeAddress(row: AddressRow): IntakeAddress {
+  const kind =
+    row.kind === "list" ? "list" : row.division_id ? "division" : "school";
+  return {
+    id: row.id,
+    token: row.token,
+    kind,
+    divisionId: row.division_id,
+    label: row.label ?? null,
+    enabled: row.enabled !== false,
+    visibleGrades: row.visible_grades?.length ? row.visible_grades : null,
+    allowedSenders: row.allowed_senders?.length ? row.allowed_senders : null,
+    defaultFolderId: row.default_folder_id ?? null,
+    createdAt: row.created_at ?? "",
+  };
+}
+
+/** Whole school, divisions (in division order), then lists by creation. */
+export function sortIntakeAddresses(
+  addresses: IntakeAddress[],
+  divisions: Pick<EventCalendar, "id">[] = []
+): IntakeAddress[] {
+  const divisionOrder = new Map(divisions.map((d, i) => [d.id, i]));
+  return [...addresses].sort(
+    (a, b) =>
+      KIND_ORDER[a.kind] - KIND_ORDER[b.kind] ||
+      (divisionOrder.get(a.divisionId ?? "") ?? 0) - (divisionOrder.get(b.divisionId ?? "") ?? 0) ||
+      a.createdAt.localeCompare(b.createdAt)
+  );
+}
+
+/** The summary the settings page and actions return, from address rows. */
+export function summarizeAddresses(
+  rows: AddressRow[],
+  divisions: EventCalendar[]
+): InboundAddresses {
+  const addresses = sortIntakeAddresses(rows.map(toIntakeAddress), divisions);
+  return {
+    wholeSchoolToken: addresses.find((a) => a.kind === "school")?.token ?? null,
+    divisionAddresses: addresses
+      .filter((a) => a.kind === "division")
+      .map((a) => ({ id: a.id, token: a.token, divisionId: a.divisionId! })),
+    divisions,
+    addresses,
+  };
 }
 
 /**
@@ -56,18 +143,26 @@ export async function ensureInboundAddresses(
   const readAddresses = () =>
     supabase
       .from("email_ingestion_addresses")
-      .select("id, token, division_id")
+      .select(INTAKE_ADDRESS_COLUMNS)
       .eq("school_id", schoolId)
-      .order("created_at", { ascending: true });
+      .order("created_at", { ascending: true })
+      .returns<AddressRow[]>();
 
   const { data: existing, error: readError } = await readAddresses();
   if (readError) throw new Error(readError.message);
 
+  // List addresses also have no division, so the whole-school one is found
+  // by its kind.
+  const isSystemFor = (a: AddressRow, divisionId: string | null) =>
+    divisionId === null
+      ? a.division_id === null && a.kind !== "list"
+      : a.division_id === divisionId;
   const missing = [null, ...(divisions ?? []).map((d) => d.id as string)]
-    .filter((divisionId) => !(existing ?? []).some((a) => a.division_id === divisionId))
+    .filter((divisionId) => !(existing ?? []).some((a) => isSystemFor(a, divisionId)))
     .map((divisionId) => ({
       school_id: schoolId,
       division_id: divisionId,
+      kind: divisionId ? "division" : "school",
       token: generateInboundToken(),
     }));
 
@@ -83,11 +178,5 @@ export async function ensureInboundAddresses(
     addresses = reread ?? [];
   }
 
-  return {
-    wholeSchoolToken: addresses.find((a) => a.division_id === null)?.token ?? null,
-    divisionAddresses: addresses
-      .filter((a) => a.division_id !== null)
-      .map((a) => ({ id: a.id, token: a.token, divisionId: a.division_id })),
-    divisions: (divisions ?? []) as EventCalendar[],
-  };
+  return summarizeAddresses(addresses, (divisions ?? []) as EventCalendar[]);
 }

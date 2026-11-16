@@ -85,6 +85,7 @@ test("actions using requireSchoolAdmin get the lock through it", () => {
     "actions/contact-folders.ts",
     "actions/contacts.ts",
     "actions/email-review.ts",
+    "actions/intake-addresses.ts",
     "actions/website-sources.ts",
   ]) {
     assert.match(read(file), /from "@\/lib\/auth\/require-school-admin"/, file);

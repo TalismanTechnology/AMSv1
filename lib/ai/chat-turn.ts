@@ -40,6 +40,7 @@ import {
   withoutDropped,
 } from "@/lib/conflicts/resolutions";
 import { eventSource } from "@/lib/ai/citations";
+import { conflictsInReach } from "@/lib/documents/grade-visibility";
 import type { ChatSource } from "@/lib/types";
 import { TEXT_MODEL_ID } from "@/lib/ai/models";
 import { answerSettings, classifyQuestion, type AnswerSettings } from "@/lib/ai/question-complexity";
@@ -92,6 +93,7 @@ export async function prepareChatTurn({
   messages,
   lastMessageText,
   schoolId,
+  viewerId,
   children,
   now,
   timer = createTimer(),
@@ -99,6 +101,11 @@ export async function prepareChatTurn({
   messages: UIMessage[];
   lastMessageText: string;
   schoolId: string;
+  /**
+   * The signed-in user asking. Retrieval returns only what the database says
+   * they may see (grade-restricted documents, migration 051).
+   */
+  viewerId: string;
   /** May be a pending fetch — it is awaited after the other context starts. */
   children: ChildContext[] | Promise<ChildContext[]>;
   /** Pinned by the eval so date-relative answers are reproducible. */
@@ -153,8 +160,9 @@ export async function prepareChatTurn({
   // assemblePassages does the narrowing.
   let matchedChunks: RelevantChunk[] = [];
   let keywordHits: KeywordHit[] = [];
-  const vectorSearch = matchDocumentChunks(searchQuery, 40, 0.45, schoolId, timer);
-  const keywordSearch = keywordSearchChunks(searchQuery, schoolId);
+  const scope = { schoolId, viewerId };
+  const vectorSearch = matchDocumentChunks(searchQuery, scope, 40, 0.45, timer);
+  const keywordSearch = keywordSearchChunks(searchQuery, scope);
   timer.observe("vectorSearch", vectorSearch);
   timer.observe("keywordSearch", keywordSearch);
   const [vectorResult, keywordResult] = await Promise.allSettled([vectorSearch, keywordSearch]);
@@ -170,10 +178,13 @@ export async function prepareChatTurn({
   // read never throws and is empty until migration 046 is applied.
   const docInfo = attachDocumentInfo(matchedChunks);
   const passageChunks = fetchPassageChunks(matchedChunks, keywordHits);
-  const conflicts = loadResolvedConflicts(adminSupabase, schoolId, [
+  const reachable = new Set([
     ...matchedChunks.map((c) => c.document_id),
     ...keywordHits.map((h) => h.document_id),
   ]);
+  const conflicts = loadResolvedConflicts(adminSupabase, schoolId, [...reachable]).then(
+    (found) => keepConflictsInReach(adminSupabase, found, reachable)
+  );
   timer.observe("docInfo", docInfo);
   timer.observe("passages", passageChunks);
   timer.observe("conflicts", conflicts);
@@ -338,4 +349,34 @@ export function sanitizeMessages(messages: UIMessage[]): UIMessage[] {
         : [],
     }))
     .filter((m) => m.parts.length > 0);
+}
+
+/**
+ * Rulings whose other side is a document this viewer can't see are dropped
+ * (conflictsInReach). Sides outside the viewer's own results are looked up;
+ * any failure drops the ruling rather than risk quoting it.
+ */
+async function keepConflictsInReach<C extends { a: { document_id: string }; b: { document_id: string } }>(
+  supabase: ReturnType<typeof createAdminClient>,
+  conflicts: C[],
+  reachable: Set<string>
+): Promise<C[]> {
+  const outside = [
+    ...new Set(conflicts.flatMap((c) => [c.a.document_id, c.b.document_id])),
+  ].filter((id) => !reachable.has(id));
+  if (!outside.length) return conflicts;
+  const { data, error } = await supabase
+    .from("documents")
+    .select("id, visible_grades")
+    .in("id", outside);
+  if (error) {
+    console.error("[conflicts] Visibility check failed (dropping rulings):", error.message);
+    return conflictsInReach(conflicts, reachable, new Set());
+  }
+  const open = new Set(
+    ((data ?? []) as { id: string; visible_grades: string[] | null }[])
+      .filter((d) => !d.visible_grades?.length)
+      .map((d) => d.id)
+  );
+  return conflictsInReach(conflicts, reachable, open);
 }

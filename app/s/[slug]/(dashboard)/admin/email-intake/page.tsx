@@ -3,6 +3,8 @@ import { PageTransition } from "@/components/motion";
 import { EmailIngestionSection } from "@/components/admin/settings/email-ingestion";
 import { ContentPageHeader } from "@/components/admin/settings/settings-header";
 import { loadInboundAddresses, loadRecentEmails } from "../settings/data";
+import { createClient } from "@/lib/supabase/server";
+import type { Folder } from "@/lib/types";
 
 // Server actions run within their page's limit; this is the limit the single
 // Settings page had (e.g. website "Sync now" keeps crawling via after()).
@@ -17,9 +19,11 @@ export default async function EmailIntakePage({
 }) {
   const { slug } = await params;
   const { school } = await requireSchoolContext(slug);
-  const [recentEmails, inboundAddresses] = await Promise.all([
+  const supabase = await createClient();
+  const [recentEmails, inboundAddresses, { data: folders }] = await Promise.all([
     loadRecentEmails(school.id),
     loadInboundAddresses(school.id, school.email_ingestion_enabled ?? false),
+    supabase.from("folders").select("*").eq("school_id", school.id).order("name"),
   ]);
 
   return (
@@ -33,6 +37,7 @@ export default async function EmailIntakePage({
             autoSort: school.auto_sort_enabled ?? true,
             ...inboundAddresses,
             inboundDomain: process.env.INBOUND_EMAIL_DOMAIN ?? null,
+            folders: (folders ?? []) as Folder[],
             recent: recentEmails,
           }}
         />

@@ -114,6 +114,8 @@ export interface Document {
   updated_at: string;
   category?: Category | null;
   folder?: Folder | null;
+  /** Grades whose parents may see it (migration 051); null = all parents. */
+  visible_grades?: string[] | null;
   /** Divisions the document is for; none means the whole school. Populated
    * when fetched with the event_calendars embed. */
   divisions?: EventCalendar[];

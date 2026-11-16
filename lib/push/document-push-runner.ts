@@ -11,6 +11,11 @@ import {
   shouldSend,
   type DocumentPushOutcome,
 } from "./document-push";
+import {
+  groupRecipientsByVisibleDocuments,
+  isForAllParents,
+  type ViewerChild,
+} from "@/lib/documents/grade-visibility";
 
 // Database side of the "new documents" push (migration 042). Documents are
 // queued when they first become ready for parents; the send-document-pushes
@@ -182,9 +187,17 @@ async function runSchool(
     return { ...base, result: decision.reason === "empty" ? "claimed_elsewhere" : decision.reason };
   }
 
-  const docs: Array<{ id: string; title: string | null; status: string }> = [];
+  const docs: Array<{
+    id: string;
+    title: string | null;
+    status: string;
+    visible_grades: string[] | null;
+  }> = [];
   for (const part of chunk(ids, ID_CHUNK)) {
-    const { data, error } = await admin.from("documents").select("id, title, status").in("id", part);
+    const { data, error } = await admin
+      .from("documents")
+      .select("id, title, status, visible_grades")
+      .in("id", part);
     if (error) throw new Error(`documents: ${error.message}`);
     docs.push(...((data ?? []) as typeof docs));
   }
@@ -217,23 +230,43 @@ async function runSchool(
       return { ...base, result: OUTCOMES.skippedNoRecipients, documents: claimedIds.length };
     }
 
-    const titleById = new Map(docs.map((doc) => [doc.id, doc.title ?? ""]));
-    const message = buildDocumentPushMessage({
-      schoolName: resolveSchoolName(school.name as string | null, settings?.school_name),
-      schoolSlug: school.slug as string,
-      titles: claimedIds.map((id) => titleById.get(id) ?? ""),
-    });
+    // Each parent hears only about the documents they may open: documents
+    // limited to some grades (migration 051) go to parents with a current
+    // child in one of them. Parents who can see none of the batch get nothing.
+    const docById = new Map(docs.map((doc) => [doc.id, doc]));
+    const batch = claimedIds.map((id) => ({
+      id,
+      title: docById.get(id)?.title ?? "",
+      visibleGrades: docById.get(id)?.visible_grades ?? null,
+    }));
+    const restricted = batch.some((d) => !isForAllParents(d.visibleGrades));
+    const groups = restricted
+      ? groupRecipientsByVisibleDocuments(batch, recipients, await loadChildren(admin, schoolId, recipients))
+      : [{ recipients, documents: batch }];
 
-    for (const part of chunk(recipients, ID_CHUNK)) {
-      await sendPushToUsers(part, message);
+    let sentTo = 0;
+    for (const group of groups) {
+      const message = buildDocumentPushMessage({
+        schoolName: resolveSchoolName(school.name as string | null, settings?.school_name),
+        schoolSlug: school.slug as string,
+        titles: group.documents.map((d) => d.title),
+      });
+      for (const part of chunk(group.recipients, ID_CHUNK)) {
+        await sendPushToUsers(part, message);
+      }
+      sentTo += group.recipients.length;
     }
 
+    if (sentTo === 0) {
+      await setOutcome(admin, claimedIds, OUTCOMES.skippedNoRecipients);
+      return { ...base, result: OUTCOMES.skippedNoRecipients, documents: claimedIds.length };
+    }
     await setOutcome(admin, claimedIds, OUTCOMES.sent);
     return {
       ...base,
       result: OUTCOMES.sent,
       documents: claimedIds.length,
-      recipients: recipients.length,
+      recipients: sentTo,
     };
   } catch (caught: unknown) {
     // Claimed rows stay processed: retrying could send twice.
@@ -272,6 +305,30 @@ async function loadRecipients(admin: Db, schoolId: string): Promise<string[]> {
   }
 
   return unique.filter((id) => !optedOut.has(id));
+}
+
+/** Each parent's current (not graduated) children at the school. */
+async function loadChildren(
+  admin: Db,
+  schoolId: string,
+  parents: string[]
+): Promise<Map<string, ViewerChild[]>> {
+  const byParent = new Map<string, ViewerChild[]>();
+  for (const part of chunk(parents, ID_CHUNK)) {
+    const { data, error } = await admin
+      .from("children")
+      .select("parent_id, grade, graduated_at")
+      .eq("school_id", schoolId)
+      .in("parent_id", part);
+    // Throws: sending without knowing grades could reach the wrong parents.
+    if (error) throw new Error(`children: ${error.message}`);
+    for (const row of (data ?? []) as { parent_id: string; grade: string | null; graduated_at: string | null }[]) {
+      const list = byParent.get(row.parent_id) ?? [];
+      list.push({ grade: row.grade, graduated: !!row.graduated_at });
+      byParent.set(row.parent_id, list);
+    }
+  }
+  return byParent;
 }
 
 /** Mark still-unprocessed rows done with an outcome. */

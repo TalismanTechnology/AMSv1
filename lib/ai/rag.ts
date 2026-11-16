@@ -95,6 +95,38 @@ function formatStructuralLocation(metadata: ChunkMetadata): ChunkLocation | null
   return null;
 }
 
+/**
+ * Whose library to search: the school, and the signed-in user asking. The
+ * database works out from the user what they may see (school admins and
+ * super-admins everything; a parent only documents for all parents or for a
+ * grade one of their current children is in) inside the *_v2 functions
+ * (migration 051). There is deliberately no unscoped variant: without a
+ * viewer nothing is returned.
+ */
+export interface RetrievalScope {
+  schoolId: string;
+  viewerId: string;
+}
+
+/** Shared by both retrieval functions so neither can drift to an unscoped RPC. */
+export const RETRIEVAL_RPCS = {
+  vector: "match_document_chunks_v2",
+  keyword: "search_document_chunks_v2",
+} as const;
+
+type Rpc = (fn: string, args: Record<string, unknown>) => PromiseLike<{
+  data: unknown;
+  error: unknown;
+}>;
+
+/** The service-role client's rpc, swappable in tests. */
+let rpcClient: () => { rpc: Rpc } = () => createAdminClient() as unknown as { rpc: Rpc };
+
+/** Tests only: route retrieval RPCs to a stub. */
+export function setRetrievalRpcForTests(client: (() => { rpc: Rpc }) | null): void {
+  rpcClient = client ?? (() => createAdminClient() as unknown as { rpc: Rpc });
+}
+
 /** A chunk surfaced by full-text search rather than by embedding similarity. */
 export interface KeywordHit {
   document_id: string;
@@ -145,18 +177,19 @@ const HITS_PER_TERM = 8;
 
 export async function keywordSearchChunks(
   query: string,
-  schoolId: string,
+  scope: RetrievalScope,
   limit = 30
 ): Promise<KeywordHit[]> {
   const keywords = extractKeywords(query).slice(0, MAX_KEYWORD_TERMS);
-  if (keywords.length === 0) return [];
+  if (keywords.length === 0 || !scope.viewerId) return [];
 
-  const supabase = createAdminClient();
+  const supabase = rpcClient();
 
   const run = async (tsQuery: string, rowLimit: number): Promise<KeywordHit[]> => {
-    const { data, error } = await supabase.rpc("search_document_chunks", {
-      p_school_id: schoolId,
+    const { data, error } = await supabase.rpc(RETRIEVAL_RPCS.keyword, {
+      p_school_id: scope.schoolId,
       p_query: tsQuery,
+      p_viewer: scope.viewerId,
       p_limit: rowLimit,
     });
     if (error) {
@@ -196,12 +229,12 @@ export async function keywordSearchChunks(
 
 export async function searchDocuments(
   query: string,
+  scope: RetrievalScope,
   matchCount = 8,
-  matchThreshold = 0.7,
-  schoolId?: string
+  matchThreshold = 0.7
 ): Promise<RelevantChunk[]> {
   return attachDocumentInfo(
-    await matchDocumentChunks(query, matchCount, matchThreshold, schoolId)
+    await matchDocumentChunks(query, scope, matchCount, matchThreshold)
   );
 }
 
@@ -212,24 +245,27 @@ export async function searchDocuments(
  */
 export async function matchDocumentChunks(
   query: string,
+  scope: RetrievalScope,
   matchCount = 8,
   matchThreshold = 0.7,
-  schoolId?: string,
   /** Chat latency logging only (lib/ai/timing.ts). */
-  timer?: StageTimer
+  timer?: StageTimer,
+  embed: (text: string) => Promise<number[]> = generateEmbedding
 ): Promise<RelevantChunk[]> {
-  const supabase = createAdminClient();
+  if (!scope.schoolId || !scope.viewerId) return [];
+  const supabase = rpcClient();
 
   // Generate embedding for the query
   const embedded = timer?.start("embedding");
-  const queryEmbedding = await generateEmbedding(query);
+  const queryEmbedding = await embed(query);
   embedded?.();
 
   // Use the database function for semantic search
   const matched = timer?.start("vectorRpc");
-  const { data: chunks, error } = await supabase.rpc("match_document_chunks", {
+  const { data: chunks, error } = await supabase.rpc(RETRIEVAL_RPCS.vector, {
     query_embedding: JSON.stringify(queryEmbedding),
-    p_school_id: schoolId,
+    p_school_id: scope.schoolId,
+    p_viewer: scope.viewerId,
     match_threshold: matchThreshold,
     match_count: matchCount,
   });

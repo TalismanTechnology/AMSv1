@@ -1,20 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { Copy, Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { LogoSpinner } from "@/components/logo-spinner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { TimeAgo } from "@/components/ui/time-ago";
 import { updateEmailIngestion } from "@/actions/settings";
 import { approveHeldEmail, rejectHeldEmail } from "@/actions/email-review";
-import { calendarColorClasses } from "@/lib/event-calendars";
-import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { InboundAddresses } from "@/lib/email/addresses";
+import type { Folder } from "@/lib/types";
+import { IntakeAddressList } from "@/components/admin/settings/intake-addresses";
 
 export interface EmailIngestionLogEntry {
   id: string;
@@ -32,6 +30,8 @@ export interface EmailIngestionConfig extends InboundAddresses {
   /** Set when the addresses couldn't be loaded, saying why. */
   addressesError: string | null;
   inboundDomain: string | null;
+  /** The school's folders, for an address's default folder. */
+  folders: Folder[];
   recent: EmailIngestionLogEntry[];
 }
 
@@ -94,16 +94,8 @@ export function EmailIngestionSection({
         {(enabled || addresses.wholeSchoolToken) && (
           <div
             id="setting-inbound-addresses"
-            className="scroll-mt-6 space-y-4 rounded-xl border border-border p-3 sm:p-4"
+            className="scroll-mt-6 space-y-4"
           >
-            <div className="space-y-1">
-              <Label>Where to send emails</Label>
-              <p className="text-xs text-muted-foreground">
-                Forward or send school emails to these addresses. Each one
-                files what it receives into its own division. Mail from any
-                sender is accepted.
-              </p>
-            </div>
             {config.addressesError ? (
               <AddressNotice>{config.addressesError}</AddressNotice>
             ) : !config.inboundDomain ? (
@@ -124,27 +116,14 @@ export function EmailIngestionSection({
                     turned away until you switch it on and save.
                   </AddressNotice>
                 )}
-                <AddressRow
-                  label="Whole school"
-                  hint="The AI decides which division each email belongs to."
-                  address={inboundAddress}
+                <IntakeAddressList
+                  key={addresses.addresses.map((a) => a.id).join(",")}
+                  schoolId={schoolId}
+                  addresses={addresses.addresses}
+                  divisions={addresses.divisions}
+                  folders={config.folders}
+                  inboundDomain={config.inboundDomain}
                 />
-                {addresses.divisions.map((division) => {
-                  const token = addresses.divisionAddresses.find(
-                    (a) => a.divisionId === division.id
-                  )?.token;
-                  const address = token ? addressFor(token) : null;
-                  if (!address) return null;
-                  return (
-                    <AddressRow
-                      key={division.id}
-                      label={division.name}
-                      hint={`Everything sent here is filed under ${division.name}.`}
-                      color={division.color}
-                      address={address}
-                    />
-                  );
-                })}
               </>
             )}
           </div>
@@ -183,67 +162,6 @@ function AddressNotice({ children }: { children: React.ReactNode }) {
   );
 }
 
-function AddressRow({
-  label,
-  hint,
-  color,
-  address,
-}: {
-  label: string;
-  /** Where mail sent to this address ends up. */
-  hint?: string;
-  /** Division color; omitted for the whole-school address. */
-  color?: string;
-  address: string;
-}) {
-  const [copied, setCopied] = useState(false);
-
-  function copyAddress() {
-    navigator.clipboard.writeText(address);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
-
-  return (
-    <div className="space-y-1.5">
-      <p className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs font-medium text-ink-soft">
-        <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-          {color && (
-            <span
-              className={cn("h-2 w-2 rounded-full", calendarColorClasses(color).dot)}
-            />
-          )}
-          {label}
-        </span>
-        {hint && <span className="font-normal text-muted-foreground">· {hint}</span>}
-      </p>
-      <div className="flex gap-2">
-        <Input
-          readOnly
-          value={address}
-          aria-label={`${label} inbound address`}
-          className="px-2.5 font-mono text-[11px] sm:px-3 sm:text-sm"
-          onFocus={(e) => e.target.select()}
-        />
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          onClick={copyAddress}
-          className="shrink-0"
-          aria-label={`Copy ${label} address`}
-        >
-          {copied ? (
-            <Check className="h-4 w-4 text-green-500" />
-          ) : (
-            <Copy className="h-4 w-4" />
-          )}
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 const EMAIL_STATUS: Record<string, { label: string; className: string }> = {
   accepted: { label: "Added", className: "bg-success/15 text-success" },
   processing: { label: "Processing", className: "bg-amber-500/15 text-amber-500" },
@@ -260,7 +178,7 @@ const EMAIL_STATUS: Record<string, { label: string; className: string }> = {
     className: "bg-destructive/15 text-destructive",
   },
   rejected_disabled: {
-    label: "Ingestion off",
+    label: "Turned away (off)",
     className: "bg-secondary text-secondary-foreground",
   },
   duplicate: { label: "Duplicate", className: "bg-secondary text-secondary-foreground" },
