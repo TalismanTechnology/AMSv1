@@ -3,6 +3,14 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { authCookieOptions, isAuthCookieName } from "./cookie-options";
 import {
+  GOOGLE_INTENT_COOKIE,
+  GOOGLE_MESSAGES,
+  isGoogleSignInEnabled,
+  isPasswordSignInDisabled,
+  sessionAuthMethods,
+  violatesPasswordPolicy,
+} from "@/lib/auth/google-sign-in";
+import {
   AUTH_NO_STORE_CACHE_CONTROL,
   copyResponseCookies,
   isTransientAuthError,
@@ -25,6 +33,20 @@ export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
   const pathname = request.nextUrl.pathname;
+
+  // Google sign-in came back to the Site URL instead of /auth/callback:
+  // Supabase does that when redirectTo isn't on its allowlist. Only when this
+  // browser started a Google sign-in (the intent cookie), so a stray ?code on
+  // the landing page is left alone.
+  if (
+    pathname === "/" &&
+    request.cookies.has(GOOGLE_INTENT_COOKIE) &&
+    (request.nextUrl.searchParams.has("code") || request.nextUrl.searchParams.has("error"))
+  ) {
+    const callback = request.nextUrl.clone();
+    callback.pathname = "/auth/callback";
+    return NextResponse.redirect(callback);
+  }
 
   // ─── Fast path: public routes that never need auth ─────────────────
   if (pathname === "/" || PUBLIC_PAGES.has(pathname)) {
@@ -109,6 +131,33 @@ export async function updateSession(request: NextRequest) {
     authUnavailable
       ? copyResponseCookies(supabaseResponse, authUnavailableResponse())
       : redirectTo(path);
+
+  // "Require Google sign-in" accounts (lib/auth/google-sign-in.ts): a session
+  // that came from a password is ended here, on every page and API request,
+  // however it was obtained, including straight from Supabase's password
+  // endpoint. Costs nothing for other accounts: the flag is in app_metadata,
+  // which getUser() already returned.
+  if (user) {
+    const googleEnabled = isGoogleSignInEnabled();
+    if (googleEnabled && isPasswordSignInDisabled(user.app_metadata)) {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (
+        violatesPasswordPolicy({
+          googleEnabled,
+          appMetadata: user.app_metadata,
+          authMethods: sessionAuthMethods(session?.access_token),
+        })
+      ) {
+        await supabase.auth.signOut({ scope: "local" });
+        const login = request.nextUrl.clone();
+        login.pathname = "/login/staff";
+        login.search = `?error=${encodeURIComponent(GOOGLE_MESSAGES.passwordDisabled)}`;
+        return copyResponseCookies(supabaseResponse, NextResponse.redirect(login));
+      }
+    }
+  }
 
   // ─── Platform auth pages (/login, /login/staff) ───────────────────
   if (isPlatformAuth) {

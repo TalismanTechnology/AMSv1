@@ -4,6 +4,7 @@ import { AUTH_PROVIDERS, type AuthProvider } from "@/lib/auth/provider";
 
 // "Sign in with Blackbaud" (or Veracross) inside the app. The server half and the reasoning
 // are in lib/auth/app-handoff.ts; this is the part that runs in the web view.
+// Staff "Continue with Google" reuses the same sheet (lib/native/google-sign-in.ts).
 
 const APP_CALLBACK_URL = "app.askmyschool://auth-callback";
 const CALLBACK_SCHEME = "app.askmyschool";
@@ -22,14 +23,14 @@ function base64url(bytes: Uint8Array): string {
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-async function createVerifier(): Promise<{ verifier: string; challenge: string }> {
+export async function createVerifier(): Promise<{ verifier: string; challenge: string }> {
   const verifier = base64url(crypto.getRandomValues(new Uint8Array(32)));
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
   return { verifier, challenge: base64url(new Uint8Array(digest)) };
 }
 
 /** iOS: ASWebAuthenticationSession, via the app's own AuthSession plugin. */
-async function openIosSheet(url: string): Promise<string | null> {
+export async function openIosSheet(url: string): Promise<string | null> {
   const { registerPlugin } = await import("@capacitor/core");
   const authSession = registerPlugin<AuthSessionPlugin>("AuthSession");
 
@@ -43,7 +44,7 @@ async function openIosSheet(url: string): Promise<string | null> {
 }
 
 /** Android: a Custom Tab, closed when the app.askmyschool:// link comes back. */
-async function openAndroidTab(url: string): Promise<string | null> {
+export async function openAndroidTab(url: string): Promise<string | null> {
   const [{ App }, { Browser }] = await Promise.all([
     import("@capacitor/app"),
     import("@capacitor/browser"),
@@ -84,7 +85,7 @@ async function openAndroidTab(url: string): Promise<string | null> {
 }
 
 /** Navigates with a POST so the verifier travels in the body, not the URL. */
-function postForm(action: string, fields: Record<string, string>): void {
+export function postForm(action: string, fields: Record<string, string>): void {
   const form = document.createElement("form");
   form.method = "POST";
   form.action = action;

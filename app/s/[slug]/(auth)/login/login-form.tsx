@@ -13,6 +13,7 @@ import { AuthShell } from "@/components/auth/auth-shell";
 import { ParentSignInButton } from "@/components/auth/parent-sign-in-button";
 import { RosterSignInForm } from "@/components/auth/roster-sign-in-form";
 import { LegalNotice } from "@/components/legal/legal-notice";
+import { AuthDivider, GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { AUTH_PROVIDERS, type AuthProvider } from "@/lib/auth/provider";
 import { schoolPossessive } from "@/lib/school-display-name";
 
@@ -23,6 +24,8 @@ interface LoginFormProps {
   schoolName: string | null;
   provider: AuthProvider;
   signInEnabled: boolean;
+  /** GOOGLE_SIGNIN_ENABLED. Google is offered in the staff section only. */
+  googleSignInEnabled: boolean;
 }
 
 export function LoginForm({
@@ -31,6 +34,7 @@ export function LoginForm({
   schoolName,
   provider,
   signInEnabled,
+  googleSignInEnabled,
 }: LoginFormProps) {
   const { label: providerLabel, portalName } = AUTH_PROVIDERS[provider];
   const searchParams = useSearchParams();
@@ -128,6 +132,17 @@ export function LoginForm({
               {notEnabled}
             </p>
           ))}
+
+        {showStaffSignIn && googleSignInEnabled && (
+          <>
+            <GoogleSignInButton
+              next={`/s/${schoolSlug}/admin`}
+              loginPath={`/s/${schoolSlug}/login`}
+              disabled={formPending}
+            />
+            <AuthDivider />
+          </>
+        )}
 
         {showStaffSignIn && (
           <form action={formAction} className="space-y-4">

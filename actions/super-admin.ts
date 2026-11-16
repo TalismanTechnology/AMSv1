@@ -7,6 +7,11 @@ import { removeWebsiteStorageForSchool } from "@/lib/website/documents";
 import { revalidatePath } from "next/cache";
 import { superAdminLockedOut } from "@/lib/school-lock/access";
 import { SCHOOL_LOCKED_ERROR } from "@/lib/school-lock/core";
+import {
+  PASSWORD_SIGNIN_DISABLED_KEY,
+  hasVerifiedGoogleEmail,
+  isGoogleSignInEnabled,
+} from "@/lib/auth/google-sign-in";
 
 export async function createSchool(formData: FormData) {
   const supabase = await createClient();
@@ -245,5 +250,61 @@ export async function deleteSchool(schoolId: string) {
 
   revalidatePath("/super-admin");
   revalidatePath("/", "layout");
+  return { success: true };
+}
+
+/**
+ * "Require Google sign-in for my account": turns password sign-in off (or
+ * back on) for the signed-in super-admin. Stored in app_metadata
+ * (lib/auth/google-sign-in.ts), which only the service role can write. Can
+ * only be turned on once a Google identity is linked and Google sign-in is
+ * on, so it can't lock the account out.
+ */
+export async function setRequireGoogleSignIn(enabled: boolean) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { error: "Unauthorized" };
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (profile?.role !== "super_admin") return { error: "Unauthorized" };
+
+  const admin = createAdminClient();
+
+  if (enabled) {
+    if (!isGoogleSignInEnabled()) {
+      return { error: "Google sign-in isn't turned on for AskMySchool yet." };
+    }
+    // Fresh from Auth rather than the session, so a just-linked identity counts.
+    const { data, error } = await admin.auth.admin.getUserById(user.id);
+    if (error || !data.user) return { error: "Could not load your account." };
+    if (!hasVerifiedGoogleEmail(data.user)) {
+      return {
+        error: "Sign in with Google once first, so your Google account is linked.",
+      };
+    }
+  }
+
+  const { error } = await admin.auth.admin.updateUserById(user.id, {
+    app_metadata: { [PASSWORD_SIGNIN_DISABLED_KEY]: enabled },
+  });
+
+  if (error) return { error: error.message };
+
+  logAudit(
+    user.id,
+    enabled ? "require_google_sign_in_enabled" : "require_google_sign_in_disabled",
+    "user",
+    user.id
+  );
+
+  revalidatePath("/super-admin");
   return { success: true };
 }

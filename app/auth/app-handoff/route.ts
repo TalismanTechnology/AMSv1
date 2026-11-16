@@ -1,8 +1,16 @@
 import { NextResponse } from "next/server";
 import { redeemAppHandoff } from "@/lib/auth/app-handoff";
-import { startParentSession } from "@/lib/auth/parent-session";
+import { startParentSession, startStaffSession } from "@/lib/auth/parent-session";
+import { loadStaffAccess } from "@/lib/auth/google-access";
+import {
+  decideGoogleAccess,
+  loginPathFor,
+  parseGoogleHandoffSlug,
+  withError,
+} from "@/lib/auth/google-sign-in";
 
-// The native app's half of Blackbaud sign-in (see lib/auth/app-handoff.ts).
+// The native app's half of Blackbaud sign-in (see lib/auth/app-handoff.ts),
+// and of staff "Continue with Google" (lib/auth/google-sign-in.ts).
 //
 //   POST /auth/app-handoff   form: code, verifier
 //
@@ -35,6 +43,32 @@ export async function POST(request: Request) {
 
     if (!handoff) {
       return toLogin(`${origin}/login?error=${encodeURIComponent(FAILED)}`);
+    }
+
+    const google = parseGoogleHandoffSlug(handoff.schoolSlug);
+    if (google) {
+      // Staff signed in with Google in the sign-in sheet. The callback already
+      // checked their verified Google email moments ago; their role is
+      // checked again here, right before the session starts.
+      const next = google.schoolSlug ? `/s/${google.schoolSlug}/admin` : null;
+      const outcome: { destination?: string; refusal: string } = { refusal: FAILED };
+      const started = await startStaffSession(handoff.email, async (user) => {
+        const decision = decideGoogleAccess({
+          emailVerified: true,
+          access: await loadStaffAccess(user.id),
+          next,
+        });
+        if (!decision.allowed) {
+          outcome.refusal = decision.message;
+          return false;
+        }
+        outcome.destination = decision.destination;
+        return true;
+      });
+      if (!started || !outcome.destination) {
+        return toLogin(`${origin}${withError(loginPathFor(next), outcome.refusal)}`);
+      }
+      return NextResponse.redirect(`${origin}${outcome.destination}`, 303);
     }
 
     await startParentSession(handoff.email);
