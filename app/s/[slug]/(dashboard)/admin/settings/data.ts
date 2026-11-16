@@ -139,6 +139,7 @@ export async function loadInboundAddresses(
         .from("email_ingestion_addresses")
         .select(INTAKE_ADDRESS_COLUMNS)
         .eq("school_id", schoolId)
+        .is("deleted_at", null)
         .order("created_at", { ascending: true }),
       supabase
         .from("event_calendars")

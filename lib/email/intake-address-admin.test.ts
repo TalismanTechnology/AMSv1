@@ -46,6 +46,7 @@ function fakeDb(opts: { address?: Row | null; folder?: Row | null; insertErrors?
         update: (p: Row) => ((op.action = "update"), (op.payload = p), b),
         delete: () => ((op.action = "delete"), b),
         eq: (c: string, v: unknown) => (op.filters.push([c, v]), b),
+        is: (c: string, v: unknown) => (op.filters.push([c, v]), b),
         single: () => b,
         maybeSingle: () => b,
         then: (res: (r: unknown) => unknown) => Promise.resolve(reply(op)).then(res),
@@ -141,7 +142,7 @@ test("rename / change visibility updates only this school's address", async () =
   const r = await updateIntakeAddressCore(d, SCHOOL, ADDRESS_ID, { label: "Grade 10", visibleGrades: ["10"] });
   assert.ok("address" in r);
   const update = ops.find((o) => o.action === "update")!;
-  assert.deepEqual(update.filters, [["id", ADDRESS_ID], ["school_id", SCHOOL]]);
+  assert.deepEqual(update.filters, [["id", ADDRESS_ID], ["school_id", SCHOOL], ["deleted_at", null]]);
   assert.deepEqual(update.payload!.visible_grades, ["10"]);
 });
 
@@ -159,16 +160,7 @@ test("disable / enable", async () => {
   assert.equal(ops.find((o) => o.action === "update")!.payload!.enabled, false);
 });
 
-test("delete: list addresses only; the whole-school address can't be deleted", async () => {
-  const list = fakeDb({ address: listRow });
-  assert.deepEqual(await deleteIntakeAddressCore(deps(list.db).d, SCHOOL, ADDRESS_ID), { success: true });
-  assert.deepEqual(list.ops.find((o) => o.action === "delete")!.filters, [["id", ADDRESS_ID], ["school_id", SCHOOL]]);
-
-  const sys = fakeDb({ address: schoolRow });
-  const r = await deleteIntakeAddressCore(deps(sys.db).d, SCHOOL, ADDRESS_ID);
-  assert.ok("error" in r);
-  assert.equal(sys.ops.filter((o) => o.action === "delete").length, 0);
-});
+// Deleting (soft delete, migration 053) is tested in intake-address-delete.test.ts.
 
 test("an id that isn't a uuid, or from another school, is not found", async () => {
   const { db } = fakeDb({ address: null });

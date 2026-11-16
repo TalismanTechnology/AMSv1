@@ -61,10 +61,31 @@ division, and any **list addresses** added with **Add address**. Each has:
 | Allowed senders | `allowed_senders` | `NULL` = anyone | Full addresses (`office@school.org`) or domains (`school.org` / `@school.org`, subdomains included). Others are logged as `rejected_domain`. With no school-wide allowlist, this is per address and replaces "anyone" for that address only. |
 | Default folder | `default_folder_id` | none | Set on each document; auto-sort then leaves the folder alone. |
 
-`kind` is `school`, `division` or `list`. The whole-school and division
-addresses can be edited and switched off but not deleted; list addresses
-can be deleted (documents they added stay, with their visibility).
-Changing an address affects only mail that arrives afterwards.
+`kind` is `school`, `division` or `list`. Every address can be edited and
+switched off. List and division addresses can also be deleted (migration
+053); the whole-school address can't (it's the default for the Gmail and
+manual intake, and would be created again). Changing an address affects
+only mail that arrives afterwards.
+
+Deleting is a soft delete: the row gets `deleted_at` / `deleted_by` and
+`enabled = false`, keeps its token and its slot (so a deleted division
+address isn't recreated), and disappears from the admin UI and every
+action ("Address not found."). Mail to it is logged as `rejected_disabled`
+("Address deleted: …") and never falls back to another address; if the
+same email also reached a live address, that one decides as usual.
+Nothing in the library is touched: documents keep their own
+`visible_grades`, folder and divisions. The confirm dialog shows how many
+documents came in through the address: accepted `email_ingestions` rows
+record the addresses that took the message in `intake_address_ids`, and the
+count is the distinct documents of those rows that still exist. 053
+backfills it only for older held-for-review rows (from their
+`division_ids`, division addresses only), so for older addresses the count
+covers "documents recorded as coming in through this address".
+
+The list shows the whole-school address, then divisions (division
+addresses, then lists for two or more grades by lowest and highest grade),
+then single-grade lists by grade, then other lists by name. Switched-off
+addresses are in a collapsed **Switched off (n)** section at the bottom.
 
 When one email reaches several addresses of the school, the addresses that
 are on and accept the sender decide: their divisions; all parents if any of
@@ -218,9 +239,11 @@ Apply `supabase/migrations/019_email_ingestion.sql`,
 `supabase/migrations/027_email_ingestion_claims.sql`,
 `supabase/migrations/028_division_email_addresses.sql`,
 `supabase/migrations/029_division_categories.sql`,
-`supabase/migrations/032_email_ingestion_review.sql` and
-`supabase/migrations/051_intake_address_visibility.sql` to your database.
-051 must be applied **before** deploying the code that uses it. Apply
+`supabase/migrations/032_email_ingestion_review.sql`,
+`supabase/migrations/051_intake_address_visibility.sql` and
+`supabase/migrations/053_intake_address_delete.sql` to your database.
+051 and 053 must be applied **before** deploying the code that uses them
+(053 is additive and safe for the code running before it). Apply
 `052_retire_unscoped_retrieval.sql` only **after** that deploy is live.
 032 adds the review statuses and columns (now used only by older held rows).
 028 copies each school's existing address into `email_ingestion_addresses`,

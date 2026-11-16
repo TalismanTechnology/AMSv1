@@ -56,7 +56,8 @@ export function extractInboundTokens(
  * A school's inbound address; division_id is null for the whole-school one
  * and for mailing-list addresses. The settings (migration 051) are optional
  * so a row without them behaves as every address did before: on, any
- * sender, all parents, no folder.
+ * sender, all parents, no folder. deleted_at (migration 053) is set on an
+ * address an admin deleted; its mail is turned away.
  */
 export interface InboundAddress {
   id?: string;
@@ -69,6 +70,7 @@ export interface InboundAddress {
   visible_grades?: string[] | null;
   allowed_senders?: string[] | null;
   default_folder_id?: string | null;
+  deleted_at?: string | null;
 }
 
 /**
@@ -158,22 +160,30 @@ export type AddressDecision =
   | { accepted: false; status: "rejected_disabled" | "rejected_domain"; reason: string };
 
 /**
- * Apply the reached addresses' own settings (migration 051). Switched-off
- * addresses are ignored, as are those whose sender rule turns the sender
- * away; the message is taken if any address is left, and rejected otherwise:
- * as rejected_disabled when every address was off, else rejected_domain.
- * The addresses that took it decide the divisions, the audience (all parents
- * if any of them is for all parents, else every grade any of them names) and
- * the folder (the first that has one).
+ * Apply the reached addresses' own settings (migration 051). Deleted and
+ * switched-off addresses are ignored, as are those whose sender rule turns
+ * the sender away; the message is taken if any address is left, and
+ * rejected otherwise: as rejected_disabled when every address was deleted
+ * or off (never falling back to another address), else rejected_domain.
+ * The addresses that took it decide the divisions, the audience (all
+ * parents if any of them is for all parents, else every grade any of them
+ * names) and the folder (the first that has one).
  */
 export function applyAddressRules(
   reached: InboundAddress[],
   fromAddress: string | null
 ): AddressDecision {
-  const enabled = reached.filter((a) => a.enabled !== false);
+  const enabled = reached.filter((a) => !a.deleted_at && a.enabled !== false);
   if (!enabled.length) {
-    const names = reached.map(addressName).join(", ");
-    return { accepted: false, status: "rejected_disabled", reason: `Address switched off: ${names}` };
+    const deleted = reached.filter((a) => a.deleted_at);
+    const off = reached.filter((a) => !a.deleted_at);
+    const reason = [
+      deleted.length ? `Address deleted: ${deleted.map(addressName).join(", ")}` : "",
+      off.length ? `Address switched off: ${off.map(addressName).join(", ")}` : "",
+    ]
+      .filter(Boolean)
+      .join("; ");
+    return { accepted: false, status: "rejected_disabled", reason };
   }
   const taking = enabled.filter((a) => senderAllowed(fromAddress, a.allowed_senders));
   if (!taking.length) {

@@ -7,6 +7,7 @@ import { logAudit } from "@/lib/audit";
 import {
   createIntakeAddressCore,
   deleteIntakeAddressCore,
+  getIntakeAddressDeleteInfoCore,
   setIntakeAddressEnabledCore,
   updateIntakeAddressCore,
   type AddressResult,
@@ -53,6 +54,14 @@ export async function setIntakeAddressEnabled(
   enabled: boolean
 ): Promise<AddressResult> {
   return revalidated(await setIntakeAddressEnabledCore(deps, schoolId, addressId, enabled));
+}
+
+/** For the delete dialog: how many documents came in through the address. */
+export async function getIntakeAddressDeleteInfo(
+  schoolId: string,
+  addressId: string
+): Promise<{ documentCount: number } | { error: string }> {
+  return getIntakeAddressDeleteInfoCore(deps, schoolId, addressId);
 }
 
 export async function deleteIntakeAddress(
