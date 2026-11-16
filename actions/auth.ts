@@ -3,6 +3,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { getStaffRole } from "@/lib/auth/parent-session";
 import { forgetThisDevice } from "@/lib/push/device-cookie";
+import {
+  GOOGLE_MESSAGES,
+  isGoogleSignInEnabled,
+  isPasswordSignInDisabled,
+} from "@/lib/auth/google-sign-in";
 import { redirect } from "next/navigation";
 
 const PARENT_PASSWORD_ERROR =
@@ -31,6 +36,15 @@ export async function login(formData: FormData) {
 
   // signInWithPassword already returns the verified user; no second round trip.
   if (!user) return { error: "Login failed" };
+
+  // "Require Google sign-in" (app_metadata, service role only). Checked after
+  // the password so it doesn't reveal which accounts use Google. Middleware
+  // also ends password sessions for these accounts, which covers anyone
+  // calling Supabase's password endpoint directly.
+  if (isGoogleSignInEnabled() && isPasswordSignInDisabled(user.app_metadata)) {
+    await supabase.auth.signOut({ scope: "local" });
+    return { error: GOOGLE_MESSAGES.passwordDisabled };
+  }
 
   const staffRole = await getStaffRole(user.id);
 

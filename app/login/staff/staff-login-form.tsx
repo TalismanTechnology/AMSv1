@@ -12,9 +12,12 @@ import { Label } from "@/components/ui/label";
 import { login } from "@/actions/auth";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { LegalNotice } from "@/components/legal/legal-notice";
+import { AuthDivider, GoogleSignInButton } from "@/components/auth/google-sign-in-button";
+import { safeNextPath } from "@/lib/auth/google-sign-in";
 
-export function StaffLoginForm() {
+export function StaffLoginForm({ googleSignInEnabled }: { googleSignInEnabled: boolean }) {
   const searchParams = useSearchParams();
+  const next = safeNextPath(searchParams.get("next")) ?? undefined;
   const [email, setEmail] = useState("");
   // useActionState marks `pending` urgent as soon as the form submits and keeps
   // it true across `login()` and its post-sign-in redirect; plain `setState`
@@ -78,6 +81,13 @@ export function StaffLoginForm() {
           >
             {error}
           </div>
+        )}
+
+        {googleSignInEnabled && (
+          <>
+            <GoogleSignInButton next={next} loginPath="/login/staff" disabled={pending} />
+            <AuthDivider />
+          </>
         )}
 
         <form action={formAction} className="space-y-4">
