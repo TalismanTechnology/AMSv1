@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DEFAULT_DIVISIONS } from "@/lib/documents/division-categories";
 import { generateInboundToken } from "@/lib/email/token";
+import { GRADE_VALUES } from "@/lib/grades";
 import type { EventCalendar } from "@/lib/types";
 
 /** A division's own inbound address. */
@@ -34,12 +35,12 @@ export interface InboundAddresses {
   wholeSchoolToken: string | null;
   divisionAddresses: DivisionAddress[];
   divisions: EventCalendar[];
-  /** Every address: whole school first, then divisions, then lists. */
+  /** Every address that isn't deleted, in sortIntakeAddresses order. */
   addresses: IntakeAddress[];
 }
 
 export const INTAKE_ADDRESS_COLUMNS =
-  "id, token, kind, division_id, label, enabled, visible_grades, allowed_senders, default_folder_id, created_at";
+  "id, token, kind, division_id, label, enabled, visible_grades, allowed_senders, default_folder_id, created_at, deleted_at";
 
 interface AddressRow {
   id: string;
@@ -52,9 +53,9 @@ interface AddressRow {
   allowed_senders?: string[] | null;
   default_folder_id?: string | null;
   created_at?: string;
+  /** Set when an admin deleted the address (migration 053). */
+  deleted_at?: string | null;
 }
-
-const KIND_ORDER = { school: 0, division: 1, list: 2 } as const;
 
 export function toIntakeAddress(row: AddressRow): IntakeAddress {
   const kind =
@@ -73,26 +74,91 @@ export function toIntakeAddress(row: AddressRow): IntakeAddress {
   };
 }
 
-/** Whole school, divisions (in division order), then lists by creation. */
+const gradeIndex = (grade: string) => {
+  const i = GRADE_VALUES.indexOf(grade);
+  return i === -1 ? GRADE_VALUES.length : i;
+};
+
+/** The address's grades as positions in GRADE_VALUES, lowest first. */
+const gradeRange = (a: IntakeAddress) => (a.visibleGrades ?? []).map(gradeIndex).sort((x, y) => x - y);
+
+/**
+ * Where an address sorts, by who it's for (not by its name):
+ *   0  the whole-school address;
+ *   1  divisions: the division addresses, then lists for two or more grades;
+ *   2  lists for a single grade;
+ *   3  other lists (for all parents).
+ */
+function sortGroup(a: IntakeAddress): 0 | 1 | 2 | 3 {
+  if (a.kind === "school") return 0;
+  if (a.kind === "division") return 1;
+  const grades = a.visibleGrades?.length ?? 0;
+  return grades >= 2 ? 1 : grades === 1 ? 2 : 3;
+}
+
+const byName = (a: IntakeAddress, b: IntakeAddress) =>
+  (a.label ?? a.token).localeCompare(b.label ?? b.token, undefined, { sensitivity: "base", numeric: true });
+
+/**
+ * Admin order: the whole school; then divisions (the system division
+ * addresses in division order, then lists for several grades by lowest
+ * grade, highest grade and name); then single-grade lists by grade; then
+ * every other list by name. Ties go to the older address.
+ */
 export function sortIntakeAddresses(
   addresses: IntakeAddress[],
   divisions: Pick<EventCalendar, "id">[] = []
 ): IntakeAddress[] {
   const divisionOrder = new Map(divisions.map((d, i) => [d.id, i]));
-  return [...addresses].sort(
-    (a, b) =>
-      KIND_ORDER[a.kind] - KIND_ORDER[b.kind] ||
-      (divisionOrder.get(a.divisionId ?? "") ?? 0) - (divisionOrder.get(b.divisionId ?? "") ?? 0) ||
-      a.createdAt.localeCompare(b.createdAt)
-  );
+  const divisionIndex = (a: IntakeAddress) => divisionOrder.get(a.divisionId ?? "") ?? divisions.length;
+
+  const compare = (a: IntakeAddress, b: IntakeAddress): number => {
+    const group = sortGroup(a) - sortGroup(b);
+    if (group) return group;
+    if (a.kind === "division" || b.kind === "division") {
+      if (a.kind !== b.kind) return a.kind === "division" ? -1 : 1;
+      return divisionIndex(a) - divisionIndex(b);
+    }
+    const [ra, rb] = [gradeRange(a), gradeRange(b)];
+    if (ra.length && rb.length) {
+      const lowest = ra[0] - rb[0];
+      if (lowest) return lowest;
+      const highest = ra[ra.length - 1] - rb[rb.length - 1];
+      if (highest) return highest;
+    }
+    return byName(a, b);
+  };
+
+  return [...addresses].sort((a, b) => compare(a, b) || a.createdAt.localeCompare(b.createdAt));
 }
 
-/** The summary the settings page and actions return, from address rows. */
+/**
+ * The admin list's two sections, each in sortIntakeAddresses order: the
+ * addresses that are on, and the switched-off ones (shown collapsed).
+ */
+export function splitIntakeAddresses(
+  addresses: IntakeAddress[],
+  divisions: Pick<EventCalendar, "id">[] = []
+): { enabled: IntakeAddress[]; switchedOff: IntakeAddress[] } {
+  const sorted = sortIntakeAddresses(addresses, divisions);
+  return {
+    enabled: sorted.filter((a) => a.enabled),
+    switchedOff: sorted.filter((a) => !a.enabled),
+  };
+}
+
+/**
+ * The summary the settings page and actions return, from address rows.
+ * Deleted addresses are left out.
+ */
 export function summarizeAddresses(
   rows: AddressRow[],
   divisions: EventCalendar[]
 ): InboundAddresses {
-  const addresses = sortIntakeAddresses(rows.map(toIntakeAddress), divisions);
+  const addresses = sortIntakeAddresses(
+    rows.filter((row) => !row.deleted_at).map(toIntakeAddress),
+    divisions
+  );
   return {
     wholeSchoolToken: addresses.find((a) => a.kind === "school")?.token ?? null,
     divisionAddresses: addresses
@@ -107,7 +173,9 @@ export function summarizeAddresses(
  * A school with email ingestion has one address for the whole school and one
  * per division (Lower, Middle, Upper School). Creates whatever is missing —
  * the divisions themselves too, if the school has none yet — and returns the
- * full set. Runs as the signed-in admin, so RLS still applies.
+ * full set, without deleted addresses. A division address an admin deleted
+ * still counts as there, so it isn't created again. Runs as the signed-in
+ * admin, so RLS still applies.
  */
 export async function ensureInboundAddresses(
   supabase: SupabaseClient,
@@ -152,7 +220,8 @@ export async function ensureInboundAddresses(
   if (readError) throw new Error(readError.message);
 
   // List addresses also have no division, so the whole-school one is found
-  // by its kind.
+  // by its kind. Deleted rows are included on purpose: a deleted division
+  // address keeps its slot (and the unique index would refuse a second).
   const isSystemFor = (a: AddressRow, divisionId: string | null) =>
     divisionId === null
       ? a.division_id === null && a.kind !== "list"

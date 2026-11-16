@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Check, Copy, MoreHorizontal, Plus } from "lucide-react";
+import { useRef, useState } from "react";
+import { Check, ChevronRight, Copy, MoreHorizontal, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { LogoSpinner } from "@/components/logo-spinner";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Dialog,
   DialogContent,
@@ -44,19 +45,27 @@ import { GradeVisibilityPicker } from "@/components/admin/grade-visibility-picke
 import {
   createIntakeAddress,
   deleteIntakeAddress,
+  getIntakeAddressDeleteInfo,
   setIntakeAddressEnabled,
   updateIntakeAddress,
 } from "@/actions/intake-addresses";
 import { formatVisibleGrades } from "@/lib/documents/grade-visibility";
 import { calendarColorClasses } from "@/lib/event-calendars";
 import { cn } from "@/lib/utils";
-import type { IntakeAddress } from "@/lib/email/addresses";
+import { splitIntakeAddresses, type IntakeAddress } from "@/lib/email/addresses";
 import type { EventCalendar, Folder } from "@/lib/types";
 
 // The school's intake addresses (migration 051): the whole-school and
 // division addresses, plus one per mailing list an admin adds. Each can be
 // renamed, limited to parents of some grades, limited to some senders, given
-// a default folder and switched off. Only list addresses can be deleted.
+// a default folder and switched off. List and division addresses can be
+// deleted (migration 053: mail to them is turned away, their documents stay
+// as they are); the whole-school address can only be switched off. Shown in
+// sortIntakeAddresses order, switched-off addresses in their own collapsed
+// section at the bottom.
+
+/** The delete dialog's document count: loading, loaded, or unavailable. */
+type DeleteInfo = { loading: true } | { documentCount: number } | { error: string };
 
 export function IntakeAddressList({
   schoolId,
@@ -74,12 +83,18 @@ export function IntakeAddressList({
   const [addresses, setAddresses] = useState(initial);
   const [editing, setEditing] = useState<IntakeAddress | "new" | null>(null);
   const [deleting, setDeleting] = useState<IntakeAddress | null>(null);
+  const [deleteInfo, setDeleteInfo] = useState<DeleteInfo>({ loading: true });
   const [busy, setBusy] = useState(false);
+  const [showOff, setShowOff] = useState(false);
+  const deletingId = useRef<string | null>(null);
+
+  const { enabled, switchedOff } = splitIntakeAddresses(addresses, divisions);
 
   const divisionOf = (a: IntakeAddress) => divisions.find((d) => d.id === a.divisionId);
   const nameOf = (a: IntakeAddress) =>
     a.label?.trim() ||
     (a.kind === "school" ? "Whole school" : a.kind === "division" ? divisionOf(a)?.name ?? "Division" : a.token);
+  const emailOf = (a: IntakeAddress) => `${a.token}@${inboundDomain}`;
 
   function replace(address: IntakeAddress) {
     setAddresses((prev) =>
@@ -96,6 +111,20 @@ export function IntakeAddressList({
     toast.success(result.address.enabled ? "Address switched on" : "Address switched off");
   }
 
+  async function startDelete(address: IntakeAddress) {
+    deletingId.current = address.id;
+    setDeleting(address);
+    setDeleteInfo({ loading: true });
+    const info = await getIntakeAddressDeleteInfo(schoolId, address.id);
+    // The dialog may have been closed, or opened for another address.
+    if (deletingId.current === address.id) setDeleteInfo(info);
+  }
+
+  function closeDelete() {
+    deletingId.current = null;
+    setDeleting(null);
+  }
+
   async function confirmDelete() {
     if (!deleting) return;
     setBusy(true);
@@ -103,9 +132,67 @@ export function IntakeAddressList({
     setBusy(false);
     if ("error" in result) return toast.error(result.error);
     setAddresses((prev) => prev.filter((a) => a.id !== deleting.id));
-    setDeleting(null);
+    closeDelete();
     toast.success("Address deleted");
   }
+
+  const renderAddress = (address: IntakeAddress) => {
+    const division = divisionOf(address);
+    return (
+      <li key={address.id} className={cn("space-y-2.5 p-3.5 sm:p-4", !address.enabled && "opacity-60")}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 space-y-1.5">
+            <p className="flex items-center gap-1.5 text-sm font-medium text-ink">
+              {division && (
+                <span className={cn("h-2 w-2 shrink-0 rounded-full", calendarColorClasses(division.color).dot)} />
+              )}
+              <span className="truncate">{nameOf(address)}</span>
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              <Badge variant="outline" className="font-normal text-ink-soft">
+                {formatVisibleGrades(address.visibleGrades)}
+              </Badge>
+              {address.allowedSenders && (
+                <Badge variant="outline" className="font-normal text-ink-soft">
+                  {address.allowedSenders.length === 1
+                    ? `Only ${address.allowedSenders[0]}`
+                    : `${address.allowedSenders.length} allowed senders`}
+                </Badge>
+              )}
+              {address.defaultFolderId && (
+                <Badge variant="outline" className="font-normal text-ink-soft">
+                  Folder: {folders.find((f) => f.id === address.defaultFolderId)?.name ?? "—"}
+                </Badge>
+              )}
+              {!address.enabled && <Badge className="bg-secondary text-secondary-foreground">Off</Badge>}
+            </div>
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" aria-label={`Options for ${nameOf(address)}`}>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => setEditing(address)}>Edit</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => toggle(address)}>
+                {address.enabled ? "Switch off" : "Switch on"}
+              </DropdownMenuItem>
+              {address.kind !== "school" && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="text-destructive" onSelect={() => startDelete(address)}>
+                    Delete
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+        <CopyableAddress label={nameOf(address)} address={emailOf(address)} />
+      </li>
+    );
+  };
 
   return (
     <div className="space-y-4">
@@ -123,65 +210,23 @@ export function IntakeAddressList({
         </Button>
       </div>
 
-      <ul className="divide-y divide-border rounded-xl border border-border">
-        {addresses.map((address) => {
-          const division = divisionOf(address);
-          return (
-            <li key={address.id} className={cn("space-y-2.5 p-3.5 sm:p-4", !address.enabled && "opacity-60")}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 space-y-1.5">
-                  <p className="flex items-center gap-1.5 text-sm font-medium text-ink">
-                    {division && (
-                      <span className={cn("h-2 w-2 shrink-0 rounded-full", calendarColorClasses(division.color).dot)} />
-                    )}
-                    <span className="truncate">{nameOf(address)}</span>
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    <Badge variant="outline" className="font-normal text-ink-soft">
-                      {formatVisibleGrades(address.visibleGrades)}
-                    </Badge>
-                    {address.allowedSenders && (
-                      <Badge variant="outline" className="font-normal text-ink-soft">
-                        {address.allowedSenders.length === 1
-                          ? `Only ${address.allowedSenders[0]}`
-                          : `${address.allowedSenders.length} allowed senders`}
-                      </Badge>
-                    )}
-                    {address.defaultFolderId && (
-                      <Badge variant="outline" className="font-normal text-ink-soft">
-                        Folder: {folders.find((f) => f.id === address.defaultFolderId)?.name ?? "—"}
-                      </Badge>
-                    )}
-                    {!address.enabled && <Badge className="bg-secondary text-secondary-foreground">Off</Badge>}
-                  </div>
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" aria-label={`Options for ${nameOf(address)}`}>
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onSelect={() => setEditing(address)}>Edit</DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => toggle(address)}>
-                      {address.enabled ? "Switch off" : "Switch on"}
-                    </DropdownMenuItem>
-                    {address.kind === "list" && (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-destructive" onSelect={() => setDeleting(address)}>
-                          Delete
-                        </DropdownMenuItem>
-                      </>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-              <CopyableAddress label={nameOf(address)} address={`${address.token}@${inboundDomain}`} />
-            </li>
-          );
-        })}
-      </ul>
+      {enabled.length > 0 && (
+        <ul className="divide-y divide-border rounded-xl border border-border">{enabled.map(renderAddress)}</ul>
+      )}
+
+      {switchedOff.length > 0 && (
+        <Collapsible open={showOff} onOpenChange={setShowOff} className="space-y-2">
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" size="sm" className="-ml-2 text-ink-soft">
+              <ChevronRight className={cn("mr-1 h-4 w-4 transition-transform", showOff && "rotate-90")} />
+              Switched off ({switchedOff.length})
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <ul className="divide-y divide-border rounded-xl border border-border">{switchedOff.map(renderAddress)}</ul>
+          </CollapsibleContent>
+        </Collapsible>
+      )}
 
       {editing && (
         <AddressDialog
@@ -197,13 +242,22 @@ export function IntakeAddressList({
         />
       )}
 
-      <AlertDialog open={!!deleting} onOpenChange={(open) => !open && setDeleting(null)}>
+      <AlertDialog open={!!deleting} onOpenChange={(open) => !open && closeDelete()}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete {deleting ? nameOf(deleting) : "address"}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Mail sent to this address will be turned away. Documents it
-              already added stay in your library, with the same visibility.
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>
+                  Mail sent to <span className="font-mono text-ink">{deleting ? emailOf(deleting) : ""}</span>{" "}
+                  will be turned away from now on.
+                </p>
+                <p>
+                  {deleting && <DeleteDocumentsNote info={deleteInfo} visibleGrades={deleting.visibleGrades} />}{" "}
+                  Nothing is deleted from the library.
+                </p>
+                <p>This can&apos;t be undone; to pause an address instead, switch it off.</p>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -213,7 +267,7 @@ export function IntakeAddressList({
                 e.preventDefault();
                 confirmDelete();
               }}
-              disabled={busy}
+              disabled={busy || "loading" in deleteInfo}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {busy && <LogoSpinner className="mr-2" />}
@@ -223,6 +277,44 @@ export function IntakeAddressList({
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+/** What happens to the documents an address brought in, for the delete dialog. */
+function DeleteDocumentsNote({
+  info,
+  visibleGrades,
+}: {
+  info: DeleteInfo;
+  visibleGrades: string[] | null;
+}) {
+  if ("loading" in info) {
+    return (
+      <span className="inline-flex items-center gap-1.5">
+        <LogoSpinner size={14} />
+        Counting the documents it brought in…
+      </span>
+    );
+  }
+  const audience = visibleGrades ? `${formatVisibleGrades(visibleGrades)} parents only` : "all parents";
+  if ("error" in info) {
+    return (
+      <>
+        The documents it already brought in stay in your library and keep
+        their current visibility ({audience}).
+      </>
+    );
+  }
+  if (info.documentCount === 0) {
+    return <>No documents are recorded as coming in through this address.</>;
+  }
+  const one = info.documentCount === 1;
+  return (
+    <>
+      The {one ? "1 document" : `${info.documentCount} documents`} recorded as
+      coming in through this address {one ? "stays" : "stay"} in your library
+      and {one ? "keeps its" : "keep their"} current visibility ({audience}).
+    </>
   );
 }
 

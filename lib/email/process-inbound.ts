@@ -28,7 +28,8 @@ import {
 // (schools.allowed_sender_domains is left in the database, unused;
 // 'pending_review' rows are from before.) Each address can also be switched
 // off, file into a default folder, and limit the documents to parents of
-// some grades (migration 051, applyAddressRules).
+// some grades (migration 051, applyAddressRules). Mail to a deleted address
+// is turned away (053); accepted rows record the addresses that took them.
 
 export type IngestStatus =
   | "processing"
@@ -117,10 +118,13 @@ const defaultDeps: ProcessInboundDeps = {
   widenVisibility: widenDocumentVisibility,
 };
 
-// The address settings arrive with migration 051; until it is applied the
-// lookup falls back to the columns every address has.
-const ADDRESS_COLUMNS =
+// The address settings arrive with migration 051 and deleted_at with 053;
+// until they are applied the lookup falls back to the columns that exist.
+// (Each fallback keeps every rule it can: without 053 no address is deleted,
+// and a deleted one is switched off anyway.)
+const SETTINGS_COLUMNS =
   "id, token, school_id, division_id, kind, label, enabled, visible_grades, allowed_senders, default_folder_id";
+const ADDRESS_COLUMNS = `${SETTINGS_COLUMNS}, deleted_at`;
 const LEGACY_ADDRESS_COLUMNS = "token, school_id, division_id";
 
 /** The matched parts of a content check, and whether anything new is left. */
@@ -161,6 +165,11 @@ export async function processInboundEmail(
     schoolId: null,
     divisionIds: [],
   };
+  // The addresses that took the message, recorded on its accepted row
+  // (email_ingestions.intake_address_ids, migration 053).
+  let takenBy: string[] = [];
+  const addressIdsFor = (status: IngestStatus) =>
+    status === "accepted" && takenBy.length ? { intake_address_ids: takenBy } : {};
 
   const result = (
     status: InboundOutcomeStatus,
@@ -196,6 +205,7 @@ export async function processInboundEmail(
           status,
           reason: reason + suffix,
           document_ids: documentIds,
+          ...addressIdsFor(status),
         })
         .select("id")
         .single();
@@ -220,8 +230,9 @@ export async function processInboundEmail(
       error: { code?: string; message: string } | null;
     }>;
   let { data: addresses, error: addressError } = await lookup(ADDRESS_COLUMNS);
-  if (addressError?.code === "42703") {
-    ({ data: addresses, error: addressError } = await lookup(LEGACY_ADDRESS_COLUMNS));
+  for (const columns of [SETTINGS_COLUMNS, LEGACY_ADDRESS_COLUMNS]) {
+    if (addressError?.code !== "42703") break;
+    ({ data: addresses, error: addressError } = await lookup(columns));
   }
   if (addressError) {
     console.error("[inbound-email] Address lookup failed:", addressError.message);
@@ -262,6 +273,7 @@ export async function processInboundEmail(
   }
   const { divisionIds, visibleGrades, folderId } = decision;
   known.divisionIds = divisionIds;
+  takenBy = [...new Set(decision.addresses.map((a) => a.id).filter((id): id is string => !!id))];
   const widen = deps.widenVisibility ?? (async () => {});
 
   if (dryRun) {
@@ -336,6 +348,17 @@ export async function processInboundEmail(
             error: "Retry later",
           });
         }
+        // The documents came in through this copy's addresses too.
+        const merged = [...new Set([...claim.addressIds, ...takenBy])];
+        if (claim.holderId && merged.length > claim.addressIds.length) {
+          const { error } = await supabase
+            .from("email_ingestions")
+            .update({ intake_address_ids: merged })
+            .eq("id", claim.holderId);
+          if (error) {
+            console.error("[inbound-email] Recording a duplicate's addresses failed:", error.message);
+          }
+        }
       } else if (divisionIds.length || visibleGrades) {
         // The first copy is still ingesting. Fail this one so Resend retries
         // it after that finishes, when it can add its divisions.
@@ -359,7 +382,7 @@ export async function processInboundEmail(
     if (!claimId) return (await record(status, reason, ids)).ingestionId;
     const { error } = await supabase
       .from("email_ingestions")
-      .update({ status, reason: reason + suffix, document_ids: ids })
+      .update({ status, reason: reason + suffix, document_ids: ids, ...addressIdsFor(status) })
       .eq("id", claimId);
     if (error) {
       console.error(`[inbound-email] Failed to settle claim ${claimId}:`, error.message);
@@ -442,7 +465,7 @@ async function claimMessage(
   data: InboundMeta & { messageId: string; reason: string }
 ): Promise<
   | { claimId: string }
-  | { skip: "duplicate"; documentIds: string[]; holderId?: string }
+  | { skip: "duplicate"; documentIds: string[]; addressIds: string[]; holderId?: string }
   | { skip: "in_progress"; holderId?: string }
 > {
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -467,7 +490,7 @@ async function claimMessage(
 
     const { data: holder } = await supabase
       .from("email_ingestions")
-      .select("id, status, created_at, document_ids")
+      .select("id, status, created_at, document_ids, intake_address_ids")
       .eq("school_id", schoolId)
       .eq("message_id", data.messageId)
       .in("status", ["processing", "accepted"])
@@ -475,7 +498,12 @@ async function claimMessage(
 
     if (!holder) continue; // released between our insert and this read
     if (holder.status === "accepted") {
-      return { skip: "duplicate", documentIds: holder.document_ids ?? [], holderId: holder.id };
+      return {
+        skip: "duplicate",
+        documentIds: holder.document_ids ?? [],
+        addressIds: holder.intake_address_ids ?? [],
+        holderId: holder.id,
+      };
     }
     if (!isStaleClaim(holder.created_at)) return { skip: "in_progress", holderId: holder.id };
 
