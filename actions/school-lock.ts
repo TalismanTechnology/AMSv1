@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getSchoolBySlug } from "@/lib/school-context";
 import { logAudit } from "@/lib/audit";
+import { adminGoogleOnlyError, superAdminGoogleOnlyError } from "@/lib/auth/admin-session";
 import {
   UNLOCK_ATTEMPT_WINDOW_MS,
   UNLOCK_TTL_MS,
@@ -55,6 +56,9 @@ async function requireGenuineSchoolAdmin(
   if (membership?.role !== "admin" || !membership.approved) {
     return { error: "Only this school's own admins can manage the owner lock." };
   }
+  // ADMIN_GOOGLE_ONLY: admin powers need a Google session.
+  const googleOnly = await adminGoogleOnlyError({ userId: user.id, isSuperAdmin: false, membership });
+  if (googleOnly) return { error: googleOnly };
   return { userId: user.id };
 }
 
@@ -166,6 +170,8 @@ export async function unlockSchool(
     .eq("id", user.id)
     .single();
   if (profile?.role !== "super_admin") return { error: "Not authorized" };
+  const googleOnly = await superAdminGoogleOnlyError(user.id);
+  if (googleOnly) return { error: googleOnly };
 
   const school = await getSchoolBySlug(slug);
   if (!school) return { error: "School not found" };

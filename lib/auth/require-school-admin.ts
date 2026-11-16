@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { schoolAccessFor } from "@/lib/school-lock/access";
 import { SCHOOL_LOCKED_ERROR } from "@/lib/school-lock/core";
+import { adminGoogleOnlyError, superAdminGoogleOnlyError } from "@/lib/auth/admin-session";
 
 // Shared authorization gate for server actions that mutate one school's
 // configuration. Always re-authorizes against the SPECIFIC school id passed in
@@ -35,6 +36,13 @@ export async function requireSchoolAdmin(
     .eq("user_id", user.id)
     .eq("school_id", schoolId)
     .maybeSingle();
+
+  const googleOnly = await adminGoogleOnlyError({
+    userId: user.id,
+    isSuperAdmin: profile?.role === "super_admin",
+    membership: membership ?? null,
+  });
+  if (googleOnly) return { error: googleOnly };
 
   if (profile?.role === "super_admin") {
     // Allowed unless the school's owner lock keeps them out.
@@ -76,6 +84,9 @@ export async function requireSuperAdmin(): Promise<SchoolAdminResult> {
   if (profile?.role !== "super_admin") {
     return { error: "Only AskMySchool support can change how parents sign in" };
   }
+
+  const googleOnly = await superAdminGoogleOnlyError(user.id);
+  if (googleOnly) return { error: googleOnly };
 
   return { userId: user.id };
 }

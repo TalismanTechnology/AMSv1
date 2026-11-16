@@ -11,6 +11,8 @@ import {
   type SchoolAccessInput,
 } from "./core";
 import { loadSchoolLock } from "./store";
+import { adminGoogleOnlyError } from "@/lib/auth/admin-session";
+import { ADMIN_GOOGLE_ONLY_MESSAGE, isAdminGoogleOnlyEnabled } from "@/lib/auth/admin-google-only";
 
 // The one place the owner lock is enforced. Every guard that lets the
 // super-admin into a school (requireSchoolContext for pages,
@@ -63,7 +65,10 @@ export async function schoolAccessFor(
 /**
  * For server actions and routes that rely on RLS (or the service role) rather
  * than requireSchoolAdmin: SCHOOL_LOCKED_ERROR when the signed-in user is a
- * super-admin locked out of this school, else null. It never grants access;
+ * super-admin locked out of this school, ADMIN_GOOGLE_ONLY_MESSAGE when
+ * ADMIN_GOOGLE_ONLY is on and a super-admin or an admin of this school isn't
+ * on a Google session (lib/auth/admin-google-only.ts; for "member" requests
+ * too), else null. It never grants access;
  * the caller's own checks still apply.
  */
 export async function schoolLockError(
@@ -89,7 +94,9 @@ export async function schoolLockError(
     .select("role")
     .eq("id", user.id)
     .single();
-  if (profile?.role !== "super_admin") return null;
+  const isSuperAdmin = profile?.role === "super_admin";
+  // Flag off: only a super-admin needs anything more (as before).
+  if (!isSuperAdmin && !isAdminGoogleOnlyEnabled()) return null;
 
   const { data: membership } = await supabase
     .from("school_memberships")
@@ -97,6 +104,14 @@ export async function schoolLockError(
     .eq("user_id", user.id)
     .eq("school_id", schoolId)
     .maybeSingle();
+
+  const googleOnly = await adminGoogleOnlyError({
+    userId: user.id,
+    isSuperAdmin,
+    membership: membership ?? null,
+  });
+  if (googleOnly) return googleOnly;
+  if (!isSuperAdmin) return null;
 
   const access = await schoolAccessFor({
     userId: user.id,
@@ -116,4 +131,9 @@ export async function assertSchoolNotLocked(
 ): Promise<void> {
   const error = await schoolLockError(schoolId, need, knownUserId);
   if (error) throw new Error(error);
+}
+
+/** HTTP status for a schoolLockError message in an API route. */
+export function schoolAccessErrorStatus(error: string): 403 | 423 {
+  return error === ADMIN_GOOGLE_ONLY_MESSAGE ? 403 : 423;
 }

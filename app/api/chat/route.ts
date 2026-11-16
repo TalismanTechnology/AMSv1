@@ -2,6 +2,7 @@ import { NextRequest, after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { schoolLockError } from "@/lib/school-lock/access";
+import { adminGoogleOnlyError } from "@/lib/auth/admin-session";
 import { appendFileSync } from "fs";
 const debugLog = (msg: string) => { const line = `[${new Date().toISOString()}] ${msg}\n`; console.log(line.trim()); if (process.env.NODE_ENV !== "production") { try { appendFileSync("chat-debug.log", line); } catch {} } };
 import {
@@ -144,7 +145,7 @@ export async function POST(request: NextRequest) {
         .single(),
       supabase
         .from("school_memberships")
-        .select("id")
+        .select("id, role")
         .eq("user_id", user.id)
         .eq("school_id", schoolId)
         .eq("approved", true)
@@ -158,6 +159,20 @@ export async function POST(request: NextRequest) {
     // role: staff previewing the chat send the same data to the same place.
     const consentDenied = aiConsentGate(profile);
     if (consentDenied) return consentDenied;
+
+    // ADMIN_GOOGLE_ONLY: a super-admin's or this school's admin's session
+    // only works from Google sign-in (no lookup unless the flag is on).
+    const googleOnly = await adminGoogleOnlyError({
+      userId: user.id,
+      isSuperAdmin: profile?.role === "super_admin",
+      membership: membership ?? null,
+    });
+    if (googleOnly) {
+      return new Response(JSON.stringify({ error: googleOnly }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
 
     if (profile?.role !== "super_admin") {
       if (!membership) {

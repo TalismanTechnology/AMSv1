@@ -1,5 +1,8 @@
 "use server";
 
+import { getStaffRole } from "@/lib/auth/parent-session";
+import { currentSessionIsGoogle } from "@/lib/auth/admin-session";
+import { ADMIN_GOOGLE_ONLY_MESSAGE, isAdminGoogleOnlyEnabled } from "@/lib/auth/admin-google-only";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -34,6 +37,15 @@ export async function deleteMyAccount(confirmation: string): Promise<{ error: st
     .maybeSingle();
   if (profile?.role === "super_admin") {
     return { error: "Super admin accounts can't be deleted from here." };
+  }
+  // ADMIN_GOOGLE_ONLY: an admin account is only managed from a Google
+  // session (deleting it removes the school's admin).
+  if (
+    isAdminGoogleOnlyEnabled() &&
+    (await getStaffRole(user.id)) &&
+    !(await currentSessionIsGoogle(user.id))
+  ) {
+    return { error: ADMIN_GOOGLE_ONLY_MESSAGE };
   }
 
   // Record it before the account goes (admin_id is cleared with the account,

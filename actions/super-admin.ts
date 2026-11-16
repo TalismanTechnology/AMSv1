@@ -7,6 +7,7 @@ import { removeWebsiteStorageForSchool } from "@/lib/website/documents";
 import { revalidatePath } from "next/cache";
 import { superAdminLockedOut } from "@/lib/school-lock/access";
 import { SCHOOL_LOCKED_ERROR } from "@/lib/school-lock/core";
+import { superAdminGoogleOnlyError } from "@/lib/auth/admin-session";
 import {
   PASSWORD_SIGNIN_DISABLED_KEY,
   hasVerifiedGoogleEmail,
@@ -29,6 +30,8 @@ export async function createSchool(formData: FormData) {
     .single();
 
   if (profile?.role !== "super_admin") return { error: "Unauthorized" };
+  const googleOnly = await superAdminGoogleOnlyError(user.id);
+  if (googleOnly) return { error: googleOnly };
 
   const name = formData.get("name") as string;
   const slug = (formData.get("slug") as string).toLowerCase().trim();
@@ -92,6 +95,8 @@ export async function updateSchool(
     .single();
 
   if (profile?.role !== "super_admin") return { error: "Unauthorized" };
+  const googleOnly = await superAdminGoogleOnlyError(user.id);
+  if (googleOnly) return { error: googleOnly };
 
   const name = data.name.trim();
   const slug = data.slug.toLowerCase().trim();
@@ -149,6 +154,8 @@ export async function assignSchoolAdmin(formData: FormData) {
     .single();
 
   if (profile?.role !== "super_admin") return { error: "Unauthorized" };
+  const googleOnly = await superAdminGoogleOnlyError(user.id);
+  if (googleOnly) return { error: googleOnly };
 
   const schoolId = formData.get("school_id") as string;
   const email = (formData.get("email") as string).toLowerCase().trim();
@@ -227,6 +234,8 @@ export async function deleteSchool(schoolId: string) {
     .single();
 
   if (profile?.role !== "super_admin") return { error: "Unauthorized" };
+  const googleOnly = await superAdminGoogleOnlyError(user.id);
+  if (googleOnly) return { error: googleOnly };
 
   const adminSupabase = createAdminClient();
 
@@ -275,6 +284,8 @@ export async function setRequireGoogleSignIn(enabled: boolean) {
     .single();
 
   if (profile?.role !== "super_admin") return { error: "Unauthorized" };
+  const googleOnly = await superAdminGoogleOnlyError(user.id);
+  if (googleOnly) return { error: googleOnly };
 
   const admin = createAdminClient();
 

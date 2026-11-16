@@ -14,8 +14,11 @@ import { AuthShell } from "@/components/auth/auth-shell";
 import { LegalNotice } from "@/components/legal/legal-notice";
 import { AuthDivider, GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { safeNextPath } from "@/lib/auth/google-sign-in";
+import { ADMIN_SIGN_IN_UNAVAILABLE_MESSAGE, type StaffSignInMode } from "@/lib/auth/admin-google-only";
 
-export function StaffLoginForm({ googleSignInEnabled }: { googleSignInEnabled: boolean }) {
+export function StaffLoginForm({ mode }: { mode: StaffSignInMode }) {
+  const showGoogle = mode === "google-only" || mode === "google-and-password";
+  const showPassword = mode === "password" || mode === "google-and-password";
   const searchParams = useSearchParams();
   const next = safeNextPath(searchParams.get("next")) ?? undefined;
   const [email, setEmail] = useState("");
@@ -83,44 +86,56 @@ export function StaffLoginForm({ googleSignInEnabled }: { googleSignInEnabled: b
           </div>
         )}
 
-        {googleSignInEnabled && (
+        {showGoogle && (
           <>
             <GoogleSignInButton next={next} loginPath="/login/staff" disabled={pending} />
-            <AuthDivider />
+            {showPassword ? (
+              <AuthDivider />
+            ) : (
+              <p className="mt-3 text-center text-sm text-ink-soft">Admins sign in with Google.</p>
+            )}
           </>
         )}
 
-        <form action={formAction} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              placeholder="you@school.org"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              disabled={pending}
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              placeholder="Enter your password"
-              disabled={pending}
-              required
-            />
-          </div>
-          <SubmitButton className="h-11 w-full" pendingText="Signing in…">
-            Sign in
-          </SubmitButton>
-        </form>
+        {mode === "unavailable" && (
+          <p className="rounded-xl border border-border bg-secondary/60 px-5 py-6 text-center text-sm text-ink-soft">
+            {ADMIN_SIGN_IN_UNAVAILABLE_MESSAGE}
+          </p>
+        )}
+
+        {showPassword && (
+          <form action={formAction} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                placeholder="you@school.org"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                disabled={pending}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                placeholder="Enter your password"
+                disabled={pending}
+                required
+              />
+            </div>
+            <SubmitButton className="h-11 w-full" pendingText="Signing in…">
+              Sign in
+            </SubmitButton>
+          </form>
+        )}
 
         <p className="mt-6 text-center text-sm text-ink-soft">
           A parent?{" "}

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { schoolLockError } from "@/lib/school-lock/access";
+import { schoolAccessErrorStatus, schoolLockError } from "@/lib/school-lock/access";
 
 export async function GET(
   _request: NextRequest,
@@ -29,7 +29,9 @@ export async function GET(
 
   // The school's owner lock (only ever affects a super-admin).
   const locked = await schoolLockError(data.school_id, "member", user.id);
-  if (locked) return NextResponse.json({ error: locked }, { status: 423 });
+  if (locked) {
+    return NextResponse.json({ error: locked }, { status: schoolAccessErrorStatus(locked) });
+  }
 
   return NextResponse.json({
     id: data.id,

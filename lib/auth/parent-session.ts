@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import type { User } from "@supabase/supabase-js";
+import type { Session, User } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -131,14 +131,15 @@ export async function startParentSession(email: string): Promise<void> {
  * of Google sign-in (app/auth/app-handoff/route.ts). `authorize` sees the
  * account first; the session only starts if it returns true. Unlike
  * startParentSession this leaves the account's other sessions and metadata
- * alone.
+ * alone. Returns the new session (null when not authorized), so the caller
+ * can mark it as a Google session.
  */
 export async function startStaffSession(
   email: string,
   authorize: (user: User) => Promise<boolean>
-): Promise<boolean> {
+): Promise<Session | null> {
   const { user, tokenHash } = await issueSignInLink(email);
-  if (!(await authorize(user))) return false;
+  if (!(await authorize(user))) return null;
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.verifyOtp({
@@ -146,11 +147,11 @@ export async function startStaffSession(
     token_hash: tokenHash,
   });
 
-  if (error || !data.user) {
-    throw new Error(`Could not start staff session: ${error?.message ?? "no user"}`);
+  if (error || !data.user || !data.session) {
+    throw new Error(`Could not start staff session: ${error?.message ?? "no session"}`);
   }
 
-  return true;
+  return data.session;
 }
 
 export type StaffRole = "super_admin" | "school_admin";

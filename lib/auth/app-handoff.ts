@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { googleHandoffSlug } from "./google-sign-in";
 
 // Signing a parent in to the iOS / Android app.
 //
@@ -58,8 +59,42 @@ export function appCallbackUrl(
   return `${APP_CALLBACK_URL}?${params.toString()}`;
 }
 
-/** Stores a one-time code for a verified parent and returns it. */
+/**
+ * A parent handoff's school_slug: a real school slug only. Anything else
+ * (notably "google:…", which /auth/app-handoff treats as a staff Google
+ * sign-in, and whose session counts as a Google session for
+ * ADMIN_GOOGLE_ONLY) is refused, so a Blackbaud or Veracross sign-in can
+ * never mint a Google handoff.
+ */
+export function isParentHandoffSlug(value: string): boolean {
+  return /^[a-z0-9-]+$/.test(value);
+}
+
+/** Stores a one-time code for a verified parent (Blackbaud, Veracross) and returns it. */
 export async function createAppHandoff(input: {
+  email: string;
+  schoolSlug: string;
+  appChallenge: string;
+}): Promise<string> {
+  if (!isParentHandoffSlug(input.schoolSlug)) {
+    throw new Error("Refusing app sign-in handoff: not a school slug");
+  }
+  return storeAppHandoff(input);
+}
+
+/**
+ * Stores a one-time code for staff who just signed in with Google (only
+ * app/auth/callback calls this) and returns it.
+ */
+export async function createGoogleAppHandoff(input: {
+  email: string;
+  schoolSlug: string | null;
+  appChallenge: string;
+}): Promise<string> {
+  return storeAppHandoff({ ...input, schoolSlug: googleHandoffSlug(input.schoolSlug) });
+}
+
+async function storeAppHandoff(input: {
   email: string;
   schoolSlug: string;
   appChallenge: string;

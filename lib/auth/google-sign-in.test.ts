@@ -306,11 +306,16 @@ test("the school login page offers Google only in the staff section, behind the 
   const uses = source.match(/<GoogleSignInButton/g) ?? [];
   assert.equal(uses.length, 1);
   assert.match(source, /\{showStaffSignIn && googleSignInEnabled && \(\s*<>\s*<GoogleSignInButton/);
-  assert.match(read("app/s/[slug]/(auth)/login/page.tsx"), /googleSignInEnabled=\{isGoogleSignInEnabled\(\)\}/);
+  assert.match(
+    source,
+    /const googleSignInEnabled = staffSignIn === "google-only" \|\| staffSignIn === "google-and-password";/
+  );
+  assert.match(read("app/s/[slug]/(auth)/login/page.tsx"), /staffSignIn=\{staffSignInMode\(\)\}/);
 });
 
 test("the staff login page renders Google only behind the flag", () => {
   const source = read("app/login/staff/staff-login-form.tsx");
-  assert.match(source, /\{googleSignInEnabled && \(\s*<>\s*<GoogleSignInButton/);
-  assert.match(read("app/login/staff/page.tsx"), /googleSignInEnabled=\{isGoogleSignInEnabled\(\)\}/);
+  assert.match(source, /\{showGoogle && \(\s*<>\s*<GoogleSignInButton/);
+  assert.match(source, /const showGoogle = mode === "google-only" \|\| mode === "google-and-password";/);
+  assert.match(read("app/login/staff/page.tsx"), /mode=\{staffSignInMode\(\)\}/);
 });
