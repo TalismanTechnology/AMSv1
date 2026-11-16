@@ -1,12 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { appCallbackUrl, createAppHandoff } from "@/lib/auth/app-handoff";
+import { appCallbackUrl, createGoogleAppHandoff } from "@/lib/auth/app-handoff";
 import { loadStaffAccess } from "@/lib/auth/google-access";
+import { recordGoogleSession } from "@/lib/auth/admin-session";
 import {
   GOOGLE_INTENT_COOKIE,
   GOOGLE_MESSAGES,
   decideGoogleAccess,
-  googleHandoffSlug,
   hasVerifiedGoogleEmail,
   isNoAccountError,
   loginPathFor,
@@ -63,7 +63,8 @@ export async function GET(request: NextRequest) {
   if (!code) return refuse(GOOGLE_MESSAGES.failed);
 
   const supabase = await createClient();
-  const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+  const { data: exchanged, error: exchangeError } =
+    await supabase.auth.exchangeCodeForSession(code);
   if (exchangeError) {
     console.error(`Google sign-in code exchange failed: ${exchangeError.message}`);
     return refuse(GOOGLE_MESSAGES.failed);
@@ -101,9 +102,9 @@ export async function GET(request: NextRequest) {
     // The session belongs in the app's web view, not this sign-in sheet: hand
     // it over (lib/auth/app-handoff.ts) and leave nothing behind here.
     try {
-      const handoffCode = await createAppHandoff({
+      const handoffCode = await createGoogleAppHandoff({
         email: user.email,
-        schoolSlug: googleHandoffSlug(decision.schoolSlug),
+        schoolSlug: decision.schoolSlug,
         appChallenge,
       });
       await supabase.auth.signOut({ scope: "local" });
@@ -115,6 +116,16 @@ export async function GET(request: NextRequest) {
       return signOutAndRefuse(GOOGLE_MESSAGES.failed);
     }
   }
+
+  // Mark this session as a Google one (ADMIN_GOOGLE_ONLY), from the token the
+  // exchange just returned. On failure the sign-in still goes ahead; admin
+  // access then asks for Google sign-in again. (The app path above signs this
+  // session out; /auth/app-handoff records the app's own session.)
+  await recordGoogleSession({
+    accessToken: exchanged.session?.access_token,
+    userId: user.id,
+    via: "web",
+  });
 
   return finish(`${origin}${decision.destination}`);
 }

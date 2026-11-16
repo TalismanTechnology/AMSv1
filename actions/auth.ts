@@ -8,6 +8,11 @@ import {
   isGoogleSignInEnabled,
   isPasswordSignInDisabled,
 } from "@/lib/auth/google-sign-in";
+import {
+  ADMIN_GOOGLE_ONLY_MESSAGE,
+  isAdminGoogleOnlyEnabled,
+  warnIfAdminsLockedOut,
+} from "@/lib/auth/admin-google-only";
 import { redirect } from "next/navigation";
 
 const PARENT_PASSWORD_ERROR =
@@ -87,6 +92,15 @@ export async function login(formData: FormData) {
   if (!staffRole) {
     await supabase.auth.signOut({ scope: "local" });
     return { error: PARENT_PASSWORD_ERROR };
+  }
+
+  // ADMIN_GOOGLE_ONLY: admin powers only come from a Google session, so a
+  // password session would be useless to staff anyway. The login pages hide
+  // the password form; this covers a stale form or a direct post.
+  if (isAdminGoogleOnlyEnabled()) {
+    await supabase.auth.signOut({ scope: "local" });
+    warnIfAdminsLockedOut();
+    return { error: ADMIN_GOOGLE_ONLY_MESSAGE };
   }
 
   if (staffRole === "super_admin") {

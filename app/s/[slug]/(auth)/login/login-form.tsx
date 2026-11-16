@@ -14,6 +14,7 @@ import { ParentSignInButton } from "@/components/auth/parent-sign-in-button";
 import { RosterSignInForm } from "@/components/auth/roster-sign-in-form";
 import { LegalNotice } from "@/components/legal/legal-notice";
 import { AuthDivider, GoogleSignInButton } from "@/components/auth/google-sign-in-button";
+import { ADMIN_SIGN_IN_UNAVAILABLE_MESSAGE, type StaffSignInMode } from "@/lib/auth/admin-google-only";
 import { AUTH_PROVIDERS, type AuthProvider } from "@/lib/auth/provider";
 import { schoolPossessive } from "@/lib/school-display-name";
 
@@ -24,8 +25,11 @@ interface LoginFormProps {
   schoolName: string | null;
   provider: AuthProvider;
   signInEnabled: boolean;
-  /** GOOGLE_SIGNIN_ENABLED. Google is offered in the staff section only. */
-  googleSignInEnabled: boolean;
+  /**
+   * What the staff section offers (GOOGLE_SIGNIN_ENABLED, ADMIN_GOOGLE_ONLY).
+   * Google is offered in the staff section only.
+   */
+  staffSignIn: StaffSignInMode;
 }
 
 export function LoginForm({
@@ -34,8 +38,10 @@ export function LoginForm({
   schoolName,
   provider,
   signInEnabled,
-  googleSignInEnabled,
+  staffSignIn,
 }: LoginFormProps) {
+  const googleSignInEnabled = staffSignIn === "google-only" || staffSignIn === "google-and-password";
+  const staffPasswordEnabled = staffSignIn === "password" || staffSignIn === "google-and-password";
   const { label: providerLabel, portalName } = AUTH_PROVIDERS[provider];
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
@@ -140,11 +146,21 @@ export function LoginForm({
               loginPath={`/s/${schoolSlug}/login`}
               disabled={formPending}
             />
-            <AuthDivider />
+            {staffPasswordEnabled ? (
+              <AuthDivider />
+            ) : (
+              <p className="mt-3 text-center text-sm text-ink-soft">Admins sign in with Google.</p>
+            )}
           </>
         )}
 
-        {showStaffSignIn && (
+        {showStaffSignIn && staffSignIn === "unavailable" && (
+          <p className="rounded-xl border border-border bg-secondary/60 px-5 py-6 text-center text-sm text-ink-soft">
+            {ADMIN_SIGN_IN_UNAVAILABLE_MESSAGE}
+          </p>
+        )}
+
+        {showStaffSignIn && staffPasswordEnabled && (
           <form action={formAction} className="space-y-4">
             <input type="hidden" name="school_slug" value={schoolSlug} />
             <input type="hidden" name="school_id" value={schoolId} />

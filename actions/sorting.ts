@@ -58,6 +58,8 @@ async function requireSchoolAdmin(schoolId: string) {
     .eq("school_id", schoolId)
     .single();
   if (membership?.role !== "admin") throw new Error("Not authorized");
+  // ADMIN_GOOGLE_ONLY: admin powers need a Google session.
+  await assertSchoolNotLocked(schoolId, "admin", user.id);
 
   return user;
 }

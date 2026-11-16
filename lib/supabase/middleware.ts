@@ -11,6 +11,12 @@ import {
   violatesPasswordPolicy,
 } from "@/lib/auth/google-sign-in";
 import {
+  ADMIN_GOOGLE_ONLY_MESSAGE,
+  isAdminCapableIn,
+  isAdminGoogleOnlyEnabled,
+} from "@/lib/auth/admin-google-only";
+import { isGoogleSessionToken } from "@/lib/auth/google-session-store";
+import {
   AUTH_NO_STORE_CACHE_CONTROL,
   copyResponseCookies,
   isTransientAuthError,
@@ -132,6 +138,33 @@ export async function updateSession(request: NextRequest) {
       ? copyResponseCookies(supabaseResponse, authUnavailableResponse())
       : redirectTo(path);
 
+  // ADMIN_GOOGLE_ONLY (lib/auth/admin-google-only.ts): admin powers only
+  // count for a session started by Google sign-in. An early gate here for the
+  // admin areas; the server-side guards (requireSchoolContext,
+  // requireSchoolAdmin, …) are the source of truth. The lookup only runs for
+  // an admin-capable user while the flag is on, so parents pay nothing.
+  const adminGoogleOnly = isAdminGoogleOnlyEnabled();
+  let googleSession: Promise<boolean> | null = null;
+  const sessionIsGoogle = () => {
+    googleSession ??= (async () => {
+      if (!user) return false;
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      return isGoogleSessionToken(adminClient, session?.access_token, user.id);
+    })();
+    return googleSession;
+  };
+  /** True when this user's admin powers don't count on this session. */
+  const adminNeedsGoogle = async (adminCapable: boolean) =>
+    adminGoogleOnly && adminCapable && !(await sessionIsGoogle());
+  const toAdminGoogleLogin = () => {
+    const login = request.nextUrl.clone();
+    login.pathname = "/login/staff";
+    login.search = `?error=${encodeURIComponent(ADMIN_GOOGLE_ONLY_MESSAGE)}`;
+    return copyResponseCookies(supabaseResponse, NextResponse.redirect(login));
+  };
+
   // "Require Google sign-in" accounts (lib/auth/google-sign-in.ts): a session
   // that came from a password is ended here, on every page and API request,
   // however it was obtained, including straight from Supabase's password
@@ -162,7 +195,7 @@ export async function updateSession(request: NextRequest) {
   // ─── Platform auth pages (/login, /login/staff) ───────────────────
   if (isPlatformAuth) {
     if (user) {
-      const destination = await getDefaultDashboard(supabase, user.id);
+      const destination = await getDefaultDashboard(supabase, user.id, adminNeedsGoogle);
       // Don't redirect to "/" — that would loop back to the landing page
       if (destination !== "/") {
         return redirectTo(destination);
@@ -174,7 +207,7 @@ export async function updateSession(request: NextRequest) {
   // ─── Legacy route redirects ────────────────────────────────────────
   if (pathname.startsWith("/admin") || pathname.startsWith("/parent")) {
     if (!user) return signedOutTo("/login");
-    const destination = await getDefaultDashboard(supabase, user.id);
+    const destination = await getDefaultDashboard(supabase, user.id, adminNeedsGoogle);
     return redirectTo(destination);
   }
 
@@ -187,6 +220,7 @@ export async function updateSession(request: NextRequest) {
       .eq("id", user.id)
       .single();
     if (profile?.role !== "super_admin") return redirectTo("/");
+    if (await adminNeedsGoogle(true)) return toAdminGoogleLogin();
     return supabaseResponse;
   }
 
@@ -224,6 +258,9 @@ export async function updateSession(request: NextRequest) {
         }
 
         if (profile?.role === "super_admin" || membership?.role === "admin") {
+          // Not on a Google session (ADMIN_GOOGLE_ONLY): stay here, where the
+          // staff section offers Continue with Google.
+          if (await adminNeedsGoogle(true)) return supabaseResponse;
           return redirectTo(`/s/${slug}/admin`);
         }
         if (membership) {
@@ -248,11 +285,9 @@ export async function updateSession(request: NextRequest) {
       ]);
 
       if (profile?.role === "super_admin" || (membership && membership.approved)) {
-        const dest =
-          profile?.role === "super_admin" || membership?.role === "admin"
-            ? `/s/${slug}/admin`
-            : `/s/${slug}/parent/chat`;
-        return redirectTo(dest);
+        const adminCapable = isAdminCapableIn(profile?.role === "super_admin", membership);
+        if (await adminNeedsGoogle(adminCapable)) return toAdminGoogleLogin();
+        return redirectTo(adminCapable ? `/s/${slug}/admin` : `/s/${slug}/parent/chat`);
       }
 
       return supabaseResponse;
@@ -281,6 +316,13 @@ export async function updateSession(request: NextRequest) {
     // If membership exists but not approved, redirect to pending
     if (membership && !membership.approved && !isSuperAdmin) {
       return redirectTo(`/s/${slug}/pending`);
+    }
+
+    // ADMIN_GOOGLE_ONLY: the super-admin or this school's admin on any other
+    // kind of session gets nothing here, parent pages included (RLS would
+    // still give the session admin-level data). Matches requireSchoolContext.
+    if (await adminNeedsGoogle(isAdminCapableIn(isSuperAdmin, membership))) {
+      return toAdminGoogleLogin();
     }
 
     // /s/{slug}/admin/* — require admin role or super_admin
@@ -351,7 +393,9 @@ function authUnavailableResponse(): NextResponse {
 
 async function getDefaultDashboard(
   supabase: Awaited<ReturnType<typeof createServerClient>>,
-  userId: string
+  userId: string,
+  /** ADMIN_GOOGLE_ONLY: true when admin powers don't count on this session. */
+  adminNeedsGoogle: (adminCapable: boolean) => Promise<boolean>
 ): Promise<string> {
   // Fetch profile + first membership in parallel
   const [{ data: profile }, { data: membership }] = await Promise.all([
@@ -364,7 +408,11 @@ async function getDefaultDashboard(
       .single(),
   ]);
 
-  if (profile?.role === "super_admin") return "/super-admin";
+  // An admin without a Google session stays on the sign-in page ("/" means
+  // "no dashboard"), which shows why and offers Continue with Google.
+  if (profile?.role === "super_admin") {
+    return (await adminNeedsGoogle(true)) ? "/" : "/super-admin";
+  }
 
   if (
     membership?.schools &&
@@ -375,9 +423,8 @@ async function getDefaultDashboard(
     if (!membership.approved) {
       return `/s/${slug}/pending`;
     }
-    return membership.role === "admin"
-      ? `/s/${slug}/admin`
-      : `/s/${slug}/parent/chat`;
+    if (membership.role !== "admin") return `/s/${slug}/parent/chat`;
+    return (await adminNeedsGoogle(true)) ? "/" : `/s/${slug}/admin`;
   }
 
   return "/";

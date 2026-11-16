@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { redeemAppHandoff } from "@/lib/auth/app-handoff";
 import { startParentSession, startStaffSession } from "@/lib/auth/parent-session";
 import { loadStaffAccess } from "@/lib/auth/google-access";
+import { recordGoogleSession } from "@/lib/auth/admin-session";
 import {
   decideGoogleAccess,
   loginPathFor,
@@ -68,6 +69,15 @@ export async function POST(request: Request) {
       if (!started || !outcome.destination) {
         return toLogin(`${origin}${withError(loginPathFor(next), outcome.refusal)}`);
       }
+      // Mark it as a Google session (ADMIN_GOOGLE_ONLY). Its amr says "otp",
+      // like a parent's email code, so this row is the only record that Google
+      // started it. On failure the sign-in still goes ahead; admin access then
+      // asks for Google sign-in again.
+      await recordGoogleSession({
+        accessToken: started.access_token,
+        userId: started.user.id,
+        via: "app",
+      });
       return NextResponse.redirect(`${origin}${outcome.destination}`, 303);
     }
 

@@ -6,6 +6,8 @@ import { cache } from "react";
 import type { School, SchoolMembership, UserRole } from "@/lib/types";
 import { superAdminLockedOut } from "@/lib/school-lock/access";
 import { hasGenuineAccess } from "@/lib/school-lock/core";
+import { adminSessionDecision } from "@/lib/auth/admin-session";
+import { ADMIN_GOOGLE_ONLY_LOGIN_PATH } from "@/lib/auth/admin-google-only";
 
 /**
  * Resolve a school from its slug. Cached per request.
@@ -102,6 +104,17 @@ export const requireSchoolContext = cache(async function requireSchoolContext(
     supabase.from("profiles").select("role").eq("id", user.id).single(),
     getUserSchoolMembership(user.id, school.id),
   ]);
+
+  // ADMIN_GOOGLE_ONLY (lib/auth/admin-google-only.ts): admin powers only
+  // count for a Google session. Without one, an admin of this school or the
+  // super-admin is sent to sign in with Google, on parent pages too (RLS
+  // would still give their session admin-level data).
+  const sessionDecision = await adminSessionDecision({
+    userId: user.id,
+    isSuperAdmin: profile?.role === "super_admin",
+    membership,
+  });
+  if (sessionDecision !== "allow") redirect(ADMIN_GOOGLE_ONLY_LOGIN_PATH);
 
   if (profile?.role === "super_admin") {
     // The school's owner lock keeps a super-admin who is only here through

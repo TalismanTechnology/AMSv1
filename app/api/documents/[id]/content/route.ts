@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { schoolLockError } from "@/lib/school-lock/access";
+import { schoolAccessErrorStatus, schoolLockError } from "@/lib/school-lock/access";
 import { stitchChunks } from "@/lib/ai/stitch";
 
 export async function GET(
@@ -31,7 +31,9 @@ export async function GET(
 
   // The school's owner lock (only ever affects a super-admin).
   const locked = await schoolLockError(doc.school_id, "member", user.id);
-  if (locked) return NextResponse.json({ error: locked }, { status: 423 });
+  if (locked) {
+    return NextResponse.json({ error: locked }, { status: schoolAccessErrorStatus(locked) });
+  }
 
   // Fetch all chunks ordered by index (RLS enforces access)
   const { data: chunks } = await supabase

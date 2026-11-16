@@ -3,7 +3,7 @@ import { getSchoolSignIn } from "@/lib/auth/sign-in-schools";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveSchoolName } from "@/lib/school-display-name";
 import { notFound } from "next/navigation";
-import { isGoogleSignInEnabled } from "@/lib/auth/google-sign-in";
+import { staffSignInMode, warnIfAdminsLockedOut } from "@/lib/auth/admin-google-only";
 import { LoginForm } from "./login-form";
 
 interface LoginPageProps {
@@ -29,6 +29,7 @@ async function loadSchoolName(schoolId: string, name: string | null | undefined)
 
 export default async function LoginPage({ params }: LoginPageProps) {
   const { slug } = await params;
+  warnIfAdminsLockedOut();
   const school = await getSchoolBySlug(slug);
   if (!school) notFound();
 
@@ -44,7 +45,7 @@ export default async function LoginPage({ params }: LoginPageProps) {
       schoolName={schoolName}
       provider={provider}
       signInEnabled={enabled}
-      googleSignInEnabled={isGoogleSignInEnabled()}
+      staffSignIn={staffSignInMode()}
     />
   );
 }

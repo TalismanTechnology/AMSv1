@@ -6,6 +6,7 @@ import { findFlaggedSessionIds, isSessionId, recheckDeletable } from "@/lib/chat
 import { listParentChats, loadParentChat } from "@/lib/chat/history";
 import { normalizeChatTitle } from "@/lib/chat/chat-view";
 import { schoolLockError } from "@/lib/school-lock/access";
+import { adminGoogleOnlyError } from "@/lib/auth/admin-session";
 import {
   blankHiddenSources,
   citedDocumentIds,
@@ -39,7 +40,7 @@ async function authorizeSchoolChat(schoolId: string) {
   if (profile?.role !== "super_admin") {
     const { data: membership } = await supabase
       .from("school_memberships")
-      .select("id")
+      .select("id, role")
       .eq("user_id", user.id)
       .eq("school_id", schoolId)
       .eq("approved", true)
@@ -47,7 +48,15 @@ async function authorizeSchoolChat(schoolId: string) {
     if (!membership) {
       return { error: "You don't have access to this school's chat." } as const;
     }
+    // ADMIN_GOOGLE_ONLY: this school's admins need a Google session.
+    const googleOnly = await adminGoogleOnlyError({
+      userId: user.id,
+      isSuperAdmin: false,
+      membership,
+    });
+    if (googleOnly) return { error: googleOnly } as const;
   } else {
+    // Owner lock, and (ADMIN_GOOGLE_ONLY) a Google session.
     const locked = await schoolLockError(schoolId, "member", user.id);
     if (locked) return { error: locked } as const;
   }

@@ -2,6 +2,8 @@ import { logout } from "@/actions/auth";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { superAdminGoogleOnlyError } from "@/lib/auth/admin-session";
+import { ADMIN_GOOGLE_ONLY_LOGIN_PATH } from "@/lib/auth/admin-google-only";
 
 export default async function SuperAdminLayout({
   children,
@@ -22,6 +24,8 @@ export default async function SuperAdminLayout({
     .single();
 
   if (profile?.role !== "super_admin") redirect("/");
+  // ADMIN_GOOGLE_ONLY: only from a Google session.
+  if (await superAdminGoogleOnlyError(user.id)) redirect(ADMIN_GOOGLE_ONLY_LOGIN_PATH);
 
   return (
     <div className="relative z-10 min-h-screen bg-background">
