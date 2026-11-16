@@ -10,6 +10,8 @@ import { enqueueDocumentPush } from "@/lib/push/document-push-runner";
 import { APPROVAL_MAX_AGE_MS } from "@/lib/push/document-push";
 import { stripMarkdown } from "@/lib/markdown/normalize";
 import { schoolLockError } from "@/lib/school-lock/access";
+import { requireSchoolAdmin } from "@/lib/auth/require-school-admin";
+import { normalizeVisibleGrades } from "@/lib/documents/grade-visibility";
 
 function triggerProcessing(documentId: string) {
   // Use after() so processing runs after the response is sent.
@@ -480,9 +482,12 @@ export async function searchDocumentContent(
   const locked = await schoolLockError(schoolId, "member", user.id);
   if (locked) return { error: locked, results: [] };
 
-  const { data, error } = await supabase.rpc("search_document_chunks", {
+  // Scoped to the signed-in user in SQL (with their session, auth.uid() is
+  // the viewer), on top of the documents / chunks policies.
+  const { data, error } = await supabase.rpc("search_document_chunks_v2", {
     p_school_id: schoolId,
     p_query: query,
+    p_viewer: user.id,
     p_limit: 20,
   });
 
@@ -499,4 +504,41 @@ export async function searchDocumentContent(
   );
 
   return { results };
+}
+
+/**
+ * Set which parents may see a document: null or [] = all parents, otherwise
+ * only parents with a current child in one of these grades. Admins only.
+ */
+export async function setDocumentVisibleGrades(
+  documentId: string,
+  schoolId: string,
+  grades: string[] | null
+): Promise<{ success: true; visibleGrades: string[] | null } | { error: string }> {
+  const auth = await requireSchoolAdmin(schoolId);
+  if ("error" in auth) return { error: auth.error };
+
+  const normalized = normalizeVisibleGrades(grades);
+  if ("error" in normalized) return { error: normalized.error };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("documents")
+    .update({ visible_grades: normalized.grades, updated_at: new Date().toISOString() })
+    .eq("id", documentId)
+    .eq("school_id", schoolId)
+    .select("id");
+  if (error) return { error: error.message };
+  if (!data?.length) return { error: "Document not found." };
+
+  logAudit(
+    auth.userId,
+    "update_document_visibility",
+    "document",
+    documentId,
+    { visible_grades: normalized.grades },
+    schoolId
+  );
+  revalidatePath("/", "layout");
+  return { success: true, visibleGrades: normalized.grades };
 }

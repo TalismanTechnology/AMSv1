@@ -299,6 +299,7 @@ export async function POST(request: NextRequest) {
       messages: contextMessages,
       lastMessageText,
       schoolId,
+      viewerId: user.id,
       children,
       timer,
     });

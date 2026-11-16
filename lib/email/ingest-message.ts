@@ -54,6 +54,13 @@ export async function ingestReceivedEmail(params: {
   subject: string | null;
   fromAddress: string | null;
   divisionIds: string[];
+  /**
+   * Who may see the documents (the intake address's visible_grades); null
+   * or omitted = all parents. Copied onto the body and every attachment.
+   */
+  visibleGrades?: string[] | null;
+  /** Folder to file the documents in (the address's default folder). */
+  folderId?: string | null;
   /** App origin used to kick off document processing. */
   origin: string;
   /**
@@ -74,8 +81,12 @@ export async function ingestReceivedEmail(params: {
    * /api/process-document (which needs PROCESS_DOCUMENT_SECRET).
    */
   processInline?: boolean;
+  /** Tests only: creates each document (defaults to ingestFileAsDocument). */
+  createDocument?: typeof ingestFileAsDocument;
 }): Promise<IngestedEmail> {
   const { schoolId, fromAddress, divisionIds, origin } = params;
+  const createDocument = params.createDocument ?? ingestFileAsDocument;
+  const placement = { visibleGrades: params.visibleGrades ?? null, folderId: params.folderId ?? null };
   const documentIds: string[] = [];
   const duplicates: IngestedEmail["duplicates"] = [];
   // Storage keys outside documents.file_url (the original HTML body), which
@@ -97,13 +108,14 @@ export async function ingestReceivedEmail(params: {
     if (bodyText && known?.body) {
       duplicates.push({ part: "body", match: known.body });
     } else if (bodyText) {
-      const { documentId, error } = await ingestFileAsDocument({
+      const { documentId, error } = await createDocument({
         schoolId,
         buffer: Buffer.from(bodyText, "utf-8"),
         fileName: `${subject}.txt`,
         contentType: "text/plain",
         title: subject,
         description: fromAddress ? `Emailed by ${fromAddress}` : null,
+        ...placement,
       });
       if (documentId) {
         documentIds.push(documentId);
@@ -135,13 +147,14 @@ export async function ingestReceivedEmail(params: {
         continue;
       }
 
-      const { documentId, error } = await ingestFileAsDocument({
+      const { documentId, error } = await createDocument({
         schoolId,
         buffer,
         fileName: filename,
         contentType: att.contentType,
         title: filename.replace(/\.[^.]+$/, ""),
         description: `From email: "${subject}"${fromAddress ? ` (${fromAddress})` : ""}`,
+        ...placement,
       });
       if (documentId) documentIds.push(documentId);
       else console.warn(`[inbound-email] Attachment ingest skipped: ${error}`);

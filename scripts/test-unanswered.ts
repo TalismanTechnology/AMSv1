@@ -29,7 +29,9 @@ async function main() {
   console.log('Embedding length:', embedding?.length);
 
   // Search with same params as the chat route
-  const { data: chunks, error } = await sb.rpc('match_document_chunks', {
+  const { data: chunks, error } = await sb.rpc('match_document_chunks_v2', {
+    // Scoped to a viewer since migration 051 (a super-admin sees everything).
+    p_viewer: process.env.VIEWER_ID,
     query_embedding: JSON.stringify(embedding),
     p_school_id: schoolId,
     match_threshold: 0.5,

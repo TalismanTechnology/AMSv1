@@ -42,6 +42,7 @@ import { answerSettings } from "@/lib/ai/question-complexity";
 import { parseFollowUps } from "@/lib/chat-utils";
 import { findCitationMismatches, type CitationMismatch } from "@/lib/ai/citation-check";
 import { CASES, type EvalCase } from "./eval/cases";
+import { evalViewerId } from "./eval/viewer";
 
 // Pinned so calendar answers ("has it passed yet?") are reproducible.
 const EVAL_NOW = new Date("2026-09-23T16:00:00Z");
@@ -158,13 +159,19 @@ Grade the answer.
   return object;
 }
 
-async function runCase(c: EvalCase, run: number, schoolId: string): Promise<CaseResult> {
+async function runCase(
+  c: EvalCase,
+  run: number,
+  schoolId: string,
+  viewerId: string
+): Promise<CaseResult> {
   const base = { id: c.id, run, question: c.question };
   try {
     const turn = await prepareChatTurn({
       messages: toUIMessages(c),
       lastMessageText: c.question,
       schoolId,
+      viewerId,
       children: c.children ?? [],
       now: EVAL_NOW,
     });
@@ -314,7 +321,7 @@ function save(label: string, answerModel: string, results: CaseResult[]) {
  * current case definitions, without regenerating them. Lets runs graded by
  * different judges (e.g. after a quota outage) be compared on one scale.
  */
-async function rejudge(file: string, schoolId: string) {
+async function rejudge(file: string, schoolId: string, viewerId: string) {
   const saved = JSON.parse(readFileSync(file, "utf8")) as {
     model: string;
     results: CaseResult[];
@@ -328,6 +335,7 @@ async function rejudge(file: string, schoolId: string) {
           messages: toUIMessages(c),
           lastMessageText: c.question,
           schoolId,
+          viewerId,
           children: c.children ?? [],
           now: EVAL_NOW,
         }).then((t) => t.systemPrompt)
@@ -369,7 +377,8 @@ async function main() {
     .single();
   if (error || !school) throw new Error(`School "${args.school}" not found: ${error?.message}`);
 
-  if (args.rejudge) return rejudge(args.rejudge, school.id);
+  const viewerId = await evalViewerId(supabase);
+  if (args.rejudge) return rejudge(args.rejudge, school.id, viewerId);
 
   const only = args.only?.split(",").map((s) => s.trim());
   const cases = only ? CASES.filter((c) => only.includes(c.id)) : CASES;
@@ -381,7 +390,9 @@ async function main() {
   );
 
   const jobs = Array.from({ length: runs }, (_, run) => cases.map((c) => ({ c, run }))).flat();
-  const results = await mapPool(jobs, CONCURRENCY, ({ c, run }) => runCase(c, run, school.id));
+  const results = await mapPool(jobs, CONCURRENCY, ({ c, run }) =>
+    runCase(c, run, school.id, viewerId)
+  );
   report(results, runs);
   save(args.label, ANSWER_MODEL_ID, results);
 }

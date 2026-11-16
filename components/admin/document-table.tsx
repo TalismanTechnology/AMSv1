@@ -42,6 +42,7 @@ import type { Document, EventCalendar } from "@/lib/types";
 import { TimeAgo } from "@/components/ui/time-ago";
 import { calendarColorClasses } from "@/lib/event-calendars";
 import { stripMarkdown } from "@/lib/markdown/normalize";
+import { GradeVisibilityBadge } from "@/components/admin/grade-visibility-picker";
 
 function EmailedBadge() {
   return (
@@ -339,6 +340,7 @@ export function DocumentTable({
                       </Badge>
                       {doc.source === "email" && <EmailedBadge />}
                       {doc.source === "website" && <WebsiteBadge url={doc.source_url} />}
+                      <GradeVisibilityBadge grades={doc.visible_grades} className="text-xs" />
                       {doc.category && (
                         <Badge
                           style={{
@@ -359,6 +361,7 @@ export function DocumentTable({
                     </Badge>
                     {doc.source === "email" && <EmailedBadge />}
                     {doc.source === "website" && <WebsiteBadge url={doc.source_url} />}
+                    <GradeVisibilityBadge grades={doc.visible_grades} className="text-xs" />
                   </div>
                 </TableCell>
                 <TableCell className="hidden md:table-cell">

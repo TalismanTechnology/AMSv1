@@ -33,7 +33,9 @@ async function main() {
 
   // 3. Test RPC with threshold 0.0 and high limit
   console.log("\n3. RPC test (threshold=0.0, limit=200)...");
-  const { data: rpcResult, error: rpcErr } = await supabase.rpc("match_document_chunks", {
+  const { data: rpcResult, error: rpcErr } = await supabase.rpc("match_document_chunks_v2", {
+    // Scoped to a viewer since migration 051 (a super-admin sees everything).
+    p_viewer: process.env.VIEWER_ID,
     query_embedding: JSON.stringify(queryEmb),
     p_school_id: schoolId,
     match_threshold: 0.0,

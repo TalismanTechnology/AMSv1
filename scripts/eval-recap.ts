@@ -23,6 +23,7 @@ import { parseArgs } from "util";
 import { generateText, type UIMessage } from "ai";
 import { google } from "@ai-sdk/google";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { evalViewerId } from "./eval/viewer";
 import { CHAT_MODEL_ID, prepareChatTurn } from "@/lib/ai/chat-turn";
 import { parseFollowUps } from "@/lib/chat-utils";
 import { buildModelHistory, type StoredMessage } from "@/lib/chat/retention";
@@ -42,7 +43,7 @@ const { values: args } = parseArgs({
   },
 });
 
-async function runChat(schoolId: string): Promise<string[]> {
+async function runChat(schoolId: string, viewerId: string): Promise<string[]> {
   // What the route would have stored: each question, then its cleaned answer.
   const stored: StoredMessage[] = [];
   const answers: string[] = [];
@@ -65,6 +66,7 @@ async function runChat(schoolId: string): Promise<string[]> {
       messages: buildModelHistory(stored, latest) as UIMessage[],
       lastMessageText: question,
       schoolId,
+      viewerId,
       children: [],
     });
     const { text } = await generateText({
@@ -95,13 +97,14 @@ async function main() {
     .single();
   if (error || !school) throw new Error(`School "${args.school}" not found: ${error?.message}`);
 
+  const viewerId = await evalViewerId(createAdminClient());
   const runs = Math.max(1, Number(args.runs) || 1);
   console.log(`Recap eval on "${school.name}" — model ${CHAT_MODEL_ID}, ${runs} run(s)`);
 
   let failures = 0;
   for (let run = 1; run <= runs; run++) {
     console.log(`\n=== Run ${run} ===`);
-    const third = (await runChat(school.id))[2];
+    const third = (await runChat(school.id, viewerId))[2];
     const recap = third.match(EARLIER_TOPICS);
     if (recap) {
       failures++;

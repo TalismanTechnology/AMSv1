@@ -3,9 +3,12 @@ import {
   parseEmailAddress,
   extractInboundTokens,
   routeInboundMessage,
+  reachedAddresses,
+  applyAddressRules,
   isStaleClaim,
+  type InboundAddress,
 } from "@/lib/email/inbound";
-import { addDocumentDivisions } from "@/lib/documents/ingest";
+import { addDocumentDivisions, widenDocumentVisibility } from "@/lib/documents/ingest";
 import { ingestReceivedEmail, type IngestedEmail } from "@/lib/email/ingest-message";
 import { emailBodyText, type InboundContent } from "@/lib/email/inbound-content";
 import {
@@ -20,14 +23,18 @@ import {
 // Resend webhook and manual raw-MIME submissions both run through here; they
 // differ only in where the content comes from and how a result is reported.
 //
-// Mail from any sender is accepted: there is no sender allowlist and no hold
-// for review. (schools.allowed_sender_domains is left in the database,
-// unused; 'pending_review' / 'rejected_domain' rows are from before.)
+// Mail from any sender is accepted unless the address it reached has its own
+// sender rule; there is no school-wide allowlist and no hold for review.
+// (schools.allowed_sender_domains is left in the database, unused;
+// 'pending_review' rows are from before.) Each address can also be switched
+// off, file into a default folder, and limit the documents to parents of
+// some grades (migration 051, applyAddressRules).
 
 export type IngestStatus =
   | "processing"
   | "accepted"
   | "rejected_disabled"
+  | "rejected_domain"
   | "rejected_unknown"
   | "duplicate"
   | "error";
@@ -98,6 +105,8 @@ export interface ProcessInboundDeps {
   ingest: typeof ingestReceivedEmail;
   addDivisions: typeof addDocumentDivisions;
   findDuplicates: typeof findContentDuplicates;
+  /** Widen who may see documents a later copy of the mail also reached. */
+  widenVisibility?: typeof widenDocumentVisibility;
 }
 
 const defaultDeps: ProcessInboundDeps = {
@@ -105,7 +114,14 @@ const defaultDeps: ProcessInboundDeps = {
   ingest: ingestReceivedEmail,
   addDivisions: addDocumentDivisions,
   findDuplicates: findContentDuplicates,
+  widenVisibility: widenDocumentVisibility,
 };
+
+// The address settings arrive with migration 051; until it is applied the
+// lookup falls back to the columns every address has.
+const ADDRESS_COLUMNS =
+  "id, token, school_id, division_id, kind, label, enabled, visible_grades, allowed_senders, default_folder_id";
+const LEGACY_ADDRESS_COLUMNS = "token, school_id, division_id";
 
 /** The matched parts of a content check, and whether anything new is left. */
 function contentPlan(
@@ -198,10 +214,15 @@ export async function processInboundEmail(
     return record("rejected_unknown", "No inbound token in recipients");
   }
 
-  const { data: addresses, error: addressError } = await supabase
-    .from("email_ingestion_addresses")
-    .select("token, school_id, division_id")
-    .in("token", tokens);
+  const lookup = (columns: string) =>
+    supabase.from("email_ingestion_addresses").select(columns).in("token", tokens) as unknown as Promise<{
+      data: InboundAddress[] | null;
+      error: { code?: string; message: string } | null;
+    }>;
+  let { data: addresses, error: addressError } = await lookup(ADDRESS_COLUMNS);
+  if (addressError?.code === "42703") {
+    ({ data: addresses, error: addressError } = await lookup(LEGACY_ADDRESS_COLUMNS));
+  }
   if (addressError) {
     console.error("[inbound-email] Address lookup failed:", addressError.message);
     return result("error", "Address lookup failed", {
@@ -228,11 +249,20 @@ export async function processInboundEmail(
   known.schoolId = schoolId;
   known.divisionIds = route.divisionIds;
 
-  // 2. The school must have ingestion on. Any sender is accepted.
+  // 2. The school must have ingestion on, and an address the mail reached
+  // must be on and take this sender (no sender rule = any sender).
   if (!school.email_ingestion_enabled) {
     return record("rejected_disabled", "Ingestion disabled");
   }
   const fromAddress = parseEmailAddress(meta.from ?? "");
+  const decision = applyAddressRules(reachedAddresses(tokens, addresses ?? []), fromAddress);
+  if (!decision.accepted) {
+    console.warn(`[inbound-email] ${decision.status}: ${decision.reason}`);
+    return record(decision.status, decision.reason);
+  }
+  const { divisionIds, visibleGrades, folderId } = decision;
+  known.divisionIds = divisionIds;
+  const widen = deps.widenVisibility ?? (async () => {});
 
   if (dryRun) {
     // Past the Message-ID check: what the content check would make of it.
@@ -293,10 +323,12 @@ export async function processInboundEmail(
       const skipped = { ingestionId: claim.holderId ?? null };
       // One email can reach two division addresses as separate deliveries
       // with the same message id (each mailing list forwards its own copy).
-      // The later copy adds its divisions to what the first one ingested.
-      if (route.divisionIds.length && claim.skip === "duplicate") {
+      // The later copy adds its divisions, and its audience, to what the
+      // first one ingested.
+      if (claim.skip === "duplicate") {
         try {
-          await deps.addDivisions(claim.documentIds, route.divisionIds);
+          if (divisionIds.length) await deps.addDivisions(claim.documentIds, divisionIds);
+          await widen(claim.documentIds, visibleGrades);
         } catch (err) {
           console.error("[inbound-email] Adding divisions to a duplicate failed:", err);
           return result("error", "Adding divisions to a duplicate failed", {
@@ -304,7 +336,7 @@ export async function processInboundEmail(
             error: "Retry later",
           });
         }
-      } else if (route.divisionIds.length) {
+      } else if (divisionIds.length || visibleGrades) {
         // The first copy is still ingesting. Fail this one so Resend retries
         // it after that finishes, when it can add its divisions.
         return result(claim.skip, "Already being ingested", { httpStatus: 409, ...skipped });
@@ -343,7 +375,9 @@ export async function processInboundEmail(
       loadContent: params.loadContent,
       subject: meta.subject,
       fromAddress,
-      divisionIds: route.divisionIds,
+      divisionIds,
+      visibleGrades,
+      folderId,
       origin: params.origin,
       suppressPush: params.suppressPush ?? false,
       dedupe: params.contentDedupe ?? false,
@@ -353,10 +387,16 @@ export async function processInboundEmail(
     const contentDuplicates = duplicates.length ? { contentDuplicates: duplicates } : {};
 
     // Like a second delivery of the same Message-ID: the copy already in the
-    // library is also for the divisions this one reached. Throws into the
-    // catch below, so the webhook answers 500 and Resend retries.
-    if (duplicates.length && route.divisionIds.length) {
-      await deps.addDivisions(duplicateIds(duplicates), route.divisionIds);
+    // library is also for the divisions this one reached, and for the grades
+    // a restricted address names. (Mail to an all-parents address doesn't
+    // undo a restriction here: the match may be an upload an admin limited.)
+    // Throws into the catch below, so the webhook answers 500 and Resend
+    // retries.
+    if (duplicates.length && divisionIds.length) {
+      await deps.addDivisions(duplicateIds(duplicates), divisionIds);
+    }
+    if (duplicates.length && visibleGrades) {
+      await widen(duplicateIds(duplicates), visibleGrades);
     }
 
     if (!documentIds.length && duplicates.length) {

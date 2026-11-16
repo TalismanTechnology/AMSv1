@@ -10,7 +10,9 @@ is about.
 
 1. Each school gets a unique whole-school inbound address,
    `<token>@<INBOUND_EMAIL_DOMAIN>`, generated the first time an admin enables
-   ingestion. Admins can add one more address per division. Addresses live in
+   ingestion, plus one per division. Admins can add more, one per mailing
+   list ("Middle School parents", "Grade 9"); see
+   [Intake addresses](#intake-addresses-and-who-sees-what). Addresses live in
    the `email_ingestion_addresses` table.
 2. Resend receives mail at `INBOUND_EMAIL_DOMAIN` (via an MX record) and POSTs
    an `email.received` event to `/api/inbound-email`.
@@ -20,10 +22,11 @@ is about.
    signature, or 500 if the secret isn't configured. It then finds which of
    our addresses the mail reached, checking `to`, `cc`, `bcc`, and
    `received_for`. That decides the school and the divisions.
-4. Any sender is accepted. There is no sender allowlist and nothing is held
-   for review: if the school has ingestion enabled, the mail is ingested. (The
-   old `schools.allowed_sender_domains` column is still in the database but
-   unused, and there is no setting for it.)
+4. The school must have ingestion enabled, and an address the mail reached
+   must be switched on and accept the sender. An address with no sender rule
+   (the default) accepts anyone; there is no school-wide allowlist and
+   nothing is held for review. (The old `schools.allowed_sender_domains`
+   column is still in the database but unused.)
 5. Every attachment becomes its own document; the email body becomes one text
    document. Image attachments and inline images are skipped.
 6. Mail that reached a division's address marks its documents for that
@@ -37,10 +40,77 @@ is about.
    that division's categories, landing in its "Other" when nothing else fits,
    and a document's division always follows its category.
 
+8. Every document gets the address's audience (`documents.visible_grades`)
+   and, if the address has one, its default folder.
+
 Every attempt (accepted / duplicate / rejected / error) is logged in the
 `email_ingestions` table. The latest 20, plus every email still waiting for
 review, are shown to admins under
 **Admin → Settings → Email Ingestion → Recent emails**.
+
+## Intake addresses and who sees what
+
+Admin → Email intake lists every address: the whole-school one, one per
+division, and any **list addresses** added with **Add address**. Each has:
+
+| Setting | Column | Default | |
+| --- | --- | --- | --- |
+| Name | `label` | none | Required for list addresses. |
+| On / off | `enabled` | on | Mail to a switched-off address is logged as `rejected_disabled` ("Address switched off: …") and nothing is ingested. |
+| Who can see documents | `visible_grades` | `NULL` = all parents | Or grades from Pre-K, K, 1–12. |
+| Allowed senders | `allowed_senders` | `NULL` = anyone | Full addresses (`office@school.org`) or domains (`school.org` / `@school.org`, subdomains included). Others are logged as `rejected_domain`. With no school-wide allowlist, this is per address and replaces "anyone" for that address only. |
+| Default folder | `default_folder_id` | none | Set on each document; auto-sort then leaves the folder alone. |
+
+`kind` is `school`, `division` or `list`. The whole-school and division
+addresses can be edited and switched off but not deleted; list addresses
+can be deleted (documents they added stay, with their visibility).
+Changing an address affects only mail that arrives afterwards.
+
+When one email reaches several addresses of the school, the addresses that
+are on and accept the sender decide: their divisions; all parents if any of
+them is for all parents, otherwise every grade any of them names; and the
+first default folder. A later delivery of the same Message-ID to another
+address widens the first copy's documents the same way (and adds its
+divisions). A content duplicate found by the manual endpoint's
+`contentDedupe` is widened only by a restricted address, never opened to
+all parents, since the match may be an upload an admin restricted. A
+restricted copy that arrives while the first is still ingesting gets a 409
+so Resend retries it.
+
+Existing addresses (including `ams-e8d87e5b8c44`, used by the Gmail intake
+job) are `enabled`, for all parents, accept anyone and have no folder, so
+they behave exactly as before.
+
+### The visibility rule
+
+A parent sees a document if its `visible_grades` is `NULL`/empty, or if any
+of their children **in that school who haven't graduated** is in one of
+those grades. A parent with no children on file sees only documents for all
+parents. School admins and super-admins (subject to the owner lock) see
+everything. Admins can change a document's grades in its **Edit** dialog;
+restricted documents show a lock badge in the library.
+
+The rule lives in the database (`can_view_document_grades`,
+`document_view_scope`, migration 051) and, for push grouping only, in
+`lib/documents/grade-visibility.ts`.
+
+### Where it is enforced
+
+| Path | How |
+| --- | --- |
+| Parent document list, name search (`actions/parent-documents.ts`, `searchDocumentsByName`) | **DB**: RLS on `documents` / `document_chunks` (user session). |
+| `/api/documents/[id]/content`, `/source`, `/status`, `/url` | **DB**: the document is read with the user's session, so RLS returns nothing → 404. Files are only signed or downloaded after that read. Parents have no direct `storage.objects` access. |
+| Chat retrieval (vector + full text) | **DB**: `match_document_chunks_v2` / `search_document_chunks_v2` take the viewer's **id**. SQL works out admin status and current children's grades, and filters before `LIMIT`. With a user session, `auth.uid()` overrides `p_viewer`. No viewer, or not a member → no rows. |
+| Citations, neighbouring passages, document info | Built only from the scoped hits above. |
+| Admin conflict rulings in chat | **App**: a ruling is dropped unless both its documents were in the viewer's scoped hits or are for all parents. |
+| Content search (`searchDocumentContent`) | **DB**: `search_document_chunks_v2` with the user's session (auth.uid()) and RLS. |
+| Saved chat replay | **App + DB**: citations of restricted documents that the user's session can't read (RLS) are blanked on load (numbering kept). |
+| New-document push | **App**: each parent is sent only the titles of documents they may see; parents who can see none are skipped. |
+| Old `match_document_chunks` / `search_document_chunks` | 051 revokes them from `anon`. 052 (apply **after** this deploy) revokes them from every API role. |
+
+Not applicable: no share links (sharing copies the parent's own answer as
+text), no cross-user answer cache, events are never created from emails
+automatically, and insights / unanswered questions / alerts are admin-only.
 
 ## Reviewing held emails (older rows only)
 
@@ -56,6 +126,8 @@ emails** as **Needs review** with **Approve** / **Reject** buttons, and older
   fails, the email goes back to **Needs review** with the error as its
   reason. Resend keeps received mail for 30 days, so approve within that
   window.
+  Held rows don't record which address they reached, so approved mail is
+  for all parents (no list address existed when they were held).
 - **Reject** marks it `rejected_review`. Nothing was ingested.
 - Both record `reviewed_by` / `reviewed_at` and write an audit log entry.
 - A held email still occupies its Message-ID, so a new copy of it is
@@ -134,7 +206,8 @@ and the skipped ones are named in the `accepted` reason. Dry runs report the
 same (`contentDuplicates`). The webhook doesn't run this check.
 
 Differences from the webhook, because there is no Resend copy to fetch later:
-rows have no `email_id`. Like the webhook, any sender is accepted. Auth is the `CRON_SECRET` bearer
+rows have no `email_id`. Like the webhook, the address's settings apply
+(on/off, allowed senders, visibility, folder). Auth is the `CRON_SECRET` bearer
 token only (no `?key=`).
 
 ## One-time setup (what you need to do)
@@ -144,8 +217,11 @@ token only (no `?key=`).
 Apply `supabase/migrations/019_email_ingestion.sql`,
 `supabase/migrations/027_email_ingestion_claims.sql`,
 `supabase/migrations/028_division_email_addresses.sql`,
-`supabase/migrations/029_division_categories.sql` and
-`supabase/migrations/032_email_ingestion_review.sql` to your database.
+`supabase/migrations/029_division_categories.sql`,
+`supabase/migrations/032_email_ingestion_review.sql` and
+`supabase/migrations/051_intake_address_visibility.sql` to your database.
+051 must be applied **before** deploying the code that uses it. Apply
+`052_retire_unscoped_retrieval.sql` only **after** that deploy is live.
 032 adds the review statuses and columns (now used only by older held rows).
 028 copies each school's existing address into `email_ingestion_addresses`,
 so addresses already in use keep working. Apply it before deploying the code
@@ -195,9 +271,8 @@ Each school admin, under **Admin → Settings → Email Ingestion**:
 ## Notes
 
 - The random address token is required, and the school must have ingestion
-  enabled. Beyond that there is deliberately no sender restriction: anyone
-  who sends to the address adds documents parents can see, so treat the
-  address as private.
+  enabled. Unless an address has its own allowed senders, anyone who sends
+  to it adds documents parents can see, so treat the addresses as private.
 - Auto-sort runs for **any** unsorted document (emailed or manually uploaded)
   when the school has it enabled; it never overwrites a category/folder that was
   set manually, and never invents new categories/folders.

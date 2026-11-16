@@ -25,7 +25,8 @@ import {
   useCategoryLabels,
 } from "@/components/admin/category-select-items";
 import { hasDivisionCategories } from "@/lib/documents/division-categories";
-import { updateDocument } from "@/actions/documents";
+import { setDocumentVisibleGrades, updateDocument } from "@/actions/documents";
+import { GradeVisibilityPicker } from "@/components/admin/grade-visibility-picker";
 import { toast } from "sonner";
 import type { Document, Category, Folder, EventCalendar } from "@/lib/types";
 
@@ -56,6 +57,8 @@ export function DocumentEditDialog({
   const [divisionIds, setDivisionIds] = useState<string[]>(
     (document.divisions ?? []).map((d) => d.id)
   );
+  const initialGrades = document.visible_grades?.length ? document.visible_grades : null;
+  const [visibleGrades, setVisibleGrades] = useState<string[] | null>(initialGrades);
   const [saving, setSaving] = useState(false);
   const categoryLabels = useCategoryLabels(categories, divisions);
   // Once categories are grouped by division, the category picks the division.
@@ -80,8 +83,16 @@ export function DocumentEditDialog({
         .filter(Boolean),
       ...(divisionsFollowCategory ? {} : { division_ids: divisionIds }),
     });
+    // Visibility has its own admin-only action; only sent when it changed.
+    const gradesChanged = (visibleGrades ?? []).join(",") !== (initialGrades ?? []).join(",");
+    const visibility =
+      !result.error && gradesChanged
+        ? await setDocumentVisibleGrades(document.id, schoolId, visibleGrades)
+        : null;
     if (result.error) {
       toast.error(result.error);
+    } else if (visibility && "error" in visibility) {
+      toast.error(visibility.error);
     } else {
       toast.success("Document updated");
       onOpenChange(false);
@@ -183,6 +194,15 @@ export function DocumentEditDialog({
           )}
 
           <div className="space-y-2">
+            <Label className="text-ink-soft">Who can see it</Label>
+            <GradeVisibilityPicker
+              idPrefix="edit-visibility"
+              value={visibleGrades}
+              onChange={setVisibleGrades}
+            />
+          </div>
+
+          <div className="space-y-2">
             <Label className="text-ink-soft">Tags (comma-separated)</Label>
             <Input value={tags} onChange={(e) => setTags(e.target.value)} />
           </div>
@@ -197,7 +217,7 @@ export function DocumentEditDialog({
             </Button>
             <Button
               onClick={handleSave}
-              disabled={!title.trim() || saving}
+              disabled={!title.trim() || saving || (visibleGrades !== null && visibleGrades.length === 0)}
               className="bg-primary text-primary-foreground"
             >
               {saving && <LogoSpinner className="mr-2" />}

@@ -6,6 +6,12 @@ import { findFlaggedSessionIds, isSessionId, recheckDeletable } from "@/lib/chat
 import { listParentChats, loadParentChat } from "@/lib/chat/history";
 import { normalizeChatTitle } from "@/lib/chat/chat-view";
 import { schoolLockError } from "@/lib/school-lock/access";
+import {
+  blankHiddenSources,
+  citedDocumentIds,
+  hiddenDocumentIds,
+} from "@/lib/chat/source-visibility";
+import type { ChatSource } from "@/lib/types";
 
 // Parent chat history (lib/chat/retention.ts): list, open, rename and delete
 // the signed-in parent's own chats. Every query is pinned to the caller's
@@ -65,13 +71,43 @@ export async function getChatMessages(sessionId: string, schoolId: string) {
   const auth = await authorizeSchoolChat(schoolId);
   if ("error" in auth) return { error: auth.error, messages: [] };
   try {
-    const chat = await loadParentChat(createAdminClient(), auth.userId, schoolId, sessionId);
+    const admin = createAdminClient();
+    const chat = await loadParentChat(admin, auth.userId, schoolId, sessionId);
     if (!chat) return { error: "This chat is no longer available.", messages: [] };
-    return { messages: chat.messages };
+    return { messages: await withoutHiddenSources(admin, chat.messages) };
   } catch (err) {
     console.error("getChatMessages failed:", err);
     return { error: "Please try again.", messages: [] };
   }
+}
+
+/**
+ * Blank the saved citations of grade-restricted documents (migration 051)
+ * the signed-in user's own session can no longer read (RLS decides).
+ * Fails closed: if either lookup fails, every restricted citation is blanked.
+ */
+async function withoutHiddenSources<M extends { sources?: ChatSource[] | null }>(
+  admin: ReturnType<typeof createAdminClient>,
+  messages: M[]
+): Promise<M[]> {
+  const ids = citedDocumentIds(messages);
+  if (!ids.length) return messages;
+  const { data: restrictedRows, error } = await admin
+    .from("documents")
+    .select("id")
+    .in("id", ids)
+    .not("visible_grades", "is", null);
+  if (error) throw new Error(error.message);
+  const restricted = (restrictedRows ?? []).map((r) => r.id as string);
+  if (!restricted.length) return messages;
+
+  const supabase = await createClient();
+  const { data: readableRows, error: readError } = await supabase
+    .from("documents")
+    .select("id")
+    .in("id", restricted);
+  const readable = readError ? [] : (readableRows ?? []).map((r) => r.id as string);
+  return blankHiddenSources(messages, hiddenDocumentIds(restricted, readable));
 }
 
 /** Rename one of the parent's chats. Doesn't count as activity. */
