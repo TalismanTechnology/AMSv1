@@ -126,6 +126,33 @@ export async function startParentSession(email: string): Promise<void> {
   }
 }
 
+/**
+ * Starts a session for an existing staff account, for the native app's half
+ * of Google sign-in (app/auth/app-handoff/route.ts). `authorize` sees the
+ * account first; the session only starts if it returns true. Unlike
+ * startParentSession this leaves the account's other sessions and metadata
+ * alone.
+ */
+export async function startStaffSession(
+  email: string,
+  authorize: (user: User) => Promise<boolean>
+): Promise<boolean> {
+  const { user, tokenHash } = await issueSignInLink(email);
+  if (!(await authorize(user))) return false;
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.verifyOtp({
+    type: "magiclink",
+    token_hash: tokenHash,
+  });
+
+  if (error || !data.user) {
+    throw new Error(`Could not start staff session: ${error?.message ?? "no user"}`);
+  }
+
+  return true;
+}
+
 export type StaffRole = "super_admin" | "school_admin";
 
 /**

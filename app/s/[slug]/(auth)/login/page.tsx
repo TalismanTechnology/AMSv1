@@ -3,6 +3,7 @@ import { getSchoolSignIn } from "@/lib/auth/sign-in-schools";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveSchoolName } from "@/lib/school-display-name";
 import { notFound } from "next/navigation";
+import { isGoogleSignInEnabled } from "@/lib/auth/google-sign-in";
 import { LoginForm } from "./login-form";
 
 interface LoginPageProps {
@@ -43,6 +44,7 @@ export default async function LoginPage({ params }: LoginPageProps) {
       schoolName={schoolName}
       provider={provider}
       signInEnabled={enabled}
+      googleSignInEnabled={isGoogleSignInEnabled()}
     />
   );
 }
