@@ -14,11 +14,21 @@ import { AuthShell } from "@/components/auth/auth-shell";
 import { LegalNotice } from "@/components/legal/legal-notice";
 import { AuthDivider, GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { safeNextPath } from "@/lib/auth/google-sign-in";
-import { ADMIN_SIGN_IN_UNAVAILABLE_MESSAGE, type StaffSignInMode } from "@/lib/auth/admin-google-only";
+import {
+  ADMIN_SIGN_IN_UNAVAILABLE_MESSAGE,
+  PARENT_PASSWORD_FORM_NOTE,
+  PARENT_PASSWORD_LINK_LABEL,
+  staffPasswordForm,
+  type StaffSignInMode,
+} from "@/lib/auth/admin-google-only";
 
 export function StaffLoginForm({ mode }: { mode: StaffSignInMode }) {
   const showGoogle = mode === "google-only" || mode === "google-and-password";
-  const showPassword = mode === "password" || mode === "google-and-password";
+  const passwordForm = staffPasswordForm(mode);
+  // ADMIN_GOOGLE_ONLY: the password form is for parents only (see
+  // staffPasswordForm), so it stays collapsed behind a quiet link.
+  const [showParentPassword, setShowParentPassword] = useState(false);
+  const showPassword = passwordForm === "open" || showParentPassword;
   const searchParams = useSearchParams();
   const next = safeNextPath(searchParams.get("next")) ?? undefined;
   const [email, setEmail] = useState("");
@@ -89,7 +99,7 @@ export function StaffLoginForm({ mode }: { mode: StaffSignInMode }) {
         {showGoogle && (
           <>
             <GoogleSignInButton next={next} loginPath="/login/staff" disabled={pending} />
-            {showPassword ? (
+            {passwordForm === "open" ? (
               <AuthDivider />
             ) : (
               <p className="mt-3 text-center text-sm text-ink-soft">Admins sign in with Google.</p>
@@ -101,6 +111,22 @@ export function StaffLoginForm({ mode }: { mode: StaffSignInMode }) {
           <p className="rounded-xl border border-border bg-secondary/60 px-5 py-6 text-center text-sm text-ink-soft">
             {ADMIN_SIGN_IN_UNAVAILABLE_MESSAGE}
           </p>
+        )}
+
+        {passwordForm === "parent-link" && (
+          <button
+            type="button"
+            aria-expanded={showParentPassword}
+            onClick={() => setShowParentPassword((shown) => !shown)}
+            className="mt-5 w-full text-center text-sm text-ink-soft underline-offset-4 hover:text-ink hover:underline"
+            data-parent-password-link
+          >
+            {PARENT_PASSWORD_LINK_LABEL}
+          </button>
+        )}
+
+        {passwordForm === "parent-link" && showParentPassword && (
+          <p className="mt-4 mb-3 text-center text-xs text-ink-soft">{PARENT_PASSWORD_FORM_NOTE}</p>
         )}
 
         {showPassword && (

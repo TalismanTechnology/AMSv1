@@ -1,7 +1,7 @@
 import type { NativePlatform } from "./platform";
 import { createVerifier, openAndroidTab, openIosSheet, postForm } from "./blackbaud-sign-in";
 
-// Staff "Continue with Google" inside the app. Google refuses to sign in
+// "Continue with Google" inside the app. Google refuses to sign in
 // inside embedded web views (disallowed_useragent), so, like Blackbaud, it
 // runs in the system sign-in sheet (the AuthSession plugin on iOS, a Custom
 // Tab on Android) and the session comes back through /auth/app-handoff. The

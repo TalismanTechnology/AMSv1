@@ -127,8 +127,9 @@ export async function startParentSession(email: string): Promise<void> {
 }
 
 /**
- * Starts a session for an existing staff account, for the native app's half
- * of Google sign-in (app/auth/app-handoff/route.ts). `authorize` sees the
+ * Starts a session for an existing account (staff, or a parent with an
+ * approved membership), for the native app's half of Google sign-in
+ * (app/auth/app-handoff/route.ts). `authorize` sees the
  * account first; the session only starts if it returns true. Unlike
  * startParentSession this leaves the account's other sessions and metadata
  * alone. Returns the new session (null when not authorized), so the caller

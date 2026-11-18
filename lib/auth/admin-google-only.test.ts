@@ -279,19 +279,18 @@ test("Google sessions are recorded where they start", () => {
   assert.match(read("app/auth/app-handoff/route.ts"), /recordGoogleSession\(\{[\s\S]*?via: "app"/);
 });
 
-test("the staff login forms hide the password form in google-only mode", () => {
+test("the staff login forms keep the password form for parents only in google-only mode", () => {
+  // Rendered and clicked through in parent-password-link.test.tsx.
   const staff = read("app/login/staff/staff-login-form.tsx");
-  assert.match(staff, /const showPassword = mode === "password" \|\| mode === "google-and-password";/);
+  assert.match(staff, /const passwordForm = staffPasswordForm\(mode\);/);
+  assert.match(staff, /const showPassword = passwordForm === "open" \|\| showParentPassword;/);
   assert.match(staff, /\{showPassword && \(\s*<form/);
   assert.match(staff, /Admins sign in with Google\./);
   assert.match(read("app/login/staff/page.tsx"), /mode=\{staffSignInMode\(\)\}/);
 
   const school = read("app/s/[slug]/(auth)/login/login-form.tsx");
-  assert.match(
-    school,
-    /const staffPasswordEnabled = staffSignIn === "password" \|\| staffSignIn === "google-and-password";/
-  );
-  assert.match(school, /\{showStaffSignIn && staffPasswordEnabled && \(\s*<form/);
+  assert.match(school, /const passwordForm = staffPasswordForm\(staffSignIn\);/);
+  assert.match(school, /\{showStaffSignIn && staffPasswordShown && \(\s*<form/);
   assert.match(school, /Admins sign in with Google\./);
   assert.match(read("app/s/[slug]/(auth)/login/page.tsx"), /staffSignIn=\{staffSignInMode\(\)\}/);
 });

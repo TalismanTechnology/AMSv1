@@ -60,6 +60,25 @@ export function staffSignInMode(env: Record<string, string | undefined> = proces
   return google ? "google-and-password" : "password";
 }
 
+/**
+ * How the staff forms offer email + password, given the mode:
+ * - "open": the password form is shown, as before ADMIN_GOOGLE_ONLY.
+ * - "parent-link": ADMIN_GOOGLE_ONLY is on, so admins can't use a password.
+ *   Parents whose account allows one (app_metadata.parent_password_login,
+ *   e.g. the App Review demo account) still can: the form sits behind a quiet
+ *   "parent with a password" link. login() still refuses admin-capable
+ *   accounts, so this never gives an admin a way in.
+ */
+export type StaffPasswordForm = "open" | "parent-link";
+
+export function staffPasswordForm(mode: StaffSignInMode): StaffPasswordForm {
+  return mode === "password" || mode === "google-and-password" ? "open" : "parent-link";
+}
+
+export const PARENT_PASSWORD_LINK_LABEL = "A parent with a password? Sign in with email and password";
+export const PARENT_PASSWORD_FORM_NOTE =
+  "For parent accounts that have an AskMySchool password. Admins sign in with Google.";
+
 export const ADMIN_SIGN_IN_UNAVAILABLE_MESSAGE =
   "Admin sign-in is unavailable right now. Please contact AskMySchool support.";
 
