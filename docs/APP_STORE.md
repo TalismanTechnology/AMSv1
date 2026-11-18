@@ -9,7 +9,8 @@ and a step-by-step release for Lucas. Privacy answers are in
 | --- | --- |
 | Bundle ID | `app.askmyschool` |
 | Display name | AskMySchool |
-| Version / build | `MARKETING_VERSION = 1.0`, `CURRENT_PROJECT_VERSION = 1` in `ios/App/App.xcodeproj` (CI sets the build number automatically) |
+| Version / build | `MARKETING_VERSION = 1.0.2`, `CURRENT_PROJECT_VERSION = 3` in `ios/App/App.xcodeproj` (CI sets the build number automatically) |
+| Product name | `PRODUCT_NAME = AskMySchool` on the App target, so the build is `AskMySchool.app`. Keep it that way, not `$(TARGET_NAME)`: the Mac Dock shows the iPad app under its wrapper name, so `App.app` shows as "App" whatever `CFBundleName` says. `npx cap sync` doesn't set it. The target and scheme stay `App` for Capacitor and fastlane |
 | Minimum iOS | 15.0 |
 | Devices | iPhone and iPad (`TARGETED_DEVICE_FAMILY = 1,2`) |
 | Loads | https://askmyschool.app/login (`capacitor.config.ts`) |
