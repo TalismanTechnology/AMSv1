@@ -14,8 +14,10 @@
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
-	<!-- Not $(PRODUCT_NAME): that's the target name, "App", and macOS shows
-	     CFBundleName in the Dock and menu bar when the iPad app runs on a Mac. -->
+	<!-- Spelled out so this stays AskMySchool whatever the build settings say.
+	     The Mac Dock doesn't read it for the iPad app running on a Mac: it
+	     shows the wrapper name, AskMySchool.app, which comes from PRODUCT_NAME
+	     in the Xcode project (lib/native/ios-app-name.test.ts checks both). -->
 	<key>CFBundleName</key>
 	<string>AskMySchool</string>
 	<key>CFBundlePackageType</key>
