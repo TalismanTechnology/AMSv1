@@ -26,6 +26,7 @@ import {
   MapPin,
   Pencil,
   Trash2,
+  CalendarPlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,6 +35,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { AddToCalendarMenu } from "@/components/shared/add-to-calendar";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { calendarColorClasses, UNLABELED_CLASSES } from "@/lib/event-calendars";
 import { isEventVisible, usedLabels, UNLABELED_FILTER_ID } from "@/lib/event-filters";
@@ -206,32 +208,36 @@ function EventPopover({
             </p>
           )}
         </div>
-        {(onEdit || onDelete) && (
-          <div className="flex items-center gap-1 pt-1 border-t">
-            {onEdit && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs"
-                onClick={() => onEdit(event)}
-              >
-                <Pencil className="mr-1 h-3 w-3" />
-                Edit
-              </Button>
-            )}
-            {onDelete && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs text-destructive hover:text-destructive"
-                onClick={() => onDelete(event)}
-              >
-                <Trash2 className="mr-1 h-3 w-3" />
-                Delete
-              </Button>
-            )}
-          </div>
-        )}
+        <div className="flex flex-wrap items-center gap-1 pt-1 border-t">
+          <AddToCalendarMenu event={event} align="start">
+            <Button variant="ghost" size="sm" className="h-7 text-xs">
+              <CalendarPlus className="mr-1 h-3 w-3" />
+              Add to calendar
+            </Button>
+          </AddToCalendarMenu>
+          {onEdit && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => onEdit(event)}
+            >
+              <Pencil className="mr-1 h-3 w-3" />
+              Edit
+            </Button>
+          )}
+          {onDelete && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs text-destructive hover:text-destructive"
+              onClick={() => onDelete(event)}
+            >
+              <Trash2 className="mr-1 h-3 w-3" />
+              Delete
+            </Button>
+          )}
+        </div>
       </PopoverContent>
     </Popover>
   );
@@ -949,32 +955,40 @@ export function CalendarView({
                       </p>
                     )}
                   </div>
-                  {(onEditEvent || onDeleteEvent) && (
-                    <div className="-my-1 -mr-1 ml-2 flex shrink-0 items-center gap-0.5 sm:m-0 sm:ml-2 sm:gap-1">
-                      {onEditEvent && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-9 w-9 sm:h-7 sm:w-7"
-                          aria-label="Edit event"
-                          onClick={() => onEditEvent(event)}
-                        >
-                          <Pencil className="h-3 w-3" />
-                        </Button>
-                      )}
-                      {onDeleteEvent && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-9 w-9 text-destructive hover:text-destructive sm:h-7 sm:w-7"
-                          aria-label="Delete event"
-                          onClick={() => onDeleteEvent(event)}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      )}
-                    </div>
-                  )}
+                  <div className="-my-1 -mr-1 ml-2 flex shrink-0 items-center gap-0.5 sm:m-0 sm:ml-2 sm:gap-1">
+                    <AddToCalendarMenu event={event}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-9 w-9 sm:h-7 sm:w-7"
+                        aria-label={`Add ${event.title} to calendar`}
+                      >
+                        <CalendarPlus className="h-3.5 w-3.5" />
+                      </Button>
+                    </AddToCalendarMenu>
+                    {onEditEvent && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-9 w-9 sm:h-7 sm:w-7"
+                        aria-label="Edit event"
+                        onClick={() => onEditEvent(event)}
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                    )}
+                    {onDeleteEvent && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-9 w-9 text-destructive hover:text-destructive sm:h-7 sm:w-7"
+                        aria-label="Delete event"
+                        onClick={() => onDeleteEvent(event)}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

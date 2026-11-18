@@ -1,7 +1,8 @@
 "use client";
 
-import { BadgeCheck, CalendarDays, FileText, Globe } from "lucide-react";
+import { BadgeCheck, CalendarDays, CalendarPlus, FileText, Globe } from "lucide-react";
 import { useSourcePanel } from "./source-panel-context";
+import { AddToCalendarMenu } from "@/components/shared/add-to-calendar";
 import { groupSources } from "@/lib/source-groups";
 import type { ChatSource } from "@/lib/types";
 
@@ -62,9 +63,37 @@ export function SourceList({
               ))}
             </span>
           )}
+          {group.isEvent && <EventCalendarButton source={group.passages[0]} />}
         </div>
       ))}
     </div>
+  );
+}
+
+/** Add a cited calendar entry (a whole range, if it spans days) to the parent's calendar. */
+function EventCalendarButton({ source }: { source: ChatSource }) {
+  const event = source.event;
+  if (!event?.date) return null;
+  return (
+    <AddToCalendarMenu
+      event={{
+        id: source.document_id,
+        title: source.title,
+        date: event.date,
+        date_end: event.date_end,
+        start_time: event.start_time,
+        end_time: event.end_time,
+        location: event.location,
+      }}
+    >
+      <button
+        type="button"
+        aria-label={`Add ${source.title} to calendar`}
+        className="inline-flex size-6 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-primary/10 hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+      >
+        <CalendarPlus className="size-3.5" />
+      </button>
+    </AddToCalendarMenu>
   );
 }
 
