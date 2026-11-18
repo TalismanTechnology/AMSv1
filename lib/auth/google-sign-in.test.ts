@@ -193,7 +193,7 @@ test("school admin is refused at a school they don't administer", () => {
   );
 });
 
-test("parents, accounts with no profile and unknown users are refused", () => {
+test("accounts without an approved membership, with no profile, and unknown users are refused", () => {
   assert.deepEqual(decideGoogleAccess({ emailVerified: true, access: parent, next: null }), {
     allowed: false,
     message: GOOGLE_MESSAGES.noAccount,
@@ -210,6 +210,44 @@ test("parents, accounts with no profile and unknown users are refused", () => {
     decideGoogleAccess({ emailVerified: true, access: { profileRole: null, adminSchoolSlugs: [] }, next: null }),
     { allowed: false, message: GOOGLE_MESSAGES.noAccount }
   );
+});
+
+test("an existing approved parent gets a parent session at their school", () => {
+  const collegiateParent = { profileRole: "parent", adminSchoolSlugs: [], parentSchoolSlugs: ["collegiate", "oakridge"] };
+  assert.deepEqual(decideGoogleAccess({ emailVerified: true, access: collegiateParent, next: null }), {
+    allowed: true,
+    destination: "/s/collegiate/parent/chat",
+    schoolSlug: "collegiate",
+  });
+  // From a school's login page (next is that school's admin area): that school.
+  assert.deepEqual(
+    decideGoogleAccess({ emailVerified: true, access: collegiateParent, next: "/s/oakridge/admin" }),
+    { allowed: true, destination: "/s/oakridge/parent/chat", schoolSlug: "oakridge" }
+  );
+  assert.deepEqual(
+    decideGoogleAccess({ emailVerified: true, access: collegiateParent, next: "/s/greenwood/admin" }),
+    { allowed: false, message: GOOGLE_MESSAGES.notThisSchool }
+  );
+  assert.deepEqual(
+    decideGoogleAccess({ emailVerified: false, access: collegiateParent, next: null }),
+    { allowed: false, message: GOOGLE_MESSAGES.unverified }
+  );
+});
+
+test("an admin who is also a parent elsewhere still gets admin", () => {
+  const both = { profileRole: "parent", adminSchoolSlugs: ["greenwood"], parentSchoolSlugs: ["collegiate"] };
+  assert.deepEqual(decideGoogleAccess({ emailVerified: true, access: both, next: null }), {
+    allowed: true,
+    destination: "/s/greenwood/admin",
+    schoolSlug: "greenwood",
+  });
+});
+
+test("refusals tell parents how to sign in, without calling them admins", () => {
+  for (const message of [GOOGLE_MESSAGES.noAccount, GOOGLE_MESSAGES.notThisSchool, GOOGLE_MESSAGES.unverified]) {
+    assert.doesNotMatch(message, /admin account|with your password/);
+  }
+  assert.match(GOOGLE_MESSAGES.noAccount, /Parents: choose your school and sign in with Blackbaud, Veracross or the email code/);
 });
 
 test("an unverified Google email is refused, even for a super-admin", () => {

@@ -131,6 +131,11 @@ working demo login**. Apple needs credentials that work for the whole review
    (`/login/staff`), so the reviewer can at least see chat, documents and
    the calendar. Parents can't use passwords by design, so this doesn't show
    the parent sign-in; say so in the notes.
+   With `ADMIN_GOOGLE_ONLY=true` a staff password no longer works; use a
+   parent demo account with `app_metadata.parent_password_login` instead. It
+   signs in at Staff sign-in (`/login/staff`, or "School staff sign-in" on the
+   school's page) → "A parent with a password? Sign in with email and
+   password" (see docs/GOOGLE_SIGN_IN.md).
 
 Reviewers usually try **account deletion**. After review, check the demo
 account still exists, and re-create it if they deleted it.

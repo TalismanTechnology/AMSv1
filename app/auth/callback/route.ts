@@ -23,8 +23,10 @@ import {
 //
 // Redeems the PKCE code for a session (cookies are written by the shared
 // server client), then decides server-side whether this person may be here at
-// all. Only an existing super-admin or school admin whose Google email is
-// verified keeps the session; anyone else is signed straight back out.
+// all. Only an existing account whose Google email is verified keeps the
+// session: a super-admin or school admin (as admin), or a parent with an
+// approved membership (as a parent, on that school's parent chat). Anyone
+// else is signed straight back out.
 // Supabase links the Google identity to an existing account with the same
 // verified email by itself, and with sign-ups off it never creates one.
 //

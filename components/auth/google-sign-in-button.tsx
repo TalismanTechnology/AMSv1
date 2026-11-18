@@ -15,9 +15,10 @@ interface GoogleSignInButtonProps {
 }
 
 /**
- * "Continue with Google" for staff and the super-admin, shown only while
- * GOOGLE_SIGNIN_ENABLED is on (lib/auth/google-sign-in.ts). Never on parent
- * sign-in. A plain anchor to the route handler that redirects to Google; in
+ * "Continue with Google" in the staff sign-in sections, shown only while
+ * GOOGLE_SIGNIN_ENABLED is on (lib/auth/google-sign-in.ts). Never in the
+ * parent sign-in section (a parent who already has an approved membership
+ * can still use it from the staff section and gets a parent session). A plain anchor to the route handler that redirects to Google; in
  * the native app it opens the system sign-in sheet instead, because Google
  * blocks sign-in inside web views.
  */

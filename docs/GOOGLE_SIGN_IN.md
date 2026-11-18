@@ -1,8 +1,10 @@
-# Sign in with Google (staff and super-admin)
+# Sign in with Google (staff, super-admin, existing parents)
 
 "Continue with Google" on staff sign-in, using Supabase Auth's Google
-provider. Parents are unaffected: Blackbaud, Veracross and email-code sign-in
-don't change, and parent sign-in never shows the Google button.
+provider. Parent sign-in is unchanged: Blackbaud, Veracross and email-code
+sign-in work as before, and the parent section never shows the Google button.
+A parent who already has an approved membership and uses the Google button
+anyway gets a normal parent session (see "Who gets in").
 
 ## Turning it on
 
@@ -32,21 +34,33 @@ this browser started a Google sign-in), so sign-in still works.
 | Account | Result |
 | --- | --- |
 | super-admin | allowed (`/super-admin`, or the school they came from; the owner lock still applies there) |
-| admin of a school | allowed into a school they administer; from another school's login page, refused |
-| parent / no role | signed out at once, "No AskMySchool admin account uses this Google email…" |
+| admin of a school (even if also a parent elsewhere) | allowed into a school they administer; from another school's login page, refused |
+| approved parent, no admin powers | allowed as a parent: `/s/<slug>/parent/chat` of their (oldest) approved school, or of the school whose login page they came from; another school's page → refused |
+| no approved membership (unapproved parent, no role) | signed out at once, "No AskMySchool account uses this Google email. Parents: choose your school and sign in with Blackbaud, Veracross or the email code…" |
 | email not on any account | Supabase refuses ("Signups not allowed"), same message |
 | Google email not verified | refused |
 
-Nothing creates a profile or membership or grants a role. Supabase links the
-Google identity to an existing account with the same verified email
+Nothing creates an account, profile or membership or grants a role: a parent
+only gets in through Google if the school's roster check (Blackbaud,
+Veracross or the email code) already made them an approved parent there.
+Google proves the account's email, the same thing the email code proves. The
+parent's password (if any) and other sessions are left alone. Supabase links
+the Google identity to an existing account with the same verified email
 automatically; no manual linking.
+
+Residual: unlike Blackbaud / Veracross / the email code, a Google sign-in
+doesn't re-check the school's roster; it relies on the membership still being
+approved (as the parent password sign-in does). Removing or unapproving the
+membership stops it.
 
 ## Native app
 
 Google blocks sign-in inside web views, so the app opens `/auth/google` in the
 system sign-in sheet (the existing `AuthSession` plugin on iOS, a Custom Tab
 on Android) and the session comes back through `/auth/app-handoff`, exactly
-like Blackbaud. No new app build needed.
+like Blackbaud. No new app build needed. Parents work the same way: the
+handoff re-checks the approved membership and starts a parent session on that
+school's parent chat.
 
 ## Require Google sign-in (password off) for an account
 
@@ -110,13 +124,26 @@ Google sign-in again (fails closed).
 | parents | unchanged; no extra lookup |
 
 Sign-in pages: `/login/staff` and the staff section of `/s/<slug>/login` show
-only "Continue with Google" ("Admins sign in with Google."); the password
-action refuses staff accounts. Existing admin sessions from before the flag
-was turned on stop working as admin and are asked to sign in with Google.
+"Continue with Google" ("Admins sign in with Google."), and below it a quiet
+link, "A parent with a password? Sign in with email and password", which
+opens the email + password form. That form is for parent accounts with
+`app_metadata.parent_password_login` (e.g. the App Review demo login); the
+password action still refuses every admin-capable account (school admin or
+super-admin) with "For security, admin access requires signing in with
+Google…", and parents without the flag get the usual "Parents sign in with
+their school account…". Existing admin sessions from before the flag was
+turned on stop working as admin and are asked to sign in with Google.
+
+**Parents must keep working with the flag on.** PR #89 first hid the password
+form completely in google-only mode, which left `parent_password_login`
+parents (and the App Review demo login) with no way to enter a password, and
+the Google button refused every parent. Both are fixed: the parent link
+above, and Google sign-in for existing approved parents.
 
 `ADMIN_GOOGLE_ONLY=true` with `GOOGLE_SIGNIN_ENABLED` off means **no admin can
 sign in**; the staff forms say admin sign-in is unavailable and the server
-logs a warning. There's no silent fallback to passwords.
+logs a warning. There's no silent fallback to passwords for admins (the
+parent password link is still shown).
 
 ### Turning it on
 
@@ -125,7 +152,10 @@ logs a warning. There's no silent fallback to passwords.
 2. Deploy the code (flag still off; Google sign-ins now get recorded).
 3. Set `ADMIN_GOOGLE_ONLY=true` in Vercel (Production) and redeploy.
 4. Sign in with Google on the web and in the app, as a school admin and as the
-   super-admin; check a password sign-in is refused.
+   super-admin; check an admin password sign-in is refused.
+5. Check parents: a Blackbaud / Veracross / email-code sign-in, and the
+   `parent_password_login` demo account via "A parent with a password?" on
+   `/login/staff` (web and the iOS app).
 
 ### Break-glass
 

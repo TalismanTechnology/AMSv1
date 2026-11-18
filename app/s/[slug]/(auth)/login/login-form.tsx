@@ -14,7 +14,13 @@ import { ParentSignInButton } from "@/components/auth/parent-sign-in-button";
 import { RosterSignInForm } from "@/components/auth/roster-sign-in-form";
 import { LegalNotice } from "@/components/legal/legal-notice";
 import { AuthDivider, GoogleSignInButton } from "@/components/auth/google-sign-in-button";
-import { ADMIN_SIGN_IN_UNAVAILABLE_MESSAGE, type StaffSignInMode } from "@/lib/auth/admin-google-only";
+import {
+  ADMIN_SIGN_IN_UNAVAILABLE_MESSAGE,
+  PARENT_PASSWORD_FORM_NOTE,
+  PARENT_PASSWORD_LINK_LABEL,
+  staffPasswordForm,
+  type StaffSignInMode,
+} from "@/lib/auth/admin-google-only";
 import { AUTH_PROVIDERS, type AuthProvider } from "@/lib/auth/provider";
 import { schoolPossessive } from "@/lib/school-display-name";
 
@@ -41,7 +47,7 @@ export function LoginForm({
   staffSignIn,
 }: LoginFormProps) {
   const googleSignInEnabled = staffSignIn === "google-only" || staffSignIn === "google-and-password";
-  const staffPasswordEnabled = staffSignIn === "password" || staffSignIn === "google-and-password";
+  const passwordForm = staffPasswordForm(staffSignIn);
   const { label: providerLabel, portalName } = AUTH_PROVIDERS[provider];
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
@@ -51,6 +57,10 @@ export function LoginForm({
   // Parents only ever use the school's provider (Blackbaud or Veracross). The
   // password form is for staff, so it stays collapsed behind a quiet link.
   const [showStaffSignIn, setShowStaffSignIn] = useState(false);
+  // ADMIN_GOOGLE_ONLY: inside the staff section the password form is for
+  // parents only (see staffPasswordForm), behind one more quiet link.
+  const [showParentPassword, setShowParentPassword] = useState(false);
+  const staffPasswordShown = passwordForm === "open" || showParentPassword;
 
   const [actionState, formAction, formPending] = useActionState<{ attempt: number; error: string | null }, FormData>(
     async (prev: { attempt: number; error: string | null }, formData: FormData) => {
@@ -146,7 +156,7 @@ export function LoginForm({
               loginPath={`/s/${schoolSlug}/login`}
               disabled={formPending}
             />
-            {staffPasswordEnabled ? (
+            {passwordForm === "open" ? (
               <AuthDivider />
             ) : (
               <p className="mt-3 text-center text-sm text-ink-soft">Admins sign in with Google.</p>
@@ -160,7 +170,23 @@ export function LoginForm({
           </p>
         )}
 
-        {showStaffSignIn && staffPasswordEnabled && (
+        {showStaffSignIn && passwordForm === "parent-link" && (
+          <button
+            type="button"
+            aria-expanded={showParentPassword}
+            onClick={() => setShowParentPassword((shown) => !shown)}
+            className="mt-5 w-full text-center text-sm text-ink-soft underline-offset-4 hover:text-ink hover:underline"
+            data-parent-password-link
+          >
+            {PARENT_PASSWORD_LINK_LABEL}
+          </button>
+        )}
+
+        {showStaffSignIn && passwordForm === "parent-link" && showParentPassword && (
+          <p className="mt-4 mb-3 text-center text-xs text-ink-soft">{PARENT_PASSWORD_FORM_NOTE}</p>
+        )}
+
+        {showStaffSignIn && staffPasswordShown && (
           <form action={formAction} className="space-y-4">
             <input type="hidden" name="school_slug" value={schoolSlug} />
             <input type="hidden" name="school_id" value={schoolId} />

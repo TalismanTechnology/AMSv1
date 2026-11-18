@@ -1,4 +1,5 @@
-// "Continue with Google" for school staff and the super-admin.
+// "Continue with Google" for school staff and the super-admin, and for
+// parents who already have an approved parent membership.
 //
 // Google only proves who someone is. Supabase Auth's Google provider does the
 // OAuth dance (PKCE, via @supabase/ssr), and the project has sign-ups turned
@@ -9,10 +10,13 @@
 // identities by hand.
 //
 // A linked identity still isn't enough to get in. After the code exchange the
-// callback (app/auth/callback/route.ts) runs decideGoogleAccess: only a
-// super-admin or an admin of a school gets a session. Everyone else (parents,
-// accounts with no role) is signed straight back out. Nothing here creates a
-// profile or a membership or grants a role.
+// callback (app/auth/callback/route.ts) runs decideGoogleAccess: a
+// super-admin or an admin of a school gets an admin session; an account with
+// an approved parent membership (and no admin powers) gets a parent session
+// at that school. Everyone else (no approved membership, no account) is
+// signed straight back out. Nothing here creates an account, a profile or a
+// membership or grants a role: becoming a parent still goes through the
+// school's roster check (Blackbaud, Veracross or the email code).
 //
 // Everything in this file is pure so it can be unit tested; the parts that
 // talk to Supabase are in google-access.ts and the route handlers.
@@ -32,11 +36,11 @@ export const GOOGLE_INTENT_MAX_AGE_SECONDS = 10 * 60;
 
 export const GOOGLE_MESSAGES = {
   noAccount:
-    "No AskMySchool admin account uses this Google email. Sign in with your password or ask your school admin to add you.",
+    "No AskMySchool account uses this Google email. Parents: choose your school and sign in with Blackbaud, Veracross or the email code your school uses. School staff: ask your school admin to add you.",
   notThisSchool:
-    "Your Google account isn't a staff member at this school. Sign in with your password or ask your school admin to add you.",
+    "Your Google account doesn't have access to this school. Parents: sign in with your school account on this page. School staff: ask this school's admin to add you.",
   unverified:
-    "Google hasn't verified this email address, so it can't be used to sign in. Sign in with your password instead.",
+    "Google hasn't verified this email address, so it can't be used to sign in. Please choose another way to sign in.",
   failed: "We couldn't sign you in with Google. Please try again.",
   disabled: "Google sign-in isn't available right now. Please sign in with your password.",
   passwordDisabled: "This account signs in with Google.",
@@ -141,6 +145,8 @@ export interface StaffAccess {
   profileRole: string | null;
   /** Slugs of schools where the user has an `admin` membership. */
   adminSchoolSlugs: string[];
+  /** Slugs of schools where the user has an approved `parent` membership. */
+  parentSchoolSlugs?: string[];
 }
 
 export type GoogleAccessDecision =
@@ -154,8 +160,14 @@ export type GoogleAccessDecision =
  *   the owner lock (lib/school-lock) still applies; this doesn't bypass it.
  * - school admin (an `admin` membership, the same rule as password sign-in):
  *   allowed into a school they administer. Coming from one school's login
- *   page, only that school.
- * - anyone else (parents, no profile): refused.
+ *   page, only that school. Someone who is also a parent somewhere is
+ *   treated as an admin here, as before.
+ * - parent (an approved `parent` membership, no admin powers anywhere):
+ *   allowed as a parent, landing on that school's parent chat. Coming from
+ *   one school's login page, only that school (like the parent password
+ *   sign-in). Google proves the account's email, just as the email code does;
+ *   the membership itself came from the school's roster check.
+ * - anyone else (no approved membership, no profile): refused.
  */
 export function decideGoogleAccess(input: {
   emailVerified: boolean;
@@ -177,7 +189,7 @@ export function decideGoogleAccess(input: {
     };
   }
 
-  if (adminSlugs.length === 0) return { allowed: false, message: GOOGLE_MESSAGES.noAccount };
+  if (adminSlugs.length === 0) return decideParentAccess(access?.parentSchoolSlugs ?? [], requestedSlug);
 
   if (requestedSlug) {
     if (!adminSlugs.includes(requestedSlug)) {
@@ -192,6 +204,16 @@ export function decideGoogleAccess(input: {
 
   const slug = adminSlugs[0];
   return { allowed: true, destination: `/s/${slug}/admin`, schoolSlug: slug };
+}
+
+/** A Google sign-in by an account with no admin powers anywhere. */
+function decideParentAccess(parentSlugs: string[], requestedSlug: string | null): GoogleAccessDecision {
+  if (parentSlugs.length === 0) return { allowed: false, message: GOOGLE_MESSAGES.noAccount };
+  if (requestedSlug && !parentSlugs.includes(requestedSlug)) {
+    return { allowed: false, message: GOOGLE_MESSAGES.notThisSchool };
+  }
+  const slug = requestedSlug ?? parentSlugs[0];
+  return { allowed: true, destination: `/s/${slug}/parent/chat`, schoolSlug: slug };
 }
 
 /** `next` when it's already inside the school's admin area, else its admin home. */

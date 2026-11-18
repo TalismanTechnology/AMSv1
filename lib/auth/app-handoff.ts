@@ -83,7 +83,7 @@ export async function createAppHandoff(input: {
 }
 
 /**
- * Stores a one-time code for staff who just signed in with Google (only
+ * Stores a one-time code for someone who just signed in with Google (only
  * app/auth/callback calls this) and returns it.
  */
 export async function createGoogleAppHandoff(input: {

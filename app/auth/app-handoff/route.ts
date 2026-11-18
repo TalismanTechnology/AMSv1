@@ -11,7 +11,8 @@ import {
 } from "@/lib/auth/google-sign-in";
 
 // The native app's half of Blackbaud sign-in (see lib/auth/app-handoff.ts),
-// and of staff "Continue with Google" (lib/auth/google-sign-in.ts).
+// and of "Continue with Google" (lib/auth/google-sign-in.ts) for staff and
+// existing parents.
 //
 //   POST /auth/app-handoff   form: code, verifier
 //
@@ -48,9 +49,11 @@ export async function POST(request: Request) {
 
     const google = parseGoogleHandoffSlug(handoff.schoolSlug);
     if (google) {
-      // Staff signed in with Google in the sign-in sheet. The callback already
-      // checked their verified Google email moments ago; their role is
-      // checked again here, right before the session starts.
+      // Signed in with Google in the sign-in sheet. The callback already
+      // checked their verified Google email moments ago; their access (admin,
+      // or an approved parent membership) is checked again here, right before
+      // the session starts. A parent's handoff carries their school, so the
+      // decision lands them on its parent chat.
       const next = google.schoolSlug ? `/s/${google.schoolSlug}/admin` : null;
       const outcome: { destination?: string; refusal: string } = { refusal: FAILED };
       const started = await startStaffSession(handoff.email, async (user) => {
