@@ -247,7 +247,7 @@ test("refusals tell parents how to sign in, without calling them admins", () => 
   for (const message of [GOOGLE_MESSAGES.noAccount, GOOGLE_MESSAGES.notThisSchool, GOOGLE_MESSAGES.unverified]) {
     assert.doesNotMatch(message, /admin account|with your password/);
   }
-  assert.match(GOOGLE_MESSAGES.noAccount, /Parents: choose your school and sign in with Blackbaud, Veracross or the email code/);
+  assert.match(GOOGLE_MESSAGES.noAccount, /Parents: choose your school and sign in with Blackbaud or Veracross, whichever your school uses/);
 });
 
 test("an unverified Google email is refused, even for a super-admin", () => {
@@ -333,7 +333,6 @@ test("parent sign-in pages never render the Google button", () => {
   for (const file of [
     "app/login/page.tsx",
     "components/auth/parent-sign-in-button.tsx",
-    "components/auth/roster-sign-in-form.tsx",
   ]) {
     assert.doesNotMatch(read(file), /GoogleSignInButton|\/auth\/google/, file);
   }

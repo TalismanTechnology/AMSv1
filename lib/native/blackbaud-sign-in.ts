@@ -112,8 +112,8 @@ export async function signInWithSchoolProvider(
   provider: AuthProvider = "blackbaud"
 ): Promise<void> {
   const { label, startPath } = AUTH_PROVIDERS[provider];
-  // Providers without a start path (roster) sign in on the school's login
-  // page inside the web view; there is no sheet to open.
+  // A provider without a start path (the retired roster provider) has no
+  // sign-in; the school's login page explains that.
   if (!startPath) {
     window.location.assign(`/s/${encodeURIComponent(schoolSlug)}/login`);
     return;

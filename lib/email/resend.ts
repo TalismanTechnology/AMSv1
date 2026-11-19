@@ -44,7 +44,7 @@ export type SendEmailResult = { ok: true } | { ok: false; error: string };
 /**
  * Like sendEmail, but reports whether Resend accepted the message instead of
  * only logging, and supports a plain-text part and a per-message sender.
- * Used where the caller must know (sign-in codes).
+ * Used where the caller must know (ops alerts).
  */
 export async function sendEmailWithResult(message: {
   to: string;

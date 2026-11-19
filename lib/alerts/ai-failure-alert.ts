@@ -1,7 +1,7 @@
 import { after } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmailWithResult, type SendEmailResult } from "@/lib/email/resend";
-import { escapeHtml } from "@/lib/roster/login-email";
+import { escapeHtml } from "@/lib/email/escape-html";
 import { isNotInstalledError } from "@/lib/supabase/not-installed";
 import {
   adminAiErrorMessage,
@@ -117,7 +117,7 @@ export function opsAlertEmail(): string {
   return process.env.OPS_ALERT_EMAIL?.trim() || DEFAULT_OPS_EMAIL;
 }
 
-/** Same verified askmyschool.app sender as the sign-in code emails. */
+/** The verified askmyschool.app sender (AUTH_EMAIL_FROM, then EMAIL_FROM). */
 export function opsAlertFromAddress(): string {
   return (
     process.env.AUTH_EMAIL_FROM ||

@@ -16,7 +16,7 @@ import {
   updateRequireRosterMatch,
   uploadRoster,
 } from "@/actions/parent-sign-in";
-import type { AuthProvider } from "@/lib/auth/provider";
+import { isSelectableAuthProvider, type AuthProvider, type SelectableAuthProvider } from "@/lib/auth/provider";
 import {
   MAX_ROSTER_BYTES,
   ROSTER_TEMPLATE_CSV,
@@ -33,6 +33,7 @@ export interface ParentSignInConfig {
   installed: boolean;
   /** Set when the roster couldn't be read for another reason. */
   loadError: string | null;
+  /** Read from the database, so it may still be the retired "roster". */
   provider: AuthProvider;
   /** An enabled Veracross OAuth Application exists for this school. */
   veracrossAvailable: boolean;
@@ -41,7 +42,8 @@ export interface ParentSignInConfig {
   requireRosterMatch: boolean;
 }
 
-const PROVIDER_OPTIONS: { value: AuthProvider; label: string; description: string }[] = [
+// Email code ("roster") was removed and is not offered.
+const PROVIDER_OPTIONS: { value: SelectableAuthProvider; label: string; description: string }[] = [
   {
     value: "blackbaud",
     label: "Blackbaud",
@@ -52,18 +54,10 @@ const PROVIDER_OPTIONS: { value: AuthProvider; label: string; description: strin
     label: "Veracross",
     description: "Parents use their Veracross portal login.",
   },
-  {
-    value: "roster",
-    label: "Email code",
-    description: "Parents on your roster get a 6-digit code by email.",
-  },
 ];
 
-const PROVIDER_PHRASE: Record<AuthProvider, string> = {
-  blackbaud: "Blackbaud",
-  veracross: "Veracross",
-  roster: "a code emailed to the address on your roster",
-};
+const RETIRED_PROVIDER_NOTE =
+  "This school is still set to email-code sign-in, which has been removed, so parents can't sign in. Choose Blackbaud or Veracross.";
 
 const SUPPORT_NOTE = "Contact AskMySchool support to change how parents sign in.";
 
@@ -108,11 +102,13 @@ export function ParentSignInSettings({
       {!config.installed ? (
         <div className="rounded-lg border border-border bg-card p-5">
           <p className="text-sm font-medium text-ink">
-            Parents sign in with {PROVIDER_OPTIONS.find((o) => o.value === config.provider)?.label}
+            {isSelectableAuthProvider(config.provider)
+              ? `Parents sign in with ${PROVIDER_OPTIONS.find((o) => o.value === config.provider)?.label}`
+              : RETIRED_PROVIDER_NOTE}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
             {config.loadError ??
-              "Roster sign-in will be available after the next database update."}
+              "The parent roster will be available after the next database update."}
           </p>
         </div>
       ) : (
@@ -142,15 +138,12 @@ function ProviderCard({
   isSuperAdmin: boolean;
 }) {
   const router = useRouter();
-  const [pending, setPending] = useState<AuthProvider | null>(null);
+  const [pending, setPending] = useState<SelectableAuthProvider | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const disabledReason = (provider: AuthProvider): string | null => {
+  const disabledReason = (provider: SelectableAuthProvider): string | null => {
     if (provider === "veracross" && !config.veracrossAvailable) {
       return "Veracross isn't connected for this school yet.";
-    }
-    if (provider === "roster" && config.rosterActiveCount === 0) {
-      return "Upload a parent roster first.";
     }
     return null;
   };
@@ -177,6 +170,11 @@ function ProviderCard({
           Staff always sign in with their email and password.
           {isSuperAdmin ? "" : ` ${SUPPORT_NOTE}`}
         </p>
+        {!isSelectableAuthProvider(config.provider) && (
+          <p role="alert" className="mt-3 rounded-md border border-destructive/25 bg-destructive/10 p-3 text-xs text-destructive">
+            {RETIRED_PROVIDER_NOTE}
+          </p>
+        )}
         <div className="mt-4 space-y-2">
           {PROVIDER_OPTIONS.map((option) => {
             const checked = option.value === config.provider;
@@ -220,7 +218,7 @@ function ProviderCard({
         title="Change parent sign-in?"
         description={
           pending
-            ? `Parents will sign in with ${PROVIDER_PHRASE[pending]} from now on. Parents who are already signed in stay signed in.`
+            ? `Parents will sign in with ${PROVIDER_OPTIONS.find((o) => o.value === pending)?.label} from now on. Parents who are already signed in stay signed in.`
             : ""
         }
         confirmLabel="Change sign-in"

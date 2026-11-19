@@ -16,7 +16,7 @@
 // at that school. Everyone else (no approved membership, no account) is
 // signed straight back out. Nothing here creates an account, a profile or a
 // membership or grants a role: becoming a parent still goes through the
-// school's roster check (Blackbaud, Veracross or the email code).
+// school's own sign-in (Blackbaud or Veracross).
 //
 // Everything in this file is pure so it can be unit tested; the parts that
 // talk to Supabase are in google-access.ts and the route handlers.
@@ -36,7 +36,7 @@ export const GOOGLE_INTENT_MAX_AGE_SECONDS = 10 * 60;
 
 export const GOOGLE_MESSAGES = {
   noAccount:
-    "No AskMySchool account uses this Google email. Parents: choose your school and sign in with Blackbaud, Veracross or the email code your school uses. School staff: ask your school admin to add you.",
+    "No AskMySchool account uses this Google email. Parents: choose your school and sign in with Blackbaud or Veracross, whichever your school uses. School staff: ask your school admin to add you.",
   notThisSchool:
     "Your Google account doesn't have access to this school. Parents: sign in with your school account on this page. School staff: ask this school's admin to add you.",
   unverified:
@@ -165,8 +165,8 @@ export type GoogleAccessDecision =
  * - parent (an approved `parent` membership, no admin powers anywhere):
  *   allowed as a parent, landing on that school's parent chat. Coming from
  *   one school's login page, only that school (like the parent password
- *   sign-in). Google proves the account's email, just as the email code does;
- *   the membership itself came from the school's roster check.
+ *   sign-in). Google proves the account's email; the membership itself came
+ *   from the school's Blackbaud or Veracross sign-in.
  * - anyone else (no approved membership, no profile): refused.
  */
 export function decideGoogleAccess(input: {

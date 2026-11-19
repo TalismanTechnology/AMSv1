@@ -11,7 +11,6 @@ import { Label } from "@/components/ui/label";
 import { login } from "@/actions/auth";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { ParentSignInButton } from "@/components/auth/parent-sign-in-button";
-import { RosterSignInForm } from "@/components/auth/roster-sign-in-form";
 import { LegalNotice } from "@/components/legal/legal-notice";
 import { AuthDivider, GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import {
@@ -21,7 +20,7 @@ import {
   staffPasswordForm,
   type StaffSignInMode,
 } from "@/lib/auth/admin-google-only";
-import { AUTH_PROVIDERS, type AuthProvider } from "@/lib/auth/provider";
+import { AUTH_PROVIDERS, isRetiredAuthProvider, type AuthProvider } from "@/lib/auth/provider";
 import { schoolPossessive } from "@/lib/school-display-name";
 
 interface LoginFormProps {
@@ -51,8 +50,8 @@ export function LoginForm({
   const { label: providerLabel, portalName } = AUTH_PROVIDERS[provider];
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
-  const [rosterError, setRosterError] = useState<string | null>(searchParams.get("error"));
-  const [rosterRedirecting, setRosterRedirecting] = useState(false);
+  // Errors from the provider callbacks arrive as ?error=.
+  const [parentError, setParentError] = useState<string | null>(searchParams.get("error"));
   const [dismissedAttempt, setDismissedAttempt] = useState(0);
   // Parents only ever use the school's provider (Blackbaud or Veracross). The
   // password form is for staff, so it stays collapsed behind a quiet link.
@@ -70,22 +69,26 @@ export function LoginForm({
     { attempt: 0, error: null }
   );
 
-  const loading = formPending || rosterRedirecting;
+  const loading = formPending;
   const staffError = actionState.attempt > dismissedAttempt ? actionState.error : null;
-  const error = showStaffSignIn ? staffError : rosterError;
+  const error = showStaffSignIn ? staffError : parentError;
 
   // Built as whole strings so each sentence renders as one text node, and a
   // missing name reads "your school's" rather than "'s".
   const possessive = schoolPossessive(schoolName);
   const heading = schoolName ?? "Sign in";
-  const subheading =
-    provider === "roster"
-      ? "Sign in with the email address your school has on file."
-      : schoolName
-        ? `Sign in with your ${schoolName} ${providerLabel} account.`
-        : `Sign in with your school's ${providerLabel} account.`;
+  // A leftover auth_provider = 'roster' (emailed codes, removed) has no
+  // parent sign-in at all: say so rather than offer anything.
+  const retired = isRetiredAuthProvider(provider);
+  const subheading = retired
+    ? "Parent sign-in isn't available here right now."
+    : schoolName
+      ? `Sign in with your ${schoolName} ${providerLabel} account.`
+      : `Sign in with your school's ${providerLabel} account.`;
   const portalHint = `Use the same login you use for ${possessive} ${portalName}. Only parents and guardians can sign in.`;
-  const notEnabled = `${schoolName ?? "Your school"} hasn't turned on ${providerLabel} sign-in yet. Please check back soon.`;
+  const notEnabled = retired
+    ? `Parent sign-in isn't set up for ${schoolName ?? "your school"}. Please contact the school for help signing in.`
+    : `${schoolName ?? "Your school"} hasn't turned on ${providerLabel} sign-in yet. Please check back soon.`;
 
   return (
     <AuthShell>
@@ -130,13 +133,7 @@ export function LoginForm({
         )}
 
         {!showStaffSignIn &&
-          (signInEnabled && provider === "roster" ? (
-            <RosterSignInForm
-              schoolSlug={schoolSlug}
-              onError={setRosterError}
-              onSignedIn={() => setRosterRedirecting(true)}
-            />
-          ) : signInEnabled ? (
+          (signInEnabled && !retired ? (
             <>
               <ParentSignInButton schoolSlug={schoolSlug} provider={provider} />
               <p className="mt-5 text-center text-sm text-ink-soft">
@@ -225,7 +222,7 @@ export function LoginForm({
         <button
           type="button"
           onClick={() => {
-            setRosterError(null);
+            setParentError(null);
             setDismissedAttempt(actionState.attempt);
             setShowStaffSignIn((shown) => !shown);
           }}

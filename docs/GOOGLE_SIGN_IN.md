@@ -1,8 +1,8 @@
 # Sign in with Google (staff, super-admin, existing parents)
 
 "Continue with Google" on staff sign-in, using Supabase Auth's Google
-provider. Parent sign-in is unchanged: Blackbaud, Veracross and email-code
-sign-in work as before, and the parent section never shows the Google button.
+provider. Parent sign-in is unchanged: Blackbaud and Veracross sign-in work
+as before, and the parent section never shows the Google button.
 A parent who already has an approved membership and uses the Google button
 anyway gets a normal parent session (see "Who gets in").
 
@@ -36,19 +36,19 @@ this browser started a Google sign-in), so sign-in still works.
 | super-admin | allowed (`/super-admin`, or the school they came from; the owner lock still applies there) |
 | admin of a school (even if also a parent elsewhere) | allowed into a school they administer; from another school's login page, refused |
 | approved parent, no admin powers | allowed as a parent: `/s/<slug>/parent/chat` of their (oldest) approved school, or of the school whose login page they came from; another school's page → refused |
-| no approved membership (unapproved parent, no role) | signed out at once, "No AskMySchool account uses this Google email. Parents: choose your school and sign in with Blackbaud, Veracross or the email code…" |
+| no approved membership (unapproved parent, no role) | signed out at once, "No AskMySchool account uses this Google email. Parents: choose your school and sign in with Blackbaud or Veracross, whichever your school uses…" |
 | email not on any account | Supabase refuses ("Signups not allowed"), same message |
 | Google email not verified | refused |
 
 Nothing creates an account, profile or membership or grants a role: a parent
-only gets in through Google if the school's roster check (Blackbaud,
-Veracross or the email code) already made them an approved parent there.
-Google proves the account's email, the same thing the email code proves. The
+only gets in through Google if the school's own sign-in (Blackbaud or
+Veracross) already made them an approved parent there. Google proves the
+account's email. The
 parent's password (if any) and other sessions are left alone. Supabase links
 the Google identity to an existing account with the same verified email
 automatically; no manual linking.
 
-Residual: unlike Blackbaud / Veracross / the email code, a Google sign-in
+Residual: unlike Blackbaud / Veracross, a Google sign-in
 doesn't re-check the school's roster; it relies on the membership still being
 approved (as the parent password sign-in does). Removing or unapproving the
 membership stops it.
@@ -93,8 +93,8 @@ account's password to a random value.
 ## Admin Google-only (`ADMIN_GOOGLE_ONLY`)
 
 Admin powers only come from a session that Google sign-in started. A school
-admin or the super-admin signed in any other way (password, email code, magic
-link, Blackbaud, Veracross, a token straight from Supabase) gets no admin
+admin or the super-admin signed in any other way (password, magic link,
+Blackbaud, Veracross, a token straight from Supabase) gets no admin
 pages, admin actions or admin API routes. Parents are unaffected. Off unless
 `ADMIN_GOOGLE_ONLY=true` (exactly; read on the server).
 
@@ -105,7 +105,8 @@ session's id (the access token's `session_id` claim, which survives token
 refreshes) in `public.google_auth_sessions` (migration 053, service role
 only). The checks look the current token's `session_id` + user up there. The
 token's `amr` can't be used: the app's Google sign-in ends in a magic-link
-verify, so it says `otp`, exactly like a parent's email code. A Google handoff
+verify, so it says `otp`, exactly like a parent session started after
+Blackbaud / Veracross (`lib/auth/parent-session.ts`). A Google handoff
 (`google:` slug) can only be minted by `/auth/callback`; Blackbaud and
 Veracross handoffs refuse anything that isn't a school slug.
 
@@ -153,7 +154,7 @@ parent password link is still shown).
 3. Set `ADMIN_GOOGLE_ONLY=true` in Vercel (Production) and redeploy.
 4. Sign in with Google on the web and in the app, as a school admin and as the
    super-admin; check an admin password sign-in is refused.
-5. Check parents: a Blackbaud / Veracross / email-code sign-in, and the
+5. Check parents: a Blackbaud / Veracross sign-in, and the
    `parent_password_login` demo account via "A parent with a password?" on
    `/login/staff` (web and the iOS app).
 
@@ -165,7 +166,7 @@ Everything goes back to today's behaviour; the table can stay.
 ### Residual risk
 
 Supabase's own REST API doesn't know about this flag. Someone with an admin's
-password, or who can get an email code / magic link for an admin's address,
+password, or who can get a Supabase email OTP / magic link for an admin's address,
 can still get a Supabase token and query Supabase directly, within RLS (which
 gives a school admin their school and the super-admin everything). Every
 askmyschool.app page, action and API route refuses that session. To narrow it:

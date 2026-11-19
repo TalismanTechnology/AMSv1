@@ -1,12 +1,30 @@
 // Which system a school's parents sign in with. Client-safe (no secrets, no
 // server imports) so the login UI and the native bridge can use it too.
 //
-// Stored per school in schools.auth_provider (migration 034; "roster" needs
-// 045). Anything other than "veracross" or "roster" — including the column
-// not existing yet because 034 hasn't been applied — means Blackbaud, so
-// existing schools are unaffected.
+// Stored per school in schools.auth_provider (migration 034). Anything other
+// than "veracross" or "roster" — including the column not existing yet
+// because 034 hasn't been applied — means Blackbaud, so existing schools are
+// unaffected.
+//
+// "roster" was the emailed one-time-code sign-in, which has been removed. The
+// database constraint still allows the value, so it is read as a retired
+// provider: no sign-in is offered and parents are told to contact the school.
+// It can't be chosen in admin settings (SELECTABLE_AUTH_PROVIDERS).
 
 export type AuthProvider = "blackbaud" | "veracross" | "roster";
+
+/** Providers a super admin can choose and parents can actually sign in with. */
+export const SELECTABLE_AUTH_PROVIDERS = ["blackbaud", "veracross"] as const;
+export type SelectableAuthProvider = (typeof SELECTABLE_AUTH_PROVIDERS)[number];
+
+export function isSelectableAuthProvider(value: unknown): value is SelectableAuthProvider {
+  return (SELECTABLE_AUTH_PROVIDERS as readonly unknown[]).includes(value);
+}
+
+/** A leftover schools.auth_provider value that no longer has a sign-in. */
+export function isRetiredAuthProvider(provider: AuthProvider): boolean {
+  return !isSelectableAuthProvider(provider);
+}
 
 interface ProviderInfo {
   /** Product name parents recognise, e.g. on the sign-in button. */
@@ -14,10 +32,9 @@ interface ProviderInfo {
   /** What parents call the place they normally log in. */
   portalName: string;
   /**
-   * Route that starts this provider's sign-in, or null when sign-in happens
-   * on the school's own login page (roster: emailed code). The native app
-   * opens start paths in the system sign-in sheet, so a provider that never
-   * leaves askmyschool.app must not have one.
+   * Route that starts this provider's sign-in, or null when there is none
+   * (the retired roster provider). The native app opens start paths in the
+   * system sign-in sheet.
    */
   startPath: string | null;
 }
@@ -33,11 +50,11 @@ export const AUTH_PROVIDERS: Record<AuthProvider, ProviderInfo> = {
     portalName: "Veracross portal",
     startPath: "/auth/veracross",
   },
-  // Parents on the school's uploaded roster get a one-time code by email
-  // (actions/roster-sign-in.ts). See docs/ROSTER_SIGN_IN.md.
+  // Retired (emailed code sign-in was removed). Kept so a leftover database
+  // value resolves to something safe; the login page offers no sign-in for it.
   roster: {
-    label: "email",
-    portalName: "email address on file with the school",
+    label: "school",
+    portalName: "school",
     startPath: null,
   },
 };

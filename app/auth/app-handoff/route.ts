@@ -73,7 +73,7 @@ export async function POST(request: Request) {
         return toLogin(`${origin}${withError(loginPathFor(next), outcome.refusal)}`);
       }
       // Mark it as a Google session (ADMIN_GOOGLE_ONLY). Its amr says "otp",
-      // like a parent's email code, so this row is the only record that Google
+      // like a parent's Blackbaud / Veracross session, so this row is the only record that Google
       // started it. On failure the sign-in still goes ahead; admin access then
       // asks for Google sign-in again.
       await recordGoogleSession({

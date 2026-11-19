@@ -109,7 +109,7 @@ test("flag on: a Google session (web or app) keeps admin and super-admin powers"
   }
 });
 
-test("flag on: password / email-code / magic-link sessions lose admin and super-admin powers", () => {
+test("flag on: password / magic-link / Blackbaud / Veracross sessions lose admin and super-admin powers", () => {
   // Every non-Google session looks the same here: no google_auth_sessions row.
   assert.equal(
     decideSchoolAdminSession({
