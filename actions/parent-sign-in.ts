@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireSchoolAdmin, requireSuperAdmin } from "@/lib/auth/require-school-admin";
 import { logAudit } from "@/lib/audit";
-import { resolveAuthProvider, type AuthProvider } from "@/lib/auth/provider";
+import { isSelectableAuthProvider, resolveAuthProvider, type SelectableAuthProvider } from "@/lib/auth/provider";
 import { isNotInstalledError } from "@/lib/supabase/not-installed";
 import { getVeracrossConnection } from "@/lib/veracross/connection";
 import {
@@ -17,15 +17,14 @@ import {
 import { getRosterSummary, previewRosterReplacement, replaceRoster } from "@/lib/roster/store";
 
 // Server actions behind the "Parent sign-in" panel in admin settings: which
-// provider parents use, the uploaded parent roster, and the optional
-// require-roster-match gate. Every entry point re-authorizes against the
+// provider parents use (Blackbaud or Veracross), the uploaded parent roster,
+// and the optional require-roster-match gate. Every entry point re-authorizes against the
 // *specific* school id it was handed (see actions/blackbaud.ts). Changing the
 // provider and turning the gate on can lock every parent out of a school, so
 // those are super-admin only; school admins manage the roster and can turn the
 // gate off.
 
-const NOT_INSTALLED = "Email-code sign-in isn't available yet. It will be after the next database update.";
-const PROVIDERS: readonly AuthProvider[] = ["blackbaud", "veracross", "roster"];
+const NOT_INSTALLED = "The parent roster isn't available yet. It will be after the next database update.";
 // Issues returned to the browser; the full list stays in the server log.
 const MAX_ISSUES_RETURNED = 50;
 
@@ -40,23 +39,17 @@ async function activeRosterCount(schoolId: string): Promise<number | null> {
 
 export async function updateParentSignInProvider(
   schoolId: string,
-  provider: AuthProvider
+  provider: SelectableAuthProvider
 ): Promise<{ error?: string; success?: boolean }> {
   const auth = await requireSuperAdmin();
   if ("error" in auth) return { error: auth.error };
 
-  if (!PROVIDERS.includes(provider)) return { error: "Unknown sign-in method." };
+  // Email-code (roster) sign-in was removed; it can't be chosen any more.
+  if (!isSelectableAuthProvider(provider)) return { error: "Unknown sign-in method." };
 
   try {
     if (provider === "veracross" && !(await getVeracrossConnection(schoolId))) {
       return { error: "Veracross isn't connected for this school yet." };
-    }
-    if (provider === "roster") {
-      const count = await activeRosterCount(schoolId);
-      if (count === null) return { error: NOT_INSTALLED };
-      if (count === 0) {
-        return { error: "Upload a parent roster before switching to email-code sign-in." };
-      }
     }
   } catch (caught: unknown) {
     return { error: message(caught, "Could not check sign-in settings.") };
@@ -70,13 +63,7 @@ export async function updateParentSignInProvider(
     .update({ auth_provider: provider, updated_at: new Date().toISOString() })
     .eq("id", schoolId);
 
-  if (error) {
-    // 23514: the pre-045 check constraint doesn't allow 'roster' yet.
-    if (provider === "roster" && (error.code === "23514" || isNotInstalledError(error))) {
-      return { error: NOT_INSTALLED };
-    }
-    return { error: error.message };
-  }
+  if (error) return { error: error.message };
 
   logAudit(
     auth.userId,

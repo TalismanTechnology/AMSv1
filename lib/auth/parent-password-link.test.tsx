@@ -36,10 +36,6 @@ stub("next/link", {
     React.createElement("a", { href, ...rest }, children),
 });
 stub("@/actions/auth", { login: async () => ({ error: "stubbed" }) });
-stub("@/actions/roster-sign-in", {
-  requestParentCode: async () => ({}),
-  verifyParentCode: async () => ({}),
-});
 
 // ─── DOM ──────────────────────────────────────────────────────────────
 

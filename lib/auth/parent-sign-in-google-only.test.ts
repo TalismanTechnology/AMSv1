@@ -329,7 +329,7 @@ test("Google: an unknown email is refused with a message that tells parents how 
   const message = location(response).searchParams.get("error")!;
   assert.equal(location(response).pathname, "/login/staff");
   assert.doesNotMatch(message, /admin account/);
-  assert.match(message, /Parents: choose your school and sign in with Blackbaud, Veracross or the email code/);
+  assert.match(message, /Parents: choose your school and sign in with Blackbaud or Veracross, whichever your school uses/);
 });
 
 test("Google: a dual admin + parent account still gets admin", async () => {

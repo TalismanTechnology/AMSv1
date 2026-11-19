@@ -43,8 +43,8 @@ export async function GET(request: Request) {
     );
   }
 
-  // An email-code (roster) school's parents sign in on its login page; there
-  // is nothing to hand over to.
+  // A school still set to the retired email-code (roster) provider has no
+  // parent sign-in; its login page says to contact the school.
   if (resolveAuthProvider(school.auth_provider) === "roster") {
     return NextResponse.redirect(`${origin}/s/${school.slug}/login`);
   }

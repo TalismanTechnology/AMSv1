@@ -13,6 +13,7 @@ import {
   type AlertDeps,
 } from "./ai-failure-alert";
 import { adminAiErrorMessage } from "@/lib/ai/provider-errors";
+import { escapeHtml } from "@/lib/email/escape-html";
 
 // No real Supabase, Resend or Gemini calls: every dependency is injected.
 
@@ -232,4 +233,8 @@ test("adminSafeErrorMessage hides provider text but keeps our own messages", () 
   assert.equal(message, adminAiErrorMessage("billing_quota"));
   assert.ok(!message.includes("prepayment"));
   assert.equal(adminSafeErrorMessage(new Error("Not authorized"), { source: "t" }, undefined, deps), "Not authorized");
+});
+
+test("escapeHtml covers the five HTML metacharacters", () => {
+  assert.equal(escapeHtml(`<a href="x">'&'</a>`), "&lt;a href=&quot;x&quot;&gt;&#39;&amp;&#39;&lt;/a&gt;");
 });

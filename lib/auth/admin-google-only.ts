@@ -2,7 +2,7 @@
 //
 // When on, admin powers (a school's `admin` membership, and the platform
 // super-admin's elevation) only count for a session that was started by a
-// Google sign-in. Any other session — password, parent email code, magic link,
+// Google sign-in. Any other session — password, magic link,
 // Blackbaud / Veracross — still works for whatever else the account is (a
 // parent at some school), but never as an admin.
 //
@@ -12,7 +12,7 @@
 // token's session_id claim survives token refreshes, so the mark lasts as long
 // as the session. The token's `amr` can't tell us: the native app's Google
 // sign-in ends in a magic-link verify, so its session says "otp", exactly like
-// a parent's email code.
+// a parent session started after Blackbaud / Veracross (lib/auth/parent-session.ts).
 //
 // Everything here is pure (and edge-safe) so it can be unit tested and used
 // from middleware; the lookups are in admin-session.ts.

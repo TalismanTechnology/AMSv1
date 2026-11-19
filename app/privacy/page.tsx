@@ -26,7 +26,7 @@ export default function PrivacyPage() {
     <LegalPage
       eyebrow="Legal"
       title="Privacy Policy"
-      lastUpdated="October 28, 2026"
+      lastUpdated="November 18, 2026"
       intro={
         <>
           <p>
@@ -144,12 +144,10 @@ export default function PrivacyPage() {
           <strong>Uploaded parent roster.</strong> A school may instead (or
           also) upload its own parent roster to control who can sign in:
           parent names and email addresses, and children&apos;s names and
-          grades. We use it only to let listed parents sign in and to pre-fill
-          their children in the app. It is accessible only to our servers.
-          When the school removes a parent from its roster, that record is
-          deactivated and no longer allows sign-in. If your school signs
-          parents in with an emailed code, the code is stored only as a
-          one-way hash and expires after 10 minutes.
+          grades. We use it only to check that a parent signing in is on the
+          school&apos;s list. It is accessible only to our servers. When the
+          school removes a parent from its roster, that record is deactivated
+          and no longer allows sign-in.
         </p>
         <p>
           <strong>School content.</strong> Documents, calendars, events, and
@@ -280,9 +278,7 @@ export default function PrivacyPage() {
           </li>
           <li>
             <strong>Resend</strong> &mdash; receiving email that schools forward
-            to their private AskMySchool address, and sending sign-in codes to
-            parents of schools that use emailed-code sign-in (your email
-            address and the code).
+            to their private AskMySchool address.
           </li>
           <li>
             <strong>Apple Push Notification service and Google Firebase Cloud
@@ -358,8 +354,8 @@ export default function PrivacyPage() {
           each user to their own data, limit each school&apos;s administrators
           to their own school, and only let administrators read conversations
           that were flagged as described in section 6. Blackbaud connection credentials are encrypted
-          before they are stored, sign-in codes for the mobile apps and emailed
-          sign-in codes are stored only as hashes and expire quickly, and
+          before they are stored, sign-in codes for the mobile apps are stored
+          only as hashes and expire quickly, and
           parent rosters are only accessible to our servers. No system is perfectly secure; if we learn
           of a breach affecting your information, we will notify affected
           schools and users as required by law.
