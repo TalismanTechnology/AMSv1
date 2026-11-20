@@ -65,6 +65,8 @@
   --color-glass-border: var(--glass-border);
   --color-glass-bg-hover: var(--glass-bg-hover);
   --color-success: var(--success);
+  --color-brand-badge: var(--brand-badge);
+  --color-brand-badge-strong: var(--brand-badge-strong);
   --color-warning: var(--warning);
   --color-info: var(--info);
   --color-metal-blue-steel: var(--metal-blue-steel-light);
@@ -72,6 +74,12 @@
   --color-metal-gunmetal: var(--metal-gunmetal);
   --animate-collapse-down: collapse-down 0.2s ease-out;
   --animate-collapse-up: collapse-up 0.2s ease-out;
+}
+
+/* Solid brand-green fill with a white glyph. Pair with hover:bg-brand-badge-strong. */
+@utility brand-badge {
+  background-color: var(--brand-badge);
+  color: var(--brand-badge-foreground);
 }
 
 /* ===== METALLIC CHROME PALETTE ===== */
@@ -187,6 +195,13 @@
   --success: oklch(0.60 0.14 155);
   --warning: oklch(0.70 0.15 70);
   --info: oklch(0.55 0.10 240);
+
+  /* Brand badge — chat citation circles, source pills and icon badges.
+     Brand green (= --color-brand-green) with white: 7.7:1, passes WCAG AA
+     (and AAA). Strong (= forest ink, 12:1) marks hover and selected. */
+  --brand-badge: #3d5a3e;
+  --brand-badge-strong: #2d3a2e;
+  --brand-badge-foreground: #ffffff;
 
   /* ===== RAW METALLIC HEX PALETTE (for gradients) ===== */
   --metal-silver-light: #e8e8e8;
@@ -473,27 +488,6 @@
   .caret-glow {
     animation: none;
     background-color: oklch(0.88 0.006 260);
-  }
-}
-
-/* ===== INDETERMINATE PROGRESS — segment sweeps the track (no percentage) =====
-   The segment is 40% of the track, so -100% → 250% of its own width crosses
-   the whole track. */
-
-@keyframes indeterminate-progress {
-  from { transform: translateX(-100%); }
-  to   { transform: translateX(250%); }
-}
-
-.indeterminate-progress-bar {
-  animation: indeterminate-progress 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .indeterminate-progress-bar {
-    animation: none;
-    width: 100%;
-    opacity: 0.5;
   }
 }
 

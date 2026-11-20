@@ -31,7 +31,7 @@ const CITATION_RE = /\[(\d+)\]/g;
 const playedCitations = new Set<string>();
 
 const BADGE_CLASS =
-  "mx-0.5 inline-flex h-[1.1em] min-w-[1.1em] items-center justify-center rounded-sm border border-glass-border metallic-surface px-[0.25em] align-[0.15em] text-[0.7em] font-medium neon-icon-blue leading-none transition-colors hover:bg-primary/15 hover:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer";
+  "mx-0.5 inline-flex h-[1.1em] min-w-[1.1em] items-center justify-center rounded-full brand-badge px-[0.25em] align-[0.15em] text-[0.7em] font-medium leading-none transition-colors hover:bg-brand-badge-strong focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-1 cursor-pointer";
 
 function CitationBadge({
   n,

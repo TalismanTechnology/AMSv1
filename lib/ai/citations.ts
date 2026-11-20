@@ -16,10 +16,33 @@ import type { CalendarEntry } from "./context";
 // Inline [N] markers, with the space before them so a dropped one leaves none.
 const MARKER_RE = /(\s?)\[(\d+)\]/g;
 
+// Other ways the model writes citations, copied from the prompt's own
+// "[Source N]" labels or bunched: [Source 12], [Source 12 | p. 3],
+// [Sources 12, 14], [12, 14], [12; 14], [Source 12, Source 14]. One item is a
+// number, optionally after "Source(s)" and before a "| label"; items are
+// separated by commas or semicolons.
+const CITATION_ITEM = String.raw`(?:and\s+)?(?:Sources?\s*)?\d+(?:\s*\|[^\]\[\n,;]*)?`;
+const VARIANT_RE = new RegExp(
+  String.raw`\[\s*${CITATION_ITEM}(?:\s*[,;]\s*${CITATION_ITEM})*\s*\]`,
+  "gi"
+);
+const ITEM_NUMBER_RE = /(?:^\[|[,;])\s*(?:and\s+)?(?:Sources?\s*)?(\d+)/gi;
+
+/**
+ * Rewrite every citation variant as plain [N] markers — "[Sources 12, 14]"
+ * becomes "[12][14]" — so they render, renumber and resolve like any other.
+ * Plain [N] markers are left as they are.
+ */
+export function normalizeCitationMarkers(content: string): string {
+  return content.replace(VARIANT_RE, (marker) =>
+    [...marker.matchAll(ITEM_NUMBER_RE)].map((m) => `[${m[1]}]`).join("")
+  );
+}
+
 /** Source numbers in the order the answer first cites them. */
 export function citedNumbersInOrder(content: string): number[] {
   const seen = new Set<number>();
-  for (const m of content.matchAll(MARKER_RE)) seen.add(Number(m[2]));
+  for (const m of normalizeCitationMarkers(content).matchAll(MARKER_RE)) seen.add(Number(m[2]));
   return [...seen];
 }
 
@@ -31,12 +54,14 @@ export interface RenumberedAnswer {
 
 /**
  * Renumber an answer's citations to 1, 2, 3… in order of first appearance.
+ * Variants like [Source 12] or [12, 14] are normalized to [N] markers first.
  *
  * Sources the answer never cites keep their relative order after the cited
  * ones. A marker that resolves to no source is removed — it links nowhere.
  * Sources without a number pass through unchanged.
  */
-export function renumberCitations(content: string, sources: ChatSource[] = []): RenumberedAnswer {
+export function renumberCitations(raw: string, sources: ChatSource[] = []): RenumberedAnswer {
+  const content = normalizeCitationMarkers(raw);
   const known = new Set(
     sources.map((s) => s.source_number).filter((n): n is number => n != null)
   );

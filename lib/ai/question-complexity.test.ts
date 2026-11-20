@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import {
   answerSettings,
   classifyQuestion,
+  complexThinkingLevel,
   simpleThinkingLevel,
+  thinkingLevelSetting,
 } from "./question-complexity";
 
 const SIMPLE = [
@@ -118,9 +120,33 @@ test("follow-ups get a shorter word limit", () => {
 });
 
 test("a follow-up chaining another question is complex", () => {
-  assert.equal(classifyQuestion("And what about lunch?", { followUp: true }), "complex");
+  assert.equal(classifyQuestion("What about lunch and what about recess?", { followUp: true }), "complex");
   assert.equal(classifyQuestion("Why?", { followUp: true }), "complex");
   assert.equal(classifyQuestion("Should we go?", { followUp: true }), "complex");
+});
+
+test("a leading 'and' / 'so' only ties a follow-up to the conversation", () => {
+  // Classified complex in production (Nov 19 2026) and thought for 6.4 s.
+  assert.equal(
+    classifyQuestion("And what about winter break?", {
+      followUp: true,
+      searchQuery: "When is winter break?",
+    }),
+    "simple"
+  );
+  assert.equal(classifyQuestion("And what about lunch?", { followUp: true }), "simple");
+  assert.equal(classifyQuestion("So when is it?", { followUp: true }), "simple");
+  assert.equal(classifyQuestion("Ok, and what time?", { followUp: true }), "simple");
+  // Still complex when what follows is.
+  assert.equal(classifyQuestion("And why is that?", { followUp: true }), "complex");
+  assert.equal(
+    classifyQuestion("And what about winter break?", {
+      followUp: true,
+      searchQuery: "What are all the key dates and deadlines before winter break?",
+    }),
+    "complex"
+  );
+  assert.equal(classifyQuestion("And when is it, and what should he wear?"), "complex");
 });
 
 test("the simple thinking level is validated, defaulting to low", () => {
@@ -133,7 +159,21 @@ test("the simple thinking level is validated, defaulting to low", () => {
   assert.equal(simpleThinkingLevel("high"), "high");
 });
 
-test("complex questions get exactly the default call", () => {
+test("thinking-level env values: a level, 'default' (provider default), or the fallback", () => {
+  assert.equal(thinkingLevelSetting(undefined, "medium"), "medium");
+  assert.equal(thinkingLevelSetting("", "medium"), "medium");
+  assert.equal(thinkingLevelSetting("nope", "medium"), "medium");
+  assert.equal(thinkingLevelSetting(" LOW ", "medium"), "low");
+  assert.equal(thinkingLevelSetting("default", "medium"), null);
+  assert.equal(thinkingLevelSetting(" Default ", "low"), null);
+  assert.equal(complexThinkingLevel(undefined), "medium");
+  assert.equal(complexThinkingLevel("high"), "high");
+  assert.equal(complexThinkingLevel("default"), null);
+  // The simple level never falls back to the provider default.
+  assert.equal(simpleThinkingLevel("default"), "low");
+});
+
+test("complex questions think at medium by default, on the default model", () => {
   const s = answerSettings("complex", "gemini-x", {
     CHAT_SIMPLE_THINKING_LEVEL: "minimal",
     CHAT_SIMPLE_MODEL: "other-model",
@@ -141,9 +181,32 @@ test("complex questions get exactly the default call", () => {
   assert.deepEqual(s, {
     complexity: "complex",
     modelId: "gemini-x",
+    thinkingLevel: "medium",
+    providerOptions: { google: { thinkingConfig: { thinkingLevel: "medium" } } },
+  });
+});
+
+test("CHAT_COMPLEX_THINKING_LEVEL overrides, and 'default' restores the old call", () => {
+  assert.deepEqual(
+    answerSettings("complex", "gemini-x", { CHAT_COMPLEX_THINKING_LEVEL: "low" }).providerOptions,
+    { google: { thinkingConfig: { thinkingLevel: "low" } } }
+  );
+  assert.deepEqual(answerSettings("complex", "gemini-x", { CHAT_COMPLEX_THINKING_LEVEL: "default" }), {
+    complexity: "complex",
+    modelId: "gemini-x",
     thinkingLevel: null,
     providerOptions: undefined,
   });
+  // Unrecognised → medium, never an invalid level sent to the provider.
+  assert.equal(
+    answerSettings("complex", "gemini-x", { CHAT_COMPLEX_THINKING_LEVEL: "max" }).thinkingLevel,
+    "medium"
+  );
+  // The simple level is independent.
+  assert.equal(
+    answerSettings("simple", "gemini-x", { CHAT_COMPLEX_THINKING_LEVEL: "default" }).thinkingLevel,
+    "low"
+  );
 });
 
 test("simple questions keep the model and think low, without thoughts in the output", () => {

@@ -2,9 +2,10 @@
 // Model thinking dominates answer latency (10–13 s to the first token on
 // gemini-3.8-flash at its default level), and a one-fact lookup like "When is
 // Thanksgiving break?" takes as long as a multi-part question. A short single
-// lookup gets a low thinking level; everything else keeps the provider's
-// defaults. Pure and cheap — no model call — and conservative: anything it
-// isn't sure about is "complex", which is exactly the old behaviour.
+// lookup gets a low thinking level; everything else a medium one (the
+// provider's default, high, spent 10–11 s thinking on multi-part questions).
+// Pure and cheap — no model call — and conservative: anything it isn't sure
+// about is "complex".
 
 import type { GoogleLanguageModelOptions } from "@ai-sdk/google";
 
@@ -76,8 +77,13 @@ function hasSeveralSentences(text: string): boolean {
   return /[.!?]\s+[\p{L}\p{N}]/u.test(text.replace(ABBREVIATIONS, "$1"));
 }
 
+// A conjunction or filler that only ties the question to the conversation:
+// "And what about winter break?", "So when is it?". It doesn't add a second
+// question, so it is dropped before the multi-part check.
+const LEADING_CONNECTIVE = /^(?:(?:and|but|or|so|plus|ok|okay|also)\b[,\s]*)+/;
+
 function isSimpleText(text: string, maxWords: number): boolean {
-  const q = normalize(text);
+  const q = normalize(text).replace(LEADING_CONNECTIVE, "").trim();
   if (!q) return false;
   const words = wordCount(q);
   if (words === 0 || words > maxWords) return false;
@@ -116,13 +122,39 @@ export function classifyQuestion(
 export const THINKING_LEVELS = ["minimal", "low", "medium", "high"] as const;
 export type ThinkingLevel = (typeof THINKING_LEVELS)[number];
 const DEFAULT_SIMPLE_THINKING_LEVEL: ThinkingLevel = "low";
+// Medium rather than the provider's default (high): the default spent ~1.4–1.8k
+// thinking tokens, 10–11 s before the first word, on multi-part questions.
+const DEFAULT_COMPLEX_THINKING_LEVEL: ThinkingLevel = "medium";
+/** Env value that sends no thinkingConfig at all — the provider's default. */
+export const PROVIDER_DEFAULT = "default";
+
+/**
+ * A thinking level from an env value: a known level, "default" for the
+ * provider's own default (null — no thinkingConfig), or `fallback` when unset
+ * or unrecognised. "default" is the rollback switch: no deploy needed.
+ */
+export function thinkingLevelSetting(
+  value: string | undefined,
+  fallback: ThinkingLevel
+): ThinkingLevel | null {
+  const level = value?.trim().toLowerCase() ?? "";
+  if (level === PROVIDER_DEFAULT) return null;
+  return (THINKING_LEVELS as readonly string[]).includes(level)
+    ? (level as ThinkingLevel)
+    : fallback;
+}
 
 /** CHAT_SIMPLE_THINKING_LEVEL if it is a known level, else "low". */
 export function simpleThinkingLevel(value: string | undefined): ThinkingLevel {
-  const level = value?.trim().toLowerCase();
-  return (THINKING_LEVELS as readonly string[]).includes(level ?? "")
-    ? (level as ThinkingLevel)
-    : DEFAULT_SIMPLE_THINKING_LEVEL;
+  return thinkingLevelSetting(value, DEFAULT_SIMPLE_THINKING_LEVEL) ?? DEFAULT_SIMPLE_THINKING_LEVEL;
+}
+
+/**
+ * CHAT_COMPLEX_THINKING_LEVEL: a known level, or "default" for the provider's
+ * default (null); unset or unrecognised is "medium".
+ */
+export function complexThinkingLevel(value: string | undefined): ThinkingLevel | null {
+  return thinkingLevelSetting(value, DEFAULT_COMPLEX_THINKING_LEVEL);
 }
 
 export interface AnswerSettings {
@@ -130,13 +162,29 @@ export interface AnswerSettings {
   modelId: string;
   /** null = the provider's default (no thinkingConfig sent). */
   thinkingLevel: ThinkingLevel | null;
-  /** Passed straight to streamText; undefined for complex questions. */
+  /** Passed straight to streamText; undefined when the provider's default applies. */
   providerOptions: { google: GoogleLanguageModelOptions } | undefined;
 }
 
+function withThinking(
+  complexity: QuestionComplexity,
+  modelId: string,
+  thinkingLevel: ThinkingLevel | null
+): AnswerSettings {
+  return {
+    complexity,
+    modelId,
+    thinkingLevel,
+    providerOptions: thinkingLevel
+      ? { google: { thinkingConfig: { thinkingLevel } } }
+      : undefined,
+  };
+}
+
 /**
- * The answer model and thinking level for a question. Complex questions get
- * exactly the old call: `defaultModelId`, no provider options. Simple ones
+ * The answer model and thinking level for a question. Complex questions use
+ * `defaultModelId` at a medium thinking level (CHAT_COMPLEX_THINKING_LEVEL;
+ * "default" restores the old call with no provider options). Simple ones
  * keep the same model (its citation discipline is what was evaluated) unless
  * CHAT_SIMPLE_MODEL names another, with a low thinking level
  * (CHAT_SIMPLE_THINKING_LEVEL). Thoughts are never included in the output.
@@ -147,13 +195,15 @@ export function answerSettings(
   env: Record<string, string | undefined> = process.env
 ): AnswerSettings {
   if (complexity === "complex") {
-    return { complexity, modelId: defaultModelId, thinkingLevel: null, providerOptions: undefined };
+    return withThinking(
+      complexity,
+      defaultModelId,
+      complexThinkingLevel(env.CHAT_COMPLEX_THINKING_LEVEL)
+    );
   }
-  const thinkingLevel = simpleThinkingLevel(env.CHAT_SIMPLE_THINKING_LEVEL);
-  return {
+  return withThinking(
     complexity,
-    modelId: env.CHAT_SIMPLE_MODEL?.trim() || defaultModelId,
-    thinkingLevel,
-    providerOptions: { google: { thinkingConfig: { thinkingLevel } } },
-  };
+    env.CHAT_SIMPLE_MODEL?.trim() || defaultModelId,
+    simpleThinkingLevel(env.CHAT_SIMPLE_THINKING_LEVEL)
+  );
 }

@@ -7,6 +7,7 @@ import { getNativePlatform } from "@/lib/native/platform";
 import { impactHaptic, successHaptic } from "@/lib/native/haptics";
 import { shareableAnswer } from "@/lib/share-answer";
 import type { ChatSource } from "@/lib/types";
+import { IconBadge } from "./icon-badge";
 
 // Share an answer (with the documents it cites). In the iOS / Android app this
 // is the native share sheet; on the web, the browser's share sheet where there
@@ -53,12 +54,14 @@ export function MessageShare({ content, sources }: MessageShareProps) {
     <Button
       variant="ghost"
       size="icon"
-      className="h-7 w-7 rounded-md text-muted-foreground/50 transition-colors hover:bg-secondary hover:text-ink"
+      className="group h-7 w-7 rounded-md transition-colors"
       onClick={() => void handleShare()}
       aria-label="Share answer"
       title="Share answer"
     >
-      <Share className="h-3.5 w-3.5" />
+      <IconBadge className="group-hover:bg-brand-badge-strong">
+        <Share className="size-3" />
+      </IconBadge>
     </Button>
   );
 }

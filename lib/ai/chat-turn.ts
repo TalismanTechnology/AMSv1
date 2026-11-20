@@ -39,7 +39,7 @@ import {
   planConflictResolutions,
   withoutDropped,
 } from "@/lib/conflicts/resolutions";
-import { eventSource } from "@/lib/ai/citations";
+import { eventSource, normalizeCitationMarkers } from "@/lib/ai/citations";
 import { conflictsInReach } from "@/lib/documents/grade-visibility";
 import type { ChatSource } from "@/lib/types";
 import { TEXT_MODEL_ID } from "@/lib/ai/models";
@@ -53,13 +53,29 @@ export const CHAT_MODEL_ID = TEXT_MODEL_ID;
 const DEFAULT_TEMPERATURE = 0.2;
 const MAX_TEMPERATURE = 0.5;
 
+/**
+ * The number of the first calendar entry. Fixed rather than "after the last
+ * passage", so the calendar block — most of the prompt — reads the same for
+ * every question and the provider's prompt cache can reuse it (see
+ * lib/ai/system-prompt.ts). Passages never come close: at most 5 documents of
+ * at most 12 chunks, plus a few admin clarifications. What the parent sees is
+ * renumbered 1, 2, 3… per answer (lib/ai/citations.ts).
+ */
+export const CALENDAR_FIRST_NUMBER = 101;
+
+/** CALENDAR_FIRST_NUMBER, or right after the passages if they ever reach it. */
+export function calendarFirstNumber(passageCount: number): number {
+  return Math.max(CALENDAR_FIRST_NUMBER, passageCount + 1);
+}
+
 export interface ChatTurn {
   searchQuery: string;
   systemPrompt: string;
   /** Citable passages, in [N] order — sources[N-1] is what [N] opens. */
   sources: ChatSource[];
   /**
-   * Every calendar entry, numbered after the passages (sources.length + 1…).
+   * Every calendar entry, numbered from CALENDAR_FIRST_NUMBER (after the
+   * passages).
    * Only the ones an answer cites are sent to the parent — see
    * citedEventSources.
    */
@@ -148,7 +164,8 @@ export async function prepareChatTurn({
   const searchQuery = await rewriteQueryWithContext(
     providerMessages,
     providerQuestion,
-    resolvedChildren
+    resolvedChildren,
+    timer
   );
   rewritten();
   timer.note("queryRewritten", searchQuery !== providerQuestion);
@@ -245,7 +262,7 @@ export async function prepareChatTurn({
   // events are collapsed from their one-row-per-day storage into single dated
   // entries first, so a recess is one number rather than ten.
   const calendar = groupEventOccurrences(events);
-  const firstEventNumber = passages.length + 1;
+  const firstEventNumber = calendarFirstNumber(passages.length);
   const eventSources = calendar.map((entry, i) =>
     eventSource(entry, firstEventNumber + i, formatEventLine(entry))
   );
@@ -316,8 +333,8 @@ const MODEL_PART_TYPES = new Set([
   "step-start",
 ]);
 
-// Inline citations, current ([3]) and legacy ([Source 3]) forms.
-const CITATION_MARKER_RE = /\s?\[(?:Source\s+)?\d+\]/gi;
+// Inline [3] citations; variants ([Source 3], [3, 4]) are normalized first.
+const CITATION_MARKER_RE = /\s?\[\d+\]/g;
 
 /**
  * Remove [N] citations from a past answer. Sources are renumbered every turn,
@@ -325,7 +342,7 @@ const CITATION_MARKER_RE = /\s?\[(?:Source\s+)?\d+\]/gi;
  * that copies it links the fact to whatever document is [2] now.
  */
 export function stripCitationMarkers(text: string): string {
-  return text.replace(CITATION_MARKER_RE, "");
+  return normalizeCitationMarkers(text).replace(CITATION_MARKER_RE, "");
 }
 
 /**

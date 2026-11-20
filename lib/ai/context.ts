@@ -49,6 +49,10 @@ export async function fetchEventsForContext(
     )
     .eq("school_id", schoolId)
     .order("date", { ascending: false })
+    // A total order, so the calendar block (and its numbers) is identical on
+    // every request until the calendar itself changes — the prompt cache
+    // depends on it (lib/ai/system-prompt.ts).
+    .order("id", { ascending: false })
     .limit(MAX_CALENDAR_EVENTS);
 
   if (error) {
@@ -235,8 +239,8 @@ export function formatEventLine(e: CalendarEntry): string {
 
 /**
  * Format events as a text block for the system prompt, each entry numbered as
- * a citable source starting at `firstNumber` — documents take 1..N, so the
- * calendar continues the same sequence. Entries are grouped first
+ * a citable source starting at `firstNumber` — documents take 1..N and the
+ * calendar a fixed range after them (CALENDAR_FIRST_NUMBER). Entries are grouped first
  * (groupEventOccurrences), so a two-week recess is one number, not ten; the
  * citation rules ask for one entry per fact. What the parent sees is
  * renumbered per answer (lib/ai/citations.ts), so large numbers here never
