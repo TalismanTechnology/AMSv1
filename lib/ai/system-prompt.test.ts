@@ -158,9 +158,9 @@ test("a prompt without documents or children keeps the reference-material note",
   assert.doesNotMatch(buildSystemPrompt([], {}), /Everything inside these tags/);
 });
 
-test("no-deliberation calls use thinkingLevel minimal on Gemini 3, thinkingBudget 0 before", () => {
+test("no-deliberation calls use thinkingLevel low on Gemini 3 (3.8-flash rejects minimal), thinkingBudget 0 before", () => {
   assert.deepEqual(minimalThinkingOptions("gemini-3.8-flash"), {
-    google: { thinkingConfig: { thinkingLevel: "minimal" } },
+    google: { thinkingConfig: { thinkingLevel: "low" } },
   });
   assert.deepEqual(minimalThinkingOptions("gemini-2.5-flash"), {
     google: { thinkingConfig: { thinkingBudget: 0 } },
