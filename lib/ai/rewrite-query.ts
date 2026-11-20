@@ -1,9 +1,10 @@
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
-import { TEXT_MODEL_ID } from "@/lib/ai/models";
+import { TEXT_MODEL_ID, minimalThinkingOptions } from "@/lib/ai/models";
 import { reportAiFailure } from "@/lib/alerts/ai-failure-alert";
 import { labelChildren } from "./child-privacy";
 import type { ChildContext } from "./context";
+import type { StageTimer } from "./timing";
 
 interface ChatMessage {
   role: string;
@@ -72,7 +73,9 @@ export function shouldRewriteQuery(
 export async function rewriteQueryWithContext(
   messages: ChatMessage[],
   lastMessageText: string,
-  children: ChildContext[] = []
+  children: ChildContext[] = [],
+  /** Notes the rewrite's thinking-token count on the chat-timing line. */
+  timer?: StageTimer
 ): Promise<string> {
   if (!shouldRewriteQuery(messages, lastMessageText)) {
     return lastMessageText;
@@ -106,7 +109,7 @@ export async function rewriteQueryWithContext(
       : "";
 
   try {
-    const { text, finishReason } = await generateText({
+    const { text, finishReason, usage } = await generateText({
       model: google(TEXT_MODEL_ID),
       prompt: `Rewrite the follow-up question as a standalone search query for a school document search.
 
@@ -123,15 +126,20 @@ ${childrenBlock}
 Follow-up: ${lastMessageText}
 
 Standalone query:`,
-      maxOutputTokens: 150,
-      temperature: 0,
       // Gemini's thinking models charge thinking tokens against maxOutputTokens. Left on,
-      // reasoning consumed ~140 of the 150 and the rewrite was cut off
+      // reasoning consumed ~140 of 150 and the rewrite was cut off
       // mid-phrase ("What time does Mia,") — which then became the search
-      // query. Rewriting one sentence needs no deliberation.
-      providerOptions: { google: { thinkingConfig: { thinkingBudget: 0 } } },
+      // query. Rewriting one sentence needs no deliberation, and the rewrite
+      // sits in front of retrieval (1.2–1.9 s in production with the legacy
+      // thinkingBudget: 0, which Gemini 3 models don't treat as "off"), so
+      // think at the model's lowest level. The cap leaves room for the few
+      // thinking tokens "minimal" may still spend; a query is ~20 tokens.
+      maxOutputTokens: 256,
+      temperature: 0,
+      providerOptions: minimalThinkingOptions(TEXT_MODEL_ID),
     });
 
+    timer?.note("rewriteReasoningTokens", usage.outputTokenDetails?.reasoningTokens ?? null);
     const rewritten = text.trim();
     // Truncated output is worse than no rewrite at all.
     if (finishReason === "length") return lastMessageText;

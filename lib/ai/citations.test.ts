@@ -20,8 +20,10 @@ import {
   eventSource,
   eventSourceHref,
   formatEventWhen,
+  normalizeCitationMarkers,
   renumberCitations,
 } from "./citations";
+import { completePartialMarkdown } from "@/lib/markdown/normalize";
 import { formatEventsContext, type CalendarEntry } from "./context";
 import { buildSystemPrompt } from "./system-prompt";
 
@@ -401,4 +403,76 @@ test("the prompt makes the calendar citable", () => {
   assert.match(prompt, /CITATIONS/);
   assert.match(prompt, /<calendar>/);
   assert.doesNotMatch(prompt, /Never cite the calendar/);
+});
+
+// ── Citation variants and display numbering ─────────────────────────────────
+
+test("citation variants become plain [N] markers", () => {
+  assert.equal(normalizeCitationMarkers("Coffee [Source 90]."), "Coffee [90].");
+  assert.equal(normalizeCitationMarkers("Night [Source 12][Source 91]."), "Night [12][91].");
+  assert.equal(normalizeCitationMarkers("Both [Sources 12, 91]."), "Both [12][91].");
+  assert.equal(normalizeCitationMarkers("Both [12, 91]."), "Both [12][91].");
+  assert.equal(normalizeCitationMarkers("Both [12; 91]."), "Both [12][91].");
+  assert.equal(normalizeCitationMarkers("Both [Source 12, Source 91]."), "Both [12][91].");
+  assert.equal(normalizeCitationMarkers("Three [1, 2, and 3]."), "Three [1][2][3].");
+  assert.equal(normalizeCitationMarkers("Paged [Source 4 | p. 12]."), "Paged [4].");
+  assert.equal(normalizeCitationMarkers("lower [source 4]"), "lower [4]");
+  // Plain markers, links and other brackets are untouched.
+  assert.equal(normalizeCitationMarkers("Plain [3][4]."), "Plain [3][4].");
+  assert.equal(normalizeCitationMarkers("[the form](https://x.org/1) [note]"), "[the form](https://x.org/1) [note]");
+  assert.equal(normalizeCitationMarkers("Grades [K-5] and [Sources]"), "Grades [K-5] and [Sources]");
+});
+
+test("[Source N] answers renumber and resolve their calendar entries", () => {
+  // The shape of a production answer (Nov 19 2026): documents 1..12 and the
+  // calendar cited in the [Source N] form, which nothing recognised before.
+  const docs = Array.from({ length: 12 }, (_, i) => source(i + 1, `doc${i + 1}`, 1));
+  const events = [entry("coffee", { title: "Grade 8 PA Parent Coffee" }), entry("night", { title: "Transition Night" })].map(
+    (e, i) => eventSource(e, 101 + i, "")
+  );
+  const raw =
+    "Coffee on Dec 3 [Source 101]. Transition Night [Source 12][Source 102]. Wraps up 6:45 [Source 12].";
+
+  const cited = citedEventSources(raw, events);
+  assert.deepEqual(cited.map((s) => s.document_id), ["coffee", "night"]);
+
+  const out = renumberCitations(raw, [...docs, ...cited]);
+  assert.equal(out.content, "Coffee on Dec 3 [1]. Transition Night [2][3]. Wraps up 6:45 [2].");
+  assert.deepEqual(
+    out.sources.slice(0, 3).map((s) => [s.source_number, s.document_id]),
+    [[1, "coffee"], [2, "doc12"], [3, "night"]]
+  );
+  assert.equal(stripCitationMarkers(raw), "Coffee on Dec 3. Transition Night. Wraps up 6:45.");
+});
+
+test("high calendar numbers mixed with documents show as 1, 2, 3 with matching sources", () => {
+  // As the client receives them: the passages first, then each cited
+  // calendar entry as its own data-sources part, concatenated.
+  const docs = [source(1, "Calendar Details", 1), source(2, "Handbook", 4)];
+  const events = Array.from({ length: 60 }, (_, i) => eventSource(entry(`ev${i}`), 101 + i, ""));
+  const raw = "Break starts [138]. Dress code [2]. Classes resume [142], see also [1, 138].";
+  const received = [...docs, ...citedEventSources(raw, events)];
+
+  const out = renumberCitations(raw, received);
+
+  assert.equal(out.content, "Break starts [1]. Dress code [2]. Classes resume [3], see also [4][1].");
+  assert.deepEqual(citedNumbersInOrder(out.content), [1, 2, 3, 4]);
+  assert.deepEqual(
+    out.sources.map((s) => [s.source_number, s.document_id]),
+    [[1, "ev37"], [2, "Handbook"], [3, "ev41"], [4, "Calendar Details"]]
+  );
+  // Renumbering is idempotent: rendering a saved answer again changes nothing.
+  assert.deepEqual(renumberCitations(out.content, out.sources), out);
+});
+
+test("a citation variant still arriving is hidden while streaming", () => {
+  assert.equal(completePartialMarkdown("Coffee [Sources 12, 1"), "Coffee ");
+  assert.equal(completePartialMarkdown("Coffee [12, "), "Coffee ");
+  assert.equal(completePartialMarkdown("Coffee [Source"), "Coffee ");
+});
+
+test("the prompt asks for bare [N] citations at every thinking level", () => {
+  const prompt = buildSystemPrompt([], { eventsContext: formatEventsContext([entry("a")], 101) });
+  assert.match(prompt, /Never write the word "Source" in a citation/);
+  assert.match(prompt, /not \[Source 12\], not \[12, 14\]/);
 });

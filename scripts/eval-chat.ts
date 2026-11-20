@@ -21,9 +21,11 @@
  *     --rejudge eval-results/baseline-….json   # re-grade saved answers
  *
  * Answers use the production routing (lib/ai/question-complexity.ts): a
- * simple question gets the low thinking level (CHAT_SIMPLE_THINKING_LEVEL,
- * CHAT_SIMPLE_MODEL apply as in prod). --no-routing answers every question
- * with the default call, for a side-by-side.
+ * simple question gets the low thinking level, a complex one medium
+ * (CHAT_SIMPLE_THINKING_LEVEL, CHAT_SIMPLE_MODEL, CHAT_COMPLEX_THINKING_LEVEL
+ * apply as in prod). --no-routing answers every question as "complex", for a
+ * side-by-side; add CHAT_COMPLEX_THINKING_LEVEL=default for the provider's
+ * default thinking (the call before Nov 2026).
  *
  * Results are written to eval-results/<label>-<timestamp>.json.
  */
@@ -281,7 +283,7 @@ function report(results: CaseResult[], runs: number) {
     if (r.judge && !r.judge.correct) failed.push("judge:incorrect");
     if (r.judge && !r.judge.grounded) failed.push("judge:ungrounded");
     const tag = r.pass ? "PASS" : r.judge || failed.length > 0 ? "FAIL" : "????";
-    const routed = r.complexity === "simple" ? `  (simple, thinking ${r.thinkingLevel})` : "";
+    const routed = r.complexity ? `  (${r.complexity}, thinking ${r.thinkingLevel ?? "default"})` : "";
     console.log(`${tag}  ${r.id}${runs > 1 ? ` #${r.run + 1}` : ""}${routed}${failed.length ? `  [${failed.join(", ")}]` : ""}`);
     if (r.error) console.log(`      error: ${r.error}`);
     for (const m of r.citationMismatches ?? []) {

@@ -47,6 +47,27 @@ import {
 const inBackground = (task: PromiseLike<unknown>) => after(Promise.resolve(task));
 
 /**
+ * A session's latest stored messages, newest first. Service-role read: only
+ * use the result once the session is known to be the caller's
+ * (claimParentSession).
+ */
+async function loadStoredHistory(
+  admin: ReturnType<typeof createAdminClient>,
+  sessionId: string
+): Promise<StoredMessage[]> {
+  const { data, error } = await admin
+    .from("chat_messages")
+    .select("id, role, content, created_at")
+    .eq("session_id", sessionId)
+    .order("created_at", { ascending: false })
+    // One extra: a retried question's stored copy, or an assistant
+    // reply whose question fell outside the limit, is dropped.
+    .limit(MAX_HISTORY_MESSAGES + 1);
+  if (error) throw new Error(error.message);
+  return (data ?? []) as StoredMessage[];
+}
+
+/**
  * Calendar entries are numbered in the prompt but only the ones the answer
  * cites are sent: each as its own data-sources part (the client concatenates
  * them), written just before the text that first cites it so its marker
@@ -215,6 +236,17 @@ export async function POST(request: NextRequest) {
     // mid-request). Otherwise — a new chat (null), or one deleted, hidden,
     // expired or not theirs — a new session is created below, once the
     // question is ready to be saved. Never another existing session.
+    //
+    // The named session's latest messages are read alongside the claim
+    // rather than after it (one cross-region round trip less on every
+    // follow-up). Like the children above, the rows stay on our server and
+    // are used only if the claim succeeds — the claim is what proves the
+    // session is this parent's; otherwise they are dropped unread.
+    const storedHistory = requestedSessionId
+      ? loadStoredHistory(adminSupabase, requestedSessionId)
+      : null;
+    storedHistory?.catch(() => {});
+    if (storedHistory) timer.observe("historyLoad", storedHistory);
     const claimed = timer.start("sessionClaim");
     const claimedSessionId = requestedSessionId
       ? await claimParentSession(adminSupabase, user.id, schoolId, requestedSessionId)
@@ -242,20 +274,10 @@ export async function POST(request: NextRequest) {
     // question — never the history the client sent, which may hold deleted
     // (or invented) turns. Read before this turn is saved.
     let storedRows: StoredMessage[] = [];
-    const historyLoaded = timer.start("historyLoad");
-    if (claimedSessionId) {
-      const { data, error: storedError } = await adminSupabase
-        .from("chat_messages")
-        .select("id, role, content, created_at")
-        .eq("session_id", claimedSessionId)
-        .order("created_at", { ascending: false })
-        // One extra: a retried question's stored copy, or an assistant
-        // reply whose question fell outside the limit, is dropped.
-        .limit(MAX_HISTORY_MESSAGES + 1);
-      if (storedError) throw new Error(storedError.message);
-      storedRows = (data ?? []) as StoredMessage[];
-    }
-    historyLoaded();
+    const historyWaited = timer.start("historyWait");
+    // claimedSessionId is only ever the requested id, so storedHistory is set.
+    if (claimedSessionId && storedHistory) storedRows = await storedHistory;
+    historyWaited();
     const contextMessages = buildModelHistory(storedRows, lastMessage);
     timer.note(
       "firstQuestion",
@@ -507,8 +529,8 @@ export async function POST(request: NextRequest) {
       sessionId,
       messageId: assistantMessageId,
       // Routing (lib/ai/question-complexity.ts): a simple question gets a low
-      // thinking level; a complex one passes no provider options, so the
-      // provider's defaults (thinking included) apply.
+      // thinking level, a complex one medium (CHAT_COMPLEX_THINKING_LEVEL;
+      // "default" = no provider options, thinkingLevel null).
       complexity: routing.complexity,
       thinkingLevel: routing.thinkingLevel,
       model: routing.modelId,
@@ -516,6 +538,9 @@ export async function POST(request: NextRequest) {
       sources: sources.length,
       eventSources: eventSources.length,
       contactCard: !!contactCard,
+      // Size of the system prompt, to watch alongside cacheReadTokens.
+      systemPromptChars: answerSystemPrompt.length,
+      region: process.env.VERCEL_REGION ?? null,
     };
     timer.mark("streamStart");
     const result = streamText({

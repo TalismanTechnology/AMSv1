@@ -1,6 +1,6 @@
 import { generateObject } from "ai";
 import { google } from "@ai-sdk/google";
-import { TEXT_MODEL_ID } from "@/lib/ai/models";
+import { TEXT_MODEL_ID, minimalThinkingOptions } from "@/lib/ai/models";
 import { z } from "zod";
 import { reportAiFailure } from "@/lib/alerts/ai-failure-alert";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -78,7 +78,7 @@ export async function classifyContactTopic(
       temperature: 0,
       maxRetries: 1,
       abortSignal: AbortSignal.timeout(CLASSIFY_TIMEOUT_MS),
-      providerOptions: { google: { thinkingConfig: { thinkingBudget: 0 } } },
+      providerOptions: minimalThinkingOptions(TEXT_MODEL_ID),
       prompt: `A parent asked their child's school assistant the question below. Which school staff department should handle it?
 
 Topics:

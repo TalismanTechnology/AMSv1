@@ -238,9 +238,10 @@ export function normalizeMarkdown(text: string): string {
 
 const FOLLOW_UP_MARKER = "---FOLLOW_UPS---";
 
-// A trailing "[", "[1", "[Sour", "[Source 1" — a citation that is still
-// arriving. Hidden until it is complete so it doesn't flash as text.
-const PARTIAL_CITATION_RE = /\[(?:S(?:o(?:u(?:r(?:c(?:e)?)?)?)?)?)?\s*\d*$/i;
+// A trailing "[", "[1", "[Sour", "[Source 1", "[Sources 12, 1", "[12, " — a
+// citation that is still arriving. Hidden until it is complete so it doesn't
+// flash as text.
+const PARTIAL_CITATION_RE = /\[(?:S(?:o(?:u(?:r(?:c(?:es?)?)?)?)?)?)?[\s\d,;]*$/i;
 
 /**
  * Close or hide unfinished markdown at the end of a streaming answer, so a
