@@ -131,10 +131,9 @@ Standalone query:`,
       // mid-phrase ("What time does Mia,") — which then became the search
       // query. Rewriting one sentence needs no deliberation, and the rewrite
       // sits in front of retrieval (1.2–1.9 s in production with the legacy
-      // thinkingBudget: 0, which Gemini 3 models don't treat as "off"), so
-      // think at a low level ("minimal" is rejected by gemini-3.8-flash). The
-      // cap leaves room for the few thinking tokens "low" may still spend; a
-      // query is ~20 tokens. Any error falls back to the raw question below.
+      // thinkingBudget: 0; "minimal" is rejected by gemini-3.8-flash and "low"
+      // took ~3.5 s), so keep budget 0 (minimalThinkingOptions). The cap leaves
+      // room for any thinking tokens; a query is ~20 tokens. Any error falls back to the raw question below.
       maxOutputTokens: 256,
       temperature: 0,
       providerOptions: minimalThinkingOptions(TEXT_MODEL_ID),

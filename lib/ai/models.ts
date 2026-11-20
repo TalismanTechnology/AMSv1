@@ -10,16 +10,13 @@ export const TEXT_MODEL_ID = process.env.GEMINI_TEXT_MODEL?.trim() || DEFAULT_TE
 
 /**
  * Provider options for a call that needs no deliberation (a one-line rewrite,
- * a label). Gemini 3 models control thinking with `thinkingLevel` — a legacy
- * `thinkingBudget: 0` is not a documented "off" for them. Use "low", not
- * "minimal": gemini-3.8-flash rejects MINIMAL with HTTP 400 ("Thinking level
- * MINIMAL is not supported for this model"), and "low" is what the answer
- * path already uses for simple questions (0 reasoning tokens in practice).
- * Older models (gemini-2.x, if GEMINI_TEXT_MODEL points
- * at one) keep `thinkingBudget: 0`. Never both: the API rejects that.
+ * a label): `thinkingBudget: 0`, on every model. This is what these calls
+ * used for months in production. Don't switch to `thinkingLevel` here:
+ * gemini-3.8-flash rejects "minimal" with HTTP 400 ("Thinking level MINIMAL
+ * is not supported for this model"), and "low" still spent ~245 reasoning
+ * tokens and ~3.5 s on a one-line rewrite (vs 1.2–1.9 s with budget 0).
  */
-export function minimalThinkingOptions(modelId: string = TEXT_MODEL_ID) {
-  return /^gemini-[3-9]/i.test(modelId.trim())
-    ? { google: { thinkingConfig: { thinkingLevel: "low" as const } } }
-    : { google: { thinkingConfig: { thinkingBudget: 0 } } };
+export function minimalThinkingOptions(_modelId: string = TEXT_MODEL_ID) {
+  void _modelId;
+  return { google: { thinkingConfig: { thinkingBudget: 0 } } };
 }
