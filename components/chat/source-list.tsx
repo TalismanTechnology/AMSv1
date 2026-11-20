@@ -1,6 +1,7 @@
 "use client";
 
 import { BadgeCheck, CalendarDays, CalendarPlus, FileText, Globe } from "lucide-react";
+import { IconBadge } from "./icon-badge";
 import { useSourcePanel } from "./source-panel-context";
 import { AddToCalendarMenu } from "@/components/shared/add-to-calendar";
 import { groupSources } from "@/lib/source-groups";
@@ -34,15 +35,17 @@ export function SourceList({
             onClick={() => openSource(group.passages[0])}
             className="flex min-w-0 flex-1 items-center gap-2 text-left focus:outline-none focus-visible:underline"
           >
-            {group.passages[0].source_type === "clarification" ? (
-              <BadgeCheck className="size-3.5 shrink-0" />
-            ) : group.isEvent ? (
-              <CalendarDays className="size-3.5 shrink-0" aria-label="Calendar event" />
-            ) : group.isWebsite ? (
-              <Globe className="size-3.5 shrink-0" />
-            ) : (
-              <FileText className="size-3.5 shrink-0" />
-            )}
+            <IconBadge className="group-hover:bg-brand-badge-strong">
+              {group.passages[0].source_type === "clarification" ? (
+                <BadgeCheck className="size-3" />
+              ) : group.isEvent ? (
+                <CalendarDays className="size-3" aria-label="Calendar event" />
+              ) : group.isWebsite ? (
+                <Globe className="size-3" />
+              ) : (
+                <FileText className="size-3" />
+              )}
+            </IconBadge>
             <span className={`truncate ${group.isCited ? "text-ink-soft" : ""}`}>
               {group.title}
             </span>
@@ -89,9 +92,11 @@ function EventCalendarButton({ source }: { source: ChatSource }) {
       <button
         type="button"
         aria-label={`Add ${source.title} to calendar`}
-        className="inline-flex size-6 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-primary/10 hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+        className="group/cal inline-flex size-6 shrink-0 items-center justify-center rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 data-[state=open]:bg-primary/10"
       >
-        <CalendarPlus className="size-3.5" />
+        <IconBadge className="group-hover/cal:bg-brand-badge-strong">
+          <CalendarPlus className="size-3" />
+        </IconBadge>
       </button>
     </AddToCalendarMenu>
   );
@@ -117,17 +122,17 @@ function PassageChip({
       onClick={onClick}
       aria-label={`Open ${passage.title}${label ? ` at ${label}` : ""}`}
       aria-pressed={active}
-      className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[0.7rem] leading-none tabular-nums transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${
+      className={`inline-flex items-center gap-1 rounded-md border border-transparent brand-badge px-1.5 py-0.5 text-[0.7rem] leading-none tabular-nums transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-1 ${
         active
-          ? "border-primary/50 bg-primary/15 text-ink"
-          : "border-border bg-background hover:border-primary/40 hover:bg-primary/10 hover:text-ink"
+          ? "bg-brand-badge-strong ring-2 ring-brand-badge ring-offset-1 ring-offset-background"
+          : "hover:bg-brand-badge-strong"
       }`}
     >
       {showNumber && passage.source_number != null && (
         <span className="font-medium">{passage.source_number}</span>
       )}
       {showNumber && passage.source_number != null && label && (
-        <span aria-hidden className="opacity-50">·</span>
+        <span aria-hidden className="opacity-70">·</span>
       )}
       {label && <span>{label}</span>}
     </button>

@@ -5,6 +5,11 @@ import { ThumbsUp, ThumbsDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { clearFeedback, submitFeedback } from "@/actions/feedback";
 import { cn } from "@/lib/utils";
+import { IconBadge } from "./icon-badge";
+
+// Selected: darker forest fill, a brand-green ring and a filled glyph.
+const SELECTED = "bg-brand-badge-strong ring-2 ring-brand-badge ring-offset-1 ring-offset-background";
+const UNSELECTED = "group-hover:bg-brand-badge-strong";
 
 interface MessageFeedbackProps {
   messageId: string;
@@ -35,33 +40,29 @@ export function MessageFeedback({ messageId, schoolId }: MessageFeedbackProps) {
       <Button
         variant="ghost"
         size="icon"
-        className={cn(
-          "h-7 w-7 rounded-md transition-colors",
-          rating === "up"
-            ? "text-ink"
-            : "text-muted-foreground/50 hover:bg-secondary hover:text-ink"
-        )}
+        className="group h-7 w-7 rounded-md transition-colors"
         onClick={() => handleRate("up")}
         disabled={submitting}
         aria-label="Helpful"
+        aria-pressed={rating === "up"}
       >
-        <ThumbsUp className="h-3.5 w-3.5" />
+        <IconBadge className={rating === "up" ? SELECTED : UNSELECTED}>
+          <ThumbsUp className={cn("size-3", rating === "up" && "fill-current")} />
+        </IconBadge>
       </Button>
       <Button
         variant="ghost"
         size="icon"
-        className={cn(
-          "h-7 w-7 rounded-md transition-colors",
-          rating === "down"
-            ? "text-destructive"
-            : "text-muted-foreground/50 hover:bg-secondary hover:text-ink"
-        )}
+        className="group h-7 w-7 rounded-md transition-colors"
         onClick={() => handleRate("down")}
         disabled={submitting}
         aria-label="Not helpful"
+        aria-pressed={rating === "down"}
         title="Not helpful — lets your school see this question and answer so they can improve"
       >
-        <ThumbsDown className="h-3.5 w-3.5" />
+        <IconBadge className={rating === "down" ? SELECTED : UNSELECTED}>
+          <ThumbsDown className={cn("size-3", rating === "down" && "fill-current")} />
+        </IconBadge>
       </Button>
     </div>
   );
