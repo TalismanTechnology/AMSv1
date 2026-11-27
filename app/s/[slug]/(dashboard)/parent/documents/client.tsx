@@ -31,7 +31,8 @@ import {
 } from "@/components/ui/collapsible";
 import { searchDocumentContent } from "@/actions/documents";
 import { LogoSpinner } from "@/components/logo-spinner";
-import { TimeAgo } from "@/components/ui/time-ago";
+import { LocalizedTimeAgo } from "@/components/parent/time-ago";
+import { useT } from "@/components/i18n/locale-provider";
 import {
   CategorySelectItems,
   useCategoryLabels,
@@ -84,6 +85,7 @@ export function ParentDocumentsClient({
   schoolId,
 }: ParentDocumentsClientProps) {
   const categoryLabels = useCategoryLabels(categories, divisions);
+  const t = useT();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchMode, setSearchMode] = useState<"title" | "content">("title");
   const [contentResults, setContentResults] = useState<ContentSearchResult[]>([]);
@@ -184,10 +186,10 @@ export function ParentDocumentsClient({
     <div className="mx-auto max-w-4xl px-4 pb-12 pt-6 md:px-8 md:pb-16 md:pt-12">
       <header className="mb-6 md:mb-8">
         <h1 className="text-2xl font-semibold tracking-[-0.01em] text-ink">
-          Documents
+          {t("parent.documents.title")}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Browse school documents and resources.
+          {t("parent.documents.subtitle")}
         </p>
       </header>
 
@@ -198,8 +200,8 @@ export function ParentDocumentsClient({
           <Input
             placeholder={
               searchMode === "title"
-                ? "Search by title..."
-                : "Search document content..."
+                ? t("parent.documents.searchTitle")
+                : t("parent.documents.searchContent")
             }
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -211,8 +213,8 @@ export function ParentDocumentsClient({
             className="absolute right-1 top-1/2 -translate-y-1/2 h-8 text-xs px-2 sm:h-7"
             aria-label={
               searchMode === "title"
-                ? "Switch to searching document content"
-                : "Switch to searching titles"
+                ? t("parent.documents.switchToContent")
+                : t("parent.documents.switchToTitle")
             }
             onClick={() => {
               // Leaving content mode drops its results.
@@ -221,17 +223,19 @@ export function ParentDocumentsClient({
             }}
           >
             <FileSearch className="mr-1 h-3 w-3" />
-            {searchMode === "title" ? "Content" : "Title"}
+            {searchMode === "title"
+              ? t("parent.documents.modeContent")
+              : t("parent.documents.modeTitle")}
           </Button>
         </div>
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
           <SelectTrigger className="min-w-0 flex-1 data-[size=default]:h-10 sm:w-[180px] sm:flex-none sm:data-[size=default]:h-9">
-            <SelectValue placeholder="Category">
+            <SelectValue placeholder={t("parent.documents.category")}>
               {categoryLabels.get(categoryFilter)}
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Categories</SelectItem>
+            <SelectItem value="all">{t("parent.documents.allCategories")}</SelectItem>
             <CategorySelectItems categories={categories} divisions={divisions} />
           </SelectContent>
         </Select>
@@ -245,7 +249,7 @@ export function ParentDocumentsClient({
             }}
           >
             <X className="mr-1 h-3.5 w-3.5" />
-            Clear
+            {t("parent.documents.clear")}
           </Button>
         )}
       </div>
@@ -256,12 +260,17 @@ export function ParentDocumentsClient({
           {isSearchingContent ? (
             <p className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
               <LogoSpinner size={14} />
-              Searching content…
+              {t("parent.documents.searching")}
             </p>
           ) : contentResults.length > 0 ? (
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground">
-                {contentResults.length} content match{contentResults.length !== 1 && "es"}
+                {t(
+                  contentResults.length === 1
+                    ? "parent.documents.contentMatchOne"
+                    : "parent.documents.contentMatchOther",
+                  { count: contentResults.length }
+                )}
               </p>
               {contentResults.map((r, i) => (
                 <div
@@ -275,7 +284,7 @@ export function ParentDocumentsClient({
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-medium text-ink">{r.document_title}</p>
                     <Badge variant="secondary" className="text-xs">
-                      Section {r.chunk_index + 1}
+                      {t("parent.documents.section", { number: r.chunk_index + 1 })}
                     </Badge>
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
@@ -285,7 +294,7 @@ export function ParentDocumentsClient({
               ))}
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">No content matches found.</p>
+            <p className="text-sm text-muted-foreground">{t("parent.documents.noContentMatches")}</p>
           )}
         </div>
       )}
@@ -293,11 +302,11 @@ export function ParentDocumentsClient({
       {filteredDocs.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <FileText className="mb-3 h-6 w-6 text-muted-foreground" />
-          <h3 className="text-base font-semibold text-ink">No documents found</h3>
+          <h3 className="text-base font-semibold text-ink">{t("parent.documents.empty")}</h3>
           <p className="mt-1 text-sm text-muted-foreground">
             {hasActiveFilters
-              ? "Try adjusting your search or filters."
-              : "Check back later for school documents."}
+              ? t("parent.documents.emptyFiltered")
+              : t("parent.documents.emptyNone")}
           </p>
         </div>
       ) : (
@@ -325,7 +334,7 @@ export function ParentDocumentsClient({
                     )}
                   </span>
                   <span className="text-sm font-medium tracking-[-0.01em] text-ink">
-                    {group.name}
+                    {group.id === "_general" ? t("parent.documents.general") : group.name}
                   </span>
                   <Badge
                     variant="secondary"
@@ -377,7 +386,7 @@ export function ParentDocumentsClient({
                                   </Badge>
                                 )}
                                 <span className="text-[10px] text-muted-foreground">
-                                  <TimeAgo date={doc.created_at} />
+                                  <LocalizedTimeAgo date={doc.created_at} />
                                 </span>
                               </div>
                             </div>

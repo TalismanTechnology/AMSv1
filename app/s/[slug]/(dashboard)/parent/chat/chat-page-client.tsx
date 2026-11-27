@@ -4,8 +4,10 @@ import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { ChatInterface } from "@/components/chat/chat-interface";
 import {
   ChatHistorySidebar,
+  localizedChatTitle,
   type ChatHistoryPanelProps,
 } from "@/components/chat/chat-history-sidebar";
+import { useT } from "@/components/i18n/locale-provider";
 import { usePublishChatHistoryPanel } from "@/components/parent/chat-history-bridge";
 import { MagicBentoCard } from "@/components/magic-bento";
 import { Button } from "@/components/ui/button";
@@ -20,7 +22,6 @@ import {
   applyLoadedMessages,
   bindCreatedSession,
   canMountChat,
-  chatDisplayTitle,
   loadedChatView,
   newChatView,
   openChatView,
@@ -53,6 +54,7 @@ export function ChatPageClient({
   heading,
   aiConsentGiven,
 }: ChatPageClientProps) {
+  const t = useT();
   const [view, setView] = useState<ChatView<ChatMessage>>(() =>
     openChat ? loadedChatView(openChat.session.id, openChat.messages) : newChatView()
   );
@@ -71,7 +73,7 @@ export function ChatPageClient({
     if (!loadingId) return;
     let cancelled = false;
     getChatMessages(loadingId, schoolId)
-      .catch(() => ({ error: "Please try again.", messages: [] }))
+      .catch(() => ({ error: t("chat.pleaseTryAgain"), messages: [] }))
       .then((result) => {
         if (!cancelled) {
           setView((v) =>
@@ -85,7 +87,7 @@ export function ChatPageClient({
     return () => {
       cancelled = true;
     };
-  }, [loadingId, schoolId]);
+  }, [loadingId, schoolId, t]);
 
   // Keep ?chat= in step so a reload reopens the same chat (or a new one).
   useEffect(() => {
@@ -117,20 +119,20 @@ export function ChatPageClient({
     async (sessionId: string, title: string) => {
       const result = await renameChatSession(sessionId, schoolId, title).catch(() => null);
       if (!result || "error" in result) {
-        return result?.error ?? "Couldn't rename the chat. Please try again.";
+        return result?.error ?? t("chat.renameFailed");
       }
       setSessions((list) =>
         list.map((s) => (s.id === sessionId ? { ...s, title: result.title } : s))
       );
       return null;
     },
-    [schoolId]
+    [schoolId, t]
   );
 
   const handleDelete = useCallback(
     async (sessionId: string) => {
       const result = await deleteChatSession(sessionId, schoolId).catch(() => ({
-        error: "Couldn't delete the chat. Please try again.",
+        error: t("chat.deleteFailed"),
       }));
       if ("error" in result && result.error) return result.error;
       setSessions((list) => list.filter((s) => s.id !== sessionId));
@@ -138,7 +140,7 @@ export function ChatPageClient({
       setView((v) => (v.sessionId === sessionId ? newChatView(key) : v));
       return null;
     },
-    [schoolId]
+    [schoolId, t]
   );
 
   // The server reported the session the chat mounted as `key` wrote into (a
@@ -195,7 +197,7 @@ export function ChatPageClient({
             onSessionCreated={(sessionId) => handleSessionCreated(viewKey, sessionId)}
             onSend={handleSend}
             onNewChat={startNewChat}
-            heading={activeSession ? chatDisplayTitle(activeSession.title) : heading}
+            heading={activeSession ? localizedChatTitle(activeSession.title, t) : heading}
             suggestedQuestions={suggestedQuestions}
             welcomeMessage={welcomeMessage}
             schoolId={schoolId}
@@ -204,14 +206,14 @@ export function ChatPageClient({
         ) : view.error ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
             <p className="text-sm text-muted-foreground">
-              Couldn&apos;t load this chat. {view.error}
+              {t("chat.loadFailed", { error: view.error })}
             </p>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={handleRetry}>
-                Try again
+                {t("chat.tryAgain")}
               </Button>
               <Button size="sm" onClick={startNewChat}>
-                New chat
+                {t("chat.newChat")}
               </Button>
             </div>
           </div>

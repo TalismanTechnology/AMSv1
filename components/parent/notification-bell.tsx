@@ -14,7 +14,8 @@ import {
   markNotificationRead,
   markAllRead,
 } from "@/actions/notifications";
-import { TimeAgo } from "@/components/ui/time-ago";
+import { LocalizedTimeAgo } from "./time-ago";
+import { useT } from "@/components/i18n/locale-provider";
 import { cn } from "@/lib/utils";
 import { LogoSpinner } from "@/components/logo-spinner";
 import { useSchool } from "@/components/shared/school-context";
@@ -32,6 +33,7 @@ interface Notification {
 
 export function NotificationBell() {
   const { school } = useSchool();
+  const t = useT();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   // False until the first fetch lands, so the empty state doesn't flash.
   const [loaded, setLoaded] = useState(false);
@@ -85,7 +87,7 @@ export function NotificationBell() {
       <PopoverContent className="w-80 overflow-hidden rounded-xl border-border p-0" align="end">
         <div className="flex items-center justify-between border-b border-border bg-background px-4 py-3">
           <h4 className="text-sm font-semibold tracking-[-0.01em] text-ink">
-            Notifications
+            {t("parent.notifications.title")}
           </h4>
           {unreadCount > 0 && (
             <Button
@@ -95,19 +97,19 @@ export function NotificationBell() {
               onClick={handleMarkAllRead}
             >
               <Check className="mr-1 h-3 w-3" />
-              Mark all read
+              {t("parent.notifications.markAllRead")}
             </Button>
           )}
         </div>
         <ScrollArea className="max-h-80">
           {!loaded ? (
-            <div className="flex justify-center px-4 py-10" role="status" aria-label="Loading">
+            <div className="flex justify-center px-4 py-10" role="status" aria-label={t("parent.notifications.loading")}>
               <LogoSpinner className="text-muted-foreground" />
             </div>
           ) : notifications.length === 0 ? (
             <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
               <Bell className="h-5 w-5 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">No notifications yet</p>
+              <p className="text-sm text-muted-foreground">{t("parent.notifications.empty")}</p>
             </div>
           ) : (
             notifications.map((n) => (
@@ -137,7 +139,7 @@ export function NotificationBell() {
                       </p>
                     )}
                     <p className="mt-1 text-[11px] text-muted-foreground/60">
-                      <TimeAgo date={n.created_at} />
+                      <LocalizedTimeAgo date={n.created_at} />
                     </p>
                   </div>
                 </div>

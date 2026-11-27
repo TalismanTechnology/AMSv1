@@ -166,3 +166,45 @@ test("no-deliberation calls use thinkingBudget 0 on every model (3.8-flash rejec
     google: { thinkingConfig: { thinkingBudget: 0 } },
   });
 });
+
+test("a Spanish question adds the Spanish instructions at the end only", () => {
+  const options = {
+    eventsContext: formatEventsContext(calendar, CALENDAR_FIRST_NUMBER),
+    announcementsContext: announcements,
+    todayString: getTodayString(new Date("2026-11-19T15:00:00Z")),
+  };
+  const passages = [passage(1, "Classes begin at 8:30 AM.")];
+  const english = buildSystemPrompt(passages, options);
+  const defaulted = buildSystemPrompt(passages, { ...options, language: "en" });
+  const spanish = buildSystemPrompt(passages, { ...options, language: "es" });
+
+  // English is byte-for-byte what it was before Spanish existed.
+  assert.equal(defaulted, english);
+  assert.doesNotMatch(english, /SPANISH|Spanish|usted/);
+
+  // Spanish: the same prompt with the language section appended last, so the
+  // cached prefix (and every rule, citations included) is unchanged.
+  assert.ok(spanish.startsWith(english), "Spanish prompt extends the English one");
+  const tail = spanish.slice(english.length);
+  assert.match(tail, /^\n\nLANGUAGE: SPANISH/);
+  assert.match(tail, /in Spanish/);
+  assert.match(tail, /usted/);
+  assert.match(tail, /never state a fact the material doesn't contain/);
+  assert.match(tail, /names of people, places, buildings, rooms, programs/);
+  assert.match(tail, /dates, times, amounts/);
+  assert.match(tail, /\[1\] or \[1\]\[2\]/);
+  assert.match(tail, /---FOLLOW_UPS---/);
+  const stable = english.slice(0, english.indexOf("</announcements>"));
+  assert.ok(commonPrefix(english, spanish).length > stable.length);
+});
+
+test("an English question after Spanish ones is told to answer in English", () => {
+  const english = buildSystemPrompt([passage(1, "Pickup is at 3:15 PM.")], { hasHistory: true });
+  const switched = buildSystemPrompt([passage(1, "Pickup is at 3:15 PM.")], {
+    hasHistory: true,
+    switchedToEnglish: true,
+  });
+  assert.ok(switched.startsWith(english));
+  assert.match(switched.slice(english.length), /LANGUAGE: ENGLISH[\s\S]*Reply in English/);
+  assert.doesNotMatch(switched, /LANGUAGE: SPANISH/);
+});

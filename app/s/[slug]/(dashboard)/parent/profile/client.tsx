@@ -30,12 +30,22 @@ import { addChild, updateChild, removeChild } from "@/actions/children";
 import { toast } from "sonner";
 import {
   GRADES,
-  formatClassYear,
+  GRADE_VALUES,
   formatGrade,
   formatRollover,
   type Rollover,
 } from "@/lib/grades";
 import type { Profile, Child } from "@/lib/types";
+import { LanguageToggle } from "@/components/i18n/language-toggle";
+import { useLocale } from "@/components/i18n/locale-provider";
+import type { MessageKey, Translate } from "@/lib/i18n/translate";
+
+/** A stored grade ("8", "K") for display; legacy free text as written. */
+function gradeLabel(value: string, t: Translate): string {
+  return GRADE_VALUES.includes(value)
+    ? t(`parent.grade.${value}` as MessageKey)
+    : formatGrade(value);
+}
 
 interface ProfileClientProps {
   profile: Profile;
@@ -70,12 +80,22 @@ export function ProfileClient({
   const [savingChild, setSavingChild] = useState(false);
   const [deleteChildId, setDeleteChildId] = useState<string | null>(null);
   const [deletingChild, setDeletingChild] = useState(false);
+  const { locale, t } = useLocale();
+  const dateLocale = locale === "es" ? "es-US" : "en-US";
+  // "July 1" / "1 de julio" (any year: the rollover day exists every year).
+  const rolloverLabel =
+    locale === "es"
+      ? new Date(2025, gradeRollover.month - 1, gradeRollover.day).toLocaleDateString("es-US", {
+          month: "long",
+          day: "numeric",
+        })
+      : formatRollover(gradeRollover.month, gradeRollover.day);
 
   async function handleSaveName() {
     setSavingName(true);
     const result = await updateProfile({ full_name: fullName });
     if (result.error) toast.error(result.error);
-    else toast.success("Name updated");
+    else toast.success(t("parent.profile.nameUpdated"));
     setSavingName(false);
   }
 
@@ -104,7 +124,7 @@ export function ProfileClient({
       }, schoolId);
       if (result.error) toast.error(result.error);
       else {
-        toast.success("Child updated");
+        toast.success(t("parent.profile.childUpdated"));
         setChildDialogOpen(false);
       }
     } else {
@@ -115,7 +135,7 @@ export function ProfileClient({
       const result = await addChild(formData);
       if (result.error) toast.error(result.error);
       else {
-        toast.success("Child added");
+        toast.success(t("parent.profile.childAdded"));
         setChildDialogOpen(false);
       }
     }
@@ -127,7 +147,7 @@ export function ProfileClient({
     setDeletingChild(true);
     const result = await removeChild(deleteChildId, schoolId);
     if (result.error) toast.error(result.error);
-    else toast.success("Child removed");
+    else toast.success(t("parent.profile.childRemoved"));
     setDeletingChild(false);
     setDeleteChildId(null);
   }
@@ -136,10 +156,10 @@ export function ProfileClient({
     <div className="mx-auto max-w-2xl px-4 pb-12 pt-6 md:px-8 md:pb-16 md:pt-12">
       <header className="mb-10">
         <h1 className="text-2xl font-semibold tracking-[-0.01em] text-ink">
-          Profile
+          {t("parent.profile.title")}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Manage your details and your children.
+          {t("parent.profile.subtitle")}
         </p>
       </header>
 
@@ -147,21 +167,21 @@ export function ProfileClient({
       <section>
         <div className="mb-4">
           <h2 className="text-base font-semibold tracking-[-0.01em] text-ink">
-            Personal Information
+            {t("parent.profile.personalInfo")}
           </h2>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            Manage your account details.
+            {t("parent.profile.personalInfoHint")}
           </p>
         </div>
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="full-name">Full Name</Label>
+            <Label htmlFor="full-name">{t("parent.profile.fullName")}</Label>
             <div className="flex gap-2">
               <Input
                 id="full-name"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                placeholder="Your name"
+                placeholder={t("parent.profile.namePlaceholder")}
               />
               <Button
                 onClick={handleSaveName}
@@ -172,22 +192,38 @@ export function ProfileClient({
                 {savingName && (
                   <LogoSpinner className="mr-2" />
                 )}
-                Save
+                {t("parent.action.save")}
               </Button>
             </div>
           </div>
           <div className="space-y-2">
-            <Label>Email</Label>
+            <Label>{t("parent.profile.email")}</Label>
             <Input value={email} disabled className="opacity-60" />
           </div>
           <div className="text-xs text-muted-foreground">
-            Joined{" "}
-            {new Date(profile.created_at).toLocaleDateString("en-US", {
-              month: "long",
-              day: "numeric",
-              year: "numeric",
+            {t("parent.profile.joined", {
+              date: new Date(profile.created_at).toLocaleDateString(dateLocale, {
+                month: "long",
+                day: "numeric",
+                year: "numeric",
+              }),
             })}
           </div>
+        </div>
+      </section>
+
+      <section>
+        <div className="mb-4">
+          <h2 className="text-base font-semibold tracking-[-0.01em] text-ink">
+            {t("parent.profile.language")}
+          </h2>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            {t("parent.profile.languageHint")}
+          </p>
+        </div>
+        <div className="flex items-center justify-between gap-4 rounded-xl border border-border p-4">
+          <span className="text-sm font-medium text-ink">{t("parent.profile.languageRow")}</span>
+          <LanguageToggle className="text-sm" />
         </div>
       </section>
 
@@ -195,17 +231,15 @@ export function ProfileClient({
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
             <h2 className="text-base font-semibold tracking-[-0.01em] text-ink">
-              Children
+              {t("parent.profile.children")}
             </h2>
             <p className="mt-0.5 text-sm text-muted-foreground">
-              Manage your children&apos;s information. Grades move up
-              automatically each school year on{" "}
-              {formatRollover(gradeRollover.month, gradeRollover.day)}.
+              {t("parent.profile.childrenHint", { date: rolloverLabel })}
             </p>
           </div>
           <Button size="sm" onClick={openAddChild} className="shrink-0">
             <Plus className="mr-1 h-4 w-4" />
-            Add child
+            {t("parent.profile.addChild")}
           </Button>
         </div>
         <div>
@@ -213,7 +247,7 @@ export function ProfileClient({
             <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border py-8 text-center">
               <User className="h-5 w-5 text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
-                No children added yet. Click &quot;Add child&quot; to get started.
+                {t("parent.profile.noChildren")}
               </p>
             </div>
           ) : (
@@ -232,16 +266,16 @@ export function ProfileClient({
                         {child.name}
                         {child.graduated_at && (
                           <Badge variant="secondary" className="text-xs">
-                            Graduated
+                            {t("parent.profile.graduated")}
                           </Badge>
                         )}
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        {child.graduated_at ? null : formatGrade(child.grade)}
+                        {child.graduated_at ? null : gradeLabel(child.grade, t)}
                         {child.class_year != null && (
                           <span className="text-muted-foreground/70">
                             {child.graduated_at ? "" : " · "}
-                            {formatClassYear(child.class_year)}
+                            {t("parent.profile.classOf", { year: child.class_year })}
                           </span>
                         )}
                       </p>
@@ -287,36 +321,35 @@ export function ProfileClient({
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
-              {editingChild ? "Edit child" : "Add child"}
+              {editingChild ? t("parent.profile.editChild") : t("parent.profile.addChild")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="child-name">Name</Label>
+              <Label htmlFor="child-name">{t("parent.profile.childName")}</Label>
               <Input
                 id="child-name"
                 value={childName}
                 onChange={(e) => setChildName(e.target.value)}
-                placeholder="Child's name"
+                placeholder={t("parent.profile.childNamePlaceholder")}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="child-grade">Grade level</Label>
+              <Label htmlFor="child-grade">{t("parent.profile.gradeLevel")}</Label>
               <Select value={childGrade} onValueChange={setChildGrade}>
                 <SelectTrigger id="child-grade" aria-describedby="child-grade-hint">
-                  <SelectValue placeholder="Select grade level" />
+                  <SelectValue placeholder={t("parent.profile.selectGrade")} />
                 </SelectTrigger>
                 <SelectContent>
                   {GRADES.map((g) => (
                     <SelectItem key={g.value} value={g.value}>
-                      {g.label}
+                      {t(`parent.grade.${g.value}`)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               <p id="child-grade-hint" className="text-xs text-muted-foreground">
-                The grade your child is enrolled in — not their age. It moves
-                up on its own each school year; change it here if it&apos;s wrong.
+                {t("parent.profile.gradeHint")}
               </p>
             </div>
             <div className="flex justify-end gap-2">
@@ -324,7 +357,7 @@ export function ProfileClient({
                 variant="outline"
                 onClick={() => setChildDialogOpen(false)}
               >
-                Cancel
+                {t("parent.action.cancel")}
               </Button>
               <Button
                 onClick={handleSaveChild}
@@ -333,7 +366,7 @@ export function ProfileClient({
                 {savingChild && (
                   <LogoSpinner className="mr-2" />
                 )}
-                {editingChild ? "Save" : "Add"}
+                {editingChild ? t("parent.action.save") : t("parent.profile.add")}
               </Button>
             </div>
           </div>
@@ -345,9 +378,10 @@ export function ProfileClient({
         onOpenChange={(open) => {
           if (!open) setDeleteChildId(null);
         }}
-        title="Remove child"
-        description="Are you sure you want to remove this child? This action cannot be undone."
-        confirmLabel="Remove"
+        title={t("parent.profile.removeChildTitle")}
+        description={t("parent.profile.removeChildDescription")}
+        confirmLabel={t("parent.profile.remove")}
+        cancelLabel={t("parent.action.cancel")}
         variant="destructive"
         loading={deletingChild}
         onConfirm={handleDeleteChild}

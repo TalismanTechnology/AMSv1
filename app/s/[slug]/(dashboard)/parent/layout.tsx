@@ -11,6 +11,8 @@ import { NativePush } from "@/components/native/native-push";
 import { KeyboardViewport } from "@/components/shared/keyboard-viewport";
 import { APP_VIEWPORT_CLASS } from "@/lib/viewport/keyboard";
 import { AddChildrenPrompt } from "@/components/parent/add-children-prompt";
+import { LocaleProvider } from "@/components/i18n/locale-provider";
+import { getLocale } from "@/lib/i18n/server";
 import {
   CHILDREN_PROMPT_SKIP_COOKIE,
   shouldPromptForChildren,
@@ -28,7 +30,7 @@ export default async function ParentLayout({
 
   const supabase = await createClient();
 
-  const [{ data: profile }, { count: childCount }, cookieStore] = await Promise.all([
+  const [{ data: profile }, { count: childCount }, cookieStore, locale] = await Promise.all([
     supabase
       .from("profiles")
       .select("full_name, onboarding_completed")
@@ -42,6 +44,7 @@ export default async function ParentLayout({
           .eq("school_id", school.id)
       : Promise.resolve({ count: null }),
     cookies(),
+    getLocale(),
   ]);
 
   // Onboarding is required, so it is enforced here rather than by a link the
@@ -64,23 +67,23 @@ export default async function ParentLayout({
     });
 
   return (
-    <ParentSidebarProvider
-      userName={profile?.full_name || user.email || ""}
-    >
-      <TooltipProvider>
-        <ChatHistoryBridgeProvider>
-          <div className={APP_VIEWPORT_CLASS}>
-            <ParentSidebar />
-            <div className="flex flex-1 flex-col overflow-hidden">
-              <ParentMobileHeader />
-              <main className="dashboard-cards flex-1 overflow-auto basis-0">{children}</main>
+    <LocaleProvider initialLocale={locale}>
+      <ParentSidebarProvider userName={profile?.full_name || user.email || ""}>
+        <TooltipProvider>
+          <ChatHistoryBridgeProvider>
+            <div className={APP_VIEWPORT_CLASS}>
+              <ParentSidebar />
+              <div className="flex flex-1 flex-col overflow-hidden">
+                <ParentMobileHeader />
+                <main className="dashboard-cards flex-1 overflow-auto basis-0">{children}</main>
+              </div>
             </div>
-          </div>
-        </ChatHistoryBridgeProvider>
-        <KeyboardViewport />
-        <NativePush />
-        {promptForChildren && <AddChildrenPrompt slug={slug} />}
-      </TooltipProvider>
-    </ParentSidebarProvider>
+          </ChatHistoryBridgeProvider>
+          <KeyboardViewport />
+          <NativePush />
+          {promptForChildren && <AddChildrenPrompt slug={slug} />}
+        </TooltipProvider>
+      </ParentSidebarProvider>
+    </LocaleProvider>
   );
 }

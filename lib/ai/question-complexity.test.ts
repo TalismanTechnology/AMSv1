@@ -231,3 +231,52 @@ test("simple-question env overrides", () => {
     "low"
   );
 });
+
+test("Spanish: a single lookup is simple, a multi-part or should-question is complex", () => {
+  for (const q of [
+    "¿Cuándo son las vacaciones de invierno?",
+    "¿A qué hora empiezan las clases?",
+    "¿Hay clases el viernes?",
+    "¿Dónde está la oficina?",
+    "¿Cuál es el código de vestimenta?",
+    "uniforme",
+  ]) {
+    assert.equal(classifyQuestion(q), "simple", q);
+  }
+  for (const q of [
+    "¿Qué deben hacer los padres de 8.º grado antes de las vacaciones y cuáles son las fechas límite?",
+    "¿Por qué cierran temprano el viernes?",
+    "¿Qué debo llevar a la excursión?",
+    "¿Qué pasa si mi hijo llega tarde?",
+    "¿Cuál es la diferencia entre el uniforme de verano y el de invierno?",
+    "¿Qué eventos hay esta semana?",
+    "Cuénteme sobre el programa de después de clases",
+    "¿Cuándo es la graduación? ¿Dónde será?",
+    "¿Cuándo empiezan las clases y cómo me inscribo?",
+    "Resuma todas las fechas de exámenes",
+    "¿Mis hijos tienen clases el lunes?",
+  ]) {
+    assert.equal(classifyQuestion(q), "complex", q);
+  }
+});
+
+test("Spanish follow-ups: leading connectives are dropped, the search query must be simple too", () => {
+  assert.equal(
+    classifyQuestion("¿Y el viernes?", { followUp: true, searchQuery: "Is there school on Friday?" }),
+    "simple"
+  );
+  assert.equal(
+    classifyQuestion("¿Y el viernes?", {
+      followUp: true,
+      searchQuery: "What should parents prepare for Friday and what are the deadlines?",
+    }),
+    "complex"
+  );
+});
+
+test("Spanish complex questions get CHAT_COMPLEX_THINKING_LEVEL like English ones", () => {
+  const complex = classifyQuestion(
+    "¿Qué deben hacer los padres de 8.º grado antes de las vacaciones y cuáles son las fechas límite?"
+  );
+  assert.equal(answerSettings(complex, "gemini-3.8-flash", { CHAT_COMPLEX_THINKING_LEVEL: "low" }).thinkingLevel, "low");
+});

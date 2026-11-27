@@ -14,12 +14,14 @@ import { ParentSidebarContent } from "./parent-sidebar";
 import { useSchool } from "@/components/shared/school-context";
 import { ChatHistoryList } from "@/components/chat/chat-history-sidebar";
 import { useChatHistoryPanel } from "./chat-history-bridge";
+import { useT } from "@/components/i18n/locale-provider";
 
 export function ParentMobileHeader() {
   const [open, setOpen] = useState(false);
   const { school } = useSchool();
   // On the chat page, the drawer also lists the parent's chats.
   const chats = useChatHistoryPanel();
+  const t = useT();
 
   return (
     // env() insets are 0 inside the iOS app shell, which already sits below
@@ -29,7 +31,7 @@ export function ParentMobileHeader() {
         variant="ghost"
         size="icon"
         onClick={() => setOpen(true)}
-        aria-label="Open menu"
+        aria-label={t("parent.mobile.openMenu")}
         className="size-11 shrink-0 rounded-xl border border-ink/20 bg-secondary text-ink shadow-sm hover:bg-secondary/70 hover:text-ink active:bg-secondary/60"
       >
         <Menu className="size-6" strokeWidth={2.25} />
@@ -52,7 +54,7 @@ export function ParentMobileHeader() {
             chats ? "w-72" : "w-64"
           )}
         >
-          <SheetTitle className="sr-only">Navigation</SheetTitle>
+          <SheetTitle className="sr-only">{t("parent.mobile.navigation")}</SheetTitle>
           <div className="flex h-full min-h-0 flex-col">
             <ParentSidebarContent onNavigate={() => setOpen(false)} forceExpanded>
               {chats && (

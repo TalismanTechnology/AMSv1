@@ -5,12 +5,7 @@ import { Folder as FolderIcon, Mail, Phone, Search, Users, X } from "lucide-reac
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  CONTACT_TOPIC_LABELS,
-  isContactTopic,
-  mailtoHref,
-  telHref,
-} from "@/lib/contacts/directory";
+import { isContactTopic, mailtoHref, telHref } from "@/lib/contacts/directory";
 import {
   contactInitials,
   groupContactsByFolder,
@@ -19,6 +14,7 @@ import {
 } from "@/lib/contacts/folders";
 import type { ParentContact } from "@/lib/contacts/parent-directory";
 import { cn } from "@/lib/utils";
+import { useT } from "@/components/i18n/locale-provider";
 
 const ALL = "__all";
 
@@ -33,11 +29,16 @@ export function ParentContactsClient({
 }) {
   const [query, setQuery] = useState("");
   const [folderFilter, setFolderFilter] = useState<string>(ALL);
+  const t = useT();
 
   const divisionName = (id: string | null) =>
     (id && divisions.find((d) => d.id === id)?.name) || null;
 
-  const groups = useMemo(() => groupContactsByFolder(contacts, folders), [contacts, folders]);
+  const otherLabel = t("parent.contacts.other");
+  const groups = useMemo(
+    () => groupContactsByFolder(contacts, folders, otherLabel),
+    [contacts, folders, otherLabel]
+  );
   // One group and no folders: no headings or chips, just the grid.
   const grouped = !(groups.length === 1 && groups[0].id === null && folders.length === 0);
 
@@ -56,9 +57,11 @@ export function ParentContactsClient({
   return (
     <div className="mx-auto max-w-5xl px-4 pb-12 pt-6 md:px-8 md:pb-16 md:pt-12">
       <header className="mb-6 md:mb-8">
-        <h1 className="text-2xl font-semibold tracking-[-0.01em] text-ink">Contacts</h1>
+        <h1 className="text-2xl font-semibold tracking-[-0.01em] text-ink">
+          {t("parent.contacts.title")}
+        </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Find the right person or office at school.
+          {t("parent.contacts.subtitle")}
         </p>
       </header>
 
@@ -67,8 +70,8 @@ export function ParentContactsClient({
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Search by name, role, department or topic..."
-              aria-label="Search contacts"
+              placeholder={t("parent.contacts.searchPlaceholder")}
+              aria-label={t("parent.contacts.searchLabel")}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="h-10 pl-9 pr-10 sm:h-9"
@@ -77,7 +80,7 @@ export function ParentContactsClient({
               <Button
                 variant="ghost"
                 size="sm"
-                aria-label="Clear search"
+                aria-label={t("parent.contacts.clearSearch")}
                 className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 p-0 sm:h-7 sm:w-7"
                 onClick={() => setQuery("")}
               >
@@ -89,10 +92,10 @@ export function ParentContactsClient({
           {grouped && groups.length > 1 && (
             <div
               role="group"
-              aria-label="Departments"
+              aria-label={t("parent.contacts.departments")}
               className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:flex-wrap md:px-0"
             >
-              {[{ id: ALL, name: "All", count: contacts.length }, ...groups.map((g) => ({
+              {[{ id: ALL, name: t("parent.contacts.all"), count: contacts.length }, ...groups.map((g) => ({
                 id: g.id ?? "",
                 name: g.name,
                 count: g.contacts.length,
@@ -123,7 +126,9 @@ export function ParentContactsClient({
 
           {hasFilters && (
             <p className="text-xs text-muted-foreground" aria-live="polite">
-              {matchCount} contact{matchCount === 1 ? "" : "s"}
+              {t(matchCount === 1 ? "parent.contacts.countOne" : "parent.contacts.countOther", {
+                count: matchCount,
+              })}
             </p>
           )}
         </div>
@@ -132,17 +137,17 @@ export function ParentContactsClient({
       {matchCount === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <Users className="mb-3 h-6 w-6 text-muted-foreground" />
-          <h3 className="text-base font-semibold text-ink">No contacts found</h3>
+          <h3 className="text-base font-semibold text-ink">{t("parent.contacts.empty")}</h3>
           <p className="mt-1 text-sm text-muted-foreground">
             {hasFilters
-              ? "Try a different search."
-              : "Your school hasn't added its staff directory yet."}
+              ? t("parent.contacts.emptyFiltered")
+              : t("parent.contacts.emptyNone")}
           </p>
         </div>
       ) : (
         <div className="space-y-8">
           {shown.map((group) => (
-            <section key={group.id ?? "_other"} aria-label={grouped ? group.name : "Contacts"}>
+            <section key={group.id ?? "_other"} aria-label={grouped ? group.name : t("parent.contacts.title")}>
               {grouped && (
                 <h2 className="mb-3 flex items-center gap-2 text-sm font-medium tracking-[-0.01em] text-ink">
                   <FolderIcon className="h-[18px] w-[18px] text-muted-foreground" />
@@ -170,6 +175,7 @@ function ContactCard({ contact, division }: { contact: ParentContact; division: 
   const tel = contact.phone ? telHref(contact.phone) : null;
   const topics = contact.topics.filter(isContactTopic);
   const title = contact.name || contact.role;
+  const t = useT();
 
   return (
     <article className="flex min-w-0 flex-col rounded-xl border border-border p-4">
@@ -193,9 +199,9 @@ function ContactCard({ contact, division }: { contact: ParentContact; division: 
                 {division}
               </Badge>
             )}
-            {topics.slice(0, 3).map((t) => (
-              <Badge key={t} variant="outline" className="text-[10px] font-normal text-ink-soft">
-                {CONTACT_TOPIC_LABELS[t]}
+            {topics.slice(0, 3).map((topic) => (
+              <Badge key={topic} variant="outline" className="text-[10px] font-normal text-ink-soft">
+                {t(`parent.contacts.topic.${topic}`)}
               </Badge>
             ))}
           </div>

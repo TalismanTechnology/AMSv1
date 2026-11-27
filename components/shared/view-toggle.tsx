@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { useT } from "@/components/i18n/locale-provider";
 
 export type SourceView = "original" | "text";
 
@@ -17,10 +18,11 @@ export function ViewToggle({
   onChange: (value: SourceView) => void;
   className?: string;
 }) {
+  const t = useT();
   return (
     <div
       role="group"
-      aria-label="Document view"
+      aria-label={t("common.documentView")}
       className={cn("inline-flex rounded-lg border border-border p-0.5 text-xs", className)}
     >
       {(["original", "text"] as const).map((v) => (
@@ -34,7 +36,7 @@ export function ViewToggle({
             value === v ? "bg-muted text-ink" : "text-muted-foreground hover:text-ink"
           )}
         >
-          {v === "original" ? "Original" : "Text"}
+          {v === "original" ? t("common.viewOriginal") : t("common.viewText")}
         </button>
       ))}
     </div>

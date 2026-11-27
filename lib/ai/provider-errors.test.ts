@@ -166,3 +166,13 @@ test("a failing chat stream sends parents only the friendly message", async () =
       (p as { errorText?: string }).errorText === PARENT_AI_ERROR_MESSAGE)
   );
 });
+
+test("the parent's error line follows their language", async () => {
+  const { parentAiErrorMessage, PARENT_AI_ERROR_MESSAGE, PARENT_AI_ERROR_MESSAGE_ES } = await import(
+    "./provider-errors"
+  );
+  assert.equal(parentAiErrorMessage("en"), PARENT_AI_ERROR_MESSAGE);
+  assert.equal(parentAiErrorMessage(undefined), PARENT_AI_ERROR_MESSAGE);
+  assert.equal(parentAiErrorMessage("es"), PARENT_AI_ERROR_MESSAGE_ES);
+  assert.match(PARENT_AI_ERROR_MESSAGE_ES, /no está disponible/);
+});

@@ -18,6 +18,15 @@ import {
 } from "@/components/ui/tooltip";
 import { GraduationCap, ArrowLeftRight } from "lucide-react";
 import { LogoSpinner } from "@/components/logo-spinner";
+import { useT } from "@/components/i18n/locale-provider";
+import type { Translate } from "@/lib/i18n/translate";
+
+/** "(admin)" / "(parent)"; any other stored role as written. */
+function roleLabel(role: string, t: Translate): string {
+  if (role === "admin") return t("parent.schoolSwitcher.role.admin");
+  if (role === "parent") return t("parent.schoolSwitcher.role.parent");
+  return role;
+}
 
 interface SchoolSwitcherProps {
   collapsed?: boolean;
@@ -28,6 +37,8 @@ export function SchoolSwitcher({ collapsed = false }: SchoolSwitcherProps) {
   const router = useRouter();
   // Pending until the other school's page has rendered.
   const [switching, startSwitch] = useTransition();
+  // English outside the parent area's locale provider (admin sidebar).
+  const t = useT();
 
   if (memberships.length <= 1) return null;
 
@@ -44,8 +55,8 @@ export function SchoolSwitcher({ collapsed = false }: SchoolSwitcherProps) {
   if (memberships.length === 2) {
     const other = memberships.find((m) => m.school_id !== school.id);
     if (!other) return null;
-    const otherName = other.school?.name || "Other school";
-    const label = `Switch to ${otherName}`;
+    const otherName = other.school?.name || t("parent.schoolSwitcher.otherSchool");
+    const label = t("parent.schoolSwitcher.switchTo", { school: otherName });
 
     if (collapsed) {
       return (
@@ -58,7 +69,7 @@ export function SchoolSwitcher({ collapsed = false }: SchoolSwitcherProps) {
               onClick={() => goToMembership(other.school_id)}
               disabled={switching}
               aria-busy={switching}
-              aria-label={switching ? "Switching…" : label}
+              aria-label={switching ? t("parent.schoolSwitcher.switching") : label}
             >
               {switching ? <LogoSpinner /> : <ArrowLeftRight className="h-4 w-4" />}
             </Button>
@@ -82,7 +93,7 @@ export function SchoolSwitcher({ collapsed = false }: SchoolSwitcherProps) {
         ) : (
           <ArrowLeftRight className="h-3.5 w-3.5 shrink-0" />
         )}
-        <span className="truncate">{switching ? "Switching…" : `Switch to ${otherName}`}</span>
+        <span className="truncate">{switching ? t("parent.schoolSwitcher.switching") : label}</span>
       </Button>
     );
   }
@@ -94,22 +105,26 @@ export function SchoolSwitcher({ collapsed = false }: SchoolSwitcherProps) {
         <Tooltip>
           <TooltipTrigger asChild>
             <SelectTrigger
-              aria-label={switching ? "Switching…" : "Switch school"}
+              aria-label={
+                switching
+                  ? t("parent.schoolSwitcher.switching")
+                  : t("parent.schoolSwitcher.switchSchool")
+              }
               aria-busy={switching}
               className="w-full h-8 justify-center [&>svg:last-child]:hidden"
             >
               {switching ? <LogoSpinner /> : <GraduationCap className="h-4 w-4" />}
             </SelectTrigger>
           </TooltipTrigger>
-          <TooltipContent side="right">Switch school</TooltipContent>
+          <TooltipContent side="right">{t("parent.schoolSwitcher.switchSchool")}</TooltipContent>
         </Tooltip>
         <SelectContent>
           {memberships.map((m) => (
             <SelectItem key={m.school_id} value={m.school_id}>
               <span className="truncate">
-                {m.school?.name || "Unknown School"}
+                {m.school?.name || t("parent.schoolSwitcher.unknownSchool")}
               </span>
-              <span className="ml-1 text-muted-foreground">({m.role})</span>
+              <span className="ml-1 text-muted-foreground">({roleLabel(m.role, t)})</span>
             </SelectItem>
           ))}
         </SelectContent>
@@ -125,7 +140,7 @@ export function SchoolSwitcher({ collapsed = false }: SchoolSwitcherProps) {
         ) : (
           <GraduationCap className="mr-1 h-3.5 w-3.5 shrink-0" />
         )}
-        {switching && <span className="truncate">Switching…</span>}
+        {switching && <span className="truncate">{t("parent.schoolSwitcher.switching")}</span>}
         <span className={switching ? "hidden" : "contents"}>
           <SelectValue />
         </span>
@@ -134,9 +149,9 @@ export function SchoolSwitcher({ collapsed = false }: SchoolSwitcherProps) {
         {memberships.map((m) => (
           <SelectItem key={m.school_id} value={m.school_id}>
             <span className="truncate">
-              {m.school?.name || "Unknown School"}
+              {m.school?.name || t("parent.schoolSwitcher.unknownSchool")}
             </span>
-            <span className="ml-1 text-muted-foreground">({m.role})</span>
+            <span className="ml-1 text-muted-foreground">({roleLabel(m.role, t)})</span>
           </SelectItem>
         ))}
       </SelectContent>

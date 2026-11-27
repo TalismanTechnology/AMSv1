@@ -1,5 +1,8 @@
+"use client";
+
 import { Mail, Phone, UserRound } from "lucide-react";
 import { mailtoHref, telHref, type ContactCardData } from "@/lib/contacts/directory";
+import { useT } from "@/components/i18n/locale-provider";
 
 /**
  * The staff contact an unanswered question was routed to. Every detail comes
@@ -9,6 +12,7 @@ import { mailtoHref, telHref, type ContactCardData } from "@/lib/contacts/direct
  * dialer in the iOS / Android web view as in a browser.
  */
 export function ContactCard({ contact }: { contact: ContactCardData }) {
+  const t = useT();
   const email = contact.email ? mailtoHref(contact.email) : null;
   const phone = contact.phone ? telHref(contact.phone) : null;
   const subtitle = [contact.role, contact.division].filter(Boolean).join(" · ");
@@ -21,7 +25,7 @@ export function ContactCard({ contact }: { contact: ContactCardData }) {
         </div>
         <div className="min-w-0">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Who to contact
+            {t("chat.whoToContact")}
           </p>
           <p className="truncate text-[0.95rem] font-semibold text-ink">
             {contact.name || contact.role}

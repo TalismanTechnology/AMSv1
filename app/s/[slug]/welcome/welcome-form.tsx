@@ -17,7 +17,10 @@ import { LogoSpinner } from "@/components/logo-spinner";
 import { Logo } from "@/components/logo";
 import { GRADES } from "@/lib/grades";
 import { completeOnboarding, skipChildrenPrompt } from "@/actions/onboarding";
-import { schoolPossessive } from "@/lib/school-display-name";
+import { LanguageToggle } from "@/components/i18n/language-toggle";
+import { useLocale } from "@/components/i18n/locale-provider";
+import { localizeAuthError, schoolPossessiveFor } from "@/lib/i18n/auth-errors";
+import type { MessageKey } from "@/lib/i18n/translate";
 
 interface WelcomeFormProps {
   schoolId: string;
@@ -29,6 +32,24 @@ interface WelcomeFormProps {
   /** Already through first run — back here because they have no children on file. */
   returning: boolean;
 }
+
+/** Display label per stored grade value (lib/grades.ts); values never change. */
+const GRADE_LABEL_KEYS: Record<string, MessageKey> = {
+  "Pre-K": "auth.grade.preK",
+  K: "auth.grade.k",
+  "1": "auth.grade.1",
+  "2": "auth.grade.2",
+  "3": "auth.grade.3",
+  "4": "auth.grade.4",
+  "5": "auth.grade.5",
+  "6": "auth.grade.6",
+  "7": "auth.grade.7",
+  "8": "auth.grade.8",
+  "9": "auth.grade.9",
+  "10": "auth.grade.10",
+  "11": "auth.grade.11",
+  "12": "auth.grade.12",
+};
 
 interface ChildDraft {
   key: number;
@@ -45,6 +66,7 @@ export function WelcomeForm({
   returning,
 }: WelcomeFormProps) {
   const router = useRouter();
+  const { locale, t } = useLocale();
   const [children, setChildren] = useState<ChildDraft[]>([
     { key: 0, name: "", grade: "" },
   ]);
@@ -53,6 +75,10 @@ export function WelcomeForm({
   const [skipping, setSkipping] = useState(false);
 
   const matchedName = rosterName ?? fallbackName;
+  // The matched name is bold, so the sentence is split around {name}.
+  const [matchedBefore, matchedAfter = ""] = t("auth.welcome.matched", {
+    possessive: schoolPossessiveFor(locale, schoolName),
+  }).split("{name}");
 
   function updateChild(key: number, patch: Partial<ChildDraft>) {
     setChildren((current) =>
@@ -80,7 +106,7 @@ export function WelcomeForm({
     );
 
     if (filled.length === 0) {
-      setError("Add at least one child to continue.");
+      setError(t("auth.welcome.atLeastOne"));
       return;
     }
 
@@ -95,7 +121,7 @@ export function WelcomeForm({
     });
 
     if (result.error) {
-      setError(result.error);
+      setError(localizeAuthError(result.error, locale));
       setSaving(false);
       return;
     }
@@ -115,36 +141,40 @@ export function WelcomeForm({
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-xl flex-col justify-center px-6 py-16">
       <div className="metallic-card rounded-2xl p-8 sm:p-10">
-        <span className="mb-5 flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary elev-1">
-          <Logo size={24} className="text-primary" />
-        </span>
+        <div className="mb-5 flex items-start justify-between gap-3">
+          <span className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary elev-1">
+            <Logo size={24} className="text-primary" />
+          </span>
+          <LanguageToggle />
+        </div>
 
-        <p className="eyebrow">{returning ? "One more thing" : "Welcome"}</p>
+        <p className="eyebrow">
+          {returning ? t("auth.welcome.eyebrowReturning") : t("auth.welcome.eyebrow")}
+        </p>
         <h1 className="mt-2 font-serif-display text-3xl font-medium tracking-[-0.02em] text-ink">
           {returning
-            ? "Add your children"
+            ? t("auth.welcome.addChildren")
             : schoolName.trim()
-              ? `You're in at ${schoolName.trim()}`
-              : "You're in"}
+              ? t("auth.welcome.inAt", { school: schoolName.trim() })
+              : t("auth.welcome.in")}
         </h1>
 
         {matchedName && !returning && (
           <p className="mt-4 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/[0.04] p-3 text-sm text-ink-soft">
             <ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" />
             <span>
-              {`We matched you to ${schoolPossessive(schoolName)} records as `}
-              <span className="font-medium text-ink">{matchedName}</span>. If
-              that isn&apos;t you, contact the school office before continuing.
+              {matchedBefore}
+              <span className="font-medium text-ink">{matchedName}</span>
+              {matchedAfter}
             </span>
           </p>
         )}
 
         <p className="mt-6 text-sm leading-relaxed text-ink-soft">
-          Tell us who your children are so answers can be tailored to their
-          grade. You can change this later in your profile.
+          {t("auth.welcome.intro")}
         </p>
         <p className="mt-2 text-xs text-muted-foreground">
-          Enter this year&apos;s grade — it moves up automatically each school year.
+          {t("auth.welcome.gradeNote")}
         </p>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
@@ -152,7 +182,9 @@ export function WelcomeForm({
             <div key={child.key} className="flex items-end gap-2">
               <div className="flex flex-1 flex-col gap-2">
                 <Label htmlFor={`child-name-${child.key}`}>
-                  {index === 0 ? "Child's name" : `Child ${index + 1}`}
+                  {index === 0
+                    ? t("auth.welcome.childName")
+                    : t("auth.welcome.childNumber", { number: index + 1 })}
                 </Label>
                 <Input
                   id={`child-name-${child.key}`}
@@ -160,7 +192,7 @@ export function WelcomeForm({
                   onChange={(event) =>
                     updateChild(child.key, { name: event.target.value })
                   }
-                  placeholder="First and last name"
+                  placeholder={t("auth.welcome.namePlaceholder")}
                 />
               </div>
 
@@ -168,7 +200,7 @@ export function WelcomeForm({
                   so space-y would give the trigger a bottom margin and lift
                   this column out of line with the name field. */}
               <div className="flex w-40 flex-col gap-2">
-                <Label htmlFor={`child-grade-${child.key}`}>Grade level</Label>
+                <Label htmlFor={`child-grade-${child.key}`}>{t("auth.welcome.gradeLevel")}</Label>
                 <Select
                   value={child.grade}
                   onValueChange={(value) =>
@@ -176,12 +208,14 @@ export function WelcomeForm({
                   }
                 >
                   <SelectTrigger id={`child-grade-${child.key}`}>
-                    <SelectValue placeholder="Select" />
+                    <SelectValue placeholder={t("auth.welcome.selectGrade")} />
                   </SelectTrigger>
                   <SelectContent>
                     {GRADES.map((grade) => (
                       <SelectItem key={grade.value} value={grade.value}>
-                        {grade.label}
+                        {GRADE_LABEL_KEYS[grade.value]
+                          ? t(GRADE_LABEL_KEYS[grade.value])
+                          : grade.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -195,7 +229,7 @@ export function WelcomeForm({
                   size="icon"
                   className="mb-0.5 shrink-0"
                   onClick={() => removeChild(child.key)}
-                  aria-label={`Remove child ${index + 1}`}
+                  aria-label={t("auth.welcome.removeChild", { number: index + 1 })}
                 >
                   <X className="size-4" />
                 </Button>
@@ -211,7 +245,7 @@ export function WelcomeForm({
             disabled={children.length >= 12}
           >
             <Plus className="mr-2 size-4" />
-            Add another child
+            {t("auth.welcome.addAnother")}
           </Button>
 
           {error && (
@@ -222,7 +256,7 @@ export function WelcomeForm({
 
           <Button type="submit" className="h-11 w-full" disabled={saving || skipping}>
             {saving && <LogoSpinner className="mr-2" />}
-            Continue
+            {t("auth.continue")}
           </Button>
 
           <Button
@@ -233,7 +267,7 @@ export function WelcomeForm({
             disabled={saving || skipping}
           >
             {skipping && <LogoSpinner className="mr-2" />}
-            Skip for now
+            {t("auth.welcome.skip")}
           </Button>
         </form>
       </div>

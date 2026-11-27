@@ -25,6 +25,7 @@ import { getDocumentSignedUrl, getDocumentUrls } from "@/lib/storage-url";
 import { PdfPages } from "@/components/shared/pdf-pages";
 import { SourceRenderer } from "@/components/shared/source-renderer";
 import { ViewToggle, type SourceView } from "@/components/shared/view-toggle";
+import { useT } from "@/components/i18n/locale-provider";
 
 const FILE_TYPE_ICONS: Record<string, typeof FileText> = {
   pdf: FileText,
@@ -71,6 +72,9 @@ export function DocumentViewer({
   const [loading, setLoading] = useState(false);
   const [imageZoom, setImageZoom] = useState(1);
   const docxContainerRef = useRef<HTMLDivElement>(null);
+  // English outside the parent area's locale provider (admin pages).
+  const t = useT();
+  const renderFailedText = t("parent.viewer.renderFailed");
 
   const loadContent = useCallback(async (doc: ViewerDocument) => {
     setLoading(true);
@@ -119,11 +123,13 @@ export function DocumentViewer({
         breakPages: true,
       }).catch((err) => {
         console.error("DOCX render failed:", err);
-        container.innerHTML =
-          '<p class="text-sm text-muted-foreground p-4">Failed to render document preview.</p>';
+        const message = window.document.createElement("p");
+        message.className = "text-sm text-muted-foreground p-4";
+        message.textContent = renderFailedText;
+        container.replaceChildren(message);
       });
     });
-  }, [docxBlob, docxView]);
+  }, [docxBlob, docxView, renderFailedText]);
 
   useEffect(() => {
     if (open && document) {
@@ -258,7 +264,7 @@ export function DocumentViewer({
             disabled={!document.file_url}
           >
             <Download className="h-4 w-4 mr-2" />
-            Download
+            {t("parent.viewer.download")}
           </Button>
         </div>
       </DialogContent>

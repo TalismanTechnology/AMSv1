@@ -1,8 +1,10 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { useT } from "@/components/i18n/locale-provider";
 
 export function RetrievalLoadingStrip() {
+  const t = useT();
   return (
     // Mounted once per wait with fixed text, so screen readers hear it once.
     <div role="status" className="flex items-center gap-2.5 text-muted-foreground">
@@ -21,7 +23,7 @@ export function RetrievalLoadingStrip() {
           />
         ))}
       </span>
-      <span className="text-sm">Searching documents</span>
+      <span className="text-sm">{t("chat.searchingDocuments")}</span>
     </div>
   );
 }

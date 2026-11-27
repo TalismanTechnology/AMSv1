@@ -4,6 +4,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveSchoolName } from "@/lib/school-display-name";
 import { notFound } from "next/navigation";
 import { staffSignInMode, warnIfAdminsLockedOut } from "@/lib/auth/admin-google-only";
+import { LocaleProvider } from "@/components/i18n/locale-provider";
+import { getLocale } from "@/lib/i18n/server";
 import { LoginForm } from "./login-form";
 
 interface LoginPageProps {
@@ -33,19 +35,22 @@ export default async function LoginPage({ params }: LoginPageProps) {
   const school = await getSchoolBySlug(slug);
   if (!school) notFound();
 
-  const [{ provider, enabled }, schoolName] = await Promise.all([
+  const [{ provider, enabled }, schoolName, locale] = await Promise.all([
     getSchoolSignIn(school),
     loadSchoolName(school.id, school.name),
+    getLocale(),
   ]);
 
   return (
-    <LoginForm
-      schoolSlug={school.slug}
-      schoolId={school.id}
-      schoolName={schoolName}
-      provider={provider}
-      signInEnabled={enabled}
-      staffSignIn={staffSignInMode()}
-    />
+    <LocaleProvider initialLocale={locale}>
+      <LoginForm
+        schoolSlug={school.slug}
+        schoolId={school.id}
+        schoolName={schoolName}
+        provider={provider}
+        signInEnabled={enabled}
+        staffSignIn={staffSignInMode()}
+      />
+    </LocaleProvider>
   );
 }

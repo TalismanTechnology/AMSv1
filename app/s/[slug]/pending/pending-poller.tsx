@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, RefreshCw } from "lucide-react";
 import { checkApprovalStatus } from "@/actions/pending";
+import { useT } from "@/components/i18n/locale-provider";
 
 const POLL_INTERVAL_MS = 10_000;
 
@@ -14,6 +15,7 @@ const POLL_INTERVAL_MS = 10_000;
  */
 export function PendingPoller({ slug }: { slug: string }) {
   const router = useRouter();
+  const t = useT();
   const [approved, setApproved] = useState(false);
   const inFlight = useRef(false);
 
@@ -54,7 +56,7 @@ export function PendingPoller({ slug }: { slug: string }) {
     return (
       <p className="flex items-center justify-center gap-2 text-sm text-emerald-500">
         <CheckCircle2 className="h-4 w-4" />
-        Approved — taking you in…
+        {t("auth.pending.approved")}
       </p>
     );
   }
@@ -62,7 +64,7 @@ export function PendingPoller({ slug }: { slug: string }) {
   return (
     <p className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
       <RefreshCw className="h-3 w-3 animate-spin [animation-duration:3s]" />
-      Checking automatically — this page will update once you&apos;re approved.
+      {t("auth.pending.checking")}
     </p>
   );
 }

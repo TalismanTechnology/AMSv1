@@ -13,6 +13,7 @@ import {
 import { SchoolPicker } from "@/components/auth/school-picker";
 import { listJoinableSchools } from "@/actions/sign-in-schools";
 import type { JoinableSchools } from "@/lib/auth/joinable-schools";
+import { useT } from "@/components/i18n/locale-provider";
 
 interface JoinSchoolDialogProps {
   open: boolean;
@@ -25,6 +26,7 @@ interface JoinSchoolDialogProps {
 export function JoinSchoolDialog({ open, onOpenChange }: JoinSchoolDialogProps) {
   const [schools, setSchools] = useState<JoinableSchools | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const t = useT();
 
   useEffect(() => {
     if (!open || schools) return;
@@ -47,11 +49,9 @@ export function JoinSchoolDialog({ open, onOpenChange }: JoinSchoolDialogProps) 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Add a school</DialogTitle>
+          <DialogTitle>{t("parent.joinSchool.title")}</DialogTitle>
           {!nothingToAdd && (
-            <DialogDescription>
-              Choose the school and sign in with its Blackbaud account.
-            </DialogDescription>
+            <DialogDescription>{t("parent.joinSchool.description")}</DialogDescription>
           )}
         </DialogHeader>
 
@@ -63,24 +63,24 @@ export function JoinSchoolDialog({ open, onOpenChange }: JoinSchoolDialogProps) 
           <div className="space-y-3">
             {nothingToAdd ? (
               <p className="rounded-xl border border-border bg-secondary/60 px-5 py-6 text-center text-sm text-ink-soft">
-                You&apos;re already in every school on AskMySchool. If your school
-                isn&apos;t listed, ask your school office or{" "}
+                {t("parent.joinSchool.allJoinedBefore")}
                 <Link
                   href="/support"
                   className="font-medium text-primary underline-offset-4 hover:underline"
                   onClick={() => onOpenChange(false)}
                 >
-                  contact us
+                  {t("parent.joinSchool.contactUs")}
                 </Link>
-                .
+                {t("parent.joinSchool.allJoinedAfter")}
               </p>
             ) : (
               <SchoolPicker schools={schools.available} />
             )}
             {schools.pending.length > 0 && (
               <p className="text-center text-sm text-ink-soft">
-                Waiting for approval:{" "}
-                {schools.pending.map((school) => school.name).join(", ")}
+                {t("parent.joinSchool.pending", {
+                  schools: schools.pending.map((school) => school.name).join(", "),
+                })}
               </p>
             )}
           </div>

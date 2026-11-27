@@ -1,5 +1,6 @@
 import { formatChunkLocation, type CitablePassage } from "./rag";
 import { NOT_FOUND_MARKER } from "@/lib/chat-utils";
+import type { Locale } from "@/lib/i18n/locale";
 
 /**
  * The parent-facing assistant's system prompt.
@@ -32,6 +33,14 @@ export interface SystemPromptOptions {
   schoolInstructions?: string;
   /** Earlier turns precede the parent's latest message. */
   hasHistory?: boolean;
+  /**
+   * The language of the parent's latest message (lib/i18n/detect-language.ts).
+   * "es" adds the Spanish instructions at the very end — after everything
+   * the cache reuses, so the cached prefix is the same in both languages.
+   */
+  language?: Locale;
+  /** The latest message is English but the parent wrote Spanish earlier. */
+  switchedToEnglish?: boolean;
 }
 
 const ROLE =
@@ -56,6 +65,20 @@ After every reply — including when you couldn't find the answer or declined an
 const NOT_FOUND_FLAG = `NOT-FOUND FLAG
 If, and only if, your reply tells the parent you couldn't find the answer to a genuine question about the school in the school's information, put the line ${NOT_FOUND_MARKER} on its own line directly after ---FOLLOW_UPS---, before the numbered questions. Leave it out when you answered from the calendar or announcements, for greetings, thanks, or small talk, and when the question isn't about the school. Never write ${NOT_FOUND_MARKER} anywhere else.`;
 
+// Only for a Spanish latest message. The material stays English; the answer
+// is translated from it, and everything the app parses (citations, the
+// follow-up and not-found markers) stays exactly as the rules above say.
+const SPANISH_ANSWER = `LANGUAGE: SPANISH
+The parent's latest message is in Spanish. Write your whole reply in Spanish — clear, natural US Spanish for a school parent, using "usted" — including the 3 follow-up questions.
+- The school's material is in English. Translate it faithfully: don't add, drop, soften, or generalize anything, and never state a fact the material doesn't contain. Every rule above still applies.
+- Keep the names of people, places, buildings, rooms, programs, teams, events, and documents exactly as written in the material, untranslated. The first time a program or event name would be unclear, you may add a short Spanish explanation in parentheses, e.g. "Back to School Night (noche de regreso a clases)".
+- Copy dates, times, amounts, phone numbers, email addresses, and room numbers exactly. You may write a date in Spanish ("22 de diciembre"), but never change the date, time, or amount itself.
+- Citations are exactly as described above: the bare source number in square brackets, e.g. [1] or [1][2], right after the sentence it supports. Don't translate or reformat them.
+- Keep every marker line the rules above ask for (such as ---FOLLOW_UPS---) exactly as written, in English; only the text around them is Spanish.`;
+
+const ENGLISH_AFTER_SPANISH = `LANGUAGE: ENGLISH
+The parent's latest message is in English, although earlier messages were in Spanish. Reply in English, including the follow-up questions.`;
+
 export function buildSystemPrompt(
   passages: CitablePassage[],
   options: SystemPromptOptions = {}
@@ -68,6 +91,8 @@ export function buildSystemPrompt(
     todayString,
     schoolInstructions,
     hasHistory = false,
+    language = "en",
+    switchedToEnglish = false,
   } = options;
 
   const hasDocuments = passages.length > 0;
@@ -98,6 +123,8 @@ export function buildSystemPrompt(
     hasHistory ? LATEST_MESSAGE_ONLY : "",
     FOLLOW_UPS,
     hasDocuments ? "" : NOT_FOUND_FLAG,
+    // Last, where it is freshest when the model starts writing.
+    language === "es" ? SPANISH_ANSWER : switchedToEnglish ? ENGLISH_AFTER_SPANISH : "",
   ];
 
   return sections.filter(Boolean).join("\n\n");

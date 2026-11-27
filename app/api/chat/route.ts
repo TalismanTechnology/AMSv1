@@ -20,7 +20,8 @@ import { prepareChatTurn } from "@/lib/ai/chat-turn";
 import { aiConsentGate } from "@/lib/ai/consent";
 import { parseFollowUps } from "@/lib/chat-utils";
 import { citedEventSources, renumberCitations } from "@/lib/ai/citations";
-import { PARENT_AI_ERROR_MESSAGE, isAiProviderError } from "@/lib/ai/provider-errors";
+import { isAiProviderError, parentAiErrorMessage } from "@/lib/ai/provider-errors";
+import { parseLocale, type Locale } from "@/lib/i18n/locale";
 import { reportAiFailure } from "@/lib/alerts/ai-failure-alert";
 import { createTimer } from "@/lib/ai/timing";
 import type { ChatSource } from "@/lib/types";
@@ -103,6 +104,9 @@ export async function POST(request: NextRequest) {
   // A new chat's session, created while the turn is prepared. Cleared once
   // the stream is about to start; still set if the turn fails before that.
   let pendingSession: { created: Promise<string>; userId: string } | null = null;
+  // The language of the parent's friendly error line: the app's UI language
+  // until the question's own language is known (prepareChatTurn).
+  let parentLanguage: Locale = "en";
   try {
     const supabase = await createClient();
     // Read the body while auth is verified; a bad body still only surfaces
@@ -121,6 +125,10 @@ export async function POST(request: NextRequest) {
 
     const parsedBody = await body;
     const { messages, schoolId } = parsedBody;
+    // The app's UI language ("en" | "es"); only a tie-breaker for short
+    // messages — answers follow the language the parent writes in.
+    const uiLocale = parseLocale(typeof parsedBody?.locale === "string" ? parsedBody.locale : null);
+    if (uiLocale) parentLanguage = uiLocale;
     // The chat this question belongs to: an id, or null for a new chat. Never
     // inferred — a missing field is a client bug, not "the latest chat".
     const requested = parseRequestedSessionId(parsedBody);
@@ -332,15 +340,19 @@ export async function POST(request: NextRequest) {
       temperature,
       providerQuestion,
       answer: routing,
+      language,
     } = await prepareChatTurn({
       messages: contextMessages,
       lastMessageText,
       schoolId,
       viewerId: user.id,
       children,
+      uiLocale,
       timer,
     });
     prepared();
+    parentLanguage = language;
+    const parentErrorMessage = parentAiErrorMessage(language);
 
     if (searchQuery !== lastMessageText) {
       debugLog(`Query rewritten: "${lastMessageText.slice(0, 60)}" → "${searchQuery.slice(0, 60)}"`);
@@ -558,7 +570,7 @@ export async function POST(request: NextRequest) {
       onError: ({ error }) => {
         timer.mark("error");
         logTiming({ ...turnFields, outcome: "error" });
-        // Logged and alerted on; the parent only sees PARENT_AI_ERROR_MESSAGE
+        // Logged and alerted on; the parent only sees parentErrorMessage
         // (toUIMessageStream's onError below).
         reportAiFailure(error, { source: "chat.stream", schoolId }).alerted.finally(
           () => assistantSaved()
@@ -642,11 +654,11 @@ export async function POST(request: NextRequest) {
         // never see the provider's words.
         writer.merge(
           result
-            .toUIMessageStream({ onError: () => PARENT_AI_ERROR_MESSAGE })
+            .toUIMessageStream({ onError: () => parentErrorMessage })
             .pipeThrough(withCitedEvents(eventSources))
         );
       },
-      onError: () => PARENT_AI_ERROR_MESSAGE,
+      onError: () => parentErrorMessage,
     });
 
     return createUIMessageStreamResponse({ stream });
@@ -674,7 +686,7 @@ export async function POST(request: NextRequest) {
     logTiming({ outcome: "prepare-error", fromProvider });
     if (fromProvider) reportAiFailure(error, { source: "chat.prepare" });
     else console.error("Chat API error:", error);
-    return new Response(JSON.stringify({ error: PARENT_AI_ERROR_MESSAGE }), {
+    return new Response(JSON.stringify({ error: parentAiErrorMessage(parentLanguage) }), {
       status: fromProvider ? 503 : 500,
       headers: { "Content-Type": "application/json" },
     });

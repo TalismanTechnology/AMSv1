@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { stripMarkdown } from "@/lib/markdown/normalize";
+import { useT } from "@/components/i18n/locale-provider";
 
 const escapeHtml = (text: string) =>
   text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -19,14 +20,16 @@ interface ChatExportProps {
 }
 
 export function ChatExport({ messages, sessionTitle }: ChatExportProps) {
+  const t = useT();
+  const roleLabel = (role: string) => (role === "user" ? t("chat.exportYou") : t("chat.exportAssistant"));
   // Exports are plain text: answers lose their markdown, keep their [n] cites.
   const plain = (content: string) => stripMarkdown(content, { citations: false });
-  const titleText = stripMarkdown(sessionTitle, { singleLine: true }) || "Chat Export";
+  const titleText = stripMarkdown(sessionTitle, { singleLine: true }) || t("chat.exportDefaultTitle");
 
   function exportAsText() {
     const title = titleText;
     const lines = messages.map(
-      (m) => `${m.role === "user" ? "You" : "Assistant"}:\n${plain(m.content)}\n`
+      (m) => `${roleLabel(m.role)}:\n${plain(m.content)}\n`
     );
     const text = `${title}\n${"=".repeat(title.length)}\n\n${lines.join("\n---\n\n")}`;
 
@@ -55,7 +58,7 @@ export function ChatExport({ messages, sessionTitle }: ChatExportProps) {
       ${messages
         .map(
           (m) =>
-            `<div class="msg"><div class="role">${m.role === "user" ? "You" : "Assistant"}</div><div class="content">${escapeHtml(plain(m.content))}</div></div><hr/>`
+            `<div class="msg"><div class="role">${escapeHtml(roleLabel(m.role))}</div><div class="content">${escapeHtml(plain(m.content))}</div></div><hr/>`
         )
         .join("")}
       </body></html>`;
@@ -77,7 +80,7 @@ export function ChatExport({ messages, sessionTitle }: ChatExportProps) {
           variant="ghost"
           size="icon"
           className="h-8 w-8 rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-ink"
-          title="Export chat"
+          title={t("chat.exportChat")}
         >
           <Download className="h-4 w-4" />
         </Button>
@@ -85,11 +88,11 @@ export function ChatExport({ messages, sessionTitle }: ChatExportProps) {
       <DropdownMenuContent align="end">
         <DropdownMenuItem onClick={exportAsText}>
           <FileText className="mr-2 h-4 w-4" />
-          Download as Text
+          {t("chat.exportText")}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={exportAsPrint}>
           <FileText className="mr-2 h-4 w-4" />
-          Print / Save as PDF
+          {t("chat.exportPrint")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

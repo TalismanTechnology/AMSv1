@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { translate } from "@/lib/i18n/translate";
 import {
   ADMIN_GOOGLE_ONLY_LOGIN_PATH,
   ADMIN_GOOGLE_ONLY_MESSAGE,
@@ -291,7 +292,9 @@ test("the staff login forms keep the password form for parents only in google-on
   const school = read("app/s/[slug]/(auth)/login/login-form.tsx");
   assert.match(school, /const passwordForm = staffPasswordForm\(staffSignIn\);/);
   assert.match(school, /\{showStaffSignIn && staffPasswordShown && \(\s*<form/);
-  assert.match(school, /Admins sign in with Google\./);
+  // The school login page is translated: the line comes from the dictionary.
+  assert.match(school, /t\("auth\.adminsSignInWithGoogle"\)/);
+  assert.equal(translate("en", "auth.adminsSignInWithGoogle"), "Admins sign in with Google.");
   assert.match(read("app/s/[slug]/(auth)/login/page.tsx"), /staffSignIn=\{staffSignInMode\(\)\}/);
 });
 

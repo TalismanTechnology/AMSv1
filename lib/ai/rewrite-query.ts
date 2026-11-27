@@ -17,6 +17,12 @@ interface ChatMessage {
 const REFERENCE_WORDS =
   /\b(it|its|it's|that|this|those|these|they|them|their|theirs|he|him|his|she|her|hers|one|ones|other|another|else|same|also|too|again|instead|either|both|then|more)\b/i;
 const FOLLOW_UP_OPENERS = /^\s*(and|but|or|so|also|what about|how about|same|ok|okay)\b/i;
+// The same in Spanish: "¿y el viernes?", "¿eso es para todos?", "¿y para mi
+// otro hijo?". Letters outside a-z don't count for \b, hence the lookarounds.
+const SPANISH_REFERENCE_WORDS =
+  /(?<![\p{L}\p{N}])(eso|esa|ese|esos|esas|esto|ello|ellos|ellas|otro|otra|otros|otras|mismo|misma|mismos|mismas|también|tampoco|entonces|ambos|ambas)(?![\p{L}\p{N}'’])/iu;
+const SPANISH_FOLLOW_UP_OPENERS =
+  /^[\s¿¡]*(y|pero|o|entonces|también|qué tal|y si|lo mismo|vale|bueno)(?![\p{L}\p{N}'’])/iu;
 
 /**
  * Whether a question reads as a follow-up to an earlier turn rather than a
@@ -26,7 +32,12 @@ const FOLLOW_UP_OPENERS = /^\s*(and|but|or|so|also|what about|how about|same|ok|
 export function looksLikeFollowUp(text: string): boolean {
   const words = text.trim().split(/\s+/).filter(Boolean);
   if (words.length <= 2) return true;
-  return FOLLOW_UP_OPENERS.test(text) || REFERENCE_WORDS.test(text.replace(/’/g, "'"));
+  return (
+    FOLLOW_UP_OPENERS.test(text) ||
+    REFERENCE_WORDS.test(text.replace(/’/g, "'")) ||
+    SPANISH_FOLLOW_UP_OPENERS.test(text) ||
+    SPANISH_REFERENCE_WORDS.test(text)
+  );
 }
 
 /**
@@ -69,13 +80,18 @@ export function shouldRewriteQuery(
  * (lib/ai/child-privacy.ts).
  *
  * Returns the original query unchanged if there's no conversation history.
+ *
+ * `englishQuery`: the parent wrote in Spanish, so the query comes back in
+ * English — the school's documents are English, and this one call both
+ * resolves the follow-up and translates it (lib/ai/chat-turn.ts).
  */
 export async function rewriteQueryWithContext(
   messages: ChatMessage[],
   lastMessageText: string,
   children: ChildContext[] = [],
   /** Notes the rewrite's thinking-token count on the chat-timing line. */
-  timer?: StageTimer
+  timer?: StageTimer,
+  { englishQuery = false }: { englishQuery?: boolean } = {}
 ): Promise<string> {
   if (!shouldRewriteQuery(messages, lastMessageText)) {
     return lastMessageText;
@@ -108,6 +124,10 @@ export async function rewriteQueryWithContext(
       ? `\n- If the follow-up refers to a child ("[your 8th Grade child]", "my other kid", "my 8th grader", "the younger one"), resolve it to that child's grade level in the query, since documents are organised by grade and division rather than by name.`
       : "";
 
+  const languageRule = englishQuery
+    ? `\n- Write the query in English — the school's documents are in English — translating the parent's Spanish, also when the follow-up already stands on its own. Keep names of people, places, programs and events, dates, times and amounts exactly as written.`
+    : "";
+
   try {
     const { text, finishReason, usage } = await generateText({
       model: google(TEXT_MODEL_ID),
@@ -118,7 +138,7 @@ Rules:
 - It must be a complete, self-contained question — never a sentence fragment.
 - Resolve pronouns and references using the conversation.
 - Keep the parent's own wording where it is already specific.
-- Rewrite only the follow-up. Never add topics from earlier questions that the follow-up doesn't refer to; if it already stands on its own, return it unchanged.${childrenRule}
+- Rewrite only the follow-up. Never add topics from earlier questions that the follow-up doesn't refer to; if it already stands on its own, return it unchanged.${childrenRule}${languageRule}
 
 Conversation:
 ${historyText}

@@ -22,6 +22,9 @@ import {
   type ChildContext,
 } from "@/lib/ai/context";
 import { rewriteQueryWithContext, shouldRewriteQuery } from "@/lib/ai/rewrite-query";
+import { translateQueryToEnglish } from "@/lib/ai/translate-query";
+import { detectChatLanguage, detectMessageLanguage } from "@/lib/i18n/detect-language";
+import type { Locale } from "@/lib/i18n/locale";
 import { createTimer, type StageTimer } from "@/lib/ai/timing";
 import { reportAiFailure } from "@/lib/alerts/ai-failure-alert";
 import {
@@ -96,6 +99,18 @@ export interface ChatTurn {
    * anything else gets the default call.
    */
   answer: AnswerSettings;
+  /** The language of the parent's latest message: the answer is written in it. */
+  language: Locale;
+  /** The search ran on an English translation of a Spanish question. */
+  translated: boolean;
+}
+
+/** The text of a UI message's text parts. */
+function messageText(message: UIMessage): string {
+  return (message.parts ?? [])
+    .filter((p): p is { type: "text"; text: string } => p.type === "text")
+    .map((p) => p.text)
+    .join("");
 }
 
 /**
@@ -112,10 +127,16 @@ export async function prepareChatTurn({
   viewerId,
   children,
   now,
+  uiLocale,
   timer = createTimer(),
 }: {
   messages: UIMessage[];
   lastMessageText: string;
+  /**
+   * The language the parent's app is set to (the chat client sends it). Only
+   * a tie-breaker: the answer follows the language the parent wrote in.
+   */
+  uiLocale?: Locale | null;
   schoolId: string;
   /**
    * The signed-in user asking. Retrieval returns only what the database says
@@ -155,20 +176,57 @@ export async function prepareChatTurn({
   const providerMessages = redactChildNamesInMessages(messages, redactable);
   const providerQuestion = redactChildNames(lastMessageText, redactable);
 
+  // The language to answer in: the latest message's, or for a short one
+  // ("ok", "gracias") the parent's earlier messages'. Decided locally on the
+  // parent's own text — no model call, nothing sent anywhere.
+  const earlierUserTexts = messages
+    .slice(0, -1)
+    .filter((m) => m.role === "user")
+    .map(messageText);
+  const language = detectChatLanguage({
+    latest: lastMessageText,
+    previousUserMessages: earlierUserTexts,
+    uiLocale,
+  });
+  const switchedToEnglish =
+    language === "en" &&
+    earlierUserTexts.some((text) => detectMessageLanguage(text).language === "es");
+  timer.note("language", language);
+
   // Rewrite follow-up questions into standalone queries for better RAG
   // search. Children are passed so "and my other kid?" resolves to a grade
   // level the documents are actually organised by. First questions skip the
   // model call entirely (see shouldRewriteQuery).
-  timer.note("rewriteCalled", shouldRewriteQuery(providerMessages, providerQuestion));
-  const rewritten = timer.start("rewrite");
-  const searchQuery = await rewriteQueryWithContext(
-    providerMessages,
-    providerQuestion,
-    resolvedChildren,
-    timer
-  );
-  rewritten();
-  timer.note("queryRewritten", searchQuery !== providerQuestion);
+  //
+  // The school's documents are in English, so a Spanish question is searched
+  // in English: a follow-up's rewrite comes back in English, and any other
+  // Spanish question gets a quick translation (lib/ai/translate-query.ts) —
+  // one model call either way, none for English. On any failure the search
+  // uses the Spanish text. The answer model always sees the parent's words.
+  const rewriteCalled = shouldRewriteQuery(providerMessages, providerQuestion);
+  timer.note("rewriteCalled", rewriteCalled);
+  let searchQuery: string;
+  let translated = false;
+  if (language === "es" && !rewriteCalled) {
+    const translatedAt = timer.start("translate");
+    const result = await translateQueryToEnglish(providerQuestion, { timer });
+    translatedAt();
+    searchQuery = result.query;
+    translated = result.translated;
+  } else {
+    const rewritten = timer.start("rewrite");
+    searchQuery = await rewriteQueryWithContext(
+      providerMessages,
+      providerQuestion,
+      resolvedChildren,
+      timer,
+      { englishQuery: language === "es" }
+    );
+    rewritten();
+    translated = language === "es" && searchQuery !== providerQuestion;
+  }
+  timer.note("queryRewritten", rewriteCalled && searchQuery !== providerQuestion);
+  timer.note("translated", translated);
 
   // Retrieve with both strategies in parallel (non-fatal — continue without
   // sources on failure). Semantic search finds passages that mean the same
@@ -275,6 +333,8 @@ export async function prepareChatTurn({
     todayString: getTodayString(now),
     schoolInstructions: settings?.custom_system_prompt ?? undefined,
     hasHistory: messages.length > 1,
+    language,
+    switchedToEnglish,
   });
 
   const sources: ChatSource[] = passages.map((passage, i) => ({
@@ -321,6 +381,8 @@ export async function prepareChatTurn({
     temperature,
     providerQuestion,
     answer,
+    language,
+    translated,
   };
 }
 

@@ -4,6 +4,7 @@ import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LogoSpinner } from "@/components/logo-spinner";
 import { usePendingNavigation } from "@/hooks/use-pending-navigation";
+import { useT } from "@/components/i18n/locale-provider";
 import { AUTH_PROVIDERS, parentSignInHref, type AuthProvider } from "@/lib/auth/provider";
 
 interface ParentSignInButtonProps {
@@ -20,6 +21,7 @@ interface ParentSignInButtonProps {
 export function ParentSignInButton({ schoolSlug, provider }: ParentSignInButtonProps) {
   const { pending, start } = usePendingNavigation();
   const { label } = AUTH_PROVIDERS[provider];
+  const t = useT();
 
   return (
     <Button
@@ -35,11 +37,11 @@ export function ParentSignInButton({ schoolSlug, provider }: ParentSignInButtonP
         {pending ? (
           <>
             <LogoSpinner />
-            Redirecting to {label}…
+            {t("auth.redirectingTo", { provider: label })}
           </>
         ) : (
           <>
-            Sign in with {label}
+            {t("auth.signInWith", { provider: label })}
             <ArrowRight className="ml-1 size-4 transition-transform group-hover:translate-x-0.5" />
           </>
         )}

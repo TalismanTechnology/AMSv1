@@ -47,6 +47,48 @@ const COMPLEX_MARKERS = [
   /\b(my|our) (kids|children|sons|daughters|twins)\b/,
 ];
 
+// Spanish has accented letters, which \b doesn't treat as word characters, so
+// Spanish cues match on Unicode letter boundaries instead.
+function spanish(pattern: string): RegExp {
+  return new RegExp(`(?<![\\p{L}\\p{N}])(?:${pattern})(?![\\p{L}\\p{N}])`, "u");
+}
+
+// "¿Cuándo son las vacaciones de invierno?", "¿A qué hora empiezan las
+// clases?", "¿Hay clases el viernes?".
+const SPANISH_LOOKUP_OPENER = new RegExp(
+  "^(?:cuándo|cuando|dónde|donde|quién|quiénes|quien|cuál|cuáles|cual|qué|que|a qué hora|cuánto|cuánta|cuántos|cuántas|hay|es|son|está|están|habrá|puedo|puede|tiene|tienen|necesito|necesita)(?![\\p{L}\\p{N}])",
+  "u"
+);
+
+// The Spanish counterparts of COMPLEX_MARKERS.
+const SPANISH_COMPLEX_MARKERS = [
+  spanish("por qué|porqué|explica|explicar|explíqueme|explicación|razón|razones"),
+  spanish("compara|comparar|comparación|diferencia|diferencias|versus"),
+  spanish("mejor|mejores|peor|peores|prefiero|recomienda|recomiendan|recomendación|consejo|consejos|sugiere|sugerencia|sugerencias"),
+  // Should / must: "¿Qué deben hacer los padres…?"
+  spanish("debo|debe|deben|debemos|debería|deberían|deberíamos|tengo que|tienen que|hay que"),
+  spanish("podría|podrían|pudiera"),
+  spanish("si|a menos que|suponiendo|en caso de|de lo contrario"),
+  spanish("qué pasa si|qué pasaría si"),
+  spanish("ventajas|desventajas|vale la pena|plan|planear|planificar|preparar|prepararse|prepararnos"),
+  spanish("resume|resumir|resumen|todo|todos|todas|lista|cada|ambos|ambas|cualquier|cualquiera"),
+  spanish("cuénteme|cuéntame|hábleme|háblame|dígame todo"),
+  spanish("excepto|además de|en lugar de|en vez de|aparte de"),
+  spanish("conflicto|conflictos|se cruzan|choca|chocan"),
+  spanish("escribe|escriba|redacta|redacte|traduce|traduzca|traducir"),
+  spanish("(?:esta|la próxima|la siguiente) semana|(?:este|el próximo) (?:mes|semestre|trimestre|año)"),
+  spanish("próximos|próximas|entre|hasta|desde|faltan|quedan"),
+  spanish("(?:mis|nuestros|nuestras) (?:hijos|hijas|niños|niñas|gemelos)"),
+];
+
+// A second question joined to the first: "…y cuáles…", "…además…".
+const SPANISH_MULTI_PART = spanish(
+  "(?:y|o|pero|además) (?:cómo|qué|cuándo|dónde|quién|por qué|cuál|cuáles|cuánto|cuántos|es|son|hay|puedo|debo|deben)|además|también|otra pregunta"
+);
+
+// "mi hijo … y …".
+const SPANISH_MY_CHILD_AND = spanish("(?:mi|nuestro|nuestra) (?:hijo|hija|niño|niña|estudiante).*(?<![\\p{L}\\p{N}])y");
+
 // A second question joined to the first: "…and how…", "…also…", "…as well".
 const MULTI_PART =
   /\b(and|or|but|plus) (how|what|what's|when|where|who|why|which|is|are|do|does|did|can|should|will|would|could)\b|\b(also|additionally|as well|another question)\b|;/;
@@ -81,17 +123,27 @@ function hasSeveralSentences(text: string): boolean {
 // "And what about winter break?", "So when is it?". It doesn't add a second
 // question, so it is dropped before the multi-part check.
 const LEADING_CONNECTIVE = /^(?:(?:and|but|or|so|plus|ok|okay|also)\b[,\s]*)+/;
+const SPANISH_LEADING_CONNECTIVE =
+  /^(?:(?:y|pero|o|entonces|bueno|pues|ok|okay|también)(?![\p{L}\p{N}])[,\s]*)+/u;
 
 function isSimpleText(text: string, maxWords: number): boolean {
-  const q = normalize(text).replace(LEADING_CONNECTIVE, "").trim();
+  // "¿" and "¡" only open the sentence: drop them so openers match.
+  const q = normalize(text)
+    .replace(/[¿¡]/g, "")
+    .trim()
+    .replace(LEADING_CONNECTIVE, "")
+    .replace(SPANISH_LEADING_CONNECTIVE, "")
+    .trim();
   if (!q) return false;
   const words = wordCount(q);
   if (words === 0 || words > maxWords) return false;
   if (hasSeveralSentences(q)) return false;
   if (MULTI_PART.test(q) || MY_CHILD_AND.test(q)) return false;
+  if (SPANISH_MULTI_PART.test(q) || SPANISH_MY_CHILD_AND.test(q)) return false;
   if (COMPLEX_MARKERS.some((re) => re.test(q))) return false;
+  if (SPANISH_COMPLEX_MARKERS.some((re) => re.test(q))) return false;
   // A lookup opener, or a bare topic ("dress code?", "Thanksgiving break dates").
-  return LOOKUP_OPENER.test(q) || words <= BARE_TOPIC_MAX_WORDS;
+  return LOOKUP_OPENER.test(q) || SPANISH_LOOKUP_OPENER.test(q) || words <= BARE_TOPIC_MAX_WORDS;
 }
 
 /**
