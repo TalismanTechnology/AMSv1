@@ -25,14 +25,6 @@ export function ParentMobileHeader() {
     // env() insets are 0 inside the iOS app shell, which already sits below
     // the status bar, so this only pads in Safari / the installed web app.
     <div className="flex items-center justify-between border-b border-border bg-background pt-[calc(0.5rem_+_env(safe-area-inset-top))] pb-2 pl-[calc(1rem_+_env(safe-area-inset-left))] pr-[calc(1rem_+_env(safe-area-inset-right))] md:hidden">
-      <div className="flex min-w-0 items-center gap-2.5">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center">
-          <Logo size={20} className="text-primary" />
-        </span>
-        <span className="truncate text-sm font-semibold tracking-[-0.01em] text-ink">
-          {school.name}
-        </span>
-      </div>
       <Button
         variant="ghost"
         size="icon"
@@ -42,6 +34,14 @@ export function ParentMobileHeader() {
       >
         <Menu className="size-6" strokeWidth={2.25} />
       </Button>
+      <div className="flex min-w-0 items-center gap-2.5">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center">
+          <Logo size={20} className="text-primary" />
+        </span>
+        <span className="truncate text-sm font-semibold tracking-[-0.01em] text-ink">
+          {school.name}
+        </span>
+      </div>
       <Sheet open={open} onOpenChange={setOpen}>
         {/* Padded by the safe-area insets so the drawer's header sits below
             the notch / status bar. */}
