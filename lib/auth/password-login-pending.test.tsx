@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { translate } from "@/lib/i18n/translate";
 import React, { act, useActionState, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { parseHTML } from "linkedom";
@@ -129,6 +130,7 @@ test("useActionState + SubmitButton show pending feedback while login() is in fl
 });
 
 test("staff and school password login forms use useActionState + SubmitButton", () => {
+  assert.equal(translate("en", "auth.signingIn"), "Signing in…");
   const root = process.cwd();
   for (const rel of [
     "app/login/staff/staff-login-form.tsx",
@@ -136,7 +138,12 @@ test("staff and school password login forms use useActionState + SubmitButton", 
   ]) {
     const src = readFileSync(join(root, rel), "utf8");
     assert.match(src, /useActionState/, `${rel} must track form action pending via useActionState`);
-    assert.match(src, /<SubmitButton[\s\S]*pendingText="Signing in…"/, `${rel} must use SubmitButton`);
+    // The school login page is translated: its pendingText is t("auth.signingIn") ("Signing in…").
+    assert.match(
+      src,
+      /<SubmitButton[\s\S]*pendingText=(?:"Signing in…"|\{t\("auth\.signingIn"\)\})/,
+      `${rel} must use SubmitButton`
+    );
     assert.doesNotMatch(src, /setLoading\(true\);\s*setError\(null\);\s*const result = await login/, `${rel} must not set loading inside a <form action> transition`);
   }
 });

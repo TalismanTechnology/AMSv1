@@ -7,6 +7,7 @@ import remarkGfm from "remark-gfm";
 import type { ChatSource } from "@/lib/types";
 import { prepareMarkdown } from "@/lib/markdown/normalize";
 import { remarkRepairEmphasis } from "@/lib/markdown/remark-repair-emphasis";
+import { useT } from "@/components/i18n/locale-provider";
 
 interface MarkdownRendererProps {
   content: string;
@@ -46,6 +47,7 @@ function CitationBadge({
   animKey?: string;
   skipAnimation?: boolean;
 }) {
+  const t = useT();
   const alreadyPlayed =
     skipAnimation || !animKey || playedCitations.has(animKey);
   // Decided once on mount: a badge that starts animating keeps animating.
@@ -61,7 +63,7 @@ function CitationBadge({
         type="button"
         onClick={onClick}
         title={title}
-        aria-label={title ? `Source ${n}: ${title}` : `Source ${n}`}
+        aria-label={title ? t("chat.citationLabel", { n, title }) : t("chat.sourceNumber", { n })}
         className={BADGE_CLASS}
       >
         {n}
@@ -74,7 +76,7 @@ function CitationBadge({
       type="button"
       onClick={onClick}
       title={title}
-      aria-label={title ? `Source ${n}: ${title}` : `Source ${n}`}
+      aria-label={title ? t("chat.citationLabel", { n, title }) : t("chat.sourceNumber", { n })}
       className={BADGE_CLASS}
       initial={{ scale: 0, opacity: 0 }}
       animate={{ scale: [0, 1.3, 1], opacity: [0, 1, 1] }}

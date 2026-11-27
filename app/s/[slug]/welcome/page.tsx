@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { requireSchoolContext } from "@/lib/school-context";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { markOnboardingComplete } from "@/actions/onboarding";
+import { LocaleProvider } from "@/components/i18n/locale-provider";
+import { getLocale } from "@/lib/i18n/server";
 import { WelcomeForm } from "./welcome-form";
 
 interface WelcomePageProps {
@@ -64,14 +66,19 @@ export default async function WelcomePage({ params }: WelcomePageProps) {
     }
   }
 
+  // Outside the parent layout, so it brings its own LocaleProvider.
+  const locale = await getLocale();
+
   return (
-    <WelcomeForm
-      schoolId={school.id}
-      schoolSlug={school.slug}
-      schoolName={school.name}
-      rosterName={rosterName}
-      fallbackName={profile?.full_name ?? null}
-      returning={Boolean(profile?.onboarding_completed)}
-    />
+    <LocaleProvider initialLocale={locale}>
+      <WelcomeForm
+        schoolId={school.id}
+        schoolSlug={school.slug}
+        schoolName={school.name}
+        rosterName={rosterName}
+        fallbackName={profile?.full_name ?? null}
+        returning={Boolean(profile?.onboarding_completed)}
+      />
+    </LocaleProvider>
   );
 }

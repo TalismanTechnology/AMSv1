@@ -30,14 +30,17 @@ import { sidebarVariants } from "@/lib/motion";
 import { Logo } from "@/components/logo";
 import { JoinSchoolDialog } from "@/components/shared/join-school-dialog";
 import { InstallAppButton } from "@/components/shared/install-app-button";
+import { LanguageToggle } from "@/components/i18n/language-toggle";
+import { useT } from "@/components/i18n/locale-provider";
+import type { MessageKey } from "@/lib/i18n/translate";
 
-function getNavItems(slug: string) {
+function getNavItems(slug: string): { href: string; labelKey: MessageKey; icon: typeof User }[] {
   return [
-    { href: `/s/${slug}/parent/chat`, label: "Chat", icon: MessageSquare },
-    { href: `/s/${slug}/parent/documents`, label: "Documents", icon: FileText },
-    { href: `/s/${slug}/parent/contacts`, label: "Contacts", icon: BookUser },
-    { href: `/s/${slug}/parent/events`, label: "Calendar", icon: CalendarDays },
-    { href: `/s/${slug}/parent/profile`, label: "Profile", icon: User },
+    { href: `/s/${slug}/parent/chat`, labelKey: "parent.nav.chat", icon: MessageSquare },
+    { href: `/s/${slug}/parent/documents`, labelKey: "parent.nav.documents", icon: FileText },
+    { href: `/s/${slug}/parent/contacts`, labelKey: "parent.nav.contacts", icon: BookUser },
+    { href: `/s/${slug}/parent/events`, labelKey: "parent.nav.calendar", icon: CalendarDays },
+    { href: `/s/${slug}/parent/profile`, labelKey: "parent.nav.profile", icon: User },
   ];
 }
 
@@ -55,6 +58,7 @@ export function ParentSidebarContent({ onNavigate, forceExpanded, children }: Si
   const { school, slug, memberships } = useSchool();
   const navItems = getNavItems(slug);
   const [joinDialogOpen, setJoinDialogOpen] = useState(false);
+  const t = useT();
 
   return (
     <>
@@ -99,7 +103,7 @@ export function ParentSidebarContent({ onNavigate, forceExpanded, children }: Si
               >
                 <item.icon className="h-[18px] w-[18px] shrink-0" />
                 {!collapsed && (
-                  <span className="truncate tracking-[-0.01em]">{item.label}</span>
+                  <span className="truncate tracking-[-0.01em]">{t(item.labelKey)}</span>
                 )}
               </Link>
             );
@@ -107,7 +111,7 @@ export function ParentSidebarContent({ onNavigate, forceExpanded, children }: Si
             return collapsed ? (
               <Tooltip key={item.href}>
                 <TooltipTrigger asChild>{link}</TooltipTrigger>
-                <TooltipContent side="right">{item.label}</TooltipContent>
+                <TooltipContent side="right">{t(item.labelKey)}</TooltipContent>
               </Tooltip>
             ) : (
               <div key={item.href}>{link}</div>
@@ -119,7 +123,7 @@ export function ParentSidebarContent({ onNavigate, forceExpanded, children }: Si
       {children && (
         <>
           <div className="mx-2.5 mb-2 h-px bg-border" />
-          <p className="px-5 pb-2 text-xs font-medium text-ink-soft/70">Chats</p>
+          <p className="px-5 pb-2 text-xs font-medium text-ink-soft/70">{t("parent.nav.chats")}</p>
           <div className="min-h-0 flex-1">{children}</div>
         </>
       )}
@@ -139,7 +143,7 @@ export function ParentSidebarContent({ onNavigate, forceExpanded, children }: Si
                 <PlusCircle className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="right">Join School</TooltipContent>
+            <TooltipContent side="right">{t("parent.nav.joinSchool")}</TooltipContent>
           </Tooltip>
         ) : (
           <Button
@@ -149,7 +153,7 @@ export function ParentSidebarContent({ onNavigate, forceExpanded, children }: Si
             onClick={() => setJoinDialogOpen(true)}
           >
             <PlusCircle className="h-4 w-4" />
-            Join School
+            {t("parent.nav.joinSchool")}
           </Button>
         )}
         <InstallAppButton
@@ -162,6 +166,14 @@ export function ParentSidebarContent({ onNavigate, forceExpanded, children }: Si
       <JoinSchoolDialog open={joinDialogOpen} onOpenChange={setJoinDialogOpen} />
 
       <div className="px-3 pb-3 pt-1">
+        {/* English / Español. Collapsed (64px rail): EN over ES, no icon gap. */}
+        <LanguageToggle
+          compact={collapsed}
+          className={cn(
+            "px-1 pb-1",
+            collapsed && "flex-col gap-0.5 px-0 [&_span[aria-hidden]]:hidden"
+          )}
+        />
         <div
           className={cn(
             "flex items-center gap-2 px-1 py-1",
@@ -176,7 +188,7 @@ export function ParentSidebarContent({ onNavigate, forceExpanded, children }: Si
                   {userName}
                 </span>
               ) : (
-                <span className="text-xs text-ink-soft">Account</span>
+                <span className="text-xs text-ink-soft">{t("parent.nav.account")}</span>
               )}
               <form action={logout} className="shrink-0">
                 <Tooltip>
@@ -184,12 +196,12 @@ export function ParentSidebarContent({ onNavigate, forceExpanded, children }: Si
                     <SubmitButton
                       variant="ghost"
                       size="icon"
-                      aria-label="Sign out"
+                      aria-label={t("parent.nav.signOut")}
                       className="h-7 w-7 rounded-lg text-ink-soft hover:bg-secondary hover:text-ink"
                       icon={<LogOut className="h-3.5 w-3.5" />}
                     />
                   </TooltipTrigger>
-                  <TooltipContent side="right">Sign out</TooltipContent>
+                  <TooltipContent side="right">{t("parent.nav.signOut")}</TooltipContent>
                 </Tooltip>
               </form>
             </div>
@@ -202,12 +214,12 @@ export function ParentSidebarContent({ onNavigate, forceExpanded, children }: Si
                 <SubmitButton
                   variant="ghost"
                   size="sm"
-                  aria-label="Sign out"
+                  aria-label={t("parent.nav.signOut")}
                   className="w-full justify-center rounded-lg text-ink-soft hover:bg-secondary hover:text-ink"
                   icon={<LogOut className="h-4 w-4" />}
                 />
               </TooltipTrigger>
-              <TooltipContent side="right">Sign out</TooltipContent>
+              <TooltipContent side="right">{t("parent.nav.signOut")}</TooltipContent>
             </Tooltip>
           </form>
         )}

@@ -15,12 +15,23 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
-import {
-  CHAT_TITLE_MAX,
-  chatDisplayTitle,
-  groupChatsByDate,
-} from "@/lib/chat/chat-view";
+import { CHAT_TITLE_MAX, groupChatsByDate, type ChatGroupLabel } from "@/lib/chat/chat-view";
 import type { ChatListItem } from "@/lib/chat/history";
+import { stripMarkdown } from "@/lib/markdown/normalize";
+import { useT } from "@/components/i18n/locale-provider";
+import type { MessageKey, Translate } from "@/lib/i18n/translate";
+
+const GROUP_LABEL_KEYS: Record<ChatGroupLabel, MessageKey> = {
+  Today: "chat.groupToday",
+  Yesterday: "chat.groupYesterday",
+  "Previous 7 days": "chat.groupPrevious7Days",
+  Older: "chat.groupOlder",
+};
+
+/** chatDisplayTitle (lib/chat/chat-view.ts), with "New chat" in the UI language. */
+export function localizedChatTitle(title: string | null | undefined, t: Translate): string {
+  return stripMarkdown(title, { singleLine: true }) || t("chat.newChat");
+}
 
 export interface ChatHistoryPanelProps {
   sessions: ChatListItem[];
@@ -55,7 +66,8 @@ function ChatRow({
   onRename: (title: string) => Promise<string | null>;
   onRequestDelete: () => void;
 }) {
-  const title = chatDisplayTitle(session.title);
+  const t = useT();
+  const title = localizedChatTitle(session.title, t);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(title);
   const [saving, setSaving] = useState(false);
@@ -101,7 +113,7 @@ function ChatRow({
           value={draft}
           maxLength={CHAT_TITLE_MAX}
           disabled={saving}
-          aria-label="Chat name"
+          aria-label={t("chat.chatName")}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={() => void commit()}
           onKeyDown={(e) => {
@@ -120,7 +132,7 @@ function ChatRow({
           // Keep focus in the input so blur doesn't commit first.
           onMouseDown={(e) => e.preventDefault()}
           className="flex size-7 items-center justify-center rounded-md text-ink-soft hover:bg-background"
-          aria-label="Save name"
+          aria-label={t("chat.saveName")}
         >
           <Check className="size-3.5" />
         </button>
@@ -133,7 +145,7 @@ function ChatRow({
             setEditing(false);
           }}
           className="flex size-7 items-center justify-center rounded-md text-ink-soft hover:bg-background"
-          aria-label="Cancel rename"
+          aria-label={t("chat.cancelRename")}
         >
           <X className="size-3.5" />
         </button>
@@ -162,8 +174,8 @@ function ChatRow({
           type="button"
           onClick={startEditing}
           className="flex size-7 items-center justify-center rounded-md text-ink-soft/70 hover:bg-background hover:text-ink"
-          title="Rename"
-          aria-label={`Rename “${title}”`}
+          title={t("chat.rename")}
+          aria-label={t("chat.renameChat", { title })}
         >
           <Pencil className="size-3.5" />
         </button>
@@ -171,8 +183,8 @@ function ChatRow({
           type="button"
           onClick={onRequestDelete}
           className="flex size-7 items-center justify-center rounded-md text-ink-soft/70 hover:bg-destructive/10 hover:text-destructive"
-          title="Delete"
-          aria-label={`Delete “${title}”`}
+          title={t("chat.delete")}
+          aria-label={t("chat.deleteChat", { title })}
         >
           <Trash2 className="size-3.5" />
         </button>
@@ -191,6 +203,7 @@ export function ChatHistoryList({
   onDelete,
   className,
 }: ChatHistoryPanelProps & { className?: string }) {
+  const t = useT();
   const minute = useSyncExternalStore(subscribeMinute, getMinute, getServerMinute);
   const groups = useMemo(
     () =>
@@ -224,22 +237,21 @@ export function ChatHistoryList({
           className="w-full justify-start gap-2.5 rounded-lg px-3 text-ink hover:bg-secondary"
         >
           <SquarePen className="size-4" />
-          New chat
+          {t("chat.newChat")}
         </Button>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-4">
         {sessions.length === 0 ? (
           <p className="px-5 py-6 text-xs text-ink-soft/70">
-            Your chats will appear here. They&apos;re kept for 30 days after
-            your last message.
+            {t("chat.historyEmpty")}
           </p>
         ) : (
           groups.map((group) => (
             <section key={group.label ?? "all"} className="mt-2 first:mt-0">
               {group.label && (
                 <h3 className="px-5 pb-1 pt-2 text-[11px] font-medium text-ink-soft/60">
-                  {group.label}
+                  {t(GROUP_LABEL_KEYS[group.label])}
                 </h3>
               )}
               <div className="space-y-0.5">
@@ -267,14 +279,15 @@ export function ChatHistoryList({
       >
         <AlertDialogContent size="sm">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete chat?</AlertDialogTitle>
+            <AlertDialogTitle>{t("chat.deleteConfirmTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              &ldquo;{chatDisplayTitle(pendingDelete?.title)}&rdquo; will be
-              removed from your chats. This can&apos;t be undone.
+              {t("chat.deleteConfirmBody", {
+                title: localizedChatTitle(pendingDelete?.title, t),
+              })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleting}>{t("chat.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
               disabled={deleting}
@@ -284,7 +297,7 @@ export function ChatHistoryList({
                 void confirmDelete();
               }}
             >
-              {deleting ? "Deleting…" : "Delete"}
+              {deleting ? t("chat.deleting") : t("chat.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -331,6 +344,7 @@ function storeCollapsed(collapsed: boolean) {
  * (ParentMobileHeader).
  */
 export function ChatHistorySidebar(props: ChatHistoryPanelProps) {
+  const t = useT();
   const collapsed = useSyncExternalStore(subscribeCollapsed, getCollapsed, getServerCollapsed);
   const toggle = () => storeCollapsed(!collapsed);
 
@@ -341,8 +355,8 @@ export function ChatHistorySidebar(props: ChatHistoryPanelProps) {
           variant="ghost"
           size="icon-sm"
           onClick={toggle}
-          title="Show chats"
-          aria-label="Show chats"
+          title={t("chat.showChats")}
+          aria-label={t("chat.showChats")}
           className="text-ink-soft hover:bg-secondary hover:text-ink"
         >
           <PanelLeftOpen className="size-4" />
@@ -351,8 +365,8 @@ export function ChatHistorySidebar(props: ChatHistoryPanelProps) {
           variant="ghost"
           size="icon-sm"
           onClick={props.onNewChat}
-          title="New chat"
-          aria-label="New chat"
+          title={t("chat.newChat")}
+          aria-label={t("chat.newChat")}
           className="text-ink-soft hover:bg-secondary hover:text-ink"
         >
           <SquarePen className="size-4" />
@@ -364,13 +378,13 @@ export function ChatHistorySidebar(props: ChatHistoryPanelProps) {
   return (
     <aside className="hidden h-full w-64 shrink-0 flex-col border-r border-border bg-sidebar md:flex">
       <div className="flex items-center justify-between px-4 pb-2 pt-3">
-        <p className="text-xs font-medium text-ink-soft/70">Chats</p>
+        <p className="text-xs font-medium text-ink-soft/70">{t("chat.chats")}</p>
         <Button
           variant="ghost"
           size="icon-sm"
           onClick={toggle}
-          title="Hide chats"
-          aria-label="Hide chats"
+          title={t("chat.hideChats")}
+          aria-label={t("chat.hideChats")}
           className="-mr-2 text-ink-soft hover:bg-secondary hover:text-ink"
         >
           <PanelLeftClose className="size-4" />

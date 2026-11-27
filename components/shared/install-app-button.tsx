@@ -6,8 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { promptInstall, useInstallUi } from "@/lib/pwa/install-prompt";
-
-const LABEL = "Install app";
+import { useT } from "@/components/i18n/locale-provider";
 
 interface InstallAppButtonProps {
   /** Icon only, with the label in a tooltip (the collapsed sidebar rail). */
@@ -30,6 +29,9 @@ export function InstallAppButton({
   tipAlign = "start",
 }: InstallAppButtonProps) {
   const ui = useInstallUi();
+  // English outside the parent area's locale provider (admin, landing page).
+  const t = useT();
+  const label = t("parent.install.label");
 
   if (ui === "hidden") return null;
 
@@ -38,12 +40,12 @@ export function InstallAppButton({
       type="button"
       variant="ghost"
       size="sm"
-      aria-label={collapsed ? LABEL : undefined}
+      aria-label={collapsed ? label : undefined}
       className={cn(collapsed ? "justify-center" : "justify-start gap-2.5", className)}
       onClick={ui === "prompt" ? () => void promptInstall() : undefined}
     >
       <MonitorDown className={iconClassName} />
-      {!collapsed && LABEL}
+      {!collapsed && label}
     </Button>
   );
 
@@ -53,7 +55,7 @@ export function InstallAppButton({
   const withTooltip = collapsed ? (
     <Tooltip>
       <TooltipTrigger asChild>{trigger}</TooltipTrigger>
-      <TooltipContent side="right">{LABEL}</TooltipContent>
+      <TooltipContent side="right">{label}</TooltipContent>
     </Tooltip>
   ) : (
     trigger
@@ -65,7 +67,9 @@ export function InstallAppButton({
     <Popover>
       {withTooltip}
       <PopoverContent side={tipSide} align={tipAlign} className="w-64 text-sm text-ink">
-        In Safari, choose <span className="font-medium">File &gt; Add to Dock</span>.
+        {t("parent.install.safariTipBefore")}
+        <span className="font-medium">{t("parent.install.safariTipMenu")}</span>
+        {t("parent.install.safariTipAfter")}
       </PopoverContent>
     </Popover>
   );

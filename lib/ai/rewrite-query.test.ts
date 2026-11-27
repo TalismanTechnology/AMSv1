@@ -70,3 +70,14 @@ test("follow-ups that refer back are recognised", () => {
     assert.equal(looksLikeFollowUp(q), false, q);
   }
 });
+
+test("Spanish follow-ups that refer back are recognised; standalone Spanish questions are not", () => {
+  for (const q of ["¿y el viernes?", "¿Y para mi otro hijo?", "¿Eso es para todos los grados?", "¿Lo mismo para 8.º grado?", "¿Entonces a qué hora termina?"]) {
+    assert.equal(looksLikeFollowUp(q), true, q);
+  }
+  for (const q of ["¿Cuándo son las vacaciones de invierno?", "¿A qué hora empiezan las clases?"]) {
+    assert.equal(looksLikeFollowUp(q), false, q);
+  }
+  // English names starting with O' or Y' aren't Spanish openers.
+  assert.equal(looksLikeFollowUp("O'Brien hall opening hours today"), false);
+});

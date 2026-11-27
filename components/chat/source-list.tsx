@@ -6,6 +6,7 @@ import { useSourcePanel } from "./source-panel-context";
 import { AddToCalendarMenu } from "@/components/shared/add-to-calendar";
 import { groupSources } from "@/lib/source-groups";
 import type { ChatSource } from "@/lib/types";
+import { useT } from "@/components/i18n/locale-provider";
 
 export function SourceList({
   sources,
@@ -15,6 +16,7 @@ export function SourceList({
   citedNumbers: Set<number>;
 }) {
   const { openSource, activeSource } = useSourcePanel();
+  const t = useT();
   const groups = groupSources(sources, citedNumbers);
   if (groups.length === 0) return null;
 
@@ -24,7 +26,7 @@ export function SourceList({
 
   return (
     <div className="flex flex-col gap-0.5">
-      <p className="mb-1 text-xs text-muted-foreground">Sources</p>
+      <p className="mb-1 text-xs text-muted-foreground">{t("chat.sources")}</p>
       {groups.map((group) => (
         <div
           key={group.key}
@@ -39,7 +41,7 @@ export function SourceList({
               {group.passages[0].source_type === "clarification" ? (
                 <BadgeCheck className="size-3" />
               ) : group.isEvent ? (
-                <CalendarDays className="size-3" aria-label="Calendar event" />
+                <CalendarDays className="size-3" aria-label={t("chat.calendarEvent")} />
               ) : group.isWebsite ? (
                 <Globe className="size-3" />
               ) : (
@@ -75,6 +77,7 @@ export function SourceList({
 
 /** Add a cited calendar entry (a whole range, if it spans days) to the parent's calendar. */
 function EventCalendarButton({ source }: { source: ChatSource }) {
+  const t = useT();
   const event = source.event;
   if (!event?.date) return null;
   return (
@@ -91,7 +94,7 @@ function EventCalendarButton({ source }: { source: ChatSource }) {
     >
       <button
         type="button"
-        aria-label={`Add ${source.title} to calendar`}
+        aria-label={t("chat.addToCalendar", { title: source.title })}
         className="group/cal inline-flex size-6 shrink-0 items-center justify-center rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 data-[state=open]:bg-primary/10"
       >
         <IconBadge className="group-hover/cal:bg-brand-badge-strong">
@@ -113,6 +116,7 @@ function PassageChip({
   active: boolean;
   onClick: () => void;
 }) {
+  const t = useT();
   const label = passage.location?.label;
   if (!showNumber && !label) return null;
 
@@ -120,7 +124,11 @@ function PassageChip({
     <button
       type="button"
       onClick={onClick}
-      aria-label={`Open ${passage.title}${label ? ` at ${label}` : ""}`}
+      aria-label={
+        label
+          ? t("chat.openPassageAt", { title: passage.title, label })
+          : t("chat.openPassage", { title: passage.title })
+      }
       aria-pressed={active}
       className={`inline-flex items-center gap-1 rounded-md border border-transparent brand-badge px-1.5 py-0.5 text-[0.7rem] leading-none tabular-nums transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-1 ${
         active

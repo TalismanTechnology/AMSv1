@@ -1,16 +1,23 @@
-import Link from "next/link";
+"use client";
 
-/** Small print under sign-in forms linking to the Terms and Privacy Policy. */
+import Link from "next/link";
+import { useT } from "@/components/i18n/locale-provider";
+
+/**
+ * Small print under sign-in forms linking to the Terms and Privacy Policy.
+ * English outside a LocaleProvider (staff and landing pages).
+ */
 export function LegalNotice({ className = "" }: { className?: string }) {
+  const t = useT();
   return (
     <p className={`text-center text-xs text-muted-foreground ${className}`}>
-      By signing in, you agree to our{" "}
+      {t("auth.legalPrefix")}{" "}
       <Link href="/terms" className="underline underline-offset-4 hover:text-ink">
-        Terms of Service
+        {t("auth.legalTerms")}
       </Link>{" "}
-      and{" "}
+      {t("auth.legalAnd")}{" "}
       <Link href="/privacy" className="underline underline-offset-4 hover:text-ink">
-        Privacy Policy
+        {t("auth.legalPrivacy")}
       </Link>
       .
     </p>

@@ -15,6 +15,8 @@ import { citedNumbersInOrder, renumberCitations } from "@/lib/ai/citations";
 import type { ChatSource } from "@/lib/types";
 import type { ContactCardData } from "@/lib/contacts/directory";
 import { SYSTEM_BROWSER_LINK } from "@/lib/native/links";
+import { useLocale } from "@/components/i18n/locale-provider";
+import { localizeSources } from "./source-label";
 
 interface MessageBubbleProps {
   role: "user" | "assistant";
@@ -53,6 +55,7 @@ export function MessageBubble({
 }: MessageBubbleProps) {
   const isUser = role === "user";
   const { openSource } = useSourcePanel();
+  const { locale, t } = useLocale();
 
   // Stay in typewriter mode until the typing effect finishes catching up,
   // not just while the API stream is active
@@ -78,7 +81,9 @@ export function MessageBubble({
   // Citations as the parent sees them: [1], [2]… in order of first
   // appearance, with the sources renumbered to match. Answers saved before
   // renumbering existed are renumbered here too; newer ones are unchanged.
-  const { content: displayContent, sources } = renumberCitations(answer, rawSources);
+  const { content: displayContent, sources: renumbered } = renumberCitations(answer, rawSources);
+  // Page / date labels in the UI language.
+  const sources = localizeSources(renumbered, locale);
 
   if (isUser) {
     return (
@@ -133,7 +138,7 @@ export function MessageBubble({
           className="inline-flex w-fit items-center gap-1.5 text-sm font-medium text-ink-soft underline-offset-4 hover:text-ink hover:underline"
         >
           <Search className="size-3.5" aria-hidden />
-          Search the web
+          {t("chat.searchWeb")}
         </a>
       )}
 

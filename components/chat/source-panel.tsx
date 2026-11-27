@@ -13,6 +13,7 @@ import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { ease, duration } from "@/lib/motion";
 import { ViewToggle, type SourceView } from "@/components/shared/view-toggle";
+import { useT } from "@/components/i18n/locale-provider";
 
 // The document viewers are only needed once a source is opened, so they load
 // in their own chunks instead of with the chat page.
@@ -48,6 +49,7 @@ const DOCX_TYPES = new Set(["docx", "doc"]);
 function PanelContent() {
   const { activeSource, fullContent, isLoadingContent, closePanel } =
     useSourcePanel();
+  const t = useT();
   const [viewerOpen, setViewerOpen] = useState(false);
 
   const [viewUrl, setViewUrl] = useState<string | null>(null);
@@ -96,6 +98,7 @@ function PanelContent() {
   }, [documentId, fileType, isDocument]);
 
   // Render DOCX blob into container
+  const renderFailedText = t("chat.renderFailed");
   useEffect(() => {
     if (!docxBlob || !docxContainerRef.current || docxView !== "original") return;
     const container = docxContainerRef.current;
@@ -109,11 +112,13 @@ function PanelContent() {
         breakPages: true,
       }).catch((err) => {
         console.error("DOCX render failed:", err);
-        container.innerHTML =
-          '<p class="text-sm text-muted-foreground p-4">Failed to render document preview.</p>';
+        const message = document.createElement("p");
+        message.className = "text-sm text-muted-foreground p-4";
+        message.textContent = renderFailedText;
+        container.replaceChildren(message);
       });
     });
-  }, [docxBlob, docxView]);
+  }, [docxBlob, docxView, renderFailedText]);
 
   const showAsPdf = !!viewUrl && (fileType === "pdf" || hasPdf);
   const showAsDocx =
@@ -162,7 +167,9 @@ function PanelContent() {
           {(activeSource.source_number != null || activeSource.location?.label) && (
             <p className="pl-6 text-xs text-muted-foreground">
               {[
-                activeSource.source_number != null ? `Source ${activeSource.source_number}` : null,
+                activeSource.source_number != null
+                  ? t("chat.sourceNumber", { n: activeSource.source_number })
+                  : null,
                 activeSource.location?.label,
               ]
                 .filter(Boolean)
@@ -172,7 +179,7 @@ function PanelContent() {
         </div>
         <div className="flex items-center gap-1">
           {activeSource.source_url && (
-            <Button asChild variant="ghost" size="icon-xs" title="Open the web page">
+            <Button asChild variant="ghost" size="icon-xs" title={t("chat.openWebPage")}>
               <a href={activeSource.source_url} target="_blank" rel="noopener noreferrer">
                 <ExternalLink className="h-4 w-4" />
               </a>
@@ -184,7 +191,7 @@ function PanelContent() {
                 variant="ghost"
                 size="icon-xs"
                 onClick={() => setViewerOpen(true)}
-                title="Open fullscreen"
+                title={t("chat.openFullscreen")}
               >
                 <Maximize2 className="h-4 w-4" />
               </Button>
@@ -192,7 +199,7 @@ function PanelContent() {
                 variant="ghost"
                 size="icon-xs"
                 onClick={handleDownload}
-                title="Download"
+                title={t("chat.download")}
               >
                 <Download className="h-4 w-4" />
               </Button>
@@ -209,7 +216,7 @@ function PanelContent() {
           <ViewToggle value={docxView} onChange={setDocxView} />
           <Button variant="ghost" size="xs" onClick={handleDownload}>
             <Download />
-            Download
+            {t("chat.download")}
           </Button>
         </div>
       )}
@@ -289,6 +296,7 @@ function PanelContent() {
 
 export function SourcePanel() {
   const { isOpen, closePanel, activeSource } = useSourcePanel();
+  const t = useT();
   const isDesktop = useMediaQuery("(min-width: 1024px)");
 
   if (isDesktop) {
@@ -318,9 +326,9 @@ export function SourcePanel() {
       >
         {/* The visible header is PanelContent's; these name the dialog for
             screen readers, which Radix requires of every sheet. */}
-        <SheetTitle className="sr-only">{activeSource?.title ?? "Source"}</SheetTitle>
+        <SheetTitle className="sr-only">{activeSource?.title ?? t("chat.source")}</SheetTitle>
         <SheetDescription className="sr-only">
-          The school document this answer cites.
+          {t("chat.sourceSheetDescription")}
         </SheetDescription>
         <PanelContent />
       </SheetContent>

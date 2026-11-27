@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { TermsAssentCheckbox } from "@/components/legal/terms-assent-checkbox";
 import { grantAiConsent, revokeAiConsent } from "@/actions/ai-consent";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 interface AiConsentSectionProps {
   /** Agreed to the current notice version. */
@@ -25,6 +26,7 @@ export function AiConsentSection({ consented: initial, consentedAt }: AiConsentS
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const { locale, t } = useLocale();
 
   async function handleRevoke() {
     setSaving(true);
@@ -37,7 +39,7 @@ export function AiConsentSection({ consented: initial, consentedAt }: AiConsentS
     }
     setConsented(false);
     setAcceptedTerms(false);
-    toast.success("AI processing turned off");
+    toast.success(t("parent.ai.turnedOff"));
   }
 
   async function handleGrant() {
@@ -50,30 +52,26 @@ export function AiConsentSection({ consented: initial, consentedAt }: AiConsentS
       return;
     }
     setConsented(true);
-    toast.success("AI processing turned on");
+    toast.success(t("parent.ai.turnedOn"));
   }
 
   return (
     <section>
       <div className="mb-4">
         <h2 className="text-base font-semibold tracking-[-0.01em] text-ink">
-          AI processing
+          {t("parent.ai.title")}
         </h2>
         <p className="mt-0.5 text-sm text-muted-foreground">
-          How your questions are answered.
+          {t("parent.ai.subtitle")}
         </p>
       </div>
       <div className="space-y-4 rounded-xl border border-border p-4">
         <p className="text-sm leading-relaxed text-ink-soft">
-          To answer a question, AskMySchool sends it, along with the relevant
-          excerpts from your school&apos;s documents, to Google&apos;s Gemini AI.
-          Your children are described by grade level, not by name. AI answers
-          can be wrong, so
-          check the linked documents for anything important. See our{" "}
+          {t("parent.ai.notice")}
           <Link href="/privacy" className="font-medium text-ink underline underline-offset-4">
-            Privacy Policy
+            {t("parent.ai.privacyPolicy")}
           </Link>
-          .
+          {t("parent.ai.noticeEnd")}
         </p>
         {!consented && (
           <TermsAssentCheckbox
@@ -86,23 +84,26 @@ export function AiConsentSection({ consented: initial, consentedAt }: AiConsentS
           <p className="text-sm text-ink">
             {consented ? (
               <>
-                <span className="font-medium">On</span>
+                <span className="font-medium">{t("parent.ai.on")}</span>
                 {consentedAt && (
                   <span className="text-muted-foreground">
-                    {" "}
-                    · agreed{" "}
-                    {new Date(consentedAt).toLocaleDateString("en-US", {
-                      month: "long",
-                      day: "numeric",
-                      year: "numeric",
+                    {" · "}
+                    {t("parent.ai.agreed", {
+                      date: new Date(consentedAt).toLocaleDateString(
+                        locale === "es" ? "es-US" : "en-US",
+                        { month: "long", day: "numeric", year: "numeric" }
+                      ),
                     })}
                   </span>
                 )}
               </>
             ) : (
               <>
-                <span className="font-medium">Off</span>
-                <span className="text-muted-foreground"> · you&apos;ll be asked before your next question</span>
+                <span className="font-medium">{t("parent.ai.off")}</span>
+                <span className="text-muted-foreground">
+                  {" · "}
+                  {t("parent.ai.offHint")}
+                </span>
               </>
             )}
           </p>
@@ -113,28 +114,29 @@ export function AiConsentSection({ consented: initial, consentedAt }: AiConsentS
               onClick={() => setConfirmOpen(true)}
               disabled={saving}
             >
-              Withdraw consent
+              {t("parent.ai.withdraw")}
             </Button>
           ) : (
             <Button size="sm" onClick={handleGrant} disabled={saving || !acceptedTerms}>
-              Agree
+              {t("parent.ai.agree")}
             </Button>
           )}
         </div>
       </div>
       <p className="mt-3 text-xs text-muted-foreground">
-        Questions about your account?{" "}
+        {t("parent.ai.supportQuestion")}{" "}
         <Link href="/support" className="underline underline-offset-4 hover:text-ink">
-          Get support
+          {t("parent.ai.getSupport")}
         </Link>
       </p>
 
       <ConfirmDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
-        title="Withdraw consent to AI processing?"
-        description="You won't be able to ask questions until you agree again. Your past conversations stay in your history."
-        confirmLabel="Withdraw"
+        title={t("parent.ai.confirmTitle")}
+        description={t("parent.ai.confirmDescription")}
+        confirmLabel={t("parent.ai.confirmWithdraw")}
+        cancelLabel={t("parent.action.cancel")}
         onConfirm={handleRevoke}
         loading={saving}
       />

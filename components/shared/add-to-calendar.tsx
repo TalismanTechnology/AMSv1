@@ -12,6 +12,7 @@ import {
 import { googleCalendarUrl, icsPath, type CalendarEventInput } from "@/lib/calendar/ics";
 import { getNativePlatform } from "@/lib/native/platform";
 import { SYSTEM_BROWSER_LINK } from "@/lib/native/links";
+import { useT } from "@/components/i18n/locale-provider";
 
 // "Add to calendar" for one school event: Apple Calendar (.ics) or Google
 // Calendar (its "new event" form).
@@ -47,6 +48,8 @@ export function AddToCalendarMenu({ event, children, align = "end" }: AddToCalen
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [preparing, setPreparing] = useState(false);
   const platform = getNativePlatform();
+  // English outside the parent area's locale provider (admin calendar).
+  const t = useT();
   const range = event.date_end && event.date_end !== event.date ? event.date_end : null;
   const webIcsHref = icsPath(event.id, { end: range });
 
@@ -65,7 +68,7 @@ export function AddToCalendarMenu({ event, children, align = "end" }: AddToCalen
       return data.url ?? null;
     } catch (caught) {
       console.error("[add-to-calendar] signed link failed", caught);
-      toast.error("Couldn't open Apple Calendar. Please try again.");
+      toast.error(t("parent.addToCalendar.appleError"));
       return null;
     }
   }
@@ -99,7 +102,7 @@ export function AddToCalendarMenu({ event, children, align = "end" }: AddToCalen
       <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
       <DropdownMenuContent align={align} className="w-48">
         <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-          Add to calendar
+          {t("parent.calendar.addToCalendar")}
         </DropdownMenuLabel>
         {platform === "ios" ? (
           signedUrl ? (
@@ -110,12 +113,14 @@ export function AddToCalendarMenu({ event, children, align = "end" }: AddToCalen
             </DropdownMenuItem>
           ) : (
             <DropdownMenuItem disabled className={itemClass}>
-              {preparing ? "Apple Calendar…" : "Apple Calendar unavailable"}
+              {preparing
+                ? t("parent.addToCalendar.applePreparing")
+                : t("parent.addToCalendar.appleUnavailable")}
             </DropdownMenuItem>
           )
         ) : platform === "android" ? (
           <DropdownMenuItem className={itemClass} onSelect={() => void openOnAndroid()}>
-            Calendar file (.ics)
+            {t("parent.addToCalendar.icsFile")}
           </DropdownMenuItem>
         ) : (
           <DropdownMenuItem asChild className={itemClass}>

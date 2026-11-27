@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { LogoSpinner } from "@/components/logo-spinner";
 import { deleteMyAccount } from "@/actions/account";
+import { useT } from "@/components/i18n/locale-provider";
 
 const CONFIRMATION = "DELETE";
 
@@ -23,6 +24,7 @@ export function DeleteAccountSection() {
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const t = useT();
 
   const confirmed = typed.trim().toUpperCase() === CONFIRMATION;
 
@@ -41,16 +43,15 @@ export function DeleteAccountSection() {
     <section>
       <div className="mb-4">
         <h2 className="text-base font-semibold tracking-[-0.01em] text-ink">
-          Delete account
+          {t("parent.deleteAccount.title")}
         </h2>
         <p className="mt-0.5 text-sm text-muted-foreground">
-          Permanently delete your AskMySchool account and everything in it.
+          {t("parent.deleteAccount.subtitle")}
         </p>
       </div>
       <div className="flex flex-col gap-3 rounded-xl border border-destructive/25 p-4 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-ink-soft">
-          Your chats, feedback, children and notification settings are deleted.
-          Your Blackbaud account isn&apos;t affected.
+          {t("parent.deleteAccount.summary")}
         </p>
         <Button
           variant="outline"
@@ -61,25 +62,21 @@ export function DeleteAccountSection() {
           }}
         >
           <Trash2 className="mr-1.5 h-4 w-4" />
-          Delete my account
+          {t("parent.deleteAccount.button")}
         </Button>
       </div>
 
       <Dialog open={open} onOpenChange={(next) => !deleting && setOpen(next)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Delete your account?</DialogTitle>
-            <DialogDescription>
-              This permanently deletes your account, chat history, feedback,
-              children and push notification devices at every school you
-              belong to. It can&apos;t be undone. If you sign in with Blackbaud
-              again later, you&apos;ll start with a new, empty account.
-            </DialogDescription>
+            <DialogTitle>{t("parent.deleteAccount.confirmTitle")}</DialogTitle>
+            <DialogDescription>{t("parent.deleteAccount.confirmDescription")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
             <Label htmlFor="delete-confirm">
-              Type <span className="font-mono font-semibold">{CONFIRMATION}</span> to
-              confirm
+              {t("parent.deleteAccount.typeBefore")}
+              <span className="font-mono font-semibold">{CONFIRMATION}</span>
+              {t("parent.deleteAccount.typeAfter")}
             </Label>
             <Input
               id="delete-confirm"
@@ -96,7 +93,7 @@ export function DeleteAccountSection() {
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" disabled={deleting} onClick={() => setOpen(false)}>
-              Cancel
+              {t("parent.action.cancel")}
             </Button>
             <Button
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
@@ -104,7 +101,7 @@ export function DeleteAccountSection() {
               onClick={handleDelete}
             >
               {deleting && <LogoSpinner className="mr-2" />}
-              Delete my account
+              {t("parent.deleteAccount.button")}
             </Button>
           </div>
         </DialogContent>

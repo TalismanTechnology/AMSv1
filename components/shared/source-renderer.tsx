@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { format, isValid, parseISO } from "date-fns";
+import { es } from "date-fns/locale";
 import { ChevronDown, ExternalLink, Forward, Globe } from "lucide-react";
 import { LogoSpinner } from "@/components/logo-spinner";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,8 @@ import {
   type Block,
 } from "@/lib/sources/format-text";
 import { decodeHtmlEntities } from "@/lib/markdown/normalize";
+import { useLocale, useT } from "@/components/i18n/locale-provider";
+import type { Locale } from "@/lib/i18n/locale";
 
 type SourceKind = "pdf" | "docx" | "image" | "email" | "website" | "text";
 
@@ -64,6 +67,8 @@ export function SourceRenderer({
   const [data, setData] = useState<SourceResponse | null>(null);
   const [rawText, setRawText] = useState<string | null>(documentId ? null : (text ?? null));
   const [loading, setLoading] = useState(!!documentId);
+  // English outside the parent area's locale provider (admin pages).
+  const t = useT();
 
   useEffect(() => {
     if (!documentId) {
@@ -138,7 +143,7 @@ export function SourceRenderer({
   } else if (rawText?.trim()) {
     body = <FormattedText raw={rawText} start={0} end={rawText.length} />;
   } else {
-    body = <p className="py-8 text-center text-sm text-muted-foreground">No text to show for this document.</p>;
+    body = <p className="py-8 text-center text-sm text-muted-foreground">{t("parent.source.noText")}</p>;
   }
 
   return (
@@ -284,6 +289,7 @@ function Inline({ text }: { text: string }) {
 
 /** Only the page's card: the live page reads better than its extracted text. */
 function WebsiteView({ title, url }: { title: string; url: string | null }) {
+  const t = useT();
   return (
     <div className="rounded-xl border border-border bg-muted/40 p-4">
       <p className="text-base font-semibold leading-snug text-ink">{title}</p>
@@ -296,7 +302,7 @@ function WebsiteView({ title, url }: { title: string; url: string | null }) {
           <Button asChild variant="outline" size="sm" className="mt-3">
             <a href={url} target="_blank" rel="noopener noreferrer">
               <ExternalLink className="size-3.5" />
-              View original page
+              {t("parent.source.viewOriginal")}
             </a>
           </Button>
         </>
@@ -307,11 +313,14 @@ function WebsiteView({ title, url }: { title: string; url: string | null }) {
 
 // ── Email ───────────────────────────────────────────────────────────────
 
-function formatEmailDate(value: string | undefined): string | null {
+function formatEmailDate(value: string | undefined, locale: Locale): string | null {
   if (!value) return null;
   let d = parseISO(value);
   if (!isValid(d)) d = new Date(value);
-  return isValid(d) ? format(d, "EEE, MMM d, yyyy 'at' h:mm a") : value;
+  if (!isValid(d)) return value;
+  return locale === "es"
+    ? format(d, "EEE, d 'de' MMM 'de' yyyy 'a las' h:mm a", { locale: es })
+    : format(d, "EEE, MMM d, yyyy 'at' h:mm a");
 }
 
 /** "Jane Doe <jane@x.org>" → ["Jane Doe", "jane@x.org"]. */
@@ -323,9 +332,12 @@ function splitAddress(value: string): [string, string | null] {
 }
 
 function EmailHeaderCard({ headers }: { headers: EmailHeaders }) {
-  const [name, address] = headers.from ? splitAddress(headers.from) : ["Unknown sender", null];
+  const { locale, t } = useLocale();
+  const [name, address] = headers.from
+    ? splitAddress(headers.from)
+    : [t("parent.source.unknownSender"), null];
   const initial = (name.match(/[A-Za-z0-9]/)?.[0] ?? "?").toUpperCase();
-  const date = formatEmailDate(headers.date);
+  const date = formatEmailDate(headers.date, locale);
   return (
     <div className="mb-6 rounded-xl border border-border bg-muted/40 p-4">
       {headers.subject && (
@@ -345,12 +357,12 @@ function EmailHeaderCard({ headers }: { headers: EmailHeaders }) {
           </div>
           {headers.to && (
             <p className="truncate text-muted-foreground" title={headers.to}>
-              To: {headers.to}
+              {t("parent.source.to", { value: headers.to })}
             </p>
           )}
           {headers.cc && (
             <p className="truncate text-muted-foreground" title={headers.cc}>
-              Cc: {headers.cc}
+              {t("parent.source.cc", { value: headers.cc })}
             </p>
           )}
           {date && <p className="text-xs text-muted-foreground">{date}</p>}
@@ -377,6 +389,7 @@ function EmailView({
   // The original HTML reads best when there is one.
   const [view, setView] = useState<SourceView>(html ? "original" : "text");
   const [quotedOpen, setQuotedOpen] = useState(false);
+  const t = useT();
 
   const fwd =
     parsed.forwarded &&
@@ -394,7 +407,7 @@ function EmailView({
       {html && (view === "original" || !raw.trim()) ? (
         <SafeEmailHtml html={html} />
       ) : !raw.trim() ? (
-        <p className="text-sm text-muted-foreground">This email has no text.</p>
+        <p className="text-sm text-muted-foreground">{t("parent.source.noEmailText")}</p>
       ) : (
         <>
           {fwd ? (
@@ -416,7 +429,7 @@ function EmailView({
                 aria-expanded={quotedOpen}
               >
                 <ChevronDown className={cn("size-3.5 transition-transform", quotedOpen && "rotate-180")} />
-                {quotedOpen ? "Hide quoted text" : "Show quoted text"}
+                {quotedOpen ? t("parent.source.hideQuoted") : t("parent.source.showQuoted")}
               </button>
               {quotedOpen && (
                 <div className="mt-4 border-l-2 border-border pl-4 opacity-85">
@@ -432,15 +445,18 @@ function EmailView({
 }
 
 function ForwardedCard({ headers }: { headers: EmailHeaders }) {
-  const date = formatEmailDate(headers.date);
+  const { locale, t } = useLocale();
+  const date = formatEmailDate(headers.date, locale);
   return (
     <div className="my-5 rounded-lg border border-dashed border-border px-3 py-2.5 text-sm leading-6">
       <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
         <Forward className="size-3.5" />
-        Forwarded message
+        {t("parent.source.forwarded")}
       </p>
-      {headers.from && <p className="text-ink">From: {headers.from}</p>}
-      {headers.subject && <p className="text-ink-soft">Subject: {headers.subject}</p>}
+      {headers.from && <p className="text-ink">{t("parent.source.from", { value: headers.from })}</p>}
+      {headers.subject && (
+        <p className="text-ink-soft">{t("parent.source.subject", { value: headers.subject })}</p>
+      )}
       {date && <p className="text-xs text-muted-foreground">{date}</p>}
     </div>
   );
@@ -462,6 +478,7 @@ const EMAIL_FRAME_STYLE = `
  * in a new tab. The frame grows to its content so the panel scrolls as one.
  */
 function SafeEmailHtml({ html }: { html: string }) {
+  const t = useT();
   const [doc, setDoc] = useState<string | null>(null);
   const [height, setHeight] = useState(240);
   const frameRef = useRef<HTMLIFrameElement>(null);
@@ -547,7 +564,7 @@ function SafeEmailHtml({ html }: { html: string }) {
   return (
     <iframe
       ref={frameRef}
-      title="Email message"
+      title={t("parent.source.emailFrame")}
       sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin"
       srcDoc={doc}
       style={{ height }}

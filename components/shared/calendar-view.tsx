@@ -17,7 +17,9 @@ import {
   addDays,
   subDays,
   isToday,
+  type Locale as DateFnsLocale,
 } from "date-fns";
+import { es } from "date-fns/locale";
 import {
   ChevronLeft,
   ChevronRight,
@@ -40,6 +42,7 @@ import { useMediaQuery } from "@/hooks/use-media-query";
 import { calendarColorClasses, UNLABELED_CLASSES } from "@/lib/event-calendars";
 import { isEventVisible, usedLabels, UNLABELED_FILTER_ID } from "@/lib/event-filters";
 import type { CalendarLabel, SchoolEvent } from "@/lib/types";
+import { useLocale, useT } from "@/components/i18n/locale-provider";
 
 /** The school's labels by id. An event takes its color from its label. */
 const LabelsContext = createContext<Map<string, CalendarLabel>>(new Map());
@@ -56,6 +59,8 @@ function useEventColors(event: SchoolEvent) {
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const WEEKDAYS_NARROW = ["S", "M", "T", "W", "T", "F", "S"];
+const WEEKDAYS_ES = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+const WEEKDAYS_NARROW_ES = ["D", "L", "M", "M", "J", "V", "S"];
 const HOUR_START = 7;
 const HOUR_END = 21;
 const HOUR_HEIGHT = 60; // px per hour
@@ -65,6 +70,41 @@ const GUTTER_VAR = "[--gutter:44px] sm:[--gutter:60px]";
 type ViewMode = "month" | "week" | "day";
 
 // ─── Helpers ──────────────────────────────────────────────
+
+/**
+ * Date formatting in the UI language. English (admin pages, which have no
+ * locale provider) keeps the original patterns; Spanish reads "jueves, 26 de
+ * noviembre de 2026", capitalized where it starts a heading.
+ */
+function useDateFormat() {
+  const { locale } = useLocale();
+  const dateLocale: DateFnsLocale | undefined = locale === "es" ? es : undefined;
+  const isEs = locale === "es";
+  const fmt = (date: Date, pattern: string) =>
+    dateLocale ? format(date, pattern, { locale: dateLocale }) : format(date, pattern);
+  const capitalize = (text: string) => (isEs ? text.charAt(0).toUpperCase() + text.slice(1) : text);
+  return {
+    isEs,
+    fmt,
+    /** "Thursday, November 26, 2026" / "Jueves, 26 de noviembre de 2026" */
+    fullDay: (date: Date) =>
+      capitalize(fmt(date, isEs ? "EEEE, d 'de' MMMM 'de' yyyy" : "EEEE, MMMM d, yyyy")),
+    /** "November 2026" / "Noviembre de 2026" */
+    month: (date: Date) => capitalize(fmt(date, isEs ? "MMMM 'de' yyyy" : "MMMM yyyy")),
+    /** "Nov 22 – 28, 2026" / "22 – 28 de nov de 2026" */
+    week: (start: Date, end: Date) => {
+      const sameMonth = start.getMonth() === end.getMonth();
+      if (isEs) {
+        return sameMonth
+          ? `${fmt(start, "d")} – ${fmt(end, "d 'de' MMM 'de' yyyy")}`
+          : `${fmt(start, "d 'de' MMM")} – ${fmt(end, "d 'de' MMM 'de' yyyy")}`;
+      }
+      return sameMonth
+        ? `${fmt(start, "MMM d")} – ${fmt(end, "d, yyyy")}`
+        : `${fmt(start, "MMM d")} – ${fmt(end, "MMM d, yyyy")}`;
+    },
+  };
+}
 
 function formatTimeFull(time: string | null) {
   if (!time) return null;
@@ -174,6 +214,7 @@ function EventPopover({
 }) {
   // Phones have no room beside a narrow column, so open below instead.
   const isWide = useMediaQuery("(min-width: 640px)");
+  const t = useT();
   return (
     <Popover>
       <PopoverTrigger asChild>{children}</PopoverTrigger>
@@ -212,7 +253,7 @@ function EventPopover({
           <AddToCalendarMenu event={event} align="start">
             <Button variant="ghost" size="sm" className="h-7 text-xs">
               <CalendarPlus className="mr-1 h-3 w-3" />
-              Add to calendar
+              {t("parent.calendar.addToCalendar")}
             </Button>
           </AddToCalendarMenu>
           {onEdit && (
@@ -223,7 +264,7 @@ function EventPopover({
               onClick={() => onEdit(event)}
             >
               <Pencil className="mr-1 h-3 w-3" />
-              Edit
+              {t("parent.calendar.edit")}
             </Button>
           )}
           {onDelete && (
@@ -234,7 +275,7 @@ function EventPopover({
               onClick={() => onDelete(event)}
             >
               <Trash2 className="mr-1 h-3 w-3" />
-              Delete
+              {t("parent.calendar.delete")}
             </Button>
           )}
         </div>
@@ -272,18 +313,22 @@ function MonthView({
       end: endOfWeek(monthEnd),
     });
   }, [currentMonth]);
+  const t = useT();
+  const { isEs } = useDateFormat();
+  const weekdays = isEs ? WEEKDAYS_ES : WEEKDAYS;
+  const weekdaysNarrow = isEs ? WEEKDAYS_NARROW_ES : WEEKDAYS_NARROW;
 
   return (
     <div className="rounded-lg border bg-card metallic-card overflow-hidden">
       {/* Weekday headers */}
       <div className="grid grid-cols-7 border-b bg-muted/30">
-        {WEEKDAYS.map((day, i) => (
+        {weekdays.map((day, i) => (
           <div
             key={day}
             className="py-2 text-center text-xs font-medium text-muted-foreground sm:py-2.5"
           >
             <abbr title={day} className="no-underline sm:hidden">
-              {WEEKDAYS_NARROW[i]}
+              {weekdaysNarrow[i]}
             </abbr>
             <span className="hidden sm:inline">{day}</span>
           </div>
@@ -324,7 +369,12 @@ function MonthView({
               </span>
               {dayEvents.length > 0 && (
                 <span className="sr-only">
-                  , {dayEvents.length} event{dayEvents.length !== 1 ? "s" : ""}
+                  {t(
+                    dayEvents.length === 1
+                      ? "parent.calendar.eventCountSrOne"
+                      : "parent.calendar.eventCountSrOther",
+                    { count: dayEvents.length }
+                  )}
                 </span>
               )}
 
@@ -377,7 +427,7 @@ function MonthView({
                     }}
                     className="w-full text-left text-[10px] font-medium text-primary hover:underline px-1.5"
                   >
-                    +{overflow} more
+                    {t("parent.calendar.more", { count: overflow })}
                   </button>
                 )}
               </div>
@@ -409,6 +459,7 @@ function TimeGrid({
     (_, i) => HOUR_START + i
   );
   const totalHeight = hours.length * HOUR_HEIGHT;
+  const t = useT();
   const colCount = columns.length;
 
   function getEventStyle(event: SchoolEvent) {
@@ -442,7 +493,7 @@ function TimeGrid({
           }}
         >
           <div className="text-[10px] text-muted-foreground/60 px-1 py-1.5 text-right">
-            all day
+            {t("parent.calendar.allDay")}
           </div>
           {columns.map((day) => {
             const dateStr = format(day, "yyyy-MM-dd");
@@ -616,6 +667,8 @@ export function CalendarView({
   const [currentMonth, setCurrentMonth] = useState(() => openedOn ?? new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(() => openedOn ?? new Date());
   const dayListRef = useRef<HTMLDivElement>(null);
+  const t = useT();
+  const dates = useDateFormat();
 
   // Opened on a specific day: bring its event list into view.
   useEffect(() => {
@@ -687,16 +740,9 @@ export function CalendarView({
   }
 
   function getHeaderLabel() {
-    if (view === "month") return format(currentMonth, "MMMM yyyy");
-    if (view === "week") {
-      const ws = startOfWeek(selectedDate);
-      const we = endOfWeek(selectedDate);
-      if (ws.getMonth() === we.getMonth()) {
-        return `${format(ws, "MMM d")} – ${format(we, "d, yyyy")}`;
-      }
-      return `${format(ws, "MMM d")} – ${format(we, "MMM d, yyyy")}`;
-    }
-    return format(selectedDate, "EEEE, MMMM d, yyyy");
+    if (view === "month") return dates.month(currentMonth);
+    if (view === "week") return dates.week(startOfWeek(selectedDate), endOfWeek(selectedDate));
+    return dates.fullDay(selectedDate);
   }
 
   // Week view columns
@@ -724,14 +770,14 @@ export function CalendarView({
               className="order-last w-full sm:order-none sm:w-auto"
             >
               <Plus className="mr-1 h-4 w-4" />
-              Create event
+              {t("parent.calendar.createEvent")}
             </Button>
           )}
 
           {/* View toggle */}
           <div
             role="group"
-            aria-label="Calendar view"
+            aria-label={t("parent.calendar.viewLabel")}
             className="flex rounded-lg border bg-muted/30 p-0.5"
           >
             {(["month", "week", "day"] as const).map((v) => (
@@ -746,7 +792,7 @@ export function CalendarView({
                     : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                {v}
+                {t(`parent.calendar.view.${v}`)}
               </button>
             ))}
           </div>
@@ -758,13 +804,13 @@ export function CalendarView({
               className="h-9"
               onClick={goToToday}
             >
-              Today
+              {t("parent.calendar.today")}
             </Button>
             <Button
               variant="ghost"
               size="icon"
               className="h-9 w-9"
-              aria-label="Previous"
+              aria-label={t("parent.calendar.previous")}
               onClick={navigatePrev}
             >
               <ChevronLeft className="h-4 w-4" />
@@ -773,7 +819,7 @@ export function CalendarView({
               variant="ghost"
               size="icon"
               className="h-9 w-9"
-              aria-label="Next"
+              aria-label={t("parent.calendar.next")}
               onClick={navigateNext}
             >
               <ChevronRight className="h-4 w-4" />
@@ -785,7 +831,7 @@ export function CalendarView({
       {/* Label filters — only worth showing when there's a choice to make */}
       {chipCount > 1 && (
         <div className="rounded-lg border bg-card/60 p-3 metallic-card">
-          <FilterRow label="Labels">
+          <FilterRow label={t("parent.calendar.labels")}>
             {filterChips.labels.map((label) => (
               <FilterChip
                 key={label.id}
@@ -798,7 +844,7 @@ export function CalendarView({
             ))}
             {filterChips.hasUnlabeled && (
               <FilterChip
-                name="No label"
+                name={t("parent.calendar.noLabel")}
                 isOn={!hiddenLabelIds.has(UNLABELED_FILTER_ID)}
                 onToggle={() => toggleLabel(UNLABELED_FILTER_ID)}
                 dotClass={UNLABELED_CLASSES.dot}
@@ -835,7 +881,7 @@ export function CalendarView({
                   )}
                 >
                   <div className="text-[10px] font-medium text-muted-foreground uppercase">
-                    {format(day, "EEE")}
+                    {dates.fmt(day, "EEE")}
                   </div>
                   <div
                     className={cn(
@@ -899,23 +945,27 @@ export function CalendarView({
             aria-live="polite"
             className="mb-3 text-sm font-medium text-muted-foreground"
           >
-            {format(selectedDate, "EEEE, MMMM d, yyyy")}
+            {dates.fullDay(selectedDate)}
             {selectedEvents.length > 0 && (
               <span className="ml-2 text-foreground">
-                — {selectedEvents.length} event
-                {selectedEvents.length !== 1 ? "s" : ""}
+                {t(
+                  selectedEvents.length === 1
+                    ? "parent.calendar.dayCountOne"
+                    : "parent.calendar.dayCountOther",
+                  { count: selectedEvents.length }
+                )}
               </span>
             )}
           </h3>
           {selectedEvents.length === 0 ? (
             <div className="text-sm text-muted-foreground/60 py-6 text-center border rounded-lg bg-card/50">
-              No events on this day
+              {t("parent.calendar.noEvents")}
               {onCreateEventOnDate && (
                 <button
                   onClick={() => onCreateEventOnDate(selectedDateStr)}
                   className="block mx-auto mt-2 text-xs text-primary hover:underline"
                 >
-                  + Create event
+                  {t("parent.calendar.createEventPlus")}
                 </button>
               )}
             </div>
@@ -961,7 +1011,7 @@ export function CalendarView({
                         variant="ghost"
                         size="icon"
                         className="h-9 w-9 sm:h-7 sm:w-7"
-                        aria-label={`Add ${event.title} to calendar`}
+                        aria-label={t("parent.calendar.addEventToCalendar", { title: event.title })}
                       >
                         <CalendarPlus className="h-3.5 w-3.5" />
                       </Button>
@@ -971,7 +1021,7 @@ export function CalendarView({
                         variant="ghost"
                         size="icon"
                         className="h-9 w-9 sm:h-7 sm:w-7"
-                        aria-label="Edit event"
+                        aria-label={t("parent.calendar.editEvent")}
                         onClick={() => onEditEvent(event)}
                       >
                         <Pencil className="h-3 w-3" />
@@ -982,7 +1032,7 @@ export function CalendarView({
                         variant="ghost"
                         size="icon"
                         className="h-9 w-9 text-destructive hover:text-destructive sm:h-7 sm:w-7"
-                        aria-label="Delete event"
+                        aria-label={t("parent.calendar.deleteEvent")}
                         onClick={() => onDeleteEvent(event)}
                       >
                         <Trash2 className="h-3 w-3" />

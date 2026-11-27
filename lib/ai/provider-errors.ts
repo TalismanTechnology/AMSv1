@@ -33,6 +33,15 @@ export const AI_ERROR_CATEGORIES: readonly AiErrorCategory[] = [
 export const PARENT_AI_ERROR_MESSAGE =
   "Ask My School is temporarily unavailable. Please try again in a little while.";
 
+/** PARENT_AI_ERROR_MESSAGE for a parent writing in Spanish. */
+export const PARENT_AI_ERROR_MESSAGE_ES =
+  "Ask My School no está disponible en este momento. Por favor, inténtelo de nuevo en un rato.";
+
+/** The parent's error line in their language ("en" | "es"). */
+export function parentAiErrorMessage(language: string | null | undefined): string {
+  return language === "es" ? PARENT_AI_ERROR_MESSAGE_ES : PARENT_AI_ERROR_MESSAGE;
+}
+
 const ADMIN_MESSAGES: Record<AiErrorCategory, string> = {
   billing_quota:
     "The AI service is unavailable: its usage limit has been reached. The AskMySchool team has been alerted.",

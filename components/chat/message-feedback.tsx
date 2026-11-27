@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { clearFeedback, submitFeedback } from "@/actions/feedback";
 import { cn } from "@/lib/utils";
 import { IconBadge } from "./icon-badge";
+import { useT } from "@/components/i18n/locale-provider";
 
 // Selected: darker forest fill, a brand-green ring and a filled glyph.
 const SELECTED = "bg-brand-badge-strong ring-2 ring-brand-badge ring-offset-1 ring-offset-background";
@@ -17,6 +18,7 @@ interface MessageFeedbackProps {
 }
 
 export function MessageFeedback({ messageId, schoolId }: MessageFeedbackProps) {
+  const t = useT();
   const [rating, setRating] = useState<"up" | "down" | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -43,7 +45,7 @@ export function MessageFeedback({ messageId, schoolId }: MessageFeedbackProps) {
         className="group h-7 w-7 rounded-md transition-colors"
         onClick={() => handleRate("up")}
         disabled={submitting}
-        aria-label="Helpful"
+        aria-label={t("chat.helpful")}
         aria-pressed={rating === "up"}
       >
         <IconBadge className={rating === "up" ? SELECTED : UNSELECTED}>
@@ -56,9 +58,9 @@ export function MessageFeedback({ messageId, schoolId }: MessageFeedbackProps) {
         className="group h-7 w-7 rounded-md transition-colors"
         onClick={() => handleRate("down")}
         disabled={submitting}
-        aria-label="Not helpful"
+        aria-label={t("chat.notHelpful")}
         aria-pressed={rating === "down"}
-        title="Not helpful — lets your school see this question and answer so they can improve"
+        title={t("chat.notHelpfulTitle")}
       >
         <IconBadge className={rating === "down" ? SELECTED : UNSELECTED}>
           <ThumbsDown className={cn("size-3", rating === "down" && "fill-current")} />

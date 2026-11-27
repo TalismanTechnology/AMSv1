@@ -27,6 +27,7 @@ import { DocumentViewer } from "@/components/shared/document-viewer";
 import { getDocumentSignedUrl } from "@/lib/storage-url";
 import type { ChatSource } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { useT } from "@/components/i18n/locale-provider";
 
 const FILE_TYPE_ICONS: Record<string, typeof FileText> = {
   pdf: FileText,
@@ -40,10 +41,10 @@ const FILE_TYPE_ICONS: Record<string, typeof FileText> = {
 };
 
 const SOURCE_TYPE_CONFIG = {
-  announcement: { icon: Megaphone, label: "Announcement" },
-  event: { icon: CalendarDays, label: "Event" },
-  clarification: { icon: BadgeCheck, label: "Clarification" },
-};
+  announcement: { icon: Megaphone, label: "chat.announcement" },
+  event: { icon: CalendarDays, label: "chat.event" },
+  clarification: { icon: BadgeCheck, label: "chat.clarification" },
+} as const;
 
 interface DocumentPreviewCardProps {
   source: ChatSource;
@@ -56,6 +57,7 @@ export function DocumentPreviewCard({
   index,
   defaultExpanded = false,
 }: DocumentPreviewCardProps) {
+  const t = useT();
   const sourceType = source.source_type || "document";
 
   // Non-document sources render as a simple card (no expand)
@@ -72,7 +74,7 @@ export function DocumentPreviewCard({
           {source.title}
         </span>
         <Badge variant="secondary" className="shrink-0 text-[10px]">
-          {config.label}
+          {t(config.label)}
         </Badge>
       </div>
     );
@@ -90,6 +92,7 @@ function DocumentSourceCard({
   const [isOpen, setIsOpen] = useState(defaultExpanded);
   const [viewerOpen, setViewerOpen] = useState(false);
   const { openSource } = useSourcePanel();
+  const t = useT();
 
   const FileIcon = FILE_TYPE_ICONS[source.file_type || ""] || FileText;
 
@@ -162,7 +165,7 @@ function DocumentSourceCard({
               onClick={() => setViewerOpen(true)}
             >
               <Eye className="h-3 w-3" />
-              Open viewer
+              {t("chat.openViewer")}
             </Button>
             <Button
               type="button"
@@ -171,20 +174,20 @@ function DocumentSourceCard({
               onClick={() => openSource(source)}
             >
               <PanelRight className="h-3 w-3" />
-              Open in sidebar
+              {t("chat.openInSidebar")}
             </Button>
             {source.source_url && (
               <Button asChild variant="ghost" size="xs">
                 <a href={source.source_url} target="_blank" rel="noopener noreferrer">
                   <ExternalLink className="h-3 w-3" />
-                  Visit page
+                  {t("chat.visitPage")}
                 </a>
               </Button>
             )}
             {source.file_url && (
               <Button type="button" variant="ghost" size="xs" onClick={handleDownload}>
                 <Download className="h-3 w-3" />
-                Download
+                {t("chat.download")}
               </Button>
             )}
           </div>

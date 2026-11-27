@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { LogoSpinner } from "@/components/logo-spinner";
 import { usePendingNavigation } from "@/hooks/use-pending-navigation";
 import { getNativePlatform } from "@/lib/native/platform";
+import { useT } from "@/components/i18n/locale-provider";
 
 interface GoogleSignInButtonProps {
   /** Where to land afterwards (validated again on the server). */
@@ -23,6 +24,7 @@ interface GoogleSignInButtonProps {
  * blocks sign-in inside web views.
  */
 export function GoogleSignInButton({ next, loginPath, disabled }: GoogleSignInButtonProps) {
+  const t = useT();
   const { pending, start } = usePendingNavigation();
   const [nativePending, setNativePending] = useState(false);
   const busy = Boolean(pending) || nativePending;
@@ -66,12 +68,12 @@ export function GoogleSignInButton({ next, loginPath, disabled }: GoogleSignInBu
         {busy ? (
           <>
             <LogoSpinner />
-            Redirecting to Google…
+            {t("auth.redirectingToGoogle")}
           </>
         ) : (
           <>
             <GoogleLogo />
-            Continue with Google
+            {t("auth.continueWithGoogle")}
           </>
         )}
       </a>
@@ -80,7 +82,9 @@ export function GoogleSignInButton({ next, loginPath, disabled }: GoogleSignInBu
 }
 
 /** The divider between the Google button and the password form. */
-export function AuthDivider({ label = "or" }: { label?: string }) {
+export function AuthDivider({ label: labelProp }: { label?: string }) {
+  const t = useT();
+  const label = labelProp ?? t("auth.or");
   return (
     <div className="my-5 flex items-center gap-3" role="separator" aria-label={label}>
       <span className="h-px flex-1 bg-border" />

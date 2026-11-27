@@ -4,7 +4,8 @@ import { requireSchoolContext } from "@/lib/school-context";
 import { ChatPageClient } from "./chat-page-client";
 import { hasAiConsent } from "@/lib/ai/consent";
 import { loadChatPage } from "@/lib/chat/current-chat";
-import { parentChatHeading } from "@/lib/chat/chat-view";
+import { resolveSchoolName } from "@/lib/school-display-name";
+import { getTranslator } from "@/lib/i18n/server";
 
 export default async function ChatPage({
   params,
@@ -39,16 +40,20 @@ export default async function ChatPage({
     .eq("school_id", school.id)
     .single();
 
-  const [chat, { data: consent }, { data: settings }] = await Promise.all([
+  const [chat, { data: consent }, { data: settings }, { t }] = await Promise.all([
     chatPromise,
     consentPromise,
     settingsPromise,
+    getTranslator(),
   ]);
 
   const suggestedQuestions =
     settings?.suggested_questions && Array.isArray(settings.suggested_questions)
       ? (settings.suggested_questions as string[])
       : undefined;
+
+  // parentChatHeading (lib/chat/chat-view.ts), with its fallback translated.
+  const heading = resolveSchoolName(school.name) ?? t("chat.welcomeHeading");
 
   return (
     <Suspense>
@@ -62,7 +67,7 @@ export default async function ChatPage({
         }
         welcomeMessage={settings?.welcome_message}
         schoolId={school.id}
-        heading={parentChatHeading(school.name)}
+        heading={heading}
         aiConsentGiven={hasAiConsent(consent)}
       />
     </Suspense>

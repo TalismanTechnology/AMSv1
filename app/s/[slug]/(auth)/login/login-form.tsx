@@ -13,15 +13,11 @@ import { AuthShell } from "@/components/auth/auth-shell";
 import { ParentSignInButton } from "@/components/auth/parent-sign-in-button";
 import { LegalNotice } from "@/components/legal/legal-notice";
 import { AuthDivider, GoogleSignInButton } from "@/components/auth/google-sign-in-button";
-import {
-  ADMIN_SIGN_IN_UNAVAILABLE_MESSAGE,
-  PARENT_PASSWORD_FORM_NOTE,
-  PARENT_PASSWORD_LINK_LABEL,
-  staffPasswordForm,
-  type StaffSignInMode,
-} from "@/lib/auth/admin-google-only";
+import { staffPasswordForm, type StaffSignInMode } from "@/lib/auth/admin-google-only";
 import { AUTH_PROVIDERS, isRetiredAuthProvider, type AuthProvider } from "@/lib/auth/provider";
-import { schoolPossessive } from "@/lib/school-display-name";
+import { LanguageToggle } from "@/components/i18n/language-toggle";
+import { useLocale } from "@/components/i18n/locale-provider";
+import { localizeAuthError, schoolPossessiveFor } from "@/lib/i18n/auth-errors";
 
 interface LoginFormProps {
   schoolSlug: string;
@@ -47,7 +43,8 @@ export function LoginForm({
 }: LoginFormProps) {
   const googleSignInEnabled = staffSignIn === "google-only" || staffSignIn === "google-and-password";
   const passwordForm = staffPasswordForm(staffSignIn);
-  const { label: providerLabel, portalName } = AUTH_PROVIDERS[provider];
+  const { label: providerLabel } = AUTH_PROVIDERS[provider];
+  const { locale, t } = useLocale();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   // Errors from the provider callbacks arrive as ?error=.
@@ -75,20 +72,22 @@ export function LoginForm({
 
   // Built as whole strings so each sentence renders as one text node, and a
   // missing name reads "your school's" rather than "'s".
-  const possessive = schoolPossessive(schoolName);
-  const heading = schoolName ?? "Sign in";
+  const possessive = schoolPossessiveFor(locale, schoolName);
+  const heading = schoolName ?? t("auth.signIn");
   // A leftover auth_provider = 'roster' (emailed codes, removed) has no
   // parent sign-in at all: say so rather than offer anything.
   const retired = isRetiredAuthProvider(provider);
   const subheading = retired
-    ? "Parent sign-in isn't available here right now."
+    ? t("auth.parentSignInUnavailable")
     : schoolName
-      ? `Sign in with your ${schoolName} ${providerLabel} account.`
-      : `Sign in with your school's ${providerLabel} account.`;
-  const portalHint = `Use the same login you use for ${possessive} ${portalName}. Only parents and guardians can sign in.`;
+      ? t("auth.subheadingNamed", { school: schoolName, provider: providerLabel })
+      : t("auth.subheadingUnnamed", { provider: providerLabel });
+  const portalHint = t("auth.portalHint", { possessive, portal: t(`auth.portal.${provider}`) });
   const notEnabled = retired
-    ? `Parent sign-in isn't set up for ${schoolName ?? "your school"}. Please contact the school for help signing in.`
-    : `${schoolName ?? "Your school"} hasn't turned on ${providerLabel} sign-in yet. Please check back soon.`;
+    ? t("auth.notSetUp", { school: schoolName ?? t("auth.yourSchool") })
+    : schoolName
+      ? t("auth.notEnabledNamed", { school: schoolName, provider: providerLabel })
+      : t("auth.notEnabledUnnamed", { provider: providerLabel });
 
   return (
     <AuthShell>
@@ -102,24 +101,25 @@ export function LoginForm({
             transition={{ duration: 0.15 }}
             className="fixed inset-0 z-50 flex items-center justify-center bg-background"
           >
-            <LogoLoading size={100} label="Signing you in…" />
+            <LogoLoading size={100} label={t("auth.signingYouIn")} />
           </motion.div>
         )}
       </AnimatePresence>
 
       <div className="metallic-card rounded-2xl p-8 sm:p-10">
         <div className="mb-7">
-          <span className="mb-5 flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary elev-1">
-            <Logo size={24} className="text-primary" />
-          </span>
-          <p className="eyebrow">{showStaffSignIn ? "Staff sign in" : "Parent sign in"}</p>
+          <div className="mb-5 flex items-start justify-between gap-3">
+            <span className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary elev-1">
+              <Logo size={24} className="text-primary" />
+            </span>
+            <LanguageToggle />
+          </div>
+          <p className="eyebrow">{showStaffSignIn ? t("auth.staffSignIn") : t("auth.parentSignIn")}</p>
           <h1 className="mt-2 font-serif-display text-3xl font-medium tracking-[-0.02em] text-ink">
             {heading}
           </h1>
           <p className="mt-2 text-sm text-ink-soft">
-            {showStaffSignIn
-              ? "For school administrators."
-              : subheading}
+            {showStaffSignIn ? t("auth.staffSubheading") : subheading}
           </p>
         </div>
 
@@ -128,7 +128,7 @@ export function LoginForm({
             role="alert"
             className="mb-4 rounded-lg border border-destructive/25 bg-destructive/10 p-3 text-sm text-destructive"
           >
-            {error}
+            {localizeAuthError(error, locale)}
           </div>
         )}
 
@@ -156,14 +156,14 @@ export function LoginForm({
             {passwordForm === "open" ? (
               <AuthDivider />
             ) : (
-              <p className="mt-3 text-center text-sm text-ink-soft">Admins sign in with Google.</p>
+              <p className="mt-3 text-center text-sm text-ink-soft">{t("auth.adminsSignInWithGoogle")}</p>
             )}
           </>
         )}
 
         {showStaffSignIn && staffSignIn === "unavailable" && (
           <p className="rounded-xl border border-border bg-secondary/60 px-5 py-6 text-center text-sm text-ink-soft">
-            {ADMIN_SIGN_IN_UNAVAILABLE_MESSAGE}
+            {t("auth.adminSignInUnavailable")}
           </p>
         )}
 
@@ -175,12 +175,12 @@ export function LoginForm({
             className="mt-5 w-full text-center text-sm text-ink-soft underline-offset-4 hover:text-ink hover:underline"
             data-parent-password-link
           >
-            {PARENT_PASSWORD_LINK_LABEL}
+            {t("auth.parentPasswordLink")}
           </button>
         )}
 
         {showStaffSignIn && passwordForm === "parent-link" && showParentPassword && (
-          <p className="mt-4 mb-3 text-center text-xs text-ink-soft">{PARENT_PASSWORD_FORM_NOTE}</p>
+          <p className="mt-4 mb-3 text-center text-xs text-ink-soft">{t("auth.parentPasswordNote")}</p>
         )}
 
         {showStaffSignIn && staffPasswordShown && (
@@ -188,13 +188,13 @@ export function LoginForm({
             <input type="hidden" name="school_slug" value={schoolSlug} />
             <input type="hidden" name="school_id" value={schoolId} />
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t("auth.email")}</Label>
               <Input
                 id="email"
                 name="email"
                 type="email"
                 autoComplete="email"
-                placeholder="you@school.org"
+                placeholder={t("auth.emailPlaceholder")}
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 disabled={formPending}
@@ -202,19 +202,19 @@ export function LoginForm({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{t("auth.password")}</Label>
               <Input
                 id="password"
                 name="password"
                 type="password"
                 autoComplete="current-password"
-                placeholder="Enter your password"
+                placeholder={t("auth.passwordPlaceholder")}
                 disabled={formPending}
                 required
               />
             </div>
-            <SubmitButton className="h-11 w-full" pendingText="Signing in…">
-              Sign in
+            <SubmitButton className="h-11 w-full" pendingText={t("auth.signingIn")}>
+              {t("auth.signIn")}
             </SubmitButton>
           </form>
         )}
@@ -228,7 +228,7 @@ export function LoginForm({
           }}
           className="mt-6 w-full text-center text-sm text-ink-soft underline-offset-4 hover:text-ink hover:underline"
         >
-          {showStaffSignIn ? "Back to parent sign-in" : "School staff sign-in"}
+          {showStaffSignIn ? t("auth.backToParentSignIn") : t("auth.staffSignInLink")}
         </button>
         <LegalNotice className="mt-4" />
       </div>

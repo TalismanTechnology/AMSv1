@@ -19,11 +19,11 @@ import { SourcePanelProvider } from "./source-panel-context";
 import { ChatExport } from "./chat-export";
 import { AiConsentDialog } from "./ai-consent-dialog";
 import { isAiConsentError } from "@/lib/ai/consent";
-import { PARENT_AI_ERROR_MESSAGE } from "@/lib/ai/provider-errors";
 import { searchDocumentsByName } from "@/actions/documents";
 import { parseFollowUps } from "@/lib/chat-utils";
 import type { ChatSource, ChatMessage } from "@/lib/types";
 import type { ContactCardData } from "@/lib/contacts/directory";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 interface ChatInterfaceProps {
   /**
@@ -89,6 +89,13 @@ export function ChatInterface({
   useLayoutEffect(() => {
     sessionIdRef.current = sessionId;
   }, [sessionId]);
+  // The UI language, sent with each question as the server's fallback for
+  // the answer's language. A ref for the same reason as sessionIdRef.
+  const { locale, t } = useLocale();
+  const localeRef = useRef(locale);
+  useLayoutEffect(() => {
+    localeRef.current = locale;
+  }, [locale]);
 
   // Convert DB messages to UIMessage format for useChat hydration
   const hydratedMessages = useMemo(() => {
@@ -116,7 +123,11 @@ export function ChatInterface({
       // eslint-disable-next-line react-hooks/refs
       new DefaultChatTransport({
         api: "/api/chat",
-        body: () => ({ sessionId: sessionIdRef.current ?? null, schoolId }),
+        body: () => ({
+          sessionId: sessionIdRef.current ?? null,
+          schoolId,
+          locale: localeRef.current,
+        }),
       }),
     [schoolId]
   );
@@ -187,7 +198,7 @@ export function ChatInterface({
         parts: [
           {
             type: "text" as const,
-            text: `Searching for documents matching "${query}"...`,
+            text: t("chat.previewSearching", { query }),
           },
         ],
       },
@@ -204,7 +215,7 @@ export function ChatInterface({
                 parts: [
                   {
                     type: "text" as const,
-                    text: `No documents found matching "${query}".`,
+                    text: t("chat.previewNone", { query }),
                   },
                 ],
               }
@@ -231,7 +242,10 @@ export function ChatInterface({
               parts: [
                 {
                   type: "text" as const,
-                  text: `Found ${result.documents.length} document(s) matching "${query}":`,
+                  text: t("chat.previewFound", {
+                    count: result.documents.length,
+                    query,
+                  }),
                 },
                 { type: "data-sources" as const, data: previewSources },
               ],
@@ -368,7 +382,7 @@ export function ChatInterface({
           {messages.length > 0 && (
             <div className="flex items-center justify-between px-4 py-2.5">
               <p className="truncate text-sm font-medium text-ink">
-                {heading || "Conversation"}
+                {heading || t("chat.conversation")}
               </p>
               <div className="flex shrink-0 items-center gap-1">
                 {onNewChat && (
@@ -379,7 +393,7 @@ export function ChatInterface({
                     className="text-muted-foreground md:hidden"
                   >
                     <SquarePen className="size-4" />
-                    New chat
+                    {t("chat.newChat")}
                   </Button>
                 )}
                 <ChatExport
@@ -455,15 +469,14 @@ export function ChatInterface({
               )}
               {consentError && !consentDialogOpen && (
                 <div className="rounded-xl border border-border bg-muted/40 px-5 py-4 text-sm leading-relaxed text-ink-soft">
-                  To get answers, agree to AI processing — send your question
-                  again to see the notice.
+                  {t("chat.consentNotice")}
                 </div>
               )}
               {((error && !consentError) || sendError) && (
                 <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-5 py-4 text-sm leading-relaxed text-destructive">
                   {/* Never the error's own text: it can be the AI provider's
                       (billing, quota…) or a server message. */}
-                  {PARENT_AI_ERROR_MESSAGE}
+                  {t("chat.errorUnavailable")}
                 </div>
               )}
             </div>
@@ -480,7 +493,7 @@ export function ChatInterface({
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={onKeyDown}
-                placeholder="Ask a question about your school…"
+                placeholder={t("chat.inputPlaceholder")}
                 rows={1}
                 className="min-h-[36px] resize-none border-0 bg-transparent px-0 py-1.5 text-ink shadow-none placeholder:text-muted-foreground focus-visible:border-transparent focus-visible:ring-0"
                 disabled={isLoading}
@@ -490,7 +503,7 @@ export function ChatInterface({
                 size="icon"
                 disabled={isLoading || !input.trim()}
                 aria-busy={isLoading}
-                aria-label={isLoading ? "Sending…" : "Send"}
+                aria-label={isLoading ? t("chat.sending") : t("chat.send")}
                 className="size-9 shrink-0 rounded-full bg-primary text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
               >
                 {isLoading ? <LogoSpinner /> : <Send className="size-4" />}
