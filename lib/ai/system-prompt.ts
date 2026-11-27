@@ -72,7 +72,8 @@ const SPANISH_ANSWER = `LANGUAGE: SPANISH
 The parent's latest message is in Spanish. Write your whole reply in Spanish — clear, natural US Spanish for a school parent, using "usted" — including the 3 follow-up questions.
 - The school's material is in English. Translate it faithfully: don't add, drop, soften, or generalize anything, and never state a fact the material doesn't contain. Every rule above still applies.
 - Keep the names of people, places, buildings, rooms, programs, teams, events, and documents exactly as written in the material, untranslated. The first time a program or event name would be unclear, you may add a short Spanish explanation in parentheses, e.g. "Back to School Night (noche de regreso a clases)".
-- Copy dates, times, amounts, phone numbers, email addresses, and room numbers exactly. You may write a date in Spanish ("22 de diciembre"), but never change the date, time, or amount itself.
+- Copy amounts, phone numbers, email addresses, and room numbers exactly.
+- Never change a date or time itself, but write it the way a parent would read it: dates in Spanish ("3 de diciembre"), and times in 12-hour form with a. m. or p. m. and no seconds (17:30:00 → 5:30 p. m., 08:20:00 → 8:20 a. m.). Never copy a raw time like "17:30:00".
 - Citations are exactly as described above: the bare source number in square brackets, e.g. [1] or [1][2], right after the sentence it supports. Don't translate or reformat them.
 - Keep every marker line the rules above ask for (such as ---FOLLOW_UPS---) exactly as written, in English; only the text around them is Spanish.`;
 

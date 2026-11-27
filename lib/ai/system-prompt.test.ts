@@ -191,7 +191,14 @@ test("a Spanish question adds the Spanish instructions at the end only", () => {
   assert.match(tail, /usted/);
   assert.match(tail, /never state a fact the material doesn't contain/);
   assert.match(tail, /names of people, places, buildings, rooms, programs/);
-  assert.match(tail, /dates, times, amounts/);
+  assert.match(tail, /amounts, phone numbers, email addresses, and room numbers exactly/);
+  // Times read naturally (no seconds), but the value itself never changes.
+  assert.match(tail, /Never change a date or time itself/);
+  assert.match(tail, /no seconds/);
+  assert.match(tail, /17:30:00 → 5:30 p\. m\./);
+  assert.match(tail, /08:20:00 → 8:20 a\. m\./);
+  assert.match(tail, /"3 de diciembre"/);
+  assert.doesNotMatch(tail, /Copy dates, times/);
   assert.match(tail, /\[1\] or \[1\]\[2\]/);
   assert.match(tail, /---FOLLOW_UPS---/);
   const stable = english.slice(0, english.indexOf("</announcements>"));
